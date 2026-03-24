@@ -854,6 +854,9 @@
             const tagNonVpc = config.tagNonVpcServices;
 
             const linkedAccountIds = isCentral ? (config.linkedAccounts || []).map(a => a.id) : [];
+            const scopedAccountIdsJson = (config.stacksetAccounts && config.stacksetAccounts.length > 0)
+                ? JSON.stringify(config.stacksetAccounts.map(a => a.id))
+                : '["ALL"]';
 
             const crossAccountPermission = isCentral ? `
               - Sid: CrossAccountAssumeRole
@@ -928,12 +931,7 @@ Parameters:
   ScopedVpcIds:
     Type: String
     Default: '${config.scopedVpcIds.join(',')}'
-  ScopedAccountIds:
-    Type: String
-    Default: 'ALL'
-
 Conditions:
-  IsAccountAll: !Equals [!Ref ScopedAccountIds, 'ALL']
   IsVpcNone: !Equals [!Ref ScopedVpcIds, 'NONE']
 
 Resources:
@@ -950,12 +948,11 @@ Resources:
             "agreement_start_date": "${config.agreementDate}",
             "agreement_end_date": "${config.agreementEndDate}",
             "scope_mode": "${scopeMode}",
-            "scoped_account_ids": \${AccountIds},
+            "scoped_account_ids": ${scopedAccountIdsJson},
             "scoped_vpc_ids": \${VpcIds},
             "tag_non_vpc_services": ${tagNonVpc}
           }
-        - AccountIds: !If [IsAccountAll, '["ALL"]', !Sub '["$\{ScopedAccountIds}"]']
-          VpcIds: !If [IsVpcNone, '[]', !Sub '["$\{ScopedVpcIds}"]']
+        - VpcIds: !If [IsVpcNone, '[]', !Sub '["$\{ScopedVpcIds}"]']
 
   AutoTaggerRole:
     Type: AWS::IAM::Role
@@ -1588,7 +1585,6 @@ Resources:
                               {'ParameterKey':'AgreementStartDate','ParameterValue':props['AgreementStartDate']},
                               {'ParameterKey':'AgreementEndDate','ParameterValue':props['AgreementEndDate']},
                               {'ParameterKey':'ScopeMode','ParameterValue':'account'},
-                              {'ParameterKey':'ScopedAccountIds','ParameterValue':'ALL'},
                               {'ParameterKey':'ScopedVpcIds','ParameterValue':'NONE'},
                           ],
                           Capabilities=['CAPABILITY_NAMED_IAM'],
