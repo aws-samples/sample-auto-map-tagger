@@ -229,6 +229,11 @@
                     <label>Customer Name <span class="hint">(for your reference — not included in template)</span></label>
                     <input type="text" id="customerName" placeholder="e.g., Acme Corp">
                 </div>
+                <div class="form-group">
+                    <label>Alert Email <span class="hint">(optional — customer ops team email)</span></label>
+                    <input type="email" id="alertEmail" placeholder="e.g., ops@customer.com">
+                    <div class="hint" style="margin-top: 4px;">Receives tagging failure alerts. Customer must confirm the AWS subscription email after deployment.</div>
+                </div>
             </div>
 
             <div class="card">
@@ -591,6 +596,7 @@
                 mpeId: document.getElementById('mpeId').value.trim(),
                 agreementDate: document.getElementById('agreementDate').value,
                 agreementEndDate: document.getElementById('agreementEndDate').value,
+                alertEmail: document.getElementById('alertEmail').value.trim(),
                 customerName: document.getElementById('customerName').value.trim(),
                 deployMode,
                 scopeMode: useVpcScope ? 'vpc' : 'account',
@@ -643,6 +649,7 @@
                 ['MAP Engagement ID', config.mpeId],
                 ['Agreement Start Date', config.agreementDate],
                 ['Agreement End Date', config.agreementEndDate],
+                ['Alert Email', config.alertEmail || '(none)'],
                 ['Deployment Mode', config.deployMode === 'single' ? 'Single Account' : 'Multiple Accounts'],
             ];
 
@@ -861,6 +868,7 @@
             const scopedVpcIdsJson = (config.scopedVpcIds && config.scopedVpcIds.length > 0 && config.scopedVpcIds[0] !== 'NONE')
                 ? JSON.stringify(config.scopedVpcIds)
                 : '[]';
+            const alertEmail = config.alertEmail || '';
 
             const crossAccountPermission = isCentral ? `
               - Sid: CrossAccountAssumeRole
@@ -932,6 +940,13 @@ Parameters:
     Type: String
     Default: '${scopeMode}'
     AllowedValues: [account, vpc]
+  AlertEmail:
+    Type: String
+    Default: '${alertEmail}'
+    Description: Customer ops email for tagging failure alerts (leave empty to disable)
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
 
 Resources:
 
@@ -1295,8 +1310,16 @@ ${eventNamesList}
   AlertTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: map-auto-tagger-alerts
+      TopicName: auto-map-tagger-alerts
       DisplayName: MAP 2.0 Auto-Tagger Alerts
+
+  AlertSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
 
   TaggerErrorAlarm:
     Type: AWS::CloudWatch::Alarm
