@@ -473,6 +473,7 @@
             document.getElementById('opt-multi').classList.toggle('selected', mode === 'multi');
             document.getElementById('multi-account-options').classList.toggle('hidden', mode === 'single');
             document.getElementById('prereq-multi').style.display = mode === 'multi' ? 'block' : 'none';
+            document.getElementById('vpc-scope-card').style.display = mode === 'multi' ? 'none' : '';
         }
 
         function selectEventMode(mode) {
@@ -857,6 +858,9 @@
             const scopedAccountIdsJson = (config.stacksetAccounts && config.stacksetAccounts.length > 0)
                 ? JSON.stringify(config.stacksetAccounts.map(a => a.id))
                 : '["ALL"]';
+            const scopedVpcIdsJson = (config.scopedVpcIds && config.scopedVpcIds.length > 0 && config.scopedVpcIds[0] !== 'NONE')
+                ? JSON.stringify(config.scopedVpcIds)
+                : '[]';
 
             const crossAccountPermission = isCentral ? `
               - Sid: CrossAccountAssumeRole
@@ -928,11 +932,6 @@ Parameters:
     Type: String
     Default: '${scopeMode}'
     AllowedValues: [account, vpc]
-  ScopedVpcIds:
-    Type: String
-    Default: '${config.scopedVpcIds.join(',')}'
-Conditions:
-  IsVpcNone: !Equals [!Ref ScopedVpcIds, 'NONE']
 
 Resources:
 
@@ -941,18 +940,16 @@ Resources:
     Properties:
       Name: /auto-map-tagger/config
       Type: String
-      Value: !Sub
-        - |
+      Value: |
           {
             "mpe_id": "${mpe}",
             "agreement_start_date": "${config.agreementDate}",
             "agreement_end_date": "${config.agreementEndDate}",
             "scope_mode": "${scopeMode}",
             "scoped_account_ids": ${scopedAccountIdsJson},
-            "scoped_vpc_ids": \${VpcIds},
+            "scoped_vpc_ids": ${scopedVpcIdsJson},
             "tag_non_vpc_services": ${tagNonVpc}
           }
-        - VpcIds: !If [IsVpcNone, '[]', !Sub '["$\{ScopedVpcIds}"]']
 
   AutoTaggerRole:
     Type: AWS::IAM::Role
@@ -1036,11 +1033,40 @@ ${crossAccountCode}
               end = datetime.strptime(config['agreement_end_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
               return start <= now <= end
 
-          def is_in_scope(config, account_id):
-              scoped = config.get('scoped_account_ids', ['ALL'])
-              if isinstance(scoped, str):
-                  scoped = [s.strip() for s in scoped.split(',')]
-              return 'ALL' in scoped or account_id in scoped
+          def is_in_scope(config, account_id, detail):
+              mode = config.get('scope_mode', 'account')
+              if mode == 'account':
+                  scoped = config.get('scoped_account_ids', ['ALL'])
+                  if isinstance(scoped, str):
+                      scoped = [s.strip() for s in scoped.split(',')]
+                  return 'ALL' in scoped or account_id in scoped
+              if mode == 'vpc':
+                  scoped_vpcs = config.get('scoped_vpc_ids', [])
+                  if isinstance(scoped_vpcs, str):
+                      scoped_vpcs = [s.strip() for s in scoped_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
+                  vpc_id = None
+                  if 'instanceId' in detail:
+                      try:
+                          resp = ec2.describe_instances(InstanceIds=[detail['instanceId']])
+                          vpc_id = resp['Reservations'][0]['Instances'][0].get('VpcId')
+                      except: pass
+                  elif 'vpcId' in detail:
+                      vpc_id = detail['vpcId']
+                  elif 'volumeId' in detail:
+                      try:
+                          resp = ec2.describe_volumes(VolumeIds=[detail['volumeId']])
+                          attachments = resp['Volumes'][0].get('Attachments', [])
+                          if attachments:
+                              inst_id = attachments[0]['InstanceId']
+                              resp2 = ec2.describe_instances(InstanceIds=[inst_id])
+                              vpc_id = resp2['Reservations'][0]['Instances'][0].get('VpcId')
+                      except: pass
+                  if vpc_id and vpc_id in scoped_vpcs:
+                      return True
+                  if vpc_id is None:
+                      return bool(config.get('tag_non_vpc_services', True))
+                  return False
+              return False
 
           def handler(event, context):
               config = get_config()
@@ -1051,7 +1077,7 @@ ${crossAccountCode}
                   return {'status': 'skipped', 'reason': 'event_error'}
               account_id = detail.get('recipientAccountId', event.get('account', ''))
               region = event.get('region', detail.get('awsRegion', os.environ.get('AWS_REGION', '')))
-              if not is_in_scope(config, account_id):
+              if not is_in_scope(config, account_id, detail):
                   return {'status': 'skipped', 'reason': 'out_of_scope'}
               event_name = detail.get('eventName', '')
               SKIP = ['CreateGrant','CreateLogStream','CreateTags','CreateOrUpdateTags','ModifyTags','DeleteTags',
@@ -1585,7 +1611,6 @@ Resources:
                               {'ParameterKey':'AgreementStartDate','ParameterValue':props['AgreementStartDate']},
                               {'ParameterKey':'AgreementEndDate','ParameterValue':props['AgreementEndDate']},
                               {'ParameterKey':'ScopeMode','ParameterValue':'account'},
-                              {'ParameterKey':'ScopedVpcIds','ParameterValue':'NONE'},
                           ],
                           Capabilities=['CAPABILITY_NAMED_IAM'],
                           PermissionModel='SERVICE_MANAGED',
