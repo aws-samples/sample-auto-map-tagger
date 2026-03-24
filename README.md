@@ -309,6 +309,6 @@ aws logs filter-log-events \
 
 ---
 
-*MAP 2.0 Auto-Tagger — v18 (AppSec hardening)*
+*MAP 2.0 Auto-Tagger — v19 (configurator improvements)*
 *190+ Resource Types | 79+ Bugs Fixed | CT Org Validated (4 accounts × 4 regions)*
 *Status: PRODUCTION READY ✅*
