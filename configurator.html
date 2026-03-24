@@ -49,7 +49,7 @@
         .form-group { margin-bottom: 16px; }
         label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
         label .hint { font-weight: 400; color: #687078; font-size: 12px; }
-        input[type="text"], input[type="date"], select {
+        input[type="text"], input[type="date"], input[type="email"], select {
             width: 100%;
             padding: 8px 12px;
             font-size: 14px;
@@ -195,6 +195,11 @@
                 <p class="subtitle">Enter the MAP agreement details from AWS Investments</p>
 
                 <div class="form-group">
+                    <label>Customer Name <span class="hint">(used for filename generation only)</span></label>
+                    <input type="text" id="customerName" placeholder="e.g., Acme Corp">
+                </div>
+
+                <div class="form-group">
                     <label>MAP 2.0 Tag Value <span class="hint">(ex. migA1B2C3D4E5)</span></label>
                     <input type="text" id="mpeId" placeholder="migA1B2C3D4E5">
                     <div class="error-msg" id="mpeId-error">MAP Engagement ID must start with 'mig' followed by alphanumeric characters</div>
@@ -212,12 +217,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Customer Name <span class="hint">(for your reference — not included in template)</span></label>
-                    <input type="text" id="customerName" placeholder="e.g., Acme Corp">
-                </div>
-                <div class="form-group">
                     <label>Alert Email <span class="hint">(optional — email to receive tagging failure alerts, ex. customer ops team)</span></label>
-                    <input type="email" id="alertEmail" placeholder="e.g., ops@customer.com" style="width: 100%; max-width: 480px;">
+                    <input type="email" id="alertEmail" placeholder="e.g., ops@customer.com">
                     <div class="hint" style="margin-top: 4px;">Customer must confirm the AWS subscription email after deployment.</div>
                 </div>
             </div>
