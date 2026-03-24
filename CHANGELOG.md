@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v19.1] - 2026-03-25
+
+### Fixed (configurator.html + map2-auto-tagger-optimized.yaml) — E2E test findings
+
+**Configurator-generated template bugs:**
+- EventBridge rule exceeded 2048 char limit (explicit event list) → switched to prefix matching (`Create*`, `Run*`, `Put*`, etc.)
+- `scoped_account_ids` stored as `["111,222"]` instead of `["111","222"]` → fixed JSON embedding
+- VPC scope: `RunInstances` VPC ID not extracted (nested in `responseElements.instancesSet.items[0].vpcId`) → added nested lookup
+- `ssm:GetParameters` (plural) permission missing → added to `MinimalReads` IAM Sid
+- Lambda tried to tag its own config SSM parameter → added skip for `CONFIG_PARAM`
+- `cloudformation:ListStackSetOperations` missing from deploy role → added
+- SERVICE_MANAGED StackSet `Accounts` targeting not supported by AWS (hard constraint) → always use root OU; account filtering via Lambda `scoped_account_ids` config
+- 15+ ARN field names missing from `ARN_FIELDS` (fileSystemArn, repositoryArn, etc.) → synced with standalone YAML
+- Transit Gateway: CloudTrail response sometimes wraps in `CreateTransitGatewayResponse` → added fallback
+- Glue Database, Workflow, Crawler, Trigger: no ARN construction → added handlers
+- API Gateway REST: `apigateway:PATCH` permission missing → added
+- ALB, NLB: ARN in `resp.loadBalancers[0]` (list) not scanned → added `CreateLoadBalancer` handler
+- CodeDeploy App, Athena Workgroup, Glue Job, CodeArtifact Domain: no ARN construction → added handlers
+- ENI (CreateNetworkInterface): nested response structure → added handler
+- Deploy Lambda race condition (`OperationInProgressException`) → added wait loop for in-progress operations
+
+**Both templates:**
+- VPC scope: `RunInstances` VPC detection fixed (same bug in standalone YAML)
+
+---
+
 ## [v19] - 2026-03-24
 
 ### Added (configurator.html)
