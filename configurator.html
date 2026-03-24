@@ -1321,10 +1321,35 @@ ${crossAccountCode}
                   elif event_name in ['CreateDeliveryStream']:
                       n = req.get('deliveryStreamName')
                       arn = f"arn:{p}:firehose:{region}:{account_id}:deliverystream/{n}" if n else None
+                  elif event_name == 'CreateLoadBalancer':
+                      lbs = resp.get('loadBalancers', [])
+                      if lbs: arn = lbs[0].get('loadBalancerArn')
+                  elif event_name == 'CreateTargetGroup':
+                      tgs = resp.get('targetGroups', [])
+                      if tgs: arn = tgs[0].get('targetGroupArn')
+                  elif event_name == 'CreateApplication' and detail.get('eventSource') == 'codedeploy.amazonaws.com':
+                      n = req.get('applicationName')
+                      arn = f"arn:{p}:codedeploy:{region}:{account_id}:application:{n}" if n else None
+                  elif event_name == 'CreateWorkGroup':
+                      n = req.get('name') or req.get('workGroup', {}).get('name') or req.get('Name')
+                      arn = f"arn:{p}:athena:{region}:{account_id}:workgroup/{n}" if n else None
+                  elif event_name == 'CreateJob' and detail.get('eventSource') == 'glue.amazonaws.com':
+                      n = req.get('name') or req.get('jobName') or req.get('Name')
+                      arn = f"arn:{p}:glue:{region}:{account_id}:job/{n}" if n else None
+                  elif event_name == 'CreateDomain' and detail.get('eventSource') == 'codeartifact.amazonaws.com':
+                      n = req.get('domain')
+                      arn = f"arn:{p}:codeartifact:{region}:{account_id}:domain/{n}" if n else None
+                  elif event_name == 'CreateRepository' and detail.get('eventSource') == 'codeartifact.amazonaws.com':
+                      domain = req.get('domain'); repo = req.get('repository')
+                      arn = f"arn:{p}:codeartifact:{region}:{account_id}:repository/{domain}/{repo}" if domain and repo else None
                   elif event_name in ['CreateRestApi', 'CreateApi']:
                       api_id = resp.get('id') or resp.get('apiId')
                       api_type = 'restapis' if event_name == 'CreateRestApi' else 'apis'
                       arn = f"arn:{p}:apigateway:{region}::/{api_type}/{api_id}" if api_id else None
+                  elif event_name == 'CreateNetworkInterface':
+                      eni = resp.get('networkInterface', {})
+                      eni_id = eni.get('networkInterfaceId')
+                      arn = f"arn:{p}:ec2:{region}:{account_id}:network-interface/{eni_id}" if eni_id else None
                   elif event_name == 'CreateDatabase' and detail.get('eventSource') == 'glue.amazonaws.com':
                       db_name = req.get('databaseInput', {}).get('name')
                       arn = f"arn:{p}:glue:{region}:{account_id}:database/{db_name}" if db_name else None
