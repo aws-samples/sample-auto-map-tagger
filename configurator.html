@@ -2033,20 +2033,24 @@ echo "  aws cloudformation list-stack-instances --stack-set-name map-auto-tagger
 
         function downloadFile(type) {
             const { config, mainTemplate, perAccountTemplate, deployScript } = window._generated;
+            const customerSlug = config.customerName
+                ? config.customerName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+                : '';
+            const fileId = customerSlug ? `${customerSlug}-${config.mpeId}` : config.mpeId;
             let content, filename, mime;
             if (type === 'script') {
                 content = deployScript;
-                filename = 'deploy.sh';
+                filename = `deploy-${fileId}.sh`;
                 mime = 'text/x-sh';
             } else if (type === 'org') {
                 content = mainTemplate;
-                filename = `map-auto-tagger-org-${config.mpeId}.yaml`;
+                filename = `map-auto-tagger-org-${fileId}.yaml`;
             } else if (type === 'accounts') {
                 content = perAccountTemplate;
-                filename = `map-auto-tagger-accounts-${config.mpeId}.yaml`;
+                filename = `map-auto-tagger-accounts-${fileId}.yaml`;
             } else {
                 content = mainTemplate;
-                filename = `map-auto-tagger-${config.mpeId}.yaml`;
+                filename = `map-auto-tagger-${fileId}.yaml`;
             }
             const blob = new Blob([content], { type: mime || 'text/yaml' });
             const url = URL.createObjectURL(blob);
