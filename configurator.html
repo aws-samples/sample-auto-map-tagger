@@ -217,7 +217,12 @@
                 <div class="form-group">
                     <label>Agreement Start Date</label>
                     <input type="date" id="agreementDate">
-                    <div class="error-msg" id="agreementDate-error">Agreement date is required</div>
+                    <div class="error-msg" id="agreementDate-error">Agreement start date is required</div>
+                </div>
+                <div class="form-group">
+                    <label>Agreement End Date</label>
+                    <input type="date" id="agreementEndDate">
+                    <div class="error-msg" id="agreementEndDate-error">Agreement end date is required and must be after start date</div>
                 </div>
 
                 <div class="form-group">
@@ -562,6 +567,16 @@
                 document.getElementById('agreementDate-error').style.display = 'none';
             }
 
+            const endDate = document.getElementById('agreementEndDate').value;
+            if (!endDate || endDate <= date) {
+                document.getElementById('agreementEndDate').classList.add('error');
+                document.getElementById('agreementEndDate-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('agreementEndDate').classList.remove('error');
+                document.getElementById('agreementEndDate-error').style.display = 'none';
+            }
+
             return valid;
         }
 
@@ -574,6 +589,7 @@
             const config = {
                 mpeId: document.getElementById('mpeId').value.trim(),
                 agreementDate: document.getElementById('agreementDate').value,
+                agreementEndDate: document.getElementById('agreementEndDate').value,
                 customerName: document.getElementById('customerName').value.trim(),
                 deployMode,
                 scopeMode: useVpcScope ? 'vpc' : 'account',
@@ -625,6 +641,7 @@
                 ['Customer', config.customerName || '(not specified)'],
                 ['MAP Engagement ID', config.mpeId],
                 ['Agreement Start Date', config.agreementDate],
+                ['Agreement End Date', config.agreementEndDate],
                 ['Deployment Mode', config.deployMode === 'single' ? 'Single Account' : 'Multiple Accounts'],
             ];
 
@@ -899,6 +916,11 @@ Parameters:
     Default: '${config.agreementDate}'
     AllowedPattern: ^\\d{4}-\\d{2}-\\d{2}$
     Description: MAP agreement start date (YYYY-MM-DD)
+  AgreementEndDate:
+    Type: String
+    Default: '${config.agreementEndDate}'
+    AllowedPattern: ^\\d{4}-\\d{2}-\\d{2}$
+    Description: MAP agreement end date (YYYY-MM-DD)
   ScopeMode:
     Type: String
     Default: '${scopeMode}'
@@ -926,6 +948,7 @@ Resources:
           {
             "mpe_id": "${mpe}",
             "agreement_start_date": "${config.agreementDate}",
+            "agreement_end_date": "${config.agreementEndDate}",
             "scope_mode": "${scopeMode}",
             "scoped_account_ids": \${AccountIds},
             "scoped_vpc_ids": \${VpcIds},
@@ -1010,9 +1033,11 @@ ${crossAccountCode}
                   _config = json.loads(resp['Parameter']['Value'])
               return _config
 
-          def is_after_agreement(config):
+          def is_within_agreement(config):
+              now = datetime.now(timezone.utc)
               start = datetime.strptime(config['agreement_start_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
-              return datetime.now(timezone.utc) >= start
+              end = datetime.strptime(config['agreement_end_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              return start <= now <= end
 
           def is_in_scope(config, account_id):
               scoped = config.get('scoped_account_ids', ['ALL'])
@@ -1022,8 +1047,8 @@ ${crossAccountCode}
 
           def handler(event, context):
               config = get_config()
-              if not is_after_agreement(config):
-                  return {'status': 'skipped', 'reason': 'before_agreement'}
+              if not is_within_agreement(config):
+                  return {'status': 'skipped', 'reason': 'outside_agreement_period'}
               detail = event.get('detail', {})
               if detail.get('errorCode') or detail.get('errorMessage'):
                   return {'status': 'skipped', 'reason': 'event_error'}
@@ -1445,6 +1470,10 @@ Parameters:
     Type: String
     Default: '${config.agreementDate}'
     Description: MAP agreement start date (YYYY-MM-DD)
+  AgreementEndDate:
+    Type: String
+    Default: '${config.agreementEndDate}'
+    Description: MAP agreement end date (YYYY-MM-DD)
   PerAccountTemplateURL:
     Type: String
     Description: S3 URL of map-auto-tagger-accounts-${mpe}.yaml
@@ -1557,6 +1586,7 @@ Resources:
                           Parameters=[
                               {'ParameterKey':'MpeId','ParameterValue':props['MpeId']},
                               {'ParameterKey':'AgreementStartDate','ParameterValue':props['AgreementStartDate']},
+                              {'ParameterKey':'AgreementEndDate','ParameterValue':props['AgreementEndDate']},
                               {'ParameterKey':'ScopeMode','ParameterValue':'account'},
                               {'ParameterKey':'ScopedAccountIds','ParameterValue':'ALL'},
                               {'ParameterKey':'ScopedVpcIds','ParameterValue':'NONE'},
@@ -1598,6 +1628,7 @@ Resources:
       TemplateURL: !Ref PerAccountTemplateURL
       MpeId: !Ref MpeId
       AgreementStartDate: !Ref AgreementStartDate
+      AgreementEndDate: !Ref AgreementEndDate
       Regions:
 ${regionsList}
 ${accountsNote}
