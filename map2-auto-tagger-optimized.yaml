@@ -367,13 +367,18 @@ Resources:
                   if isinstance(scoped_vpcs, str):
                       scoped_vpcs = [s.strip() for s in scoped_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
                   vpc_id = None
+                  resp_els = detail.get('responseElements') or {}
                   if 'instanceId' in detail:
                       try:
                           resp = ec2.describe_instances(InstanceIds=[detail['instanceId']])
                           vpc_id = resp['Reservations'][0]['Instances'][0].get('VpcId')
                       except: pass
+                  elif resp_els.get('instancesSet', {}).get('items'):
+                      vpc_id = resp_els['instancesSet']['items'][0].get('vpcId')
                   elif 'vpcId' in detail:
                       vpc_id = detail['vpcId']
+                  elif resp_els.get('vpcId'):
+                      vpc_id = resp_els['vpcId']
                   elif 'volumeId' in detail:
                       try:
                           resp = ec2.describe_volumes(VolumeIds=[detail['volumeId']])

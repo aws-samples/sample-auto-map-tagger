@@ -806,6 +806,7 @@
             // Integration
             'sns:TagResource','sqs:TagQueue','states:TagResource','events:TagResource',
             'pipes:TagResource','scheduler:TagResource','appsync:TagResource','apigateway:TagResource',
+            'apigateway:PUT','apigateway:PATCH',
             // Management & Monitoring
             'logs:TagResource','cloudwatch:TagResource','ssm:AddTagsToResource',
             'secretsmanager:TagResource','xray:TagResource','appconfig:TagResource',
@@ -1002,6 +1003,7 @@ ${permissionsList}
                   - ec2:DescribeInstances
                   - ec2:DescribeVolumes
                   - sts:GetCallerIdentity
+                  - ssm:GetParameters
                 Resource: '*'
               - Sid: ReadConfig
                 Effect: Allow
@@ -1066,13 +1068,20 @@ ${crossAccountCode}
                   if isinstance(scoped_vpcs, str):
                       scoped_vpcs = [s.strip() for s in scoped_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
                   vpc_id = None
+                  resp_els = detail.get('responseElements') or {}
+                  req_params = detail.get('requestParameters') or {}
                   if 'instanceId' in detail:
                       try:
                           resp = ec2.describe_instances(InstanceIds=[detail['instanceId']])
                           vpc_id = resp['Reservations'][0]['Instances'][0].get('VpcId')
                       except: pass
+                  elif resp_els.get('instancesSet', {}).get('items'):
+                      # RunInstances — vpcId is in responseElements.instancesSet.items[0]
+                      vpc_id = resp_els['instancesSet']['items'][0].get('vpcId')
                   elif 'vpcId' in detail:
                       vpc_id = detail['vpcId']
+                  elif resp_els.get('vpcId'):
+                      vpc_id = resp_els['vpcId']
                   elif 'volumeId' in detail:
                       try:
                           resp = ec2.describe_volumes(VolumeIds=[detail['volumeId']])
@@ -1196,6 +1205,11 @@ ${crossAccountCode}
               if event_name in SKIP:
                   return {'status': 'skipped', 'reason': 'non_taggable'}
 
+              # Skip our own config parameter
+              req_param = (detail.get('requestParameters') or {}).get('name', '')
+              if req_param == os.environ.get('CONFIG_PARAM', ''):
+                  return {'status': 'skipped', 'reason': 'config_param'}
+
               # Determine if cross-account tagging needed
               local_account = boto3.client('sts').get_caller_identity()['Account']
               target_account = get_account_from_arn(
@@ -1221,11 +1235,17 @@ ${crossAccountCode}
                   'backupVaultArn','dBInstanceArn','dBClusterArn','queueArn','loadBalancerArn',
                   'eventBusArn','notebookInstanceArn','documentClassifierArn','applicationArn',
                   'ApplicationARN','backupPlanArn','locationArn','computeEnvironmentArn','appArn',
-                  'layerVersionArn','groupArn','activityArn','serviceArn','replicationGroupArn',
+                  'layerVersionArn','groupArn','groupARN','activityArn','serviceArn','replicationGroupArn',
                   'modelArn','endpointArn','endpointConfigArn','guardrailArn','agentArn',
                   'knowledgeBaseArn','flowArn','promptArn','inferenceProfileArn','namespaceArn',
                   'workgroupArn','firewallArn','firewallPolicyArn','addonArn','userPoolArn',
-                  'channelArn','acceleratorArn','jobArn','layerArn','pipeArn']
+                  'channelArn','acceleratorArn','jobArn','layerArn','pipeArn',
+                  'fileSystemArn','repositoryArn','registryArn','imageArn',
+                  'keyArn','policyArn','trainingJobArn','connectionArn',
+                  'nodeGroupArn','containerArn','aliasArn',
+                  'agentAliasArn','dataSourceArn','provisionedModelArn','promptVersionArn',
+                  'domainArn','featureGroupArn','studioLifecycleConfigArn',
+                  'ruleArn','recorderArn','deliveryChannelArn']
 
               for field in ARN_FIELDS:
                   if field in resp and resp[field] and str(resp[field]).startswith('arn:'):
@@ -1248,8 +1268,15 @@ ${crossAccountCode}
                   elif event_name == 'CreateQueue':
                       url = resp.get('queueUrl',''); parts = url.rstrip('/').split('/')
                       arn = f"arn:{p}:sqs:{region}:{account_id}:{parts[-1]}" if parts else None
+                  elif event_name == 'CreateTransitGateway':
+                      tgw = resp.get('transitGateway', {})
+                      if not tgw and 'CreateTransitGatewayResponse' in resp:
+                          tgw = resp['CreateTransitGatewayResponse'].get('transitGateway', {})
+                      tgw_id = tgw.get('transitGatewayId')
+                      if tgw_id:
+                          arn = f"arn:{p}:ec2:{region}:{account_id}:transit-gateway/{tgw_id}"
                   elif event_name in ['CreateVpc','CreateSubnet','CreateSecurityGroup','CreateRouteTable',
-                       'CreateInternetGateway','CreateNatGateway','CreateTransitGateway','CreateNetworkAcl',
+                       'CreateInternetGateway','CreateNatGateway','CreateNetworkAcl',
                        'CreateDhcpOptions','CreateVpcEndpoint','CreateCustomerGateway','CreateVpnGateway']:
                       obj_map = {'CreateVpc':'vpc.vpcId','CreateSubnet':'subnet.subnetId',
                           'CreateSecurityGroup':'groupId','CreateRouteTable':'routeTable.routeTableId',
@@ -1294,6 +1321,13 @@ ${crossAccountCode}
                   elif event_name in ['CreateDeliveryStream']:
                       n = req.get('deliveryStreamName')
                       arn = f"arn:{p}:firehose:{region}:{account_id}:deliverystream/{n}" if n else None
+                  elif event_name in ['CreateRestApi', 'CreateApi']:
+                      api_id = resp.get('id') or resp.get('apiId')
+                      api_type = 'restapis' if event_name == 'CreateRestApi' else 'apis'
+                      arn = f"arn:{p}:apigateway:{region}::/{api_type}/{api_id}" if api_id else None
+                  elif event_name == 'CreateDatabase' and detail.get('eventSource') == 'glue.amazonaws.com':
+                      db_name = req.get('databaseInput', {}).get('name')
+                      arn = f"arn:{p}:glue:{region}:{account_id}:database/{db_name}" if db_name else None
 
               if not arn:
                   print(f'No ARN found for {event_name}')
@@ -1385,7 +1419,18 @@ ${crossAccountCode}
           - AWS API Call via CloudTrail
         detail:
           eventName:
-${eventNamesList}
+            - prefix: "Create"
+            - prefix: "Run"
+            - prefix: "Activate"
+            - prefix: "Register"
+            - prefix: "Put"
+            - prefix: "Issue"
+            - prefix: "Start"
+            - prefix: "Request"
+            - prefix: "Allocate"
+            - prefix: "Launch"
+            - prefix: "Import"
+            - prefix: "Publish"
       Targets:
         - Arn: !GetAtt AutoTaggerFunction.Arn
           Id: MapAutoTagger
@@ -1611,10 +1656,9 @@ it deploys one Lambda per account with zero cross-account complexity.`;
             const accounts = (config.stacksetAccounts || []);
             const regions = (config.regions || ['ap-northeast-2']);
             const regionsList = regions.map(r => `        - ${r}`).join('\n');
-            const accountIdsCsv = accounts.map(a => a.id).join(',');
             const accountsNote = accounts.length > 0
-                ? `      AccountIds: '${accountIdsCsv}'  # Specific accounts: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ')}`
-                : `      AccountIds: ''  # Empty = deploy to all accounts in the organization`;
+                ? `      # Lambda deployed to all org accounts. Tagging scoped to: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ')}`
+                : `      # Lambda deployed to all org accounts. Tagging applies to all accounts.`;
 
             return `AWSTemplateFormatVersion: '2010-09-09'
 Description: >
@@ -1666,6 +1710,7 @@ Resources:
                   - cloudformation:CreateStackInstances
                   - cloudformation:DeleteStackInstances
                   - cloudformation:DescribeStackSetOperation
+                  - cloudformation:ListStackSetOperations
                   - cloudformation:ListStackInstances
                   - s3:GetObject
                   - logs:CreateLogGroup
@@ -1700,15 +1745,10 @@ Resources:
               stackset_name = props['StackSetName']
               if event['RequestType'] == 'Delete':
                   try:
-                      acct_ids = [a for a in props.get('AccountIds', '').split(',') if a.strip()]
-                      if acct_ids:
-                          del_targets = {'Accounts': acct_ids}
-                      else:
-                          org = boto3.client('organizations', region_name='us-east-1')
-                          root_id = org.list_roots()['Roots'][0]['Id']
-                          del_targets = {'OrganizationalUnitIds': [root_id]}
+                      org = boto3.client('organizations', region_name='us-east-1')
+                      root_id = org.list_roots()['Roots'][0]['Id']
                       cf.delete_stack_instances(StackSetName=stackset_name,
-                          DeploymentTargets=del_targets,
+                          DeploymentTargets={'OrganizationalUnitIds': [root_id]},
                           Regions=props.get('Regions', ['ap-northeast-2']),
                           RetainStacks=False)
                       time.sleep(90)
@@ -1718,21 +1758,17 @@ Resources:
                   respond(event, context, 'SUCCESS')
                   return
               try:
-                  acct_ids = [a for a in props.get('AccountIds', '').split(',') if a.strip()]
-                  if acct_ids:
-                      targets = {'Accounts': acct_ids}
-                      root_id = 'N/A'
-                      print('Targeting specific accounts:', acct_ids)
-                  else:
-                      org = boto3.client('organizations', region_name='us-east-1')
-                      try:
-                          org.enable_aws_service_access(ServicePrincipal='stacksets.cloudformation.amazonaws.com')
-                          print('StackSets service access enabled')
-                      except Exception as e:
-                          print('Service access already enabled or skipped:', e)
-                      root_id = org.list_roots()['Roots'][0]['Id']
-                      print('Root OU:', root_id)
-                      targets = {'OrganizationalUnitIds': [root_id]}
+                  org = boto3.client('organizations', region_name='us-east-1')
+                  try:
+                      org.enable_aws_service_access(ServicePrincipal='stacksets.cloudformation.amazonaws.com')
+                      print('StackSets service access enabled')
+                  except Exception as e:
+                      print('Service access already enabled or skipped:', e)
+                  root_id = org.list_roots()['Roots'][0]['Id']
+                  print('Root OU:', root_id)
+                  # StackSet deploys Lambda to all org accounts.
+                  # Account-level filtering is handled by scoped_account_ids in Lambda config.
+                  targets = {'OrganizationalUnitIds': [root_id]}
                   s3 = boto3.client('s3')
                   url = props['TemplateURL']
                   bkt = url.split('.s3.')[0].replace('https://','')
@@ -1755,7 +1791,12 @@ Resources:
                           AutoDeployment={'Enabled': False})
                       print('StackSet created')
                   except cf.exceptions.NameAlreadyExistsException:
-                      print('StackSet exists')
+                      print('StackSet exists — waiting for any in-progress operations...')
+                      for _ in range(30):
+                          ops = cf.list_stack_set_operations(StackSetName=stackset_name, MaxResults=1).get('Summaries', [])
+                          if not ops or ops[0]['Status'] not in ('RUNNING', 'STOPPING'):
+                              break
+                          time.sleep(10)
                   op = cf.create_stack_instances(StackSetName=stackset_name,
                       DeploymentTargets=targets,
                       Regions=props.get('Regions', ['ap-northeast-2']))
