@@ -23,8 +23,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Removed `ScopedAccountIds` and `ScopedVpcIds` CF parameters and `IsAccountAll`/`IsVpcNone` conditions (no longer needed)
 
 ### Changed (configurator.html)
-- Prerequisite checkboxes replaced with a disclaimer info box — preflight checks in `deploy.sh` now enforce requirements at runtime
-- `configurator.html` marked as internal AWS BD tool only — not for customer use
+- Prerequisite checkboxes replaced with red disclaimer info box, moved to Step 3 (Download)
+- MAP Engagement ID label → "MAP 2.0 Tag Value (ex. migA1B2C3D4E5)"
+- Agreement start/end dates have descriptive hints
+- Customer Name moved to first field, hint "(used for filename generation only)"
+- Customer Name + MPE ID used in downloaded filenames (e.g. `deploy-acme-corp-migA1B2.sh`)
+- Alert email input full-width, hint text updated
+- VPC scope moved inside deployment mode card as collapsible (Single Account only)
+- Non-VPC services checkbox moved to top of VPC scope section for visibility
+- Email input height fixed (added `input[type="email"]` to CSS selector)
+- `configurator.html` marked as internal AWS BD tool only — excluded from public distribution via `.gitattributes`
 
 ---
 
