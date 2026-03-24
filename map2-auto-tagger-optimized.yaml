@@ -1,0 +1,1815 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  MAP 2.0 Auto-Tagger v18 - Automatically tags newly created AWS resources with the
+  map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
+  across all major AWS services. Deploy once; tagging happens automatically within
+  60-90 seconds of resource creation. v18: AppSec hardening - removed cross-account
+  AssumeRole, removed discontinued service permissions, added security justification
+  comments, added threat model.
+
+Parameters:
+  MpeId:
+    Type: String
+    Description: MAP 2.0 Migration Program Engagement ID (e.g., mig1234567890)
+    AllowedPattern: ^mig[a-zA-Z0-9]+$
+    ConstraintDescription: Must start with 'mig' followed by alphanumeric characters
+  AgreementStartDate:
+    Type: String
+    Description: MAP 2.0 agreement start date (YYYY-MM-DD)
+    AllowedPattern: ^\d{4}-\d{2}-\d{2}$
+  ScopeMode:
+    Type: String
+    Description: How to determine which resources to tag
+    Default: account
+    AllowedValues:
+      - account
+      - vpc
+  ScopedAccountIds:
+    Type: String
+    Description: >
+      Comma-separated AWS account IDs in MAP scope (used when ScopeMode=account).
+      Leave as 'ALL' to tag all resources in this account.
+    Default: ALL
+  ScopedVpcIds:
+    Type: String
+    Description: >
+      Comma-separated VPC IDs in MAP scope (used when ScopeMode=vpc).
+      Only resources in these VPCs will be tagged.
+    Default: NONE
+
+Conditions:
+  IsAccountAll: !Equals [!Ref ScopedAccountIds, 'ALL']
+  IsVpcNone: !Equals [!Ref ScopedVpcIds, 'NONE']
+
+Resources:
+
+  # SSM Parameter Store - single source of truth for config
+  MapConfig:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /map-tagger/config
+      Type: String
+      Description: MAP 2.0 Auto-Tagger configuration
+      Value: !Sub
+        - |
+          {
+            "mpe_id": "${MpeId}",
+            "agreement_start_date": "${AgreementStartDate}",
+            "scope_mode": "${ScopeMode}",
+            "scoped_account_ids": ${AccountIdsArray},
+            "scoped_vpc_ids": ${VpcIdsArray}
+          }
+        - AccountIdsArray: !If
+            - IsAccountAll
+            - '["ALL"]'
+            - !Sub '["${ScopedAccountIds}"]'
+          VpcIdsArray: !If
+            - IsVpcNone
+            - '[]'
+            - !Sub '["${ScopedVpcIds}"]'
+
+  # Lambda execution role
+  AutoTaggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'map-auto-tagger-role-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: map-auto-tagger-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: UniversalTagging
+                Effect: Allow
+                Action:
+                  - tag:TagResources
+                  - tag:GetResources
+                Resource: '*'
+              - Sid: ServiceSpecificTagging
+                Effect: Allow
+                Action:
+                  # --- Compute ---
+                  - ec2:CreateTags
+                  - autoscaling:CreateOrUpdateTags
+                  - ecs:TagResource
+                  - eks:TagResource
+                  - lambda:TagResource
+                  - batch:TagResource
+                  - apprunner:TagResource
+                  - lightsail:TagResource
+                  - elasticbeanstalk:AddTags
+                  - emr-serverless:TagResource
+                  - elasticmapreduce:AddTags
+                  # --- Storage ---
+                  - s3:PutBucketTagging
+                  - s3:GetBucketTagging
+                  - elasticfilesystem:TagResource
+                  - fsx:TagResource
+                  - ecr:TagResource
+                  - backup:TagResource
+                  # --- Database ---
+                  - rds:AddTagsToResource
+                  - dynamodb:TagResource
+                  - elasticache:AddTagsToResource
+                  - memorydb:TagResource
+                  - redshift:CreateTags
+                  - redshift-serverless:TagResource
+                  - es:AddTags
+                  - kafka:TagResource
+                  - dms:AddTagsToResource
+                  - cassandra:TagResource
+                  - mq:CreateTags
+                  # --- Networking ---
+                  - elasticloadbalancing:AddTags
+                  - globalaccelerator:TagResource
+                  - cloudfront:TagResource
+                  - route53:ChangeTagsForResource
+                  - network-firewall:TagResource
+                  - directconnect:TagResource
+                  - appmesh:TagResource
+                  # --- Analytics ---
+                  - kinesis:AddTagsToStream
+                  - firehose:TagDeliveryStream
+                  - kinesisanalytics:TagResource
+                  - glue:TagResource
+                  - glue:GetDatabase
+                  - databrew:TagResource
+                  - athena:TagResource
+                  # --- Integration ---
+                  - sns:TagResource
+                  - sqs:TagQueue
+                  - states:TagResource
+                  - events:TagResource
+                  - pipes:TagResource
+                  - scheduler:TagResource
+                  - appsync:TagResource
+                  # SECURITY NOTE: API Gateway v1 (REST APIs) tags via PUT /tags/{arn}.
+                  # AWS maps this to 'apigateway:PUT' — no narrower IAM action exists for v1 tagging.
+                  # Lambda code only calls tagging APIs; no other API GW mutation code paths exist.
+                  - apigateway:PUT
+                  # --- Management & Monitoring ---
+                  - logs:TagResource
+                  - cloudwatch:TagResource
+                  - ssm:AddTagsToResource
+                  - secretsmanager:TagResource
+                  - xray:TagResource
+                  - appconfig:TagResource
+                  - airflow:TagResource
+                  - servicediscovery:TagResource
+                  # --- Security & Identity ---
+                  - kms:TagResource
+                  - acm:AddTagsToCertificate
+                  - acm-pca:TagCertificateAuthority
+                  - wafv2:TagResource
+                  - guardduty:TagResource
+                  - macie2:TagResource
+                  - cognito-idp:TagResource
+                  - cognito-identity:TagResource
+                  - access-analyzer:TagResource
+                  - verifiedpermissions:TagResource
+                  - detective:TagResource
+                  - securityhub:TagResource
+                  - inspector2:TagResource
+                  - cleanrooms:TagResource
+                  # --- Developer Tools ---
+                  - codecommit:TagResource
+                  - codedeploy:TagResource
+                  - codepipeline:TagResource
+                  - amplify:TagResource
+                  - cloud9:TagResource
+                  - codeartifact:TagResource
+                  - codeguru-profiler:TagResource
+                  # SECURITY NOTE: CodeBuild has no standalone TagResource IAM action.
+                  # AWS requires UpdateProject to apply tags (confirmed via AccessDenied testing).
+                  # BatchGetProjects resolves project ARNs. Lambda code only calls tagging APIs.
+                  - codebuild:UpdateProject
+                  - codebuild:BatchGetProjects
+                  # SECURITY NOTE: AWS routes tag:TagResources on CF stacks through UpdateStack
+                  # internally (confirmed via AccessDenied testing). Lambda code only calls
+                  # tag:TagResources; UpdateStack is never invoked directly by the Lambda.
+                  - cloudformation:TagResource
+                  - cloudformation:UpdateStack
+                  - cloudformation:UpdateStackSet
+                  # SECURITY NOTE: AWS routes Service Catalog tagging through UpdateProduct /
+                  # UpdatePortfolio internally (confirmed via AccessDenied testing in v14).
+                  # Lambda code only calls tag:TagResources; Update* is never invoked directly.
+                  - servicecatalog:TagResource
+                  - servicecatalog:UpdatePortfolio
+                  - servicecatalog:UpdateProduct
+                  # --- Migration & Transfer ---
+                  - transfer:TagResource
+                  - datasync:TagResource
+                  - storagegateway:AddTagsToResource
+                  # --- ML / AI ---
+                  - sagemaker:AddTags
+                  - comprehend:TagResource
+                  - rekognition:TagResource
+                  - kendra:TagResource
+                  - lex:TagResource
+                  - transcribe:TagResource
+                  - bedrock:TagResource
+                  - aoss:TagResource
+                  - braket:TagResource
+                  # --- IoT ---
+                  - iot:TagResource
+                  - iotanalytics:TagResource
+                  - iotevents:TagResource
+                  - iotsitewise:TagResource
+                  - iottwinmaker:TagResource
+                  - greengrass:TagResource
+                  # --- Media ---
+                  - ivs:TagResource
+                  - ivschat:TagResource
+                  - mediaconvert:TagResource
+                  - medialive:CreateTags
+                  - mediapackage:TagResource
+                  # --- Other ---
+                  - ram:TagResource
+                  - appstream:TagResource
+                  - workspaces:CreateTags
+                  - workspaces-web:TagResource
+                  - quicksight:TagResource
+                  - connect:TagResource
+                  - mobiletargeting:TagResource
+                  - managedblockchain:TagResource
+                  - gamelift:TagResource
+                  - geo:TagResource
+                  - timestream:TagResource
+                  - scn:TagResource
+                  - healthlake:TagResource
+                  - omics:TagResource
+                  - datazone:TagResource
+                  - qbusiness:TagResource
+                  - frauddetector:TagResource
+                Resource: '*'
+              # NOTE: sts:AssumeRole for cross-account architecture has been removed from the
+              # default template. The recommended deployment (StackSets) gives each account its
+              # own Lambda — no cross-account role assumption is needed or exercised.
+              - Sid: MinimalReads
+                Effect: Allow
+                Action:
+                  # VPC scope checking (only used when ScopeMode=vpc)
+                  - ec2:DescribeInstances
+                  - ec2:DescribeVolumes
+                  # Determine local account ID for cross-account tagging logic
+                  - sts:GetCallerIdentity
+                  # IAM role tagging (iam:TagRole not covered by tag:TagResources)
+                  - iam:TagRole
+                Resource: '*'
+              - Sid: ReadConfig
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/map-tagger/config
+              - Sid: Logging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
+
+  # CloudWatch Log Group — explicit declaration sets retention and ensures logs are
+  # cleaned up when the stack is deleted. Lambda uses this group automatically.
+  AutoTaggerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/map-auto-tagger
+      RetentionInDays: 90
+
+  # Lambda function
+  AutoTaggerFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: AutoTaggerLogGroup
+    Properties:
+      FunctionName: map-auto-tagger
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt AutoTaggerRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      # ReservedConcurrentExecutions limits Lambda concurrency during bursts
+      # Adjust based on expected resource creation rate; 10 is conservative
+      ReservedConcurrentExecutions: 10
+      Environment:
+        Variables:
+          CONFIG_PARAM: /map-tagger/config
+      Code:
+        ZipFile: |
+          import json, os, boto3, re
+          from datetime import datetime, timezone
+
+          ssm = boto3.client('ssm')
+          ec2 = boto3.client('ec2')
+          tagging = boto3.client('resourcegroupstaggingapi')
+          _config = None
+          _cross_account_clients = {}
+
+          def get_cross_account_client(service, target_account_id, region):
+              """Assume cross-account role and return a boto3 client for the target account."""
+              cache_key = f"{service}:{target_account_id}:{region}"
+              if cache_key not in _cross_account_clients:
+                  sts = boto3.client('sts')
+                  role_arn = f"arn:aws:iam::{target_account_id}:role/MapAutoTaggerCrossAccount"
+                  try:
+                      creds = sts.assume_role(
+                          RoleArn=role_arn,
+                          RoleSessionName="map-auto-tagger-cross-account"
+                      )['Credentials']
+                      _cross_account_clients[cache_key] = boto3.client(
+                          service,
+                          region_name=region,
+                          aws_access_key_id=creds['AccessKeyId'],
+                          aws_secret_access_key=creds['SecretAccessKey'],
+                          aws_session_token=creds['SessionToken']
+                      )
+                  except Exception as e:
+                      print(f'Cannot assume cross-account role in {target_account_id}: {e}')
+                      return None
+              return _cross_account_clients[cache_key]
+
+          def get_account_from_arn(arn):
+              """Extract account ID from ARN."""
+              parts = arn.split(':')
+              return parts[4] if len(parts) > 4 else None
+
+          def get_config():
+              global _config
+              if _config is None:
+                  resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
+                  _config = json.loads(resp['Parameter']['Value'])
+              return _config
+
+          def is_after_agreement(config):
+              start = datetime.strptime(config['agreement_start_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              return datetime.now(timezone.utc) >= start
+
+          def is_in_scope(config, account_id, detail):
+              mode = config['scope_mode']
+              if mode == 'account':
+                  scoped = config.get('scoped_account_ids', [])
+                  if isinstance(scoped, str):
+                      scoped = [s.strip() for s in scoped.split(',')]
+                  if 'ALL' in scoped:
+                      return True
+                  return account_id in scoped
+              if mode == 'vpc':
+                  scoped_vpcs = config.get('scoped_vpc_ids', [])
+                  if isinstance(scoped_vpcs, str):
+                      scoped_vpcs = [s.strip() for s in scoped_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
+                  vpc_id = None
+                  if 'instanceId' in detail:
+                      try:
+                          resp = ec2.describe_instances(InstanceIds=[detail['instanceId']])
+                          vpc_id = resp['Reservations'][0]['Instances'][0].get('VpcId')
+                      except: pass
+                  elif 'vpcId' in detail:
+                      vpc_id = detail['vpcId']
+                  elif 'volumeId' in detail:
+                      try:
+                          resp = ec2.describe_volumes(VolumeIds=[detail['volumeId']])
+                          attachments = resp['Volumes'][0].get('Attachments', [])
+                          if attachments:
+                              inst_id = attachments[0]['InstanceId']
+                              resp2 = ec2.describe_instances(InstanceIds=[inst_id])
+                              vpc_id = resp2['Reservations'][0]['Instances'][0].get('VpcId')
+                      except: pass
+                  if vpc_id and vpc_id in scoped_vpcs:
+                      return True
+                  if vpc_id is None:
+                      scoped_accts = config.get('scoped_account_ids', [])
+                      if isinstance(scoped_accts, str):
+                          scoped_accts = [s.strip() for s in scoped_accts.split(',')]
+                      if 'ALL' in scoped_accts:
+                          return True
+                      return account_id in scoped_accts
+                  return False
+              return False
+
+          def extract_arn(detail, account_id, region):
+              event_name = detail.get('eventName', '')
+              event_source = detail.get('eventSource', '')
+              resp = detail.get('responseElements') or {}
+              req = detail.get('requestParameters') or {}
+              resources = detail.get('resources', [])
+
+              # Handle early exceptions BEFORE universal pattern scan
+              # (prevents universal scan from picking up wrong ARNs)
+              # Bedrock Agent (nested: agent.agentArn)
+              if event_name == 'CreateAgent' and event_source == 'bedrock.amazonaws.com':
+                  agent_arn = resp.get('agent', {}).get('agentArn')
+                  if agent_arn:
+                      return agent_arn
+
+              # Bedrock Agent Action Group (no ARN in response — construct from IDs)
+              elif event_name == 'CreateAgentActionGroup' and event_source == 'bedrock.amazonaws.com':
+                  ag = resp.get('agentActionGroup', {})
+                  agent_id = ag.get('agentId')
+                  agent_ver = ag.get('agentVersion', 'DRAFT')
+                  ag_id = ag.get('actionGroupId')
+                  if agent_id and ag_id:
+                      return f"arn:aws:bedrock:{region}:{account_id}:agent/{agent_id}/agentversion/{agent_ver}/actiongroup/{ag_id}"
+
+              # Bedrock Agent Alias (nested: agentAlias.agentAliasArn)
+              elif event_name == 'CreateAgentAlias' and event_source == 'bedrock.amazonaws.com':
+                  alias_arn = resp.get('agentAlias', {}).get('agentAliasArn')
+                  if alias_arn:
+                      return alias_arn
+
+              # Bedrock Knowledge Base Data Source (no ARN in response — construct)
+              elif event_name == 'CreateDataSource' and event_source == 'bedrock.amazonaws.com':
+                  ds = resp.get('dataSource', {})
+                  kb_id = ds.get('knowledgeBaseId') or req.get('knowledgeBaseId')
+                  ds_id = ds.get('dataSourceId')
+                  if kb_id and ds_id:
+                      return f"arn:aws:bedrock:{region}:{account_id}:knowledge-base/{kb_id}/data-source/{ds_id}"
+
+              # Lambda Layer — early exit to prefer layerArn (taggable) over layerVersionArn (not)
+              if event_name in ('PublishLayerVersion', 'PublishLayerVersion20181031'):
+                  layer_arn = resp.get('layerArn')
+                  if layer_arn:
+                      return layer_arn
+
+              # ECS Service — early exit to prevent clusterArn being picked up by universal scan
+              elif event_name == 'CreateService' and event_source == 'ecs.amazonaws.com':
+                  svc_arn = resp.get('service', {}).get('serviceArn')
+                  if svc_arn:
+                      return svc_arn
+
+              elif event_name == 'CreateVpnConnection':
+                  vpn = resp.get('vpnConnection', {})
+                  vpn_id = vpn.get('vpnConnectionId')
+                  if vpn_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpn-connection/{vpn_id}"
+
+              elif event_name == 'CreatePlacementGroup':
+                  pg = resp.get('placementGroup', {})
+                  if not pg and 'CreatePlacementGroupResponse' in resp:
+                      pg = resp['CreatePlacementGroupResponse'].get('placementGroup', {})
+                  pg_id = pg.get('groupId')
+                  if pg_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:placement-group/{pg_id}"
+
+              # IVS Channel — must be before universal scan; response has both channel and streamKey
+              # Universal scan finds streamKey.arn first; we need channel.arn
+              elif event_name == 'CreateChannel' and event_source == 'ivs.amazonaws.com':
+                  channel_arn = resp.get('channel', {}).get('arn')
+                  if channel_arn:
+                      return channel_arn
+
+              # Lightsail Container Service — must be before universal scan
+              # Universal scan finds containerService.arn (UUID-based); we need containerServiceName
+              elif event_name == 'CreateContainerService' and event_source == 'lightsail.amazonaws.com':
+                  cs = resp.get('containerService', {})
+                  service_name = cs.get('containerServiceName') or req.get('serviceName')
+                  if service_name:
+                      return f"arn:aws:lightsail:{region}:{account_id}:ContainerService/{service_name}"
+
+              # Lightsail Load Balancer — response has operations list, no direct ARN
+              elif event_name == 'CreateLoadBalancer' and event_source == 'lightsail.amazonaws.com':
+                  lb_name = req.get('loadBalancerName')
+                  if not lb_name:
+                      ops = resp.get('operations', [])
+                      lb_name = ops[0].get('resourceName') if ops else None
+                  if lb_name:
+                      return f"arn:aws:lightsail:{region}:{account_id}:LoadBalancer/{lb_name}"
+
+              # Lightsail Relational Database
+              elif event_name == 'CreateRelationalDatabase' and event_source == 'lightsail.amazonaws.com':
+                  db_name = req.get('relationalDatabaseName')
+                  if not db_name:
+                      ops = resp.get('operations', [])
+                      db_name = ops[0].get('resourceName') if ops else None
+                  if db_name:
+                      return f"arn:aws:lightsail:{region}:{account_id}:RelationalDatabase/{db_name}"
+
+              # Universal ARN patterns
+              arn_patterns = [
+                  'arn', 'Arn', 'ARN', 'resourceArn', 'ResourceArn', 'clusterArn', 'functionArn',
+                  'topicArn', 'tableArn', 'streamArn', 'stateMachineArn', 'pipelineArn',
+                  'backupVaultArn', 'dBInstanceArn', 'dBClusterArn', 'queueArn', 'loadBalancerArn',
+                  'eventBusArn', 'aRN', 'notebookInstanceArn', 'documentClassifierArn', 'applicationArn',
+                  'ApplicationARN', 'backupPlanArn', 'locationArn', 'computeEnvironmentArn', 'appArn',
+                  'layerVersionArn', 'groupARN', 'groupArn', 'activityArn', 'keyArn', 'serviceArn',
+                  'policyArn', 'replicationGroupArn',
+                  'modelArn', 'endpointArn', 'endpointConfigArn', 'trainingJobArn',
+                  'connectionArn', 'workgroupArn', 'namespaceArn',
+                  'clusterArn', 'nodeGroupArn', 'containerArn',
+                  'registryArn', 'imageArn', 'repositoryArn',
+                  'aliasArn', 'layerArn', 'pipeArn', 'channelArn',
+                  'acceleratorArn', 'jobArn', 'firewallArn',
+                  'firewallPolicyArn', 'addonArn', 'userPoolArn',
+                  'guardrailArn', 'agentArn', 'knowledgeBaseArn',
+                  'flowArn', 'promptArn', 'promptVersionArn',
+                  # Bedrock sub-resources
+                  'agentAliasArn', 'dataSourceArn', 'provisionedModelArn',
+                  # Amazon MQ
+                  'BrokerArn', 'brokerArn',
+                  # Amazon Detective
+                  'GraphArn',
+                  # AWS HealthLake
+                  'DatastoreArn', 'datastoreArn',
+                  # Amazon WorkSpaces Web
+                  'portalArn',
+                  # SageMaker Pipeline / Studio Domain / Feature Store
+                  'PipelineArn', 'DomainArn', 'FeatureGroupArn', 'featureGroupArn',
+                  # Service Catalog (nested in productViewDetail)
+                  'productARN',
+                  # IoT SiteWise
+                  'assetModelArn', 'assetArn', 'portalArn', 'gatewayArn',
+                  # IoT Analytics / TwinMaker / Events
+                  'datasetArn', 'workspaceArn', 'inputArn', 'detectorModelArn',
+                  # GameLift
+                  'buildArn', 'scriptArn', 'fleetArn',
+                  # CodeGuru Profiler
+                  'profilingGroupArn',
+                  # Clean Rooms
+                  'collaborationArn', 'membershipArn',
+                  # Fraud Detector
+                  'detectorArn', 'entityTypeArn', 'labelArn', 'eventTypeArn',
+                  # Lookout services
+                  'ProjectArn', 'DatasetArn', 'AnomalyDetectorArn',
+                  # AWS DataZone / Supply Chain / Q Business
+                  'domainArn', 'instanceArn', 'applicationArn',
+                  # Amazon Omics
+                  'sequenceStoreArn', 'annotationStoreArn',
+                  # Transcribe
+                  'languageModelArn', 'vocabularyArn',
+                  # Elastic Beanstalk
+                  'ApplicationArn', 'EnvironmentArn',
+                  # MediaLive / MediaPackage / MediaStore
+                  'ChannelArn', 'OriginEndpointArn',
+                  # IoT Greengrass / TwinMaker
+                  'componentVersionArn', 'workspaceArn'
+              ]
+
+              # Try to find ARN in response
+              for pattern in arn_patterns:
+                  if pattern in resp and resp[pattern]:
+                      return resp[pattern]
+                  for key, val in resp.items():
+                      if isinstance(val, dict) and pattern in val and val[pattern]:
+                          return val[pattern]
+
+              # Glue Table - must be before resources array check to avoid returning database ARN
+              # (Glue CreateTable CloudTrail resources array contains database ARN first)
+              if event_name == 'CreateTable' and event_source == 'glue.amazonaws.com':
+                  db_name = req.get('databaseName')
+                  tbl_name = req.get('tableInput', {}).get('name')
+                  if db_name and tbl_name:
+                      return f"arn:aws:glue:{region}:{account_id}:table/{db_name}/{tbl_name}"
+
+              # Check resources array (used by some services like Keyspaces)
+              # Skip catalog ARNs for Glue (use database ARN instead)
+              if resources and len(resources) > 0:
+                  for resource in resources:
+                      arn = resource.get('ARN')
+                      # Skip Glue catalog ARNs - we want the database/table ARN
+                      if arn and ':catalog' not in arn:
+                          return arn
+
+              # Construct ARNs for specific services
+              service = event_source.split('.')[0].replace('aws.', '')
+              
+              if event_name == 'RunInstances':
+                  items = resp.get('instancesSet', {}).get('items', [])
+                  if items:
+                      return f"arn:aws:ec2:{region}:{account_id}:instance/{items[0].get('instanceId')}"
+              elif event_name == 'CreateVolume':
+                  vol_id = resp.get('volumeId')
+                  return f"arn:aws:ec2:{region}:{account_id}:volume/{vol_id}" if vol_id else None
+              elif event_name == 'CreateBucket':
+                  bucket = req.get('bucketName')
+                  return f"arn:aws:s3:::{bucket}" if bucket else None
+              elif event_name == 'CreateStream' and 'kinesis' in service:
+                  name = req.get('streamName')
+                  return f"arn:aws:kinesis:{region}:{account_id}:stream/{name}" if name else None
+              elif event_name == 'CreateDeliveryStream':
+                  name = req.get('deliveryStreamName')
+                  return f"arn:aws:firehose:{region}:{account_id}:deliverystream/{name}" if name else None
+              elif event_name == 'CreateNatGateway':
+                  nat_id = resp.get('natGateway', {}).get('natGatewayId')
+                  return f"arn:aws:ec2:{region}:{account_id}:natgateway/{nat_id}" if nat_id else None
+              elif event_name == 'CreateAutoScalingGroup':
+                  name = req.get('autoScalingGroupName')
+                  return f"arn:aws:autoscaling:{region}:{account_id}:autoScalingGroup:*:autoScalingGroupName/{name}" if name else None
+              elif event_name == 'CreateLogGroup':
+                  name = req.get('logGroupName')
+                  return f"arn:aws:logs:{region}:{account_id}:log-group:{name}" if name else None
+              elif event_name in ['CreateRestApi', 'CreateApi']:
+                  api_id = resp.get('id') or resp.get('apiId')
+                  api_type = 'restapis' if event_name == 'CreateRestApi' else 'apis'
+                  return f"arn:aws:apigateway:{region}::/{api_type}/{api_id}" if api_id else None
+              elif event_name == 'CreateQueue':
+                  # SQS returns URL, need to construct ARN
+                  queue_url = resp.get('queueUrl')
+                  if queue_url:
+                      queue_name = queue_url.split('/')[-1]
+                      return f"arn:aws:sqs:{region}:{account_id}:{queue_name}"
+
+              # EC2 Resources (use resource IDs to construct ARNs)
+              elif event_name == 'CreateVpc':
+                  vpc = resp.get('vpc', {})
+                  vpc_id = vpc.get('vpcId')
+                  if vpc_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc/{vpc_id}"
+              elif event_name == 'CreateSecurityGroup':
+                  group_id = resp.get('groupId')
+                  if group_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:security-group/{group_id}"
+              elif event_name == 'CreateNetworkInterface':
+                  eni = resp.get('networkInterface', {})
+                  eni_id = eni.get('networkInterfaceId')
+                  if eni_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:network-interface/{eni_id}"
+              elif event_name == 'CreateSubnet':
+                  subnet = resp.get('subnet', {})
+                  subnet_id = subnet.get('subnetId')
+                  if subnet_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:subnet/{subnet_id}"
+              elif event_name == 'CreateInternetGateway':
+                  igw = resp.get('internetGateway', {})
+                  igw_id = igw.get('internetGatewayId')
+                  if igw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:internet-gateway/{igw_id}"
+              elif event_name == 'AllocateAddress':
+                  alloc_id = resp.get('allocationId')
+                  if alloc_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:elastic-ip/{alloc_id}"
+
+              # Egress-only Internet Gateway
+              elif event_name == 'CreateEgressOnlyInternetGateway':
+                  eigw = resp.get('egressOnlyInternetGateway', {})
+                  if not eigw and 'CreateEgressOnlyInternetGatewayResponse' in resp:
+                      eigw = resp['CreateEgressOnlyInternetGatewayResponse'].get('egressOnlyInternetGateway', {})
+                  eigw_id = eigw.get('egressOnlyInternetGatewayId')
+                  if eigw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:egress-only-internet-gateway/{eigw_id}"
+
+              # Customer Gateway
+              elif event_name == 'CreateCustomerGateway':
+                  cgw = resp.get('customerGateway', {})
+                  if not cgw and 'CreateCustomerGatewayResponse' in resp:
+                      cgw = resp['CreateCustomerGatewayResponse'].get('customerGateway', {})
+                  cgw_id = cgw.get('customerGatewayId')
+                  if cgw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:customer-gateway/{cgw_id}"
+
+              # Network ACL
+              elif event_name == 'CreateNetworkAcl':
+                  acl = resp.get('networkAcl', {})
+                  if not acl and 'CreateNetworkAclResponse' in resp:
+                      acl = resp['CreateNetworkAclResponse'].get('networkAcl', {})
+                  acl_id = acl.get('networkAclId')
+                  if acl_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:network-acl/{acl_id}"
+
+              # NAT Gateway (improved extraction)
+              elif event_name == 'CreateNatGateway':
+                  nat_id = None
+                  if 'natGateway' in resp:
+                      nat_id = resp['natGateway'].get('natGatewayId')
+                  if not nat_id:
+                      nat_id = resp.get('natGatewayId')
+                  if nat_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:natgateway/{nat_id}"
+
+              # Simple ARN Extractions
+              elif event_name == 'CreateRepository' and event_source == 'ecr.amazonaws.com':
+                  repo = resp.get('repository', {})
+                  arn = repo.get('repositoryArn')
+                  return arn
+              elif event_name == 'CreateFileSystem' and event_source == 'elasticfilesystem.amazonaws.com':
+                  return resp.get('fileSystemArn')
+              elif event_name == 'CreateFileSystem' and event_source == 'fsx.amazonaws.com':
+                  fs = resp.get('fileSystem', {})
+                  return fs.get('resourceARN')
+              elif event_name == 'PutRule':
+                  rule_arn = resp.get('ruleArn')
+                  return rule_arn
+              elif event_name == 'CreateStack':
+                  stack_id = resp.get('stackId')
+                  return stack_id
+              elif event_name == 'CreateStackSet':
+                  stackset_id = resp.get('stackSetId')
+                  if stackset_id:
+                      # StackSet ID format: name:uuid
+                      return f"arn:aws:cloudformation:{region}:{account_id}:stackset/{stackset_id}"
+              elif event_name == 'CreateLaunchTemplate':
+                  # CloudTrail wraps EC2 responses in <EventName>Response
+                  template = resp.get('launchTemplate', {})
+                  if not template and 'CreateLaunchTemplateResponse' in resp:
+                      template = resp['CreateLaunchTemplateResponse'].get('launchTemplate', {})
+                  template_id = template.get('launchTemplateId')
+                  if template_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:launch-template/{template_id}"
+
+              # CloudWatch Alarms
+              elif event_name == 'PutMetricAlarm':
+                  alarm_name = req.get('alarmName')
+                  if alarm_name:
+                      return f"arn:aws:cloudwatch:{region}:{account_id}:alarm:{alarm_name}"
+
+              # SSM Parameters
+              elif event_name == 'PutParameter':
+                  param_name = req.get('name')
+                  if param_name:
+                      return f"arn:aws:ssm:{region}:{account_id}:parameter{param_name}"
+
+              # ACM Certificates
+              elif event_name == 'RequestCertificate':
+                  cert_arn = resp.get('certificateArn')
+                  return cert_arn
+
+              # Transit Gateway (EC2 response wrapper)
+              elif event_name == 'CreateTransitGateway':
+                  tgw = resp.get('transitGateway', {})
+                  if not tgw and 'CreateTransitGatewayResponse' in resp:
+                      tgw = resp['CreateTransitGatewayResponse'].get('transitGateway', {})
+                  tgw_id = tgw.get('transitGatewayId')
+                  if tgw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:transit-gateway/{tgw_id}"
+
+              # VPN Gateway (EC2 response wrapper)
+              elif event_name == 'CreateVpnGateway':
+                  vpn = resp.get('vpnGateway', {})
+                  if not vpn and 'CreateVpnGatewayResponse' in resp:
+                      vpn = resp['CreateVpnGatewayResponse'].get('vpnGateway', {})
+                  vpn_id = vpn.get('vpnGatewayId')
+                  if vpn_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpn-gateway/{vpn_id}"
+
+              # Route Table
+              elif event_name == 'CreateRouteTable':
+                  rt = resp.get('routeTable', {})
+                  if not rt and 'CreateRouteTableResponse' in resp:
+                      rt = resp['CreateRouteTableResponse'].get('routeTable', {})
+                  rt_id = rt.get('routeTableId')
+                  if rt_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:route-table/{rt_id}"
+
+              # Glue Job
+              elif event_name == 'CreateJob':
+                  job_name = req.get('name')
+                  if job_name:
+                      return f"arn:aws:glue:{region}:{account_id}:job/{job_name}"
+
+              # Load Balancer (ALB/NLB)
+              elif event_name == 'CreateLoadBalancer':
+                  lbs = resp.get('loadBalancers', [])
+                  if lbs and len(lbs) > 0:
+                      return lbs[0].get('loadBalancerArn')
+
+              # Database Clusters
+              elif event_name == 'CreateDBCluster':
+                  cluster = resp.get('dBCluster', {})
+                  return cluster.get('dBClusterArn')
+              elif event_name == 'CreateCluster' and event_source == 'redshift.amazonaws.com':
+                  cluster_id = resp.get('clusterIdentifier')
+                  if cluster_id:
+                      return f"arn:aws:redshift:{region}:{account_id}:cluster:{cluster_id}"
+              elif event_name == 'CreateCluster' and event_source == 'memorydb.amazonaws.com':
+                  cluster = resp.get('cluster', {})
+                  return cluster.get('aRN')  # Note: capital ARN
+
+              # SageMaker
+              elif event_name == 'CreateNotebookInstance':
+                  return resp.get('notebookInstanceArn')
+
+              # Comprehend
+              elif event_name == 'CreateDocumentClassifier':
+                  return resp.get('documentClassifierArn')
+
+              # AppSync
+              elif event_name == 'CreateGraphqlApi':
+                  api = resp.get('graphqlApi', {})
+                  return api.get('arn')
+
+              # IoT
+              elif event_name == 'CreateThing':
+                  return resp.get('thingArn')
+
+              # Service Catalog
+              elif event_name == 'CreatePortfolio':
+                  portfolio = resp.get('portfolioDetail', {})
+                  return portfolio.get('aRN')  # Note: capital ARN
+
+              # Lightsail - uses resource name not ARN
+              elif event_name == 'CreateInstances' and event_source == 'lightsail.amazonaws.com':
+                  ops = resp.get('operations', [])
+                  if ops and len(ops) > 0:
+                      resource_name = ops[0].get('resourceName')
+                      if resource_name:
+                          return f"arn:aws:lightsail:{region}:{account_id}:Instance/{resource_name}"
+
+              # Lightsail Container Service (ARN has UUID - use serviceName from request)
+              elif event_name == 'CreateContainerService' and event_source == 'lightsail.amazonaws.com':
+                  service_name = req.get('serviceName')
+                  if not service_name:
+                      cs = resp.get('containerService', {})
+                      service_name = cs.get('containerServiceName')
+                  if service_name:
+                      return f"arn:aws:lightsail:{region}:{account_id}:ContainerService/{service_name}"
+
+              # Lightsail Load Balancer (response has operations list)
+              elif event_name == 'CreateLoadBalancer' and event_source == 'lightsail.amazonaws.com':
+                  lb_name = req.get('loadBalancerName')
+                  if not lb_name:
+                      ops = resp.get('operations', [])
+                      lb_name = ops[0].get('resourceName') if ops else None
+                  if lb_name:
+                      return f"arn:aws:lightsail:{region}:{account_id}:LoadBalancer/{lb_name}"
+
+              # Lightsail Relational Database
+              elif event_name == 'CreateRelationalDatabase' and event_source == 'lightsail.amazonaws.com':
+                  ops = resp.get('operations', [])
+                  db_name = req.get('relationalDatabaseName')
+                  if not db_name and ops:
+                      db_name = ops[0].get('resourceName')
+                  if db_name:
+                      return f"arn:aws:lightsail:{region}:{account_id}:RelationalDatabase/{db_name}"
+
+              # Transfer Family Server
+              elif event_name == 'CreateServer' and event_source == 'transfer.amazonaws.com':
+                  server_id = resp.get('serverId')
+                  if server_id:
+                      return f"arn:aws:transfer:{region}:{account_id}:server/{server_id}"
+
+              # RDS Proxy
+              elif event_name == 'CreateDBProxy':
+                  proxy = resp.get('dBProxy', {})
+                  return proxy.get('dBProxyArn')
+
+              # Global Accelerator
+              elif event_name == 'CreateAccelerator':
+                  accelerator = resp.get('accelerator', {})
+                  return accelerator.get('acceleratorArn')
+
+              # GuardDuty IP Set
+              elif event_name == 'CreateIPSet':
+                  detector_id = req.get('detectorId')
+                  ipset_id = resp.get('ipSetId')
+                  if detector_id and ipset_id:
+                      return f"arn:aws:guardduty:{region}:{account_id}:detector/{detector_id}/ipset/{ipset_id}"
+
+              # CodeBuild Project
+              elif event_name == 'CreateProject' and event_source == 'codebuild.amazonaws.com':
+                  project = resp.get('project', {})
+                  return project.get('arn')
+
+              # CodePipeline Pipeline - ARN not in response, construct from name
+              elif event_name == 'CreatePipeline' and event_source == 'codepipeline.amazonaws.com':
+                  pipeline = resp.get('pipeline', {})
+                  pipeline_name = pipeline.get('name')
+                  if pipeline_name:
+                      return f"arn:aws:codepipeline:{region}:{account_id}:{pipeline_name}"
+
+              # CodeDeploy Application
+              elif event_name == 'CreateApplication' and event_source == 'codedeploy.amazonaws.com':
+                  app_name = req.get('applicationName')
+                  if app_name:
+                      return f"arn:aws:codedeploy:{region}:{account_id}:application:{app_name}"
+
+              # Rekognition Collection
+              elif event_name == 'CreateCollection':
+                  arn = resp.get('collectionArn')
+                  # Rekognition ARNs are missing the 'arn:' prefix
+                  if arn and not arn.startswith('arn:'):
+                      arn = f"arn:{arn}"
+                  return arn
+
+              # Target Group
+              elif event_name == 'CreateTargetGroup':
+                  tgs = resp.get('targetGroups', [])
+                  if tgs and len(tgs) > 0:
+                      return tgs[0].get('targetGroupArn')
+
+              # Glue Database
+              elif event_name == 'CreateDatabase' and event_source == 'glue.amazonaws.com':
+                  db_name = req.get('databaseInput', {}).get('name')
+                  if db_name:
+                      return f"arn:aws:glue:{region}:{account_id}:database/{db_name}"
+
+              # Glue Crawler
+              elif event_name == 'CreateCrawler':
+                  crawler_name = req.get('name')
+                  if crawler_name:
+                      return f"arn:aws:glue:{region}:{account_id}:crawler/{crawler_name}"
+
+              # Glue Workflow
+              elif event_name == 'CreateWorkflow':
+                  workflow_name = resp.get('name')
+                  if workflow_name:
+                      return f"arn:aws:glue:{region}:{account_id}:workflow/{workflow_name}"
+
+              # Backup Plan
+              elif event_name == 'CreateBackupPlan':
+                  plan_id = resp.get('backupPlanId')
+                  if plan_id:
+                      return f"arn:aws:backup:{region}:{account_id}:backup-plan:{plan_id}"
+
+              # WAFv2 Rule Group
+              elif event_name == 'CreateRuleGroup':
+                  summary = resp.get('summary', {})
+                  return summary.get('aRN')
+
+              # CloudWatch Dashboard
+              elif event_name == 'PutDashboard':
+                  dashboard_name = req.get('dashboardName')
+                  if dashboard_name:
+                      return f"arn:aws:cloudwatch:{region}:{account_id}:dashboard/{dashboard_name}"
+
+              # EMR Cluster (RunJobFlow)
+              elif event_name == 'RunJobFlow':
+                  cluster_id = resp.get('jobFlowId')
+                  if cluster_id:
+                      return f"arn:aws:elasticmapreduce:{region}:{account_id}:cluster/{cluster_id}"
+
+              # EKS Nodegroup
+              elif event_name == 'CreateNodegroup':
+                  nodegroup = resp.get('nodegroup', {})
+                  return nodegroup.get('nodegroupArn')
+
+              # ElastiCache - needs retry, but add ARN extraction
+              elif event_name == 'CreateCacheCluster':
+                  cache = resp.get('cacheCluster', {})
+                  return cache.get('aRN')
+
+              # OpenSearch Serverless Collection
+              elif event_name == 'CreateCollection' and event_source == 'aoss.amazonaws.com':
+                  detail = resp.get('createCollectionDetail', {})
+                  return detail.get('arn')
+
+              # Route53 Hosted Zone
+              elif event_name == 'CreateHostedZone':
+                  zone_id = resp.get('hostedZone', {}).get('id')
+                  if zone_id:
+                      # ID format: /hostedzone/Z0862949349EG6JSOWHXK
+                      zone_id = zone_id.split('/')[-1]
+                      return f"arn:aws:route53:::hostedzone/{zone_id}"
+
+              # VPC Peering Connection
+              elif event_name == 'CreateVpcPeeringConnection':
+                  vpc_pcx = resp.get('vpcPeeringConnection', {})
+                  if not vpc_pcx and 'CreateVpcPeeringConnectionResponse' in resp:
+                      vpc_pcx = resp['CreateVpcPeeringConnectionResponse'].get('vpcPeeringConnection', {})
+                  pcx_id = vpc_pcx.get('vpcPeeringConnectionId')
+                  if pcx_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc-peering-connection/{pcx_id}"
+
+              # EBS Snapshot
+              elif event_name == 'CreateSnapshot':
+                  snapshot_id = resp.get('snapshotId')
+                  if snapshot_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:snapshot/{snapshot_id}"
+
+              # VPC Flow Logs
+              elif event_name == 'CreateFlowLogs':
+                  # EC2 response wrapper: CreateFlowLogsResponse.flowLogIdSet.item
+                  fl_id = None
+                  if 'CreateFlowLogsResponse' in resp:
+                      nested = resp['CreateFlowLogsResponse']
+                      fl_id_set = nested.get('flowLogIdSet', {})
+                      fl_id = fl_id_set.get('item') if isinstance(fl_id_set, dict) else None
+                      if isinstance(fl_id, list):
+                          fl_id = fl_id[0]
+                  if not fl_id:
+                      flow_ids = resp.get('flowLogIds', [])
+                      fl_id = flow_ids[0] if flow_ids else None
+                  if fl_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc-flow-log/{fl_id}"
+
+              # SSM Document
+              elif event_name == 'CreateDocument':
+                  doc_desc = resp.get('documentDescription', {})
+                  doc_name = doc_desc.get('name')
+                  if doc_name:
+                      return f"arn:aws:ssm:{region}:{account_id}:document/{doc_name}"
+
+              # DHCP Options
+              elif event_name == 'CreateDhcpOptions':
+                  dhcp = resp.get('dhcpOptions', {})
+                  if not dhcp and 'CreateDhcpOptionsResponse' in resp:
+                      dhcp = resp['CreateDhcpOptionsResponse'].get('dhcpOptions', {})
+                  dhcp_id = dhcp.get('dhcpOptionsId')
+                  if dhcp_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:dhcp-options/{dhcp_id}"
+
+              # Placement Group - use groupId not groupName for ARN
+              elif event_name == 'CreatePlacementGroup':
+                  pg = resp.get('placementGroup', {})
+                  if not pg and 'CreatePlacementGroupResponse' in resp:
+                      pg = resp['CreatePlacementGroupResponse'].get('placementGroup', {})
+                  # Use groupId (pg-xxx) not groupName for EC2 tagging compatibility
+                  pg_id = pg.get('groupId')
+                  if pg_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:placement-group/{pg_id}"
+                  pg_arn = pg.get('groupArn')
+                  if pg_arn:
+                      return pg_arn
+
+              # AMI (CreateImage)
+              elif event_name == 'CreateImage':
+                  image_id = resp.get('imageId')
+                  if not image_id:
+                      image_id = resp.get('ImageId')
+                  if image_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:image/{image_id}"
+
+              # DMS Replication Instance
+              elif event_name == 'CreateReplicationInstance':
+                  rep = resp.get('replicationInstance', {})
+                  rep_arn = rep.get('replicationInstanceArn')
+                  if rep_arn:
+                      return rep_arn
+
+              # DataSync Task
+              elif event_name == 'CreateTask':
+                  task_arn = resp.get('taskArn')
+                  if task_arn:
+                      return task_arn
+
+              # CodeDeploy Deployment Group
+              elif event_name == 'CreateDeploymentGroup':
+                  dg_id = resp.get('deploymentGroupId')
+                  app_name = req.get('applicationName')
+                  dg_name = req.get('deploymentGroupName')
+                  if dg_id and app_name and dg_name:
+                      return f"arn:aws:codedeploy:{region}:{account_id}:deploymentgroup:{app_name}/{dg_name}"
+
+              # AppConfig Configuration Profile
+              elif event_name == 'CreateConfigurationProfile':
+                  app_id = req.get('applicationId') or resp.get('applicationId')
+                  profile_id = resp.get('id')
+                  if app_id and profile_id:
+                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}/configurationprofile/{profile_id}"
+
+              # AppConfig Environment
+              elif event_name == 'CreateEnvironment' and event_source == 'appconfig.amazonaws.com':
+                  app_id = req.get('applicationId')
+                  env_id = resp.get('id')
+                  if app_id and env_id:
+                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}/environment/{env_id}"
+
+              # EventBridge Scheduler Schedule Group
+              elif event_name == 'CreateScheduleGroup' and event_source == 'scheduler.amazonaws.com':
+                  sg_arn = resp.get('ScheduleGroupArn') or resp.get('scheduleGroupArn')
+                  name = req.get('Name') or req.get('name')
+                  if sg_arn:
+                      return sg_arn
+                  elif name:
+                      return f"arn:aws:scheduler:{region}:{account_id}:schedule-group/{name}"
+
+              # EventBridge Scheduler Schedule
+              elif event_name == 'CreateSchedule' and event_source == 'scheduler.amazonaws.com':
+                  sch_arn = resp.get('ScheduleArn') or resp.get('scheduleArn')
+                  if sch_arn:
+                      return sch_arn
+                  group = req.get('GroupName', 'default')
+                  name = req.get('Name', '')
+                  if name:
+                      return f"arn:aws:scheduler:{region}:{account_id}:schedule/{group}/{name}"
+
+              # Glue DataBrew Dataset
+              elif event_name == 'CreateDataset' and event_source == 'databrew.amazonaws.com':
+                  name = resp.get('Name') or req.get('Name')
+                  if name:
+                      return f"arn:aws:databrew:{region}:{account_id}:dataset/{name}"
+
+              # Glue DataBrew Recipe
+              elif event_name == 'CreateRecipe' and event_source == 'databrew.amazonaws.com':
+                  name = resp.get('Name') or req.get('Name')
+                  if name:
+                      return f"arn:aws:databrew:{region}:{account_id}:recipe/{name}"
+
+              # Amazon Verified Permissions Policy Store
+              elif event_name == 'CreatePolicyStore' and event_source == 'verifiedpermissions.amazonaws.com':
+                  ps_arn = resp.get('arn') or resp.get('Arn')
+                  ps_id = resp.get('policyStoreId') or resp.get('PolicyStoreId')
+                  if ps_arn:
+                      return ps_arn
+                  elif ps_id:
+                      return f"arn:aws:verifiedpermissions::{account_id}:policy-store/{ps_id}"
+
+              # Amazon Location Service
+              elif event_name in ('CreateMap','CreateTracker','CreatePlaceIndex','CreateRouteCalculator',
+                                  'CreateGeofenceCollection') and event_source == 'geo.amazonaws.com':
+                  for key in ('mapArn','trackerArn','indexArn','calculatorArn','collectionArn',
+                              'MapArn','TrackerArn','IndexArn','CalculatorArn','CollectionArn'):
+                      if key in resp and resp[key]:
+                          return resp[key]
+
+              # Amazon Timestream Database
+              elif event_name == 'CreateDatabase' and event_source == 'timestream.amazonaws.com':
+                  db = resp.get('Database', {})
+                  db_arn = db.get('Arn')
+                  if db_arn:
+                      return db_arn
+
+              # Amazon Timestream Table
+              elif event_name == 'CreateTable' and event_source == 'timestream.amazonaws.com':
+                  tbl = resp.get('Table', {})
+                  tbl_arn = tbl.get('Arn')
+                  if tbl_arn:
+                      return tbl_arn
+
+              # EMR Serverless Application (applicationId not ARN in response)
+              elif event_name == 'CreateApplication' and event_source == 'emr-serverless.amazonaws.com':
+                  app_id = resp.get('applicationId')
+                  if app_id:
+                      return f"arn:aws:emr-serverless:{region}:{account_id}:/applications/{app_id}"
+
+              # Amazon Kendra Index (Id not ARN in response)
+              elif event_name == 'CreateIndex' and event_source == 'kendra.amazonaws.com':
+                  idx_id = resp.get('Id')
+                  if idx_id:
+                      return f"arn:aws:kendra:{region}:{account_id}:index/{idx_id}"
+
+              # Amazon Kendra DataSource
+              elif event_name == 'CreateDataSource' and event_source == 'kendra.amazonaws.com':
+                  ds_id = resp.get('Id')
+                  idx_id = req.get('IndexId')
+                  if ds_id and idx_id:
+                      return f"arn:aws:kendra:{region}:{account_id}:index/{idx_id}/data-source/{ds_id}"
+
+              # Amazon Lex v2 Bot
+              elif event_name == 'CreateBot' and event_source == 'lex.amazonaws.com':
+                  bot_id = resp.get('botId')
+                  if bot_id:
+                      return f"arn:aws:lex:{region}:{account_id}:bot/{bot_id}"
+
+              # Amazon Transcribe Vocabulary (response uses camelCase: vocabularyName)
+              elif event_name == 'CreateVocabulary' and event_source == 'transcribe.amazonaws.com':
+                  name = (resp.get('vocabularyName') or resp.get('VocabularyName') or
+                          req.get('VocabularyName') or req.get('vocabularyName'))
+                  if name:
+                      return f"arn:aws:transcribe:{region}:{account_id}:vocabulary/{name}"
+
+              # Amazon Transcribe Language Model
+              elif event_name == 'CreateLanguageModel' and event_source == 'transcribe.amazonaws.com':
+                  # Response uses camelCase: modelName not ModelName
+                  name = (resp.get('modelName') or resp.get('ModelName') or
+                          req.get('ModelName') or req.get('modelName'))
+                  if name:
+                      return f"arn:aws:transcribe:{region}:{account_id}:language-model/{name}"
+
+              # Amazon Transcribe Medical Vocabulary
+              elif event_name == 'CreateMedicalVocabulary' and event_source == 'transcribe.amazonaws.com':
+                  name = resp.get('VocabularyName') or req.get('VocabularyName')
+                  if name:
+                      return f"arn:aws:transcribe:{region}:{account_id}:medical-vocabulary/{name}"
+
+              # AWS Elastic Beanstalk Application
+              elif event_name == 'CreateApplication' and event_source == 'elasticbeanstalk.amazonaws.com':
+                  app = resp.get('Application', {})
+                  app_arn = app.get('ApplicationArn')
+                  if app_arn:
+                      return app_arn
+                  app_name = app.get('ApplicationName') or req.get('ApplicationName')
+                  if app_name:
+                      return f"arn:aws:elasticbeanstalk:{region}:{account_id}:application/{app_name}"
+
+              # AWS Elastic Beanstalk Environment
+              elif event_name == 'CreateEnvironment' and event_source == 'elasticbeanstalk.amazonaws.com':
+                  env_arn = resp.get('EnvironmentArn')
+                  if env_arn:
+                      return env_arn
+
+              # Amazon Q Business Application
+              elif event_name == 'CreateApplication' and event_source == 'qbusiness.amazonaws.com':
+                  app_id = resp.get('applicationId') or resp.get('ApplicationId')
+                  app_arn = resp.get('applicationArn') or resp.get('ApplicationArn')
+                  if app_arn:
+                      return app_arn
+                  if app_id:
+                      return f"arn:aws:qbusiness:{region}:{account_id}:application/{app_id}"
+
+              # AWS Supply Chain Instance
+              elif event_name == 'CreateInstance' and event_source == 'scn.amazonaws.com':
+                  inst = resp.get('instance', {})
+                  inst_id = inst.get('instanceId') or resp.get('instanceId')
+                  if inst_id:
+                      return f"arn:aws:scn:{region}:{account_id}:instance/{inst_id}"
+
+              # Amazon GameLift Build
+              elif event_name == 'CreateBuild' and event_source == 'gamelift.amazonaws.com':
+                  build = resp.get('Build', {})
+                  build_arn = build.get('BuildArn') or build.get('buildArn')
+                  if build_arn:
+                      return build_arn
+
+              # Amazon GameLift Script
+              elif event_name == 'CreateScript' and event_source == 'gamelift.amazonaws.com':
+                  script = resp.get('Script', {})
+                  script_arn = script.get('ScriptArn') or script.get('scriptArn')
+                  if script_arn:
+                      return script_arn
+
+              # Amazon GameLift Fleet
+              elif event_name == 'CreateFleet' and event_source == 'gamelift.amazonaws.com':
+                  fleet_attrib = resp.get('FleetAttributes', {})
+                  fleet_arn = fleet_attrib.get('FleetArn')
+                  if fleet_arn:
+                      return fleet_arn
+
+              # Amplify Branch
+              elif event_name == 'CreateBranch':
+                  branch = resp.get('branch', {})
+                  branch_arn = branch.get('branchArn')
+                  if branch_arn:
+                      return branch_arn
+
+              # EventBridge Connection (get connectionArn from response, not the secret)
+              elif event_name == 'CreateConnection' and event_source == 'events.amazonaws.com':
+                  conn_arn = resp.get('connectionArn')
+                  if conn_arn:
+                      return conn_arn
+
+              # ECS Service
+              elif event_name == 'CreateService' and event_source == 'ecs.amazonaws.com':
+                  svc = resp.get('service', {})
+                  svc_arn = svc.get('serviceArn')
+                  if svc_arn:
+                      return svc_arn
+
+              # RDS Snapshots (flat response — ARN is at top level)
+              elif event_name == 'CreateDBSnapshot':
+                  arn = resp.get('dBSnapshotArn')
+                  if not arn:
+                      arn = resp.get('dBSnapshot', {}).get('dBSnapshotArn')
+                  if arn:
+                      return arn
+
+              elif event_name == 'CreateDBClusterSnapshot':
+                  arn = resp.get('dBClusterSnapshotArn')
+                  if not arn:
+                      arn = resp.get('dBClusterSnapshot', {}).get('dBClusterSnapshotArn')
+                  if arn:
+                      return arn
+
+              elif event_name == 'CreateDBInstanceReadReplica':
+                  arn = resp.get('dBInstanceArn')
+                  if not arn:
+                      arn = resp.get('dBInstance', {}).get('dBInstanceArn')
+                  if arn:
+                      return arn
+
+              # Bedrock Application Inference Profile
+              elif event_name == 'CreateInferenceProfile':
+                  inf_arn = resp.get('inferenceProfileArn')
+                  if inf_arn:
+                      return inf_arn
+
+              # Kinesis Analytics v2 (KDA)
+              elif event_name == 'CreateApplication' and event_source == 'kinesisanalytics.amazonaws.com':
+                  app_arn = resp.get('applicationDetail', {}).get('applicationARN')
+                  if not app_arn:
+                      app_arn = resp.get('ApplicationARN')
+                  if app_arn:
+                      return app_arn
+
+              # Redshift Serverless Namespace
+              elif event_name == 'CreateNamespace':
+                  ns = resp.get('namespace', {})
+                  ns_arn = ns.get('namespaceArn')
+                  if ns_arn:
+                      return ns_arn
+
+              # Redshift Serverless Workgroup (empty responseElements — construct from request)
+              elif event_name == 'CreateWorkgroup':
+                  wg = resp.get('workgroup', {})
+                  wg_arn = wg.get('workgroupArn')
+                  if not wg_arn:
+                      wg_name = req.get('workgroupName')
+                      if wg_name:
+                          wg_arn = f"arn:aws:redshift-serverless:{region}:{account_id}:workgroup/{wg_name}"
+                  if wg_arn:
+                      return wg_arn
+
+              # Carrier Gateway
+              elif event_name == 'CreateCarrierGateway':
+                  cagw = resp.get('carrierGateway', {})
+                  if not cagw and 'CreateCarrierGatewayResponse' in resp:
+                      cagw = resp['CreateCarrierGatewayResponse'].get('carrierGateway', {})
+                  cagw_id = cagw.get('carrierGatewayId')
+                  if cagw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:carrier-gateway/{cagw_id}"
+
+              # Glue Trigger
+              elif event_name == 'CreateTrigger' and event_source == 'glue.amazonaws.com':
+                  trigger_name = resp.get('name')
+                  if trigger_name:
+                      return f"arn:aws:glue:{region}:{account_id}:trigger/{trigger_name}"
+
+              # VPC Endpoint
+              elif event_name == 'CreateVpcEndpoint':
+                  vpc_endpoint = resp.get('vpcEndpoint', {})
+                  if not vpc_endpoint and 'CreateVpcEndpointResponse' in resp:
+                      vpc_endpoint = resp['CreateVpcEndpointResponse'].get('vpcEndpoint', {})
+                  vpc_endpoint_id = vpc_endpoint.get('vpcEndpointId')
+                  if vpc_endpoint_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc-endpoint/{vpc_endpoint_id}"
+
+              # API Gateway v2 VPC Link
+              elif event_name == 'CreateVpcLink' and event_source == 'apigateway.amazonaws.com':
+                  vpc_link_id = resp.get('vpcLinkId')
+                  if vpc_link_id:
+                      return f"arn:aws:apigateway:{region}::/vpclinks/{vpc_link_id}"
+
+              # App Mesh (3-level deep: mesh.metadata.arn)
+              elif event_name == 'CreateMesh':
+                  mesh_arn = resp.get('mesh', {}).get('metadata', {}).get('arn')
+                  if mesh_arn:
+                      return mesh_arn
+
+              # API Gateway API Key
+              elif event_name == 'CreateApiKey':
+                  api_key_id = resp.get('id')
+                  if api_key_id:
+                      return f"arn:aws:apigateway:{region}::/apikeys/{api_key_id}"
+
+              # CloudWatch Insights Query Definition
+              elif event_name == 'PutQueryDefinition':
+                  query_def_id = resp.get('queryDefinitionId')
+                  if query_def_id:
+                      return f"arn:aws:logs:{region}:{account_id}:query-definition:{query_def_id}"
+
+              # Athena WorkGroup
+              elif event_name == 'CreateWorkGroup':
+                  workgroup_name = req.get('name')
+                  if workgroup_name:
+                      return f"arn:aws:athena:{region}:{account_id}:workgroup/{workgroup_name}"
+
+              # X-Ray Sampling Rule
+              elif event_name == 'CreateSamplingRule':
+                  rule_record = resp.get('samplingRuleRecord', {})
+                  rule_arn = rule_record.get('samplingRule', {}).get('ruleARN')
+                  if rule_arn:
+                      return rule_arn
+
+              # Service Discovery HTTP Namespace
+              elif event_name == 'CreateHttpNamespace':
+                  operation_id = resp.get('operationId')
+                  # Need to construct ARN from namespace ID (requires additional API call)
+                  # For now, skip - would need async operation tracking
+                  return None
+
+              # AppConfig Application
+              elif event_name == 'CreateApplication' and event_source == 'appconfig.amazonaws.com':
+                  app_id = resp.get('id')
+                  if app_id:
+                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}"
+
+              # ELB Classic (different from ALB/NLB)
+              elif event_name == 'CreateLoadBalancer' and event_source == 'elasticloadbalancing.amazonaws.com':
+                  # Classic ELB (v1) vs ALB/NLB (v2)
+                  if 'loadBalancers' in resp and resp['loadBalancers']:
+                      # ALB/NLB path (already handled above)
+                      lbs = resp.get('loadBalancers', [])
+                      if lbs and len(lbs) > 0:
+                          return lbs[0].get('loadBalancerArn')
+                  else:
+                      # Classic ELB doesn't return ARN in response
+                      lb_name = req.get('loadBalancerName')
+                      if lb_name:
+                          return f"arn:aws:elasticloadbalancing:{region}:{account_id}:loadbalancer/{lb_name}"
+
+              # ACM Private CA
+              elif event_name == 'CreateCertificateAuthority':
+                  ca_arn = resp.get('certificateAuthorityArn')
+                  if ca_arn:
+                      return ca_arn
+
+              # RAM Resource Share
+              elif event_name == 'CreateResourceShare':
+                  share = resp.get('resourceShare', {})
+                  share_arn = share.get('resourceShareArn')
+                  if share_arn:
+                      return share_arn
+
+              # Storage Gateway Tape Pool
+              elif event_name == 'CreateTapePool':
+                  pool_arn = resp.get('poolARN')
+                  if pool_arn:
+                      return pool_arn
+
+              # Cognito User Pool
+              elif event_name == 'CreateUserPool':
+                  pool = resp.get('userPool', {})
+                  pool_id = pool.get('id')
+                  if pool_id:
+                      return f"arn:aws:cognito-idp:{region}:{account_id}:userpool/{pool_id}"
+
+              # Cognito Identity Pool
+              elif event_name == 'CreateIdentityPool':
+                  pool_id = resp.get('identityPoolId')
+                  if pool_id:
+                      return f"arn:aws:cognito-identity:{region}:{account_id}:identitypool/{pool_id}"
+
+              # CodePipeline Pipeline
+              elif event_name == 'CreatePipeline' and event_source == 'codepipeline.amazonaws.com':
+                  pipeline = resp.get('pipeline', {})
+                  pipeline_name = pipeline.get('name')
+                  if pipeline_name:
+                      return f"arn:aws:codepipeline:{region}:{account_id}:{pipeline_name}"
+
+              # Network Firewall Policy
+              elif event_name == 'CreateFirewallPolicy':
+                  nfw_resp = resp.get('firewallPolicyResponse', {})
+                  nfw_arn = nfw_resp.get('firewallPolicyArn')
+                  if nfw_arn:
+                      return nfw_arn
+
+              # Network Firewall
+              elif event_name == 'CreateFirewall':
+                  fw = resp.get('firewall', {})
+                  fw_arn = fw.get('firewallArn')
+                  if fw_arn:
+                      return fw_arn
+
+              # EKS Add-on
+              elif event_name == 'CreateAddon':
+                  addon = resp.get('addon', {})
+                  addon_arn = addon.get('addonArn')
+                  if addon_arn:
+                      return addon_arn
+
+              # Macie Classification Job
+              elif event_name == 'CreateClassificationJob':
+                  job_arn = resp.get('jobArn')
+                  if job_arn:
+                      return job_arn
+
+              # Lambda Layer — tag the layer itself (not the version ARN)
+              elif event_name in ('PublishLayerVersion', 'PublishLayerVersion20181031'):
+                  # layerArn = arn:aws:lambda:region:account:layer:name (taggable)
+                  # layerVersionArn = arn:aws:lambda:...:layer:name:version (not taggable)
+                  layer_arn = resp.get('layerArn') or resp.get('layerVersionArn')
+                  if layer_arn:
+                      return layer_arn
+
+              # Lambda Alias — aliases are not taggable (AWS limitation)
+              # elif event_name in ('CreateAlias', 'CreateAlias20150331'):
+              #     return None  # "Tags on function aliases and versions are not supported"
+
+              # Transit Gateway VPC Attachment
+              elif event_name == 'CreateTransitGatewayVpcAttachment':
+                  tgwa = resp.get('transitGatewayVpcAttachment', {})
+                  if not tgwa and 'CreateTransitGatewayVpcAttachmentResponse' in resp:
+                      tgwa = resp['CreateTransitGatewayVpcAttachmentResponse'].get('transitGatewayVpcAttachment', {})
+                  att_id = tgwa.get('transitGatewayAttachmentId')
+                  if att_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:transit-gateway-attachment/{att_id}"
+
+              # App Runner Service
+              elif event_name == 'CreateService' and event_source == 'apprunner.amazonaws.com':
+                  svc = resp.get('service', {})
+                  svc_arn = svc.get('serviceArn')
+                  if svc_arn:
+                      return svc_arn
+
+              # VPC Flow Logs (EC2 response wrapper: CreateFlowLogsResponse.flowLogIdSet.item)
+              elif event_name == 'CreateFlowLogs':
+                  fl_id = None
+                  if 'CreateFlowLogsResponse' in resp:
+                      nested = resp['CreateFlowLogsResponse']
+                      fl_id_set = nested.get('flowLogIdSet', {})
+                      fl_id = fl_id_set.get('item') if isinstance(fl_id_set, dict) else None
+                      if isinstance(fl_id, list):
+                          fl_id = fl_id[0]
+                  if not fl_id:
+                      flow_ids = resp.get('flowLogIds', [])
+                      fl_id = flow_ids[0] if flow_ids else None
+                  if fl_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc-flow-log/{fl_id}"
+
+              # Glue Table
+              elif event_name == 'CreateTable' and event_source == 'glue.amazonaws.com':
+                  db_name = req.get('databaseName')
+                  tbl_name = req.get('tableInput', {}).get('name')
+                  if db_name and tbl_name:
+                      return f"arn:aws:glue:{region}:{account_id}:table/{db_name}/{tbl_name}"
+
+              # ElastiCache Snapshot
+              elif event_name == 'CreateSnapshot' and event_source == 'elasticache.amazonaws.com':
+                  snap = resp.get('snapshot', {})
+                  snap_arn = snap.get('aRN') or snap.get('arn') or snap.get('ARN')
+                  if not snap_arn:
+                      snap_name = snap.get('snapshotName') or req.get('snapshotName')
+                      if snap_name:
+                          snap_arn = f"arn:aws:elasticache:{region}:{account_id}:snapshot:{snap_name}"
+                  if snap_arn:
+                      return snap_arn
+
+              # WorkSpaces
+              elif event_name == 'CreateWorkspaces':
+                  pending = resp.get('pendingRequests', [])
+                  if pending:
+                      ws_id = pending[0].get('workspaceId')
+                      if ws_id:
+                          return f"arn:aws:workspaces:{region}:{account_id}:workspace/{ws_id}"
+
+              # Route53 Health Check
+              elif event_name == 'CreateHealthCheck':
+                  health_check = resp.get('healthCheck', {})
+                  health_check_id = health_check.get('id')
+                  if health_check_id:
+                      return f"arn:aws:route53:::healthcheck/{health_check_id}"
+
+              # EC2 Key Pair
+              elif event_name == 'CreateKeyPair':
+                  key_pair_id = resp.get('keyPairId')
+                  if key_pair_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:key-pair/{key_pair_id}"
+
+              return None
+
+          def tag_resource(arn, tag_key, tag_value, tagging_client=None, ec2_client=None, target_account=None, target_region=None):
+              _tagging = tagging_client or tagging
+              _ec2 = ec2_client or ec2
+              _region = target_region or boto3.session.Session().region_name
+
+              def get_service_client(service):
+                  """Get the right client — cross-account if needed, local otherwise."""
+                  if target_account:
+                      c = get_cross_account_client(service, target_account, _region)
+                      if c:
+                          return c
+                  return boto3.client(service, region_name=_region)
+
+              # Handle special cases that don't support Resource Groups Tagging API
+              if ':s3:::' in arn:
+                  s3 = get_service_client('s3')
+                  bucket = arn.split(':::')[1]
+                  existing = []
+                  try:
+                      existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
+                  except: pass
+                  existing = [t for t in existing if t['Key'] != tag_key]
+                  existing.append({'Key': tag_key, 'Value': tag_value})
+                  s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing})
+                  return True
+              elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
+                  ba = boto3.client('bedrock-agent', region_name=arn.split(':')[3])
+                  ba.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  return True
+              elif ':ivs:' in arn:
+                  ivs_region = arn.split(':')[3] or region
+                  ivs = boto3.client('ivs', region_name=ivs_region)
+                  ivs.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  return True
+              elif ':scheduler:' in arn and ':schedule/' in arn and ':schedule-group/' not in arn:
+                  # Individual EventBridge Schedules: AWS TagResource API only accepts
+                  # schedule-group ARNs, not individual schedule ARNs. Platform limitation.
+                  # Schedule Groups are tagged correctly via tag:TagResources.
+                  print(f"Skipping individual schedule (not taggable post-creation): {arn}")
+                  return False
+              elif ':transcribe:' in arn:
+                  # Transcribe resources need transcribe:TagResource (tag:TagResources not supported)
+                  tr_region = arn.split(':')[3] or region
+                  tr_c = boto3.client('transcribe', region_name=tr_region)
+                  tr_c.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':scn:' in arn:
+                  # AWS Supply Chain uses scn:TagResource (tag:TagResources not supported)
+                  scn_region = arn.split(':')[3] or region
+                  scn_c = boto3.client('supplychain', region_name=scn_region)
+                  scn_c.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  return True
+              elif ':apprunner:' in arn:
+                  # App Runner may be in a different region than the Lambda
+                  ar_region = arn.split(':')[3] or region
+                  ar = boto3.client('apprunner', region_name=ar_region)
+                  ar.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':quicksight:' in arn:
+                  # QuickSight resources must be tagged in the region where they exist
+                  qs_region = arn.split(':')[3] or region
+                  qs = boto3.client('quicksight', region_name=qs_region)
+                  account = arn.split(':')[4]
+                  qs.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':globalaccelerator:' in arn:
+                  ga = boto3.client('globalaccelerator', region_name='us-west-2')
+                  ga.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':cloudfront:' in arn:
+                  cf = boto3.client('cloudfront')
+                  cf.tag_resource(Resource=arn, Tags={'Items': [{'Key': tag_key, 'Value': tag_value}]})
+                  return True
+              elif ':route53:::hostedzone/' in arn:
+                  r53 = boto3.client('route53')
+                  zone_id = arn.split('/')[-1]
+                  r53.change_tags_for_resource(ResourceType='hostedzone', ResourceId=zone_id, AddTags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':kinesis:' in arn and ':stream/' in arn:
+                  kinesis = get_service_client('kinesis')
+                  stream_name = arn.split('/')[-1]
+                  kinesis.add_tags_to_stream(StreamName=stream_name, Tags={tag_key: tag_value})
+                  return True
+              elif ':firehose:' in arn:
+                  firehose = get_service_client('firehose')
+                  stream_name = arn.split('/')[-1]
+                  firehose.tag_delivery_stream(DeliveryStreamName=stream_name, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':apigateway:' in arn:
+                  apigw = get_service_client('apigateway') if '/restapis/' in arn else get_service_client('apigatewayv2')
+                  if '/restapis/' in arn:
+                      apigw.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  else:
+                      apigw.tag_resource(ResourceArn=arn, Tags={tag_key: tag_value})
+                  return True
+              elif ':autoscaling:' in arn:
+                  asg = get_service_client('autoscaling')
+                  name = arn.split('/')[-1]
+                  asg.create_or_update_tags(Tags=[{
+                      'ResourceId': name,
+                      'ResourceType': 'auto-scaling-group',
+                      'Key': tag_key,
+                      'Value': tag_value,
+                      'PropagateAtLaunch': False
+                  }])
+                  return True
+              elif ':sqs:' in arn:
+                  sqs = get_service_client('sqs')
+                  queue_name = arn.split(':')[-1]
+                  q_region = arn.split(':')[3]
+                  q_account = arn.split(':')[4]
+                  queue_url = f"https://sqs.{q_region}.amazonaws.com/{q_account}/{queue_name}"
+                  sqs.tag_queue(QueueUrl=queue_url, Tags={tag_key: tag_value})
+                  return True
+              elif ':memorydb:' in arn:
+                  memorydb = get_service_client('memorydb')
+                  memorydb.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':iot:' in arn:
+                  iot = get_service_client('iot')
+                  iot.tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':lightsail:' in arn:
+                  lightsail = get_service_client('lightsail')
+                  lightsail.tag_resource(resourceName=arn.split('/')[-1], tags=[{'key': tag_key, 'value': tag_value}])
+                  return True
+              else:
+                  # Use universal Resource Groups Tagging API (with optional cross-account client)
+                  try:
+                      response = _tagging.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
+                      if response.get('FailedResourcesMap'):
+                          failures = response['FailedResourcesMap']
+                          error_msg = failures.get(arn, {}).get('ErrorMessage', 'Unknown error')
+                          raise Exception(f"Tagging API failed: {error_msg}")
+                      return True
+                  except Exception as e:
+                      # Fallback to EC2 tagging for VPC resources
+                      if ':ec2:' in arn:
+                          resource_id = arn.split('/')[-1]
+                          _ec2.create_tags(Resources=[resource_id], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                          return True
+                      raise e
+
+          def handler(event, context):
+              config = get_config()
+              if not is_after_agreement(config):
+                  print('Before agreement start date, skipping.')
+                  return {'status': 'skipped', 'reason': 'before_agreement_date'}
+
+              detail = event.get('detail', {})
+              account_id = detail.get('recipientAccountId', event.get('account', ''))
+              region = event.get('region', detail.get('awsRegion', ''))
+              
+              if not is_in_scope(config, account_id, detail):
+                  print(f'Resource not in MAP scope (account={account_id}), skipping.')
+                  return {'status': 'skipped', 'reason': 'out_of_scope'}
+              
+              if detail.get('errorCode') or detail.get('errorMessage'):
+                  print(f'CloudTrail event has error, skipping: {detail.get("errorMessage")}')
+                  return {'status': 'skipped', 'reason': 'event_error'}
+
+              # Skip non-taggable resource events
+              event_name = detail.get('eventName', '')
+              # Events to ignore — either not taggable, or would cause a feedback loop
+              # (e.g. PutBucketTagging: tagging an S3 bucket fires this event, which
+              #  would re-trigger this Lambda, which would tag again — infinite loop)
+              IGNORE_EVENTS = [
+                  'CreateGrant', 'CreateLogStream', 'CreateTags',
+                  'CreateOrUpdateTags', 'ModifyTags', 'DeleteTags',
+                  'PutBucketTagging', 'TagResource', 'TagResources',
+                  'UntagResource', 'UntagResources', 'AddTagsToResource',
+              ]
+              if event_name in IGNORE_EVENTS:
+                  print(f'Skipping non-taggable event: {event_name}')
+                  return {'status': 'skipped', 'reason': 'non_taggable_event'}
+
+              arn = extract_arn(detail, account_id, region)
+              if not arn:
+                  print(f'Could not extract ARN from event: {detail.get("eventName")}')
+                  return {'status': 'skipped', 'reason': 'no_arn'}
+              
+              tag_key = 'map-migrated'
+              tag_value = config['mpe_id']
+
+              # Determine if cross-account tagging is needed
+              local_account = boto3.client('sts').get_caller_identity()['Account']
+              target_account = get_account_from_arn(arn) or account_id
+
+              try:
+                  if target_account and target_account != local_account:
+                      # Cross-account: assume role in target account
+                      cross_tagging = get_cross_account_client('resourcegroupstaggingapi', target_account, region)
+                      cross_ec2 = get_cross_account_client('ec2', target_account, region)
+                      if cross_tagging:
+                          tag_resource(arn, tag_key, tag_value,
+                                       tagging_client=cross_tagging, ec2_client=cross_ec2,
+                                       target_account=target_account, target_region=region)
+                      else:
+                          tag_resource(arn, tag_key, tag_value)
+                  else:
+                      tag_resource(arn, tag_key, tag_value)
+                  print(f'Tagged {arn} with {tag_key}={tag_value}')
+                  return {'status': 'tagged', 'resources': [arn]}
+              except Exception as e:
+                  print(f'Failed to tag {arn}: {e}')
+                  return {'status': 'failed', 'error': str(e)}
+
+  # EventBridge rule - matches ALL resource creation events
+  AutoTagEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: map-auto-tagger-rule
+      Description: Triggers MAP auto-tagger on resource creation events
+      State: ENABLED
+      EventPattern:
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventName:
+            - prefix: "Create"
+            - prefix: "Run"
+            - prefix: "Activate"
+            - prefix: "Register"
+            - prefix: "Put"
+            - prefix: "Issue"
+            - prefix: "Start"
+            - prefix: "Request"    # ACM certificates
+            - prefix: "Allocate"   # Elastic IPs, EBS snapshots
+            - prefix: "Launch"     # EMR clusters, SageMaker jobs
+            - prefix: "Import"     # EC2 AMIs, snapshots
+            - prefix: "Publish"    # Lambda layers (PublishLayerVersion)
+      Targets:
+        - Arn: !GetAtt AutoTaggerFunction.Arn
+          Id: MapAutoTagger
+
+  # Permission for EventBridge to invoke Lambda
+  AutoTagEventPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AutoTaggerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt AutoTagEventRule.Arn
+
+  # SNS topic for tagging alerts
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: map-tagger-alerts
+      DisplayName: MAP 2.0 Auto-Tagger Alerts
+
+  # CloudWatch alarm - fires if Lambda errors spike
+  TaggerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-errors
+      AlarmDescription: MAP auto-tagger Lambda is failing
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AutoTaggerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+
+Outputs:
+  LambdaArn:
+    Description: ARN of the MAP auto-tagger Lambda function
+    Value: !GetAtt AutoTaggerFunction.Arn
+  ConfigParameter:
+    Description: SSM Parameter Store path for MAP tagger config
+    Value: /map-tagger/config
+  AlertTopicArn:
+    Description: SNS topic for tagger alerts - subscribe your email here
+    Value: !Ref AlertTopic

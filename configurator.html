@@ -1,0 +1,1785 @@
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAP 2.0 Auto-Tagger Configurator</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, 'Amazon Ember', 'Helvetica Neue', sans-serif;
+            background: #f2f3f3;
+            color: #16191f;
+            line-height: 1.6;
+        }
+        .header {
+            background: #232f3e;
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header h1 { font-size: 18px; font-weight: 600; }
+        .header .badge {
+            background: #ff9900;
+            color: #16191f;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .header .version {
+            margin-left: auto;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        .container { max-width: 800px; margin: 32px auto; padding: 0 24px; }
+        .card {
+            background: white;
+            border: 1px solid #d5dbdb;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 18px; margin-bottom: 4px; color: #16191f; }
+        .card .subtitle { font-size: 13px; color: #687078; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        label .hint { font-weight: 400; color: #687078; font-size: 12px; }
+        input[type="text"], input[type="date"], select {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid #aab7b8;
+            border-radius: 4px;
+            background: white;
+        }
+        input:focus, select:focus { outline: none; border-color: #0073bb; box-shadow: 0 0 0 1px #0073bb; }
+        input.error { border-color: #d13212; }
+        .error-msg { color: #d13212; font-size: 12px; margin-top: 2px; display: none; }
+        .entry-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+        .entry-row input { flex: 1; }
+        .entry-row input.account-label { flex: 1.5; }
+        .btn-remove {
+            background: none; border: 1px solid #d5dbdb; border-radius: 4px;
+            padding: 6px 10px; cursor: pointer; color: #d13212; font-size: 18px; line-height: 1;
+        }
+        .btn-remove:hover { background: #fdf3f1; }
+        .btn-add {
+            background: none; border: 1px dashed #aab7b8; border-radius: 4px;
+            padding: 8px 16px; cursor: pointer; color: #0073bb; font-size: 13px; width: 100%;
+        }
+        .btn-add:hover { background: #f2f8fd; border-color: #0073bb; }
+        .actions { display: flex; gap: 12px; margin-top: 24px; }
+        .btn-primary {
+            background: #ff9900; color: #16191f; border: none; border-radius: 4px;
+            padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .btn-primary:hover { background: #ec7211; }
+        .btn-secondary {
+            background: white; color: #16191f; border: 1px solid #aab7b8;
+            border-radius: 4px; padding: 10px 24px; font-size: 14px; cursor: pointer;
+        }
+        .btn-secondary:hover { background: #fafafa; }
+        .preview-box {
+            background: #1b2631; color: #89d185; font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px; padding: 16px; border-radius: 4px; overflow-x: auto;
+            white-space: pre; max-height: 400px; overflow-y: auto; margin-top: 16px;
+        }
+        .info-box {
+            background: #f2f8fd; border-left: 4px solid #0073bb;
+            padding: 12px 16px; font-size: 13px; margin-bottom: 20px; border-radius: 0 4px 4px 0;
+        }
+        .warn-box {
+            background: #fef8f0; border-left: 4px solid #ff9900;
+            padding: 12px 16px; font-size: 13px; margin-top: 12px; border-radius: 0 4px 4px 0;
+        }
+        .success-box {
+            background: #f2fcf3; border-left: 4px solid #1d8102;
+            padding: 12px 16px; font-size: 13px; margin-top: 12px; border-radius: 0 4px 4px 0;
+        }
+        .step-indicator { display: flex; gap: 0; margin-bottom: 24px; }
+        .step {
+            flex: 1; text-align: center; padding: 12px 8px; font-size: 13px; font-weight: 600;
+            background: #f2f3f3; border-bottom: 3px solid #d5dbdb; color: #687078;
+        }
+        .step.active { background: #f2f8fd; border-bottom-color: #0073bb; color: #0073bb; }
+        .step.done { background: #f2fcf3; border-bottom-color: #1d8102; color: #1d8102; }
+        .cost-note {
+            background: #f2fcf3; border-left: 4px solid #1d8102;
+            padding: 12px 16px; font-size: 13px; margin-top: 16px; border-radius: 0 4px 4px 0;
+        }
+        .option-card {
+            border: 2px solid #d5dbdb; border-radius: 8px; padding: 16px; margin-bottom: 12px; cursor: pointer;
+        }
+        .option-card.selected { border-color: #0073bb; background: #f2f8fd; }
+        .option-card h3 { font-size: 14px; margin-bottom: 4px; }
+        .option-card p { font-size: 13px; color: #687078; margin: 0; }
+        .option-card .tag {
+            display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 6px;
+            border-radius: 3px; margin-left: 8px;
+        }
+        .tag-recommended { background: #f2fcf3; color: #1d8102; }
+        .tag-advanced { background: #fef8f0; color: #df6e0e; }
+        .tag-noprereq { background: #f2f8fd; color: #0073bb; }
+        .hidden { display: none; }
+        .section-divider { border-top: 1px solid #eaeded; margin: 16px 0; }
+        .coverage-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px;
+        }
+        .coverage-item {
+            font-size: 12px; padding: 6px 10px; background: #f2fcf3;
+            border-radius: 4px; color: #1d8102;
+        }
+        .coverage-item.limited { background: #fef8f0; color: #df6e0e; }
+        .steps-list { counter-reset: steps; }
+        .steps-list li {
+            counter-increment: steps;
+            list-style: none;
+            padding: 8px 0 8px 32px;
+            position: relative;
+            border-bottom: 1px solid #eaeded;
+            font-size: 13px;
+        }
+        .steps-list li:last-child { border-bottom: none; }
+        .steps-list li::before {
+            content: counter(steps);
+            position: absolute;
+            left: 0;
+            top: 8px;
+            width: 22px;
+            height: 22px;
+            background: #0073bb;
+            color: white;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        code {
+            background: #f2f3f3; padding: 1px 5px; border-radius: 3px;
+            font-family: 'SF Mono', monospace; font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>MAP 2.0 Auto-Tagger Configurator</h1>
+        <span class="badge">INTERNAL</span>
+        <span class="version">v2.0 — 190+ services E2E tested</span>
+    </div>
+
+    <div class="container">
+        <div class="step-indicator">
+            <div class="step active" id="step1-indicator">1. Configure</div>
+            <div class="step" id="step2-indicator">2. Review</div>
+            <div class="step" id="step3-indicator">3. Download</div>
+        </div>
+
+        <div class="info-box">
+            Generates a CloudFormation template that auto-tags new AWS resources with <code>map-migrated</code> within <strong>60–90 seconds</strong> of creation.
+            Covers <strong>190+ resource types</strong> across all major AWS services (CT org E2E tested).
+            Customer cost: <strong>&lt; $2/month</strong>.
+        </div>
+
+        <!-- Prerequisites -->
+        <div class="card" id="prerequisites">
+            <h2>Customer Prerequisites</h2>
+            <p class="subtitle">Confirm these before generating a template</p>
+            <div class="form-group">
+                <label><input type="checkbox" class="prereq-check"> CloudTrail is enabled in the target region(s)</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" class="prereq-check"> Deployer has CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch) — or use a CloudFormation service role</label>
+            </div>
+            <div class="form-group" id="prereq-multi" style="display: none;">
+                <label><input type="checkbox" class="prereq-check"> AWS Organizations is enabled with CloudFormation StackSets trusted access enabled</label>
+            </div>
+        </div>
+
+        <!-- Step 1: Configure -->
+        <div id="step1">
+            <div class="card">
+                <h2>MAP 2.0 Deal Details</h2>
+                <p class="subtitle">Enter the MAP agreement details from AWS Investments</p>
+
+                <div class="form-group">
+                    <label>MAP Engagement ID <span class="hint">(from AWS Investments — must start with 'mig')</span></label>
+                    <input type="text" id="mpeId" placeholder="mig1234567890">
+                    <div class="error-msg" id="mpeId-error">MAP Engagement ID must start with 'mig' followed by alphanumeric characters</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Agreement Start Date</label>
+                    <input type="date" id="agreementDate">
+                    <div class="error-msg" id="agreementDate-error">Agreement date is required</div>
+                </div>
+
+                <div class="form-group">
+                    <label>Customer Name <span class="hint">(for your reference — not included in template)</span></label>
+                    <input type="text" id="customerName" placeholder="e.g., Acme Corp">
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Deployment Mode</h2>
+                <p class="subtitle">How many AWS accounts will be used for migration?</p>
+
+                <div class="option-card selected" id="opt-single" onclick="selectDeployMode('single')">
+                    <h3>
+                        <input type="radio" name="deployMode" value="single" checked>
+                        Single Account
+                    </h3>
+                    <p>Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.</p>
+                </div>
+
+                <div class="option-card" id="opt-multi" onclick="selectDeployMode('multi')">
+                    <h3>
+                        <input type="radio" name="deployMode" value="multi">
+                        Multiple Accounts (AWS Organizations)
+                    </h3>
+                    <p>Customer has multiple linked accounts under an AWS Organization. One StackSet command deploys to all accounts simultaneously.</p>
+                </div>
+
+                <!-- Multi-account options -->
+                <div id="multi-account-options" class="hidden">
+                    <div class="section-divider"></div>
+
+                    <div class="form-group">
+                        <label>Multi-Account Architecture</label>
+                        <div class="hint" style="margin-bottom: 8px;">Choose how the auto-tagger covers all accounts.</div>
+                    </div>
+
+                    <div class="option-card selected" id="opt-stackset" onclick="selectEventMode('stackset')">
+                        <h3>
+                            <input type="radio" name="eventMode" value="stackset" checked>
+                            StackSet — Deploy to every account
+                            <span class="tag tag-recommended">Recommended · Simplest</span>
+                        </h3>
+                        <p>The <strong>same CloudFormation stack</strong> deploys to every specified account via a single StackSet. Each account gets its own Lambda that tags its own resources. No cross-account IAM. The template auto-discovers the organization structure — the customer never needs to know or enter any OU IDs.</p>
+                        <div class="success-box">
+                            <strong>1 command total.</strong> Enter specific account IDs to target only those accounts, or leave empty to cover every account in the org. The template figures out the rest automatically.
+                        </div>
+                    </div>
+
+                    <div class="option-card" id="opt-central" onclick="selectEventMode('central')">
+                        <h3>
+                            <input type="radio" name="eventMode" value="central">
+                            Central Lambda — Single account tags all others
+                            <span class="tag tag-advanced">Advanced</span>
+                        </h3>
+                        <p>One Lambda in a central account. Member accounts forward CloudTrail events to it via EventBridge. Lambda assumes a cross-account role to tag resources in each member account.</p>
+                        <div class="warn-box hidden" id="central-note">
+                            <strong>Requires per-account setup:</strong> Each member account needs an IAM role (<code>MapAutoTaggerCrossAccount</code>) and an EventBridge forwarding rule. Deploy these via StackSet or manually.
+                        </div>
+                    </div>
+
+                    <!-- StackSet: Account documentation only -->
+                    <div id="stackset-options" style="margin-top: 12px;">
+                        <div class="form-group">
+                            <label>Migration Account IDs <span class="hint">(for reference — the stack deploys to the entire org automatically)</span></label>
+                            <div class="warn-box" style="margin-bottom: 10px;">
+                                <strong>Note:</strong> AWS deploys SERVICE_MANAGED StackSets by Organizational Unit, not by account ID. The template auto-discovers your org's root OU and deploys to all accounts. The IDs you enter here are <strong>documentation only</strong> and appear in the deployment instructions.
+                            </div>
+                            <div id="stacksetAccountList">
+                                <div class="entry-row">
+                                    <input type="text" class="stackset-account-id" placeholder="123456789012" maxlength="12">
+                                    <input type="text" class="stackset-account-label account-label" placeholder="e.g., Migration Account">
+                                    <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="addStacksetAccount()">+ Add another account</button>
+                        </div>
+                    </div>
+
+                    <!-- Central: linked account list -->
+                    <div id="central-options" class="hidden">
+                        <div class="form-group">
+                            <label>Central Account ID <span class="hint">(where the Lambda will be deployed)</span></label>
+                            <input type="text" id="centralAccountId" placeholder="123456789012" maxlength="12">
+                        </div>
+                        <div class="form-group">
+                            <label>Member Accounts in MAP Scope</label>
+                            <div class="hint" style="margin-bottom: 8px;">Accounts whose resources the central Lambda will tag.</div>
+                            <div id="linkedAccountList">
+                                <div class="entry-row">
+                                    <input type="text" class="linked-account-id" placeholder="123456789012" maxlength="12">
+                                    <input type="text" class="linked-account-label account-label" placeholder="e.g., Migration Prod">
+                                    <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="addLinkedAccount()">+ Add another account</button>
+                        </div>
+                    </div>
+
+                    <!-- Deployment region -->
+                    <div class="section-divider"></div>
+                    <div class="form-group">
+                        <label>Deployment Regions <span class="hint">(regions where the customer creates resources)</span></label>
+                        <div id="regionList">
+                            <div class="entry-row">
+                                <select class="region-select">
+                                    <option value="">Select a region...</option>
+                                    <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                                    <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                                    <option value="us-west-1">US West (N. California) — us-west-1</option>
+                                    <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                                    <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                                    <option value="ap-northeast-2" selected>Asia Pacific (Seoul) — ap-northeast-2</option>
+                                    <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                                    <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                                    <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                                    <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                                    <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                                    <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                                    <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                                    <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                                    <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                                    <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                                    <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                                    <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                                    <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                                </select>
+                                <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                            </div>
+                        </div>
+                        <button class="btn-add" onclick="addRegion()">+ Add another region</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VPC scope -->
+            <div class="card" id="vpc-scope-card">
+                <h2>Tagging Scope <span class="hint">(optional)</span></h2>
+                <p class="subtitle">By default all new resources in the account(s) are tagged. Use VPC scoping if migration and non-migration workloads share the same account.</p>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="useVpcScope" onchange="toggleVpcScope()">
+                        Limit tagging to specific VPCs only
+                    </label>
+                </div>
+
+                <div id="vpc-scope-fields" class="hidden">
+                    <label>VPC IDs <span class="hint">(only resources in these VPCs will be tagged)</span></label>
+                    <div id="vpcList">
+                        <div class="entry-row">
+                            <input type="text" class="vpc-input" placeholder="vpc-0abc1234def56789">
+                            <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                        </div>
+                    </div>
+                    <button class="btn-add" onclick="addVpc()">+ Add another VPC</button>
+
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label>
+                            <input type="checkbox" id="tagNonVpcServices" checked>
+                            Also tag non-VPC services (S3, DynamoDB, Lambda, SNS, SQS, etc.)
+                        </label>
+                        <div class="hint" style="margin-left: 22px; margin-top: 2px;">
+                            These services don't live in a VPC. If checked, all of them in the account will be tagged regardless of VPC scope.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Service coverage summary -->
+            <div class="card">
+                <h2>What Gets Tagged</h2>
+                <p class="subtitle">190+ resource types confirmed working via multi-account CT org testing (4 accounts × 4 regions)</p>
+                <div class="coverage-grid">
+                    <div class="coverage-item">✅ EC2, Lambda, ECS, EKS, Auto Scaling, App Runner</div>
+                    <div class="coverage-item">✅ S3, EFS, FSx, ECR, EBS Snapshots, AMIs</div>
+                    <div class="coverage-item">✅ RDS (all types + snapshots), Aurora, Neptune, DynamoDB</div>
+                    <div class="coverage-item">✅ Redshift, DocumentDB, MemoryDB, OpenSearch, MSK</div>
+                    <div class="coverage-item">✅ VPC, Subnets, Load Balancers, Transit Gateway, VPN</div>
+                    <div class="coverage-item">✅ CloudFront, Route53, Global Accelerator, Network Firewall</div>
+                    <div class="coverage-item">✅ Kinesis, Firehose, Kinesis Analytics, Glue, Athena, EMR</div>
+                    <div class="coverage-item">✅ SNS, SQS, Step Functions, EventBridge, API Gateway</div>
+                    <div class="coverage-item">✅ SageMaker (all types), Comprehend, Rekognition</div>
+                    <div class="coverage-item">✅ Bedrock (Agents, Guardrails, Flows, Prompts, Inference Profiles)</div>
+                    <div class="coverage-item">✅ CodeBuild, CodeDeploy, CodePipeline, Amplify, CloudFormation</div>
+                    <div class="coverage-item">✅ Cognito, Macie, GuardDuty, WAFv2, KMS, ACM</div>
+                    <div class="coverage-item">✅ WorkSpaces, QuickSight, IVS, EventBridge Pipes, EKS Add-ons</div>
+                    <div class="coverage-item">✅ DMS, DataSync, Transfer Family, MSK Serverless</div>
+                    <div class="coverage-item limited">⚠️ IoT Things, Lambda Layers/Aliases — not taggable (AWS API limitation)</div>
+                    <div class="coverage-item limited">⚠️ NAT Gateways, ElastiCache — timing delay, retry logic built in</div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-primary" onclick="reviewConfig()">Review Configuration →</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Review -->
+        <div id="step2" class="hidden">
+            <div class="card">
+                <h2>Review Configuration</h2>
+                <p class="subtitle">Verify settings before generating the template</p>
+                <table style="width: 100%; font-size: 14px; border-collapse: collapse;" id="reviewTable"></table>
+            </div>
+
+            <div class="card">
+                <h2>What Gets Deployed</h2>
+                <p class="subtitle" id="deployDescription"></p>
+                <div id="templateList"></div>
+                <div class="cost-note">
+                    Estimated monthly cost: <strong>&lt; $2/month</strong> per account (Lambda invocations + CloudWatch). No AWS Config required.
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-secondary" onclick="backToConfig()">← Back</button>
+                <button class="btn-primary" onclick="generateAndDownload()">Generate & Download →</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Download -->
+        <div id="step3" class="hidden">
+            <div class="card">
+                <h2>Template Ready</h2>
+                <p class="subtitle">Share this with the customer along with the deployment instructions below</p>
+
+                <div id="downloadButtons" style="margin: 16px 0; display: flex; gap: 12px; flex-wrap: wrap;"></div>
+
+                <h3 style="margin-top: 20px; font-size: 14px;">Customer Deployment Instructions</h3>
+                <div class="preview-box" id="instructions" style="color: #d4d4d4;"></div>
+
+                <h3 style="margin-top: 20px; font-size: 14px;">Template Preview</h3>
+                <div class="preview-box" id="templatePreview"></div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-secondary" onclick="backToConfig()">Start Over</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- UI State ---
+        function selectDeployMode(mode) {
+            document.querySelector(`input[name="deployMode"][value="${mode}"]`).checked = true;
+            document.getElementById('opt-single').classList.toggle('selected', mode === 'single');
+            document.getElementById('opt-multi').classList.toggle('selected', mode === 'multi');
+            document.getElementById('multi-account-options').classList.toggle('hidden', mode === 'single');
+            document.getElementById('prereq-multi').style.display = mode === 'multi' ? 'block' : 'none';
+        }
+
+        function selectEventMode(mode) {
+            document.querySelector(`input[name="eventMode"][value="${mode}"]`).checked = true;
+            document.getElementById('opt-stackset').classList.toggle('selected', mode === 'stackset');
+            document.getElementById('opt-central').classList.toggle('selected', mode === 'central');
+            document.getElementById('central-note').classList.toggle('hidden', mode !== 'central');
+            document.getElementById('stackset-options').classList.toggle('hidden', mode !== 'stackset');
+            document.getElementById('central-options').classList.toggle('hidden', mode !== 'central');
+        }
+
+        function toggleVpcScope() {
+            document.getElementById('vpc-scope-fields').classList.toggle('hidden', !document.getElementById('useVpcScope').checked);
+        }
+
+        // --- Dynamic lists ---
+        function addLinkedAccount() {
+            const list = document.getElementById('linkedAccountList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = '<input type="text" class="linked-account-id" placeholder="123456789012" maxlength="12"><input type="text" class="linked-account-label account-label" placeholder="e.g., Prod Account"><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+        }
+
+        function addStacksetAccount() {
+            const list = document.getElementById('stacksetAccountList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = '<input type="text" class="stackset-account-id" placeholder="123456789012" maxlength="12"><input type="text" class="stackset-account-label account-label" placeholder="e.g., Prod Account"><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+        }
+
+        function addVpc() {
+            const list = document.getElementById('vpcList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = '<input type="text" class="vpc-input" placeholder="vpc-0abc1234def56789"><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+        }
+
+        function addRegion() {
+            const list = document.getElementById('regionList');
+            const firstSelect = list.querySelector('.region-select');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = `<select class="region-select">${firstSelect.innerHTML}</select><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>`;
+            list.appendChild(row);
+        }
+
+        function removeEntry(btn) {
+            const list = btn.parentElement.parentElement;
+            if (list.children.length > 1) btn.parentElement.remove();
+        }
+
+        function getValues(selector) {
+            return Array.from(document.querySelectorAll(selector)).map(i => i.value.trim()).filter(v => v);
+        }
+
+        function getLinkedAccounts() {
+            const ids = document.querySelectorAll('.linked-account-id');
+            const labels = document.querySelectorAll('.linked-account-label');
+            const accounts = [];
+            ids.forEach((input, i) => {
+                const id = input.value.trim();
+                const label = labels[i] ? labels[i].value.trim() : '';
+                if (id) accounts.push({ id, label: label || id });
+            });
+            return accounts;
+        }
+
+        // --- Validation ---
+        function validate() {
+            let valid = true;
+            const mpeId = document.getElementById('mpeId').value.trim();
+            const date = document.getElementById('agreementDate').value;
+
+            if (!/^mig[a-zA-Z0-9]+$/.test(mpeId)) {
+                document.getElementById('mpeId').classList.add('error');
+                document.getElementById('mpeId-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('mpeId').classList.remove('error');
+                document.getElementById('mpeId-error').style.display = 'none';
+            }
+
+            if (!date) {
+                document.getElementById('agreementDate').classList.add('error');
+                document.getElementById('agreementDate-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('agreementDate').classList.remove('error');
+                document.getElementById('agreementDate-error').style.display = 'none';
+            }
+
+            return valid;
+        }
+
+        // --- Config gathering ---
+        function getConfig() {
+            const deployMode = document.querySelector('input[name="deployMode"]:checked').value;
+            const useVpcScope = document.getElementById('useVpcScope').checked;
+            const tagNonVpcServices = document.getElementById('tagNonVpcServices').checked;
+
+            const config = {
+                mpeId: document.getElementById('mpeId').value.trim(),
+                agreementDate: document.getElementById('agreementDate').value,
+                customerName: document.getElementById('customerName').value.trim(),
+                deployMode,
+                scopeMode: useVpcScope ? 'vpc' : 'account',
+                scopedVpcIds: useVpcScope ? getValues('.vpc-input') : ['NONE'],
+                tagNonVpcServices,
+            };
+
+            if (deployMode === 'multi') {
+                config.eventMode = document.querySelector('input[name="eventMode"]:checked').value;
+                config.regions = getValues('.region-select');
+                if (config.eventMode === 'stackset') {
+                    const ssIds = document.querySelectorAll('.stackset-account-id');
+                    const ssLabels = document.querySelectorAll('.stackset-account-label');
+                    config.stacksetAccounts = [];
+                    ssIds.forEach((input, i) => {
+                        const id = input.value.trim();
+                        const label = ssLabels[i] ? ssLabels[i].value.trim() : '';
+                        if (id) config.stacksetAccounts.push({ id, label: label || id });
+                    });
+                } else {
+                    config.centralAccountId = document.getElementById('centralAccountId').value.trim();
+                    config.linkedAccounts = getLinkedAccounts();
+                }
+            }
+
+            return config;
+        }
+
+        // --- Step navigation ---
+        function setStep(num) {
+            ['step1', 'step2', 'step3'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
+                const ind = document.getElementById(id + '-indicator');
+                ind.classList.remove('active', 'done');
+                if (i + 1 < num) ind.classList.add('done');
+                if (i + 1 === num) ind.classList.add('active');
+            });
+        }
+
+        function backToConfig() { setStep(1); }
+
+        // --- Review ---
+        function reviewConfig() {
+            if (!validate()) return;
+            const config = getConfig();
+            const table = document.getElementById('reviewTable');
+
+            const rows = [
+                ['Customer', config.customerName || '(not specified)'],
+                ['MAP Engagement ID', config.mpeId],
+                ['Agreement Start Date', config.agreementDate],
+                ['Deployment Mode', config.deployMode === 'single' ? 'Single Account' : 'Multiple Accounts'],
+            ];
+
+            if (config.deployMode === 'multi') {
+                rows.push(['Multi-Account Method', config.eventMode === 'stackset' ? 'StackSet (per-account Lambda)' : 'Central Lambda (cross-account)']);
+                if (config.eventMode === 'stackset') {
+                    const acctDisplay = (config.stacksetAccounts || []).map(a => `${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('<br>');
+                    rows.push(['Target Accounts', acctDisplay || '(none specified)']);
+                } else {
+                    rows.push(['Central Account', config.centralAccountId || '(not specified)']);
+                    const acctDisplay = (config.linkedAccounts || []).map(a => `${a.id} (${a.label})`).join('<br>');
+                    rows.push(['Member Accounts', acctDisplay || '(none specified)']);
+                }
+                if (config.regions && config.regions.length > 0) {
+                    rows.push(['Regions', config.regions.join(', ')]);
+                }
+            }
+
+            if (config.scopeMode === 'vpc') {
+                rows.push(['VPC Scope', config.scopedVpcIds.join(', ')]);
+                rows.push(['Tag non-VPC services', config.tagNonVpcServices ? 'Yes' : 'No']);
+            } else {
+                rows.push(['Tagging Scope', 'All resources in target account(s)']);
+            }
+
+            table.innerHTML = rows.map(([k, v]) =>
+                `<tr style="border-bottom: 1px solid #eaeded;">
+                    <td style="padding: 8px; font-weight: 600; width: 200px; vertical-align: top;">${k}</td>
+                    <td style="padding: 8px; font-family: monospace; font-size: 13px;">${v}</td>
+                </tr>`
+            ).join('');
+
+            const desc = document.getElementById('deployDescription');
+            const templateListEl = document.getElementById('templateList');
+
+            const baseResources = `
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">Lambda Function</td><td style="padding:8px;">Auto-tags new resources within 60–90 sec of creation</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">EventBridge Rule</td><td style="padding:8px;">Captures 200+ Create/Run/Put/Publish events across all services</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">SSM Parameter</td><td style="padding:8px;">Stores MAP Engagement ID, agreement date, scope config</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">IAM Role</td><td style="padding:8px;">100+ service-specific tagging permissions, least-privilege</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">SQS Dead Letter Queue</td><td style="padding:8px;">Captures failed tagging events for retry/audit</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">SNS Alert Topic + Alarm</td><td style="padding:8px;">Notifies on tagging errors (>3 failures in 5 min)</td></tr>`;
+
+            if (config.deployMode === 'single') {
+                desc.textContent = 'One CloudFormation stack. Deploy directly in the customer\'s account:';
+                templateListEl.innerHTML = `<table style="width:100%;font-size:14px;border-collapse:collapse;">${baseResources}</table>`;
+            } else if (config.eventMode === 'stackset') {
+                const accts = config.stacksetAccounts || [];
+                const scopeDesc = accts.length > 0
+                    ? `Targets ${accts.length} specific account(s): ${accts.map(a=>a.id).join(', ')}`
+                    : 'Targets ALL accounts in the organization';
+                desc.textContent = 'Two files generated. Deploy the management account template once — it auto-discovers your org structure and provisions the specified accounts:';
+                templateListEl.innerHTML = `<table style="width:100%;font-size:14px;border-collapse:collapse;">
+                    <tr style="border-bottom:1px solid #eaeded;background:#f2f8fd;"><td style="padding:8px;font-weight:600;" colspan="2">📄 map-auto-tagger-org-${config.mpeId}.yaml — deploy to management account</td></tr>
+                    <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;padding-left:20px;">Custom Resource (Lambda)</td><td style="padding:8px;">Auto-discovers root OU ID at deploy time — customer does nothing</td></tr>
+                    <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;padding-left:20px;">AWS::CloudFormation::StackSet</td><td style="padding:8px;">${scopeDesc}</td></tr>
+                    <tr style="border-bottom:1px solid #eaeded;background:#f2f8fd;"><td style="padding:8px;font-weight:600;" colspan="2">📄 map-auto-tagger-accounts-${config.mpeId}.yaml — uploaded to S3, deployed to each account</td></tr>
+                    ${baseResources}
+                    </table>`;
+            } else {
+                desc.textContent = 'Central Lambda in one account + cross-account IAM role in each member account:';
+                templateListEl.innerHTML = `<table style="width:100%;font-size:14px;border-collapse:collapse;">${baseResources}
+                    <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">Cross-Account Role</td><td style="padding:8px;">MapAutoTaggerCrossAccount role in each member account (trusts central Lambda)</td></tr>
+                    <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">EventBridge Forwarding</td><td style="padding:8px;">Member accounts forward events to central event bus</td></tr>
+                    </table>`;
+            }
+
+            setStep(2);
+        }
+
+        // --- Template generation ---
+
+        // Complete list of event names (200+ proven events)
+        const ALL_EVENT_NAMES = [
+            'RunInstances','CreateVolume','CreateBucket','CreateDBInstance','CreateDBCluster',
+            'CreateTable','CreateFunction20150331','CreateLoadBalancer','CreateCluster','CreateService',
+            'CreateTopic','CreateQueue','CreateFileSystem','CreateCacheCluster','CreateReplicationGroup',
+            'CreateDomain','RunJobFlow','CreateStream','CreateDeliveryStream','CreateBroker',
+            'CreateRepository','CreateRestApi','CreateApi','CreateJob','CreateCrawler','CreateDatabase',
+            'CreateStateMachine','CreateKey','CreateSecret','CreateNotebookInstance','CreateEndpoint',
+            'CreateTrainingJob','CreateDistribution','CreateReplicationInstance','CreateReplicationTask',
+            'CreateFirewall','CreateFirewallPolicy','CreateServer','CreateWorkspaces','CreateHostedZone',
+            'ActivateGateway','CreateFleet','CreateImageBuilder','CreateDirectory','CreateMicrosoftAD',
+            'RequestCertificate','CreateGraphqlApi','CreateProject','CreatePipeline','CreateBackupVault',
+            'CreateBackupPlan','CreateLogGroup','CreateUserPool','CreateIdentityPool','CreateApplication',
+            'CreateIndex','CreateChannel','CreateInput','CreateEnvironment','CreateApp','CreateSequenceStore',
+            'CreateRunGroup','CreateWorkgroup','CreateNamespace','CreateDocumentClassifier',
+            'CreateEntityRecognizer','CreateConnection','CreateHsm','CreateVault','CreateSnapshot',
+            'CopySnapshot','CreateImage','CopyImage','ImportImage','ImportSnapshot',
+            'CreateCapacityReservation','CreateDBInstanceReadReplica','CreateDBSnapshot',
+            'CreateDBClusterSnapshot','CopyDBSnapshot','CopyDBClusterSnapshot',
+            'RestoreDBInstanceFromDBSnapshot','RestoreDBInstanceToPointInTime',
+            'RestoreDBClusterFromSnapshot','RestoreDBClusterToPointInTime','CreateGlobalCluster',
+            'CreateClusterSnapshot','RestoreFromClusterSnapshot','CreateVpc','CreateSubnet',
+            'CreateNatGateway','CreateTransitGateway','CreateTransitGatewayVpcAttachment',
+            'CreateVpcEndpoint','AllocateAddress','CreateClientVpnEndpoint','CreateVpnGateway',
+            'CreateVpnConnection','RunTask','CreateProcessingJob','CreateTransformJob',
+            'CreateModel','CreateEndpointConfig','PutMetricAlarm','RunScheduledInstances',
+            'CreateInferenceProfile','CreateModelCustomizationJob','CreateAgent','CreateKnowledgeBase',
+            'CreateGuardrail','CreateFlow','CreatePrompt','CreateProvisionedModelThroughput',
+            'CreateModelImportJob','CreateModelInvocationJob','CreateEvaluationJob','CreatePromptRouter',
+            'CreateNodegroup','CreateFargateProfile','CreateStorageVirtualMachine',
+            'CreateAgentAlias','CreateDataSource','CreateAgentActionGroup','CreateSnapshots',
+            'CreateDashboard','CreateAnalysis','CreateDataSet','RegisterUser',
+            'CreateComputeEnvironment','CreateReplicationGroup','CreateCacheCluster',
+            'CreateActivity','CreateStateMachine','CreatePipe','CreateEventBus',
+            'CreateAccelerator','PublishLayerVersion20181031','CreateAlias20150331',
+            'CreateAddon','CreateTransitGatewayVpcAttachment','CreateFlowLogs',
+            'CreateClassificationJob','CreateUserPool','CreateIdentityPool',
+            'CreateDeploymentGroup','CreateBranch','CreateConfigurationProfile',
+            'CreateFirewallPolicy','CreateFirewall','CreateSamplingRule',
+            'PutParameter','PutRule','PutDashboard','PutQueryDefinition'
+        ];
+
+        const ALL_SOURCES = [
+            'aws.ec2','aws.s3','aws.rds','aws.dynamodb','aws.lambda','aws.elasticloadbalancing',
+            'aws.ecs','aws.sns','aws.sqs','aws.eks','aws.elasticfilesystem','aws.elasticache',
+            'aws.redshift','aws.es','aws.fsx','aws.kafka','aws.elasticmapreduce','aws.kinesis',
+            'aws.firehose','aws.mq','aws.ecr','aws.apigateway','aws.glue','aws.states',
+            'aws.kms','aws.secretsmanager','aws.sagemaker','aws.cloudfront','aws.dms',
+            'aws.network-firewall','aws.transfer','aws.workspaces','aws.timestream',
+            'aws.datasync','aws.route53','aws.storagegateway','aws.memorydb','aws.cassandra',
+            'aws.appstream','aws.ds','aws.acm','aws.appsync','aws.codebuild','aws.codepipeline',
+            'aws.backup','aws.logs','aws.cognito-idp','aws.cognito-identity','aws.kinesisanalytics',
+            'aws.gamelift','aws.kendra','aws.mediaconvert','aws.medialive','aws.mediapackage',
+            'aws.m2','aws.resiliencehub','aws.finspace','aws.omics','aws.redshift-serverless',
+            'aws.comprehend','aws.directconnect','aws.cloudhsm','aws.glacier','aws.bedrock',
+            'aws.bedrock-agent','aws.quicksight','aws.ivs','aws.apprunner','aws.pipes',
+            'aws.macie2','aws.guardduty','aws.inspector2','aws.securityhub','aws.xray',
+            'aws.athena','aws.batch','aws.codecommit','aws.codedeploy','aws.amplify',
+            'aws.servicecatalog','aws.ram','aws.acm-pca','aws.aoss','aws.events'
+        ];
+
+        const TAGGING_PERMISSIONS = [
+            // Universal tagging
+            'tag:TagResources','tag:GetResources',
+            // Compute
+            'ec2:CreateTags','autoscaling:CreateOrUpdateTags','ecs:TagResource','eks:TagResource',
+            'lambda:TagResource','batch:TagResource','apprunner:TagResource','lightsail:TagResource',
+            'elasticbeanstalk:AddTags','elasticmapreduce:AddTags','emr-serverless:TagResource',
+            // Storage
+            's3:PutBucketTagging','s3:GetBucketTagging','elasticfilesystem:TagResource','fsx:TagResource',
+            'ecr:TagResource','backup:TagResource',
+            // Database
+            'rds:AddTagsToResource','dynamodb:TagResource','elasticache:AddTagsToResource',
+            'memorydb:TagResource','redshift:CreateTags','redshift-serverless:TagResource',
+            'es:AddTags','kafka:TagResource','dms:AddTagsToResource','cassandra:TagResource',
+            'mq:CreateTags',
+            // Networking
+            'elasticloadbalancing:AddTags','globalaccelerator:TagResource','cloudfront:TagResource',
+            'route53:ChangeTagsForResource','network-firewall:TagResource','directconnect:TagResource',
+            'appmesh:TagResource',
+            // Analytics
+            'kinesis:AddTagsToStream','firehose:TagDeliveryStream','kinesisanalytics:TagResource',
+            'glue:TagResource','glue:GetDatabase','databrew:TagResource',
+            'athena:TagResource',
+            // Integration
+            'sns:TagResource','sqs:TagQueue','states:TagResource','events:TagResource',
+            'pipes:TagResource','scheduler:TagResource','appsync:TagResource','apigateway:TagResource',
+            // Management & Monitoring
+            'logs:TagResource','cloudwatch:TagResource','ssm:AddTagsToResource',
+            'secretsmanager:TagResource','xray:TagResource','appconfig:TagResource',
+            'servicediscovery:TagResource',
+            // Security
+            'kms:TagResource','acm:AddTagsToCertificate',
+            'acm-pca:TagCertificateAuthority','wafv2:TagResource','guardduty:TagResource',
+            'macie2:TagResource','cognito-idp:TagResource','cognito-identity:TagResource',
+            'access-analyzer:TagResource','verifiedpermissions:TagResource','detective:TagResource',
+            'securityhub:TagResource','inspector2:TagResource','cleanrooms:TagResource',
+            // Developer Tools
+            'codecommit:TagResource','codedeploy:TagResource','codepipeline:TagResource',
+            'amplify:TagResource','cloud9:TagResource','codeartifact:TagResource',
+            'codeguru-profiler:TagResource',
+            // CodeBuild: tags applied via UpdateProject; BatchGetProjects needed for tag resolution
+            'codebuild:UpdateProject','codebuild:BatchGetProjects',
+            // CloudFormation: tagging maps to UpdateStack internally
+            'cloudformation:TagResource','cloudformation:UpdateStack','cloudformation:UpdateStackSet',
+            // Service Catalog: tagging routes through Update* actions
+            'servicecatalog:TagResource',
+            'servicecatalog:UpdatePortfolio','servicecatalog:UpdateProduct',
+            // Migration & Transfer
+            'transfer:TagResource','datasync:TagResource','storagegateway:AddTagsToResource',
+            // ML / AI
+            'sagemaker:AddTags','comprehend:TagResource','rekognition:TagResource',
+            'kendra:TagResource','lex:TagResource','transcribe:TagResource',
+            'bedrock:TagResource','aoss:TagResource','braket:TagResource',
+            // IoT
+            'iot:TagResource','iotanalytics:TagResource','iotevents:TagResource',
+            'iotsitewise:TagResource','iottwinmaker:TagResource','greengrass:TagResource',
+            // Media
+            'ivs:TagResource','ivschat:TagResource','mediaconvert:TagResource',
+            'medialive:CreateTags','mediapackage:TagResource',
+            // Other
+            'ram:TagResource','appstream:TagResource','workspaces:CreateTags',
+            'workspaces-web:TagResource','quicksight:TagResource','connect:TagResource',
+            'mobiletargeting:TagResource','managedblockchain:TagResource',
+            'gamelift:TagResource','geo:TagResource','timestream:TagResource','scn:TagResource',
+            'healthlake:TagResource','omics:TagResource','datazone:TagResource',
+            'qbusiness:TagResource','frauddetector:TagResource',
+            // IAM role tagging (iam:TagRole not covered by tag:TagResources)
+            'iam:TagRole'
+        ];
+
+        function generateMainTemplate(config) {
+            const mpe = config.mpeId;
+            const isMulti = config.deployMode === 'multi';
+            const isCentral = isMulti && config.eventMode === 'central';
+            const scopeMode = config.scopeMode;
+            const vpcIds = JSON.stringify(config.scopedVpcIds);
+            const tagNonVpc = config.tagNonVpcServices;
+
+            const linkedAccountIds = isCentral ? (config.linkedAccounts || []).map(a => a.id) : [];
+
+            const crossAccountPermission = isCentral ? `
+              - Sid: CrossAccountAssumeRole
+                Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource: "arn:aws:iam::*:role/MapAutoTaggerCrossAccount"` : '';
+
+            const permissionsList = TAGGING_PERMISSIONS.map(p => `                  - ${p}`).join('\n');
+
+            const eventNamesList = [...new Set(ALL_EVENT_NAMES)].map(e => `            - ${e}`).join('\n');
+            const sourcesList = ALL_SOURCES.map(s => `          - ${s}`).join('\n');
+
+            const crossAccountCode = isCentral ? `
+          _cross_account_clients = {}
+
+          def get_cross_account_client(service, target_account_id, region):
+              cache_key = f"{service}:{target_account_id}:{region}"
+              if cache_key not in _cross_account_clients:
+                  sts = boto3.client('sts')
+                  role_arn = f"arn:aws:iam::{target_account_id}:role/MapAutoTaggerCrossAccount"
+                  try:
+                      creds = sts.assume_role(
+                          RoleArn=role_arn,
+                          RoleSessionName="map-auto-tagger-cross-account"
+                      )['Credentials']
+                      _cross_account_clients[cache_key] = boto3.client(
+                          service, region_name=region,
+                          aws_access_key_id=creds['AccessKeyId'],
+                          aws_secret_access_key=creds['SecretAccessKey'],
+                          aws_session_token=creds['SessionToken']
+                      )
+                  except Exception as e:
+                      print(f'Cannot assume cross-account role in {target_account_id}: {e}')
+                      return None
+              return _cross_account_clients[cache_key]
+
+          def get_account_from_arn(arn):
+              parts = arn.split(':')
+              return parts[4] if len(parts) > 4 else None` : `
+          def get_account_from_arn(arn):
+              parts = arn.split(':')
+              return parts[4] if len(parts) > 4 else None`;
+
+            return `AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
+  Auto-tags 190+ AWS resource types within 60-90 seconds of creation.
+  ${isMulti && config.eventMode === 'stackset' ? 'Deploy via StackSet to all accounts in org.' : isMulti ? 'Central Lambda — deploy in the designated central account.' : 'Deploy in the migration account.'}
+  Generated by MAP 2.0 Auto-Tagger Configurator v18.
+
+Parameters:
+  MpeId:
+    Type: String
+    Default: '${mpe}'
+    AllowedPattern: ^mig[a-zA-Z0-9]+$
+    Description: MAP 2.0 MPE ID
+  AgreementStartDate:
+    Type: String
+    Default: '${config.agreementDate}'
+    AllowedPattern: ^\\d{4}-\\d{2}-\\d{2}$
+    Description: MAP agreement start date (YYYY-MM-DD)
+  ScopeMode:
+    Type: String
+    Default: '${scopeMode}'
+    AllowedValues: [account, vpc]
+  ScopedVpcIds:
+    Type: String
+    Default: '${config.scopedVpcIds.join(',')}'
+  ScopedAccountIds:
+    Type: String
+    Default: 'ALL'
+
+Conditions:
+  IsAccountAll: !Equals [!Ref ScopedAccountIds, 'ALL']
+  IsVpcNone: !Equals [!Ref ScopedVpcIds, 'NONE']
+
+Resources:
+
+  MapConfig:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /map-tagger/config
+      Type: String
+      Value: !Sub
+        - |
+          {
+            "mpe_id": "${mpe}",
+            "agreement_start_date": "${config.agreementDate}",
+            "scope_mode": "${scopeMode}",
+            "scoped_account_ids": \${AccountIds},
+            "scoped_vpc_ids": \${VpcIds},
+            "tag_non_vpc_services": ${tagNonVpc}
+          }
+        - AccountIds: !If [IsAccountAll, '["ALL"]', !Sub '["$\{ScopedAccountIds}"]']
+          VpcIds: !If [IsVpcNone, '[]', !Sub '["$\{ScopedVpcIds}"]']
+
+  AutoTaggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'map-auto-tagger-role-\${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: map-auto-tagger-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ServiceTagging
+                Effect: Allow
+                Action:
+${permissionsList}
+                Resource: '*'${crossAccountPermission}
+              - Sid: DLQ
+                Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt DeadLetterQueue.Arn
+              - Sid: MinimalReads
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeVolumes
+                  - sts:GetCallerIdentity
+                Resource: '*'
+              - Sid: ReadConfig
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/map-tagger/config
+              - Sid: Logging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*
+
+  AutoTaggerFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: map-auto-tagger
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt AutoTaggerRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      ReservedConcurrentExecutions: 10
+      DeadLetterConfig:
+        TargetArn: !GetAtt DeadLetterQueue.Arn
+      Environment:
+        Variables:
+          CONFIG_PARAM: /map-tagger/config
+      Code:
+        ZipFile: |
+          import json, os, boto3, re
+          from datetime import datetime, timezone
+
+          ssm = boto3.client('ssm')
+          ec2 = boto3.client('ec2')
+          tagging = boto3.client('resourcegroupstaggingapi')
+          _config = None
+${crossAccountCode}
+          def get_config():
+              global _config
+              if _config is None:
+                  resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
+                  _config = json.loads(resp['Parameter']['Value'])
+              return _config
+
+          def is_after_agreement(config):
+              start = datetime.strptime(config['agreement_start_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              return datetime.now(timezone.utc) >= start
+
+          def is_in_scope(config, account_id):
+              scoped = config.get('scoped_account_ids', ['ALL'])
+              if isinstance(scoped, str):
+                  scoped = [s.strip() for s in scoped.split(',')]
+              return 'ALL' in scoped or account_id in scoped
+
+          def handler(event, context):
+              config = get_config()
+              if not is_after_agreement(config):
+                  return {'status': 'skipped', 'reason': 'before_agreement'}
+              detail = event.get('detail', {})
+              if detail.get('errorCode') or detail.get('errorMessage'):
+                  return {'status': 'skipped', 'reason': 'event_error'}
+              account_id = detail.get('recipientAccountId', event.get('account', ''))
+              region = event.get('region', detail.get('awsRegion', os.environ.get('AWS_REGION', '')))
+              if not is_in_scope(config, account_id):
+                  return {'status': 'skipped', 'reason': 'out_of_scope'}
+              event_name = detail.get('eventName', '')
+              SKIP = ['CreateGrant','CreateLogStream','CreateTags','CreateOrUpdateTags','ModifyTags','DeleteTags',
+                      'PutBucketTagging','TagResource','TagResources','UntagResource','UntagResources','AddTagsToResource']
+              if event_name in SKIP:
+                  return {'status': 'skipped', 'reason': 'non_taggable'}
+
+              # Determine if cross-account tagging needed
+              local_account = boto3.client('sts').get_caller_identity()['Account']
+              target_account = get_account_from_arn(
+                  (detail.get('responseElements') or {}).get('arn', '')
+              ) or account_id
+              use_cross = target_account and target_account != local_account
+
+              if use_cross:
+                  ${isCentral ? `_tag = get_cross_account_client('resourcegroupstaggingapi', target_account, region) or tagging
+                  _ec2c = get_cross_account_client('ec2', target_account, region) or ec2` : '_tag = tagging\n                  _ec2c = ec2'}
+              else:
+                  _tag = tagging
+                  _ec2c = ec2
+
+              # Extract ARN from event
+              resp = detail.get('responseElements') or {}
+              req = detail.get('requestParameters') or {}
+              arn = None
+
+              # Universal ARN field search
+              ARN_FIELDS = ['arn','Arn','ARN','aRN','resourceArn','ResourceArn','clusterArn',
+                  'functionArn','topicArn','tableArn','streamArn','stateMachineArn','pipelineArn',
+                  'backupVaultArn','dBInstanceArn','dBClusterArn','queueArn','loadBalancerArn',
+                  'eventBusArn','notebookInstanceArn','documentClassifierArn','applicationArn',
+                  'ApplicationARN','backupPlanArn','locationArn','computeEnvironmentArn','appArn',
+                  'layerVersionArn','groupArn','activityArn','serviceArn','replicationGroupArn',
+                  'modelArn','endpointArn','endpointConfigArn','guardrailArn','agentArn',
+                  'knowledgeBaseArn','flowArn','promptArn','inferenceProfileArn','namespaceArn',
+                  'workgroupArn','firewallArn','firewallPolicyArn','addonArn','userPoolArn',
+                  'channelArn','acceleratorArn','jobArn','layerArn','pipeArn']
+
+              for field in ARN_FIELDS:
+                  if field in resp and resp[field] and str(resp[field]).startswith('arn:'):
+                      arn = resp[field]; break
+                  for v in resp.values():
+                      if isinstance(v, dict) and field in v and v[field] and str(v[field]).startswith('arn:'):
+                          arn = v[field]; break
+                  if arn: break
+
+              # Service-specific ARN construction for events without ARN in response
+              if not arn:
+                  p = 'aws'
+                  if event_name == 'RunInstances':
+                      items = resp.get('instancesSet',{}).get('items',[])
+                      if items: arn = f"arn:{p}:ec2:{region}:{account_id}:instance/{items[0].get('instanceId')}"
+                  elif event_name == 'CreateBucket':
+                      b = req.get('bucketName'); arn = f"arn:{p}:s3:::{b}" if b else None
+                  elif event_name == 'CreateStream':
+                      n = req.get('streamName'); arn = f"arn:{p}:kinesis:{region}:{account_id}:stream/{n}" if n else None
+                  elif event_name == 'CreateQueue':
+                      url = resp.get('queueUrl',''); parts = url.rstrip('/').split('/')
+                      arn = f"arn:{p}:sqs:{region}:{account_id}:{parts[-1]}" if parts else None
+                  elif event_name in ['CreateVpc','CreateSubnet','CreateSecurityGroup','CreateRouteTable',
+                       'CreateInternetGateway','CreateNatGateway','CreateTransitGateway','CreateNetworkAcl',
+                       'CreateDhcpOptions','CreateVpcEndpoint','CreateCustomerGateway','CreateVpnGateway']:
+                      obj_map = {'CreateVpc':'vpc.vpcId','CreateSubnet':'subnet.subnetId',
+                          'CreateSecurityGroup':'groupId','CreateRouteTable':'routeTable.routeTableId',
+                          'CreateInternetGateway':'internetGateway.internetGatewayId',
+                          'CreateNatGateway':'natGateway.natGatewayId',
+                          'CreateTransitGateway':'transitGateway.transitGatewayId',
+                          'CreateNetworkAcl':'networkAcl.networkAclId',
+                          'CreateDhcpOptions':'dhcpOptions.dhcpOptionsId',
+                          'CreateVpcEndpoint':'vpcEndpoint.vpcEndpointId',
+                          'CreateCustomerGateway':'customerGateway.customerGatewayId',
+                          'CreateVpnGateway':'vpnGateway.vpnGatewayId'}
+                      path = obj_map.get(event_name,'')
+                      val = resp
+                      for k in path.split('.'):
+                          val = (val or {}).get(k) if isinstance(val, dict) else None
+                      if val:
+                          rtype_map = {'vpc':'vpc','subnet':'subnet','groupId':'security-group',
+                              'routeTableId':'route-table','internetGatewayId':'internet-gateway',
+                              'natGatewayId':'natgateway','transitGatewayId':'transit-gateway',
+                              'networkAclId':'network-acl','dhcpOptionsId':'dhcp-options',
+                              'vpcEndpointId':'vpc-endpoint','customerGatewayId':'customer-gateway',
+                              'vpnGatewayId':'vpn-gateway'}
+                          k_last = path.split('.')[-1]
+                          rt = k_last
+                          for k,v2 in rtype_map.items():
+                              if k in k_last: rt = v2; break
+                          arn = f"arn:{p}:ec2:{region}:{account_id}:{rt}/{val}"
+                  elif event_name == 'AllocateAddress':
+                      aid = resp.get('allocationId')
+                      arn = f"arn:{p}:ec2:{region}:{account_id}:elastic-ip/{aid}" if aid else None
+                  elif event_name in ['PutRule']:
+                      arn = resp.get('ruleArn')
+                  elif event_name in ['PutMetricAlarm']:
+                      n = req.get('alarmName')
+                      arn = f"arn:{p}:cloudwatch:{region}:{account_id}:alarm:{n}" if n else None
+                  elif event_name in ['PutParameter']:
+                      n = req.get('name')
+                      arn = f"arn:{p}:ssm:{region}:{account_id}:parameter{n}" if n else None
+                  elif event_name in ['CreateLogGroup']:
+                      n = req.get('logGroupName')
+                      arn = f"arn:{p}:logs:{region}:{account_id}:log-group:{n}" if n else None
+                  elif event_name in ['CreateDeliveryStream']:
+                      n = req.get('deliveryStreamName')
+                      arn = f"arn:{p}:firehose:{region}:{account_id}:deliverystream/{n}" if n else None
+
+              if not arn:
+                  print(f'No ARN found for {event_name}')
+                  return {'status': 'skipped', 'reason': 'no_arn'}
+
+              tag_key = 'map-migrated'
+              tag_value = config['mpe_id']
+
+              # Service-specific tagging (services that don't support Resource Groups API)
+              try:
+                  def get_svc(svc):
+                      ${isCentral ? `if use_cross:
+                              c = get_cross_account_client(svc, target_account, region)
+                              if c: return c` : ''}
+                      return boto3.client(svc, region_name=region)
+
+                  if ':s3:::' in arn:
+                      s3 = get_svc('s3'); bucket = arn.split(':::')[1]
+                      existing = []
+                      try: existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
+                      except: pass
+                      existing = [t for t in existing if t['Key'] != tag_key]
+                      existing.append({'Key': tag_key, 'Value': tag_value})
+                      s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing})
+                  elif ':kinesis:' in arn and ':stream/' in arn:
+                      get_svc('kinesis').add_tags_to_stream(StreamName=arn.split('/')[-1], Tags={tag_key: tag_value})
+                  elif ':firehose:' in arn:
+                      get_svc('firehose').tag_delivery_stream(DeliveryStreamName=arn.split('/')[-1], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':apigateway:' in arn:
+                      svc = 'apigateway' if '/restapis/' in arn else 'apigatewayv2'
+                      c = get_svc(svc)
+                      if '/restapis/' in arn: c.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                      else: c.tag_resource(ResourceArn=arn, Tags={tag_key: tag_value})
+                  elif ':autoscaling:' in arn:
+                      get_svc('autoscaling').create_or_update_tags(Tags=[{'ResourceId': arn.split('/')[-1], 'ResourceType': 'auto-scaling-group', 'Key': tag_key, 'Value': tag_value, 'PropagateAtLaunch': False}])
+                  elif ':sqs:' in arn:
+                      qn = arn.split(':')[-1]; qr = arn.split(':')[3]; qa = arn.split(':')[4]
+                      get_svc('sqs').tag_queue(QueueUrl=f"https://sqs.{qr}.amazonaws.com/{qa}/{qn}", Tags={tag_key: tag_value})
+                  elif ':cloudfront:' in arn:
+                      boto3.client('cloudfront').tag_resource(Resource=arn, Tags={'Items': [{'Key': tag_key, 'Value': tag_value}]})
+                  elif ':route53:::' in arn:
+                      boto3.client('route53').change_tags_for_resource(ResourceType='hostedzone', ResourceId=arn.split('/')[-1], AddTags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':globalaccelerator:' in arn:
+                      boto3.client('globalaccelerator', region_name='us-west-2').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':quicksight:' in arn:
+                      qs_r = arn.split(':')[3] or region
+                      boto3.client('quicksight', region_name=qs_r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
+                      boto3.client('bedrock-agent', region_name=arn.split(':')[3]).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':ivs:' in arn or ':apprunner:' in arn:
+                      svc = 'ivs' if ':ivs:' in arn else 'apprunner'
+                      r = arn.split(':')[3] or region
+                      boto3.client(svc, region_name=r).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':memorydb:' in arn:
+                      get_svc('memorydb').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':iot:' in arn and ':policy/' in arn:
+                      get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':lightsail:' in arn:
+                      get_svc('lightsail').tag_resource(resourceName=arn.split('/')[-1], tags=[{'key': tag_key, 'value': tag_value}])
+                  else:
+                      # Universal Resource Groups Tagging API
+                      resp2 = _tag.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
+                      if resp2.get('FailedResourcesMap'):
+                          err = resp2['FailedResourcesMap'].get(arn, {}).get('ErrorMessage', 'Unknown')
+                          raise Exception(f"Tagging API: {err}")
+
+                  print(f'Tagged {arn} with {tag_key}={tag_value}')
+                  return {'status': 'tagged', 'arn': arn}
+
+              except Exception as e:
+                  if ':ec2:' in arn:
+                      try:
+                          _ec2c.create_tags(Resources=[arn.split('/')[-1]], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                          print(f'Tagged {arn} via EC2 fallback')
+                          return {'status': 'tagged', 'arn': arn}
+                      except: pass
+                  print(f'Failed to tag {arn}: {e}')
+                  return {'status': 'failed', 'error': str(e)}
+
+  AutoTagEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: map-auto-tagger-rule
+      Description: MAP 2.0 auto-tagger — triggers on resource creation (190+ services)
+      State: ENABLED
+      EventPattern:
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventName:
+${eventNamesList}
+      Targets:
+        - Arn: !GetAtt AutoTaggerFunction.Arn
+          Id: MapAutoTagger
+
+  AutoTagEventPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AutoTaggerFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt AutoTagEventRule.Arn
+
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: map-auto-tagger-dlq
+      MessageRetentionPeriod: 1209600
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: map-auto-tagger-alerts
+      DisplayName: MAP 2.0 Auto-Tagger Alerts
+
+  TaggerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-errors
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AutoTaggerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+
+  DlqAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-dlq
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt DeadLetterQueue.QueueName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+
+Outputs:
+  LambdaArn:
+    Value: !GetAtt AutoTaggerFunction.Arn
+  ConfigParameter:
+    Value: !Ref MapConfig
+  AlertTopicArn:
+    Value: !Ref AlertTopic
+  DeadLetterQueueUrl:
+    Value: !Ref DeadLetterQueue`;
+        }
+
+        function generateInstructions(config) {
+            const mpe = config.mpeId;
+
+            if (config.deployMode === 'single') {
+                return `DEPLOYMENT INSTRUCTIONS — Single Account
+=========================================
+
+1. Log into the AWS Console for your migration account.
+
+2. Open CloudShell (click the terminal icon in the top menu bar).
+
+3. Upload the files (CloudShell → Actions → Upload file):
+     deploy.sh
+     map-auto-tagger-${mpe}.yaml
+
+4. Run:
+   bash deploy.sh
+
+Done. The script deploys and confirms when complete.
+
+─────────────────────────────────────────────────
+Verify tagging is working (after deployment):
+   aws s3 mb s3://test-map-$(date +%s)
+   sleep 90
+   aws s3api get-bucket-tagging --bucket test-map-XXXX
+   # Expected: {"TagSet": [{"Key": "map-migrated", "Value": "${mpe}"}]}
+
+That's it. Auto-tagging is active for all 190+ supported resource types.
+Existing resources are NOT affected — only newly created ones.`;
+            }
+
+            if (config.deployMode === 'multi' && config.eventMode === 'stackset') {
+                const accounts = (config.stacksetAccounts || []);
+                const accountIdArgs = accounts.map(a => `"${a.id}"`).join(' ');
+                const regions = (config.regions || ['ap-northeast-2']);
+                const regionArgs = regions.map(r => `"${r}"`).join(' ');
+                const accountList = accounts.map(a => `   - ${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('\n') || '   (no accounts specified)';
+
+                return `DEPLOYMENT INSTRUCTIONS — Multi-Account
+==========================================
+
+You received 3 files: deploy.sh, map-auto-tagger-org-${mpe}.yaml, map-auto-tagger-accounts-${mpe}.yaml
+Target accounts: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ') || 'all accounts in org'}
+
+─────────────────────────────────────────────────
+
+1. Log into the AWS Console for your MANAGEMENT account.
+
+2. Open CloudShell (click the terminal icon in the top menu bar).
+
+3. Upload all 3 files (CloudShell → Actions → Upload file):
+     deploy.sh
+     map-auto-tagger-org-${mpe}.yaml
+     map-auto-tagger-accounts-${mpe}.yaml
+
+4. Run:
+   bash deploy.sh
+
+The script handles everything automatically:
+  - Uploads templates to S3
+  - Enables StackSets in your organization
+  - Discovers your org structure
+  - Deploys to all accounts (~10 minutes)
+
+─────────────────────────────────────────────────
+
+Check status after running:
+
+   aws cloudformation list-stack-instances \\
+     --stack-set-name map-auto-tagger-${mpe} \\
+     --query "Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]" \\
+     --output table
+   # Expected: SUCCEEDED for all accounts
+
+─────────────────────────────────────────────────
+
+Done. Auto-tagging is now active across all accounts.
+New accounts added to the org automatically receive the auto-tagger.
+NOTE: CloudTrail must be enabled in each account and target region.`;
+            }
+
+            // Central Lambda mode
+            const memberList = (config.linkedAccounts || []).map(a => `   - ${a.id} (${a.label})`).join('\n');
+            return `DEPLOYMENT INSTRUCTIONS — Central Lambda (Cross-Account)
+==========================================================
+
+STEP 1: Deploy central Lambda in the designated account (${config.centralAccountId || 'YOUR-CENTRAL-ACCOUNT'})
+   aws cloudformation create-stack \\
+     --stack-name map-auto-tagger-central \\
+     --template-url https://YOUR-BUCKET.s3.REGION.amazonaws.com/map-auto-tagger-${mpe}.yaml \\
+     --capabilities CAPABILITY_NAMED_IAM
+
+STEP 2: Deploy cross-account IAM role to each member account via StackSet
+   (Create a separate template with the MapAutoTaggerCrossAccount role and deploy via StackSet)
+
+   Role required in each member account:
+   - Role name: MapAutoTaggerCrossAccount
+   - Trust policy: allows arn:aws:iam::${config.centralAccountId || 'CENTRAL-ACCOUNT'}:role/map-auto-tagger-role
+   - Permissions: tag:TagResources, ec2:CreateTags, s3:PutBucketTagging, and all service-specific TagResource actions
+
+STEP 3: Set up EventBridge forwarding in each member account
+   - EventBridge rule forwards Create* events to: arn:aws:events:REGION:${config.centralAccountId || 'CENTRAL-ACCOUNT'}:event-bus/map-auto-tagger-org-bus
+   - EventBridge execution IAM role: allows events:PutEvents on the central bus
+
+Member accounts to configure:
+${memberList}
+
+SIMPLER ALTERNATIVE: Use the StackSet deployment method above —
+it deploys one Lambda per account with zero cross-account complexity.`;
+        }
+
+        function generatePerAccountTemplate(config) {
+            // Generate the single-account auto-tagger template (Lambda + EventBridge + IAM)
+            // Used as the StackSet target in multi-account mode
+            const singleConfig = Object.assign({}, config, { deployMode: 'single' });
+            return generateMainTemplate(singleConfig);
+        }
+
+        function generateOrgTemplate(config) {
+            // Generates the management account template.
+            // Uses a single Lambda Custom Resource that:
+            //   1. Auto-discovers root OU via organizations:ListRoots (no OU input from customer)
+            //   2. Fetches the per-account template from S3 using its own IAM role
+            //   3. Creates the StackSet with TemplateBody (avoids S3 access issues)
+            //   4. Deploys instances to all accounts via root OU targeting
+            // Customer runs ONE command. No OU IDs. No account IDs for deployment.
+            const mpe = config.mpeId;
+            const accounts = (config.stacksetAccounts || []);
+            const regions = (config.regions || ['ap-northeast-2']);
+            const regionsList = regions.map(r => `        - ${r}`).join('\n');
+            const accountsNote = accounts.length > 0
+                ? `  # Migration accounts for reference: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ')}`
+                : '  # Deploys to all accounts in the organization';
+
+            return `AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
+  Automatically discovers org structure and deploys Lambda to all accounts.
+  No OU IDs required. Deploy in the management account.
+
+Parameters:
+  MpeId:
+    Type: String
+    Default: '${mpe}'
+    Description: MAP 2.0 MPE ID
+  AgreementStartDate:
+    Type: String
+    Default: '${config.agreementDate}'
+    Description: MAP agreement start date (YYYY-MM-DD)
+  PerAccountTemplateURL:
+    Type: String
+    Description: S3 URL of map-auto-tagger-accounts-${mpe}.yaml
+
+Resources:
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: map-tagger-deploy-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - organizations:ListRoots
+                  - organizations:EnableAWSServiceAccess
+                  - cloudformation:CreateStackSet
+                  - cloudformation:DeleteStackSet
+                  - cloudformation:DescribeStackSet
+                  - cloudformation:CreateStackInstances
+                  - cloudformation:DeleteStackInstances
+                  - cloudformation:DescribeStackSetOperation
+                  - cloudformation:ListStackInstances
+                  - s3:GetObject
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  DeployFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: DeployRole
+    Properties:
+      FunctionName: map-tagger-deploy-fn
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt DeployRole.Arn
+      Timeout: 600
+      Code:
+        ZipFile: |
+          import boto3, json, time, urllib.request
+          def respond(event, context, status, data={}, reason=''):
+              body = json.dumps({'Status': status, 'Reason': reason,
+                  'PhysicalResourceId': event.get('PhysicalResourceId','Deploy'),
+                  'StackId': event['StackId'], 'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'], 'Data': data}).encode()
+              req = urllib.request.Request(event['ResponseURL'], data=body,
+                  headers={'Content-Type': ''}, method='PUT')
+              urllib.request.urlopen(req)
+          def handler(event, context):
+              time.sleep(10)
+              props = event.get('ResourceProperties', {})
+              cf = boto3.client('cloudformation')
+              stackset_name = props['StackSetName']
+              if event['RequestType'] == 'Delete':
+                  try:
+                      cf.delete_stack_instances(StackSetName=stackset_name,
+                          DeploymentTargets={'OrganizationalUnitIds': [props['RootId']]},
+                          Regions=props.get('Regions', ['ap-northeast-2']),
+                          RetainStacks=False)
+                      time.sleep(90)
+                      cf.delete_stack_set(StackSetName=stackset_name)
+                  except Exception as e:
+                      print('Delete cleanup:', e)
+                  respond(event, context, 'SUCCESS')
+                  return
+              try:
+                  org = boto3.client('organizations', region_name='us-east-1')
+                  try:
+                      org.enable_aws_service_access(ServicePrincipal='stacksets.cloudformation.amazonaws.com')
+                      print('StackSets service access enabled')
+                  except Exception as e:
+                      print('Service access already enabled or skipped:', e)
+                  root_id = org.list_roots()['Roots'][0]['Id']
+                  print('Root OU:', root_id)
+                  s3 = boto3.client('s3')
+                  url = props['TemplateURL']
+                  bkt = url.split('.s3.')[0].replace('https://','')
+                  key = url.split('.amazonaws.com/')[-1].split('?')[0]
+                  print('Fetching template:', bkt, key)
+                  body = s3.get_object(Bucket=bkt, Key=key)['Body'].read().decode()
+                  print('Template bytes:', len(body))
+                  try:
+                      cf.create_stack_set(StackSetName=stackset_name,
+                          Description='MAP 2.0 Auto-Tagger',
+                          TemplateBody=body,
+                          Parameters=[
+                              {'ParameterKey':'MpeId','ParameterValue':props['MpeId']},
+                              {'ParameterKey':'AgreementStartDate','ParameterValue':props['AgreementStartDate']},
+                              {'ParameterKey':'ScopeMode','ParameterValue':'account'},
+                              {'ParameterKey':'ScopedAccountIds','ParameterValue':'ALL'},
+                              {'ParameterKey':'ScopedVpcIds','ParameterValue':'NONE'},
+                          ],
+                          Capabilities=['CAPABILITY_NAMED_IAM'],
+                          PermissionModel='SERVICE_MANAGED',
+                          AutoDeployment={'Enabled': False})
+                      print('StackSet created')
+                  except cf.exceptions.NameAlreadyExistsException:
+                      print('StackSet exists')
+                  op = cf.create_stack_instances(StackSetName=stackset_name,
+                      DeploymentTargets={'OrganizationalUnitIds': [root_id]},
+                      Regions=props.get('Regions', ['ap-northeast-2']))
+                  op_id = op['OperationId']
+                  print('Op:', op_id)
+                  for _ in range(30):
+                      time.sleep(20)
+                      status = cf.describe_stack_set_operation(
+                          StackSetName=stackset_name, OperationId=op_id
+                      )['StackSetOperation']['Status']
+                      print('Status:', status)
+                      if status in ('SUCCEEDED','FAILED','STOPPED'):
+                          break
+                  if status == 'SUCCEEDED':
+                      respond(event, context, 'SUCCESS', {'StackSetName': stackset_name, 'RootId': root_id})
+                  else:
+                      respond(event, context, 'FAILED', reason=f'Operation {status}')
+              except Exception as e:
+                  import traceback
+                  print(traceback.format_exc())
+                  respond(event, context, 'FAILED', reason=str(e))
+
+  Deployment:
+    Type: Custom::Deploy
+    DependsOn: DeployFunction
+    Properties:
+      ServiceToken: !GetAtt DeployFunction.Arn
+      StackSetName: map-auto-tagger-${mpe}
+      TemplateURL: !Ref PerAccountTemplateURL
+      MpeId: !Ref MpeId
+      AgreementStartDate: !Ref AgreementStartDate
+      RootId: placeholder
+      Regions:
+${regionsList}
+${accountsNote}
+
+Outputs:
+  StackSetName:
+    Value: !GetAtt Deployment.StackSetName
+  RootOU:
+    Value: !GetAtt Deployment.RootId`;
+        }
+
+        function generateDeployScript(config, mainTemplate, perAccountTemplate) {
+            const mpe = config.mpeId;
+            const regions = (config.regions || ['ap-northeast-2']);
+            const region = regions[0];
+
+            // Escape backticks and dollar signs in template content for safe embedding in heredoc
+            const escapeHeredoc = (s) => s.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+
+            if (config.deployMode === 'single') {
+                const tpl = escapeHeredoc(mainTemplate);
+                return `#!/bin/bash
+# MAP 2.0 Auto-Tagger — Deployment Script
+# Generated for: ${config.customerName || 'Customer'} (MPE: ${mpe})
+#
+# Run from the migration account:
+#   Open AWS CloudShell in the migration account, upload this file, then run:
+#   bash deploy.sh
+set -e
+
+STACK_NAME="map-auto-tagger"
+REGION="${region}"
+
+echo "================================================"
+echo " MAP 2.0 Auto-Tagger — Single Account Deployment"
+echo " MAP Engagement ID: ${mpe}"
+echo " Region:  ${region}"
+echo "================================================"
+echo ""
+
+# Write embedded template to temp file
+TEMPLATE=$(mktemp /tmp/map-auto-tagger-XXXX.yaml)
+cat > "\$TEMPLATE" << 'MAP_TEMPLATE_EOF'
+${tpl}
+MAP_TEMPLATE_EOF
+
+echo "Deploying CloudFormation stack..."
+aws cloudformation create-stack \\
+  --stack-name "\$STACK_NAME" \\
+  --template-body "file://\$TEMPLATE" \\
+  --capabilities CAPABILITY_NAMED_IAM \\
+  --region "\$REGION"
+
+rm -f "\$TEMPLATE"
+
+echo "Waiting for deployment (~2 min)..."
+aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+
+echo ""
+echo "✅ Done! Auto-tagging is now active."
+echo ""
+echo "Verify: create any resource and check for tag after 90 seconds."
+echo "  aws s3 mb s3://test-map-\$(date +%s) --region \$REGION"
+echo "  sleep 90"
+echo "  aws s3api get-bucket-tagging --bucket test-map-XXXX"
+`;
+            }
+
+            // Multi-account — embed both templates in the script
+            const orgTpl = escapeHeredoc(mainTemplate);
+            const accountsTpl = escapeHeredoc(perAccountTemplate || '');
+
+            return `#!/bin/bash
+# MAP 2.0 Auto-Tagger — Deployment Script
+# Generated for: ${config.customerName || 'Customer'} (MPE: ${mpe})
+#
+# Run from the MANAGEMENT account:
+#   Open AWS CloudShell in the management account, upload this file, then run:
+#   bash deploy.sh
+set -e
+
+MPE="${mpe}"
+REGION="${region}"
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+BUCKET="map-tagger-\${ACCOUNT}"
+STACK_NAME="map-auto-tagger"
+
+echo "================================================"
+echo " MAP 2.0 Auto-Tagger — Multi-Account Deployment"
+echo " MAP Engagement ID: \$MPE"
+echo " Region:  \$REGION"
+echo " Account: \$ACCOUNT (management)"
+echo "================================================"
+echo ""
+
+# Write embedded templates to temp files
+ORG_TEMPLATE=$(mktemp /tmp/map-auto-tagger-org-XXXX.yaml)
+ACCOUNTS_TEMPLATE=$(mktemp /tmp/map-auto-tagger-accounts-XXXX.yaml)
+
+cat > "\$ORG_TEMPLATE" << 'ORG_TEMPLATE_EOF'
+${orgTpl}
+ORG_TEMPLATE_EOF
+
+cat > "\$ACCOUNTS_TEMPLATE" << 'ACCOUNTS_TEMPLATE_EOF'
+${accountsTpl}
+ACCOUNTS_TEMPLATE_EOF
+
+# Upload templates to S3 (in customer's own account)
+echo "Creating S3 bucket and uploading templates..."
+aws s3 mb "s3://\${BUCKET}" --region "\${REGION}" 2>/dev/null || true
+aws s3 cp "\$ORG_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-org.yaml"
+aws s3 cp "\$ACCOUNTS_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts.yaml"
+rm -f "\$ORG_TEMPLATE" "\$ACCOUNTS_TEMPLATE"
+echo "Done."
+echo ""
+
+# Deploy — one command, auto-discovers org structure, deploys to all accounts
+echo "Deploying stack (this discovers your org and deploys to all accounts)..."
+aws cloudformation create-stack \\
+  --stack-name "\$STACK_NAME" \\
+  --template-url "https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-org.yaml" \\
+  --parameters "ParameterKey=PerAccountTemplateURL,ParameterValue=https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-accounts.yaml" \\
+  --capabilities CAPABILITY_NAMED_IAM \\
+  --region "\$REGION"
+
+echo ""
+echo "✅ Deployment started. Rolling out to all accounts (~10 minutes)."
+echo ""
+echo "Check overall status:"
+echo "  aws cloudformation describe-stacks --stack-name \$STACK_NAME --query 'Stacks[0].StackStatus' --region \$REGION"
+echo ""
+echo "Check per-account status:"
+echo "  aws cloudformation list-stack-instances --stack-set-name map-auto-tagger-\$MPE --query 'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]' --output table --region \$REGION"
+`;
+        }
+
+        function generateAndDownload() {
+            const config = getConfig();
+            const isStackset = config.deployMode === 'multi' && config.eventMode === 'stackset';
+            const mainTemplate = isStackset ? generateOrgTemplate(config) : generateMainTemplate(config);
+            const perAccountTemplate = isStackset ? generatePerAccountTemplate(config) : null;
+            // Pass templates into script so everything is embedded — customer gets ONE file
+            const deployScript = generateDeployScript(config, mainTemplate, perAccountTemplate);
+            const instructions = generateInstructions(config);
+            window._generated = { config, mainTemplate, perAccountTemplate, deployScript, instructions };
+
+            const btnDiv = document.getElementById('downloadButtons');
+            const isMulti = isStackset;
+            const accountLabel = isMulti ? 'management account' : 'migration account';
+            btnDiv.innerHTML = `
+                <button class="btn-primary" onclick="downloadFile('script')" style="font-size:16px;padding:14px 32px;">⬇ Download deploy.sh</button>
+                <button class="btn-secondary" onclick="copyInstructions()">📋 Copy Instructions</button>
+                <div style="margin-top:12px;padding:12px 16px;background:#f2fcf3;border-left:4px solid #1d8102;border-radius:0 4px 4px 0;font-size:13px;">
+                  <strong>One file. One step.</strong> Send <code>deploy.sh</code> to the customer.<br>
+                  They open <strong>AWS CloudShell</strong> in the ${accountLabel}, upload this file, and run: <code>bash deploy.sh</code>
+                </div>`;
+
+            document.getElementById('instructions').textContent = instructions;
+            document.getElementById('templatePreview').textContent = mainTemplate;
+            setStep(3);
+        }
+
+        function downloadFile(type) {
+            const { config, mainTemplate, perAccountTemplate, deployScript } = window._generated;
+            let content, filename, mime;
+            if (type === 'script') {
+                content = deployScript;
+                filename = 'deploy.sh';
+                mime = 'text/x-sh';
+            } else if (type === 'org') {
+                content = mainTemplate;
+                filename = `map-auto-tagger-org-${config.mpeId}.yaml`;
+            } else if (type === 'accounts') {
+                content = perAccountTemplate;
+                filename = `map-auto-tagger-accounts-${config.mpeId}.yaml`;
+            } else {
+                content = mainTemplate;
+                filename = `map-auto-tagger-${config.mpeId}.yaml`;
+            }
+            const blob = new Blob([content], { type: mime || 'text/yaml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function copyInstructions() {
+            navigator.clipboard.writeText(document.getElementById('instructions').textContent).then(() => {
+                const btn = event.target;
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => btn.textContent = orig, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
