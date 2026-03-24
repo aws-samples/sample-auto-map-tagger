@@ -991,6 +991,14 @@ ${permissionsList}
                 Effect: Allow
                 Action: sqs:SendMessage
                 Resource: !GetAtt DeadLetterQueue.Arn
+              - Sid: RetryQueue
+                Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource: !GetAtt RetryQueue.Arn
               - Sid: MinimalReads
                 Effect: Allow
                 Action:
@@ -1025,6 +1033,7 @@ ${permissionsList}
       Environment:
         Variables:
           CONFIG_PARAM: /auto-map-tagger/config
+          RETRY_QUEUE_URL: !Ref RetryQueue
       Code:
         ZipFile: |
           import json, os, boto3, re
@@ -1083,7 +1092,97 @@ ${crossAccountCode}
                   return False
               return False
 
+          def do_tag(arn, tag_key, tag_value, region):
+              _t = boto3.client('resourcegroupstaggingapi', region_name=region)
+              _e = boto3.client('ec2', region_name=region)
+              def get_svc(svc): return boto3.client(svc, region_name=region)
+              try:
+                  if ':s3:::' in arn:
+                      s3 = get_svc('s3'); bucket = arn.split(':::')[1]
+                      existing = []
+                      try: existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
+                      except: pass
+                      existing = [t for t in existing if t['Key'] != tag_key]
+                      existing.append({'Key': tag_key, 'Value': tag_value})
+                      s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing})
+                  elif ':kinesis:' in arn and ':stream/' in arn:
+                      get_svc('kinesis').add_tags_to_stream(StreamName=arn.split('/')[-1], Tags={tag_key: tag_value})
+                  elif ':firehose:' in arn:
+                      get_svc('firehose').tag_delivery_stream(DeliveryStreamName=arn.split('/')[-1], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':apigateway:' in arn:
+                      svc = 'apigateway' if '/restapis/' in arn else 'apigatewayv2'
+                      c = get_svc(svc)
+                      if '/restapis/' in arn: c.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                      else: c.tag_resource(ResourceArn=arn, Tags={tag_key: tag_value})
+                  elif ':autoscaling:' in arn:
+                      get_svc('autoscaling').create_or_update_tags(Tags=[{'ResourceId': arn.split('/')[-1], 'ResourceType': 'auto-scaling-group', 'Key': tag_key, 'Value': tag_value, 'PropagateAtLaunch': False}])
+                  elif ':sqs:' in arn:
+                      qn = arn.split(':')[-1]; qr = arn.split(':')[3]; qa = arn.split(':')[4]
+                      get_svc('sqs').tag_queue(QueueUrl=f"https://sqs.{qr}.amazonaws.com/{qa}/{qn}", Tags={tag_key: tag_value})
+                  elif ':cloudfront:' in arn:
+                      boto3.client('cloudfront').tag_resource(Resource=arn, Tags={'Items': [{'Key': tag_key, 'Value': tag_value}]})
+                  elif ':route53:::' in arn:
+                      boto3.client('route53').change_tags_for_resource(ResourceType='hostedzone', ResourceId=arn.split('/')[-1], AddTags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':globalaccelerator:' in arn:
+                      boto3.client('globalaccelerator', region_name='us-west-2').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
+                      boto3.client('bedrock-agent', region_name=arn.split(':')[3]).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':ivs:' in arn or ':apprunner:' in arn:
+                      svc = 'ivs' if ':ivs:' in arn else 'apprunner'
+                      boto3.client(svc, region_name=arn.split(':')[3] or region).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':memorydb:' in arn:
+                      get_svc('memorydb').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':iot:' in arn and ':policy/' in arn:
+                      get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':lightsail:' in arn:
+                      get_svc('lightsail').tag_resource(resourceName=arn.split('/')[-1], tags=[{'key': tag_key, 'value': tag_value}])
+                  else:
+                      resp2 = _t.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
+                      if resp2.get('FailedResourcesMap'):
+                          err = resp2['FailedResourcesMap'].get(arn, {}).get('ErrorMessage', 'Unknown')
+                          raise Exception(f"Tagging API: {err}")
+                  print(f'Tagged {arn} with {tag_key}={tag_value}')
+              except Exception as e:
+                  if ':ec2:' in arn:
+                      try:
+                          _e.create_tags(Resources=[arn.split('/')[-1]], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                          print(f'Tagged {arn} via EC2 fallback')
+                          return
+                      except: pass
+                  raise
+
+          def send_retry(arn, tag_key, tag_value, region, retry_count):
+              delay = min(300 * retry_count, 900)
+              boto3.client('sqs').send_message(
+                  QueueUrl=os.environ['RETRY_QUEUE_URL'],
+                  MessageBody=json.dumps({
+                      'retry_arn': arn, 'tag_key': tag_key,
+                      'tag_value': tag_value, 'region': region,
+                      'retry_count': retry_count
+                  }),
+                  DelaySeconds=delay
+              )
+              print(f'Queued retry #{retry_count} for {arn} in {delay}s')
+
           def handler(event, context):
+              if event.get('Records'):
+                  config = get_config()
+                  for record in event['Records']:
+                      body = json.loads(record['body'])
+                      arn = body['retry_arn']
+                      tag_key = body['tag_key']
+                      tag_value = body['tag_value']
+                      retry_region = body.get('region', os.environ.get('AWS_REGION', ''))
+                      retry_count = body.get('retry_count', 1)
+                      try:
+                          do_tag(arn, tag_key, tag_value, retry_region)
+                          print(f'Retry #{retry_count} succeeded for {arn}')
+                      except Exception as e:
+                          if retry_count < 3:
+                              send_retry(arn, tag_key, tag_value, retry_region, retry_count + 1)
+                          else:
+                              print(f'Retry #{retry_count} final failure for {arn}: {e}')
+                  return
               config = get_config()
               if not is_within_agreement(config):
                   return {'status': 'skipped', 'reason': 'outside_agreement_period'}
@@ -1275,7 +1374,8 @@ ${crossAccountCode}
                           return {'status': 'tagged', 'arn': arn}
                       except: pass
                   print(f'Failed to tag {arn}: {e}')
-                  return {'status': 'failed', 'error': str(e)}
+                  send_retry(arn, tag_key, tag_value, region, 1)
+                  return {'status': 'queued_retry', 'arn': arn}
 
   AutoTagEventRule:
     Type: AWS::Events::Rule
@@ -1300,6 +1400,24 @@ ${eventNamesList}
       Action: lambda:InvokeFunction
       Principal: events.amazonaws.com
       SourceArn: !GetAtt AutoTagEventRule.Arn
+
+  RetryQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: auto-map-tagger-retry
+      VisibilityTimeout: 120
+      MessageRetentionPeriod: 3600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 3
+
+  RetryTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt RetryQueue.Arn
+      FunctionName: !GetAtt AutoTaggerFunction.Arn
+      BatchSize: 1
+      Enabled: true
 
   DeadLetterQueue:
     Type: AWS::SQS::Queue
