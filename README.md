@@ -223,6 +223,7 @@ AWS Resource Created
 
 ## Known Limitations
 
+- **Amazon Bedrock** — Bedrock spend is MAP-eligible but requires customers to create [Application Inference Profiles](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-create.html) first. Once a profile is created, this solution automatically tags it. Without an inference profile, Bedrock API calls are not MAP-trackable.
 - **Existing resources** not automatically tagged — use bulk tagging tools for backfill
 - **ECS task tag propagation** requires `propagateTags: SERVICE` in ECS service definition
 - **EKS Auto Mode nodes** — tagged via NodePool config, not standard tagging
