@@ -187,19 +187,14 @@
             Customer cost: <strong>&lt; $2/month</strong>.
         </div>
 
-        <!-- Prerequisites -->
-        <div class="card" id="prerequisites">
-            <h2>Customer Prerequisites</h2>
-            <p class="subtitle">Confirm these before generating a template</p>
-            <div class="form-group">
-                <label><input type="checkbox" class="prereq-check"> CloudTrail is enabled in the target region(s)</label>
-            </div>
-            <div class="form-group">
-                <label><input type="checkbox" class="prereq-check"> Deployer has CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch) — or use a CloudFormation service role</label>
-            </div>
-            <div class="form-group" id="prereq-multi" style="display: none;">
-                <label><input type="checkbox" class="prereq-check"> AWS Organizations is enabled with CloudFormation StackSets trusted access enabled</label>
-            </div>
+        <!-- Prerequisites disclaimer -->
+        <div class="info-box" id="prerequisites" style="border-left: 4px solid #d13212; background: #fdf3f1;">
+            <strong>Customer Prerequisites</strong> — the generated <code>deploy.sh</code> will verify these automatically before deploying:
+            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                <li>CloudTrail must be enabled in the target region(s)</li>
+                <li>Deployer must have CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch)</li>
+                <li id="prereq-multi" style="display:none;">Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access</li>
+            </ul>
         </div>
 
         <!-- Step 1: Configure -->
@@ -1827,8 +1822,42 @@ REGION="${region}"
 echo "================================================"
 echo " MAP 2.0 Auto-Tagger — Single Account Deployment"
 echo " MAP Engagement ID: ${mpe}"
-echo " Region:  ${region}"
+echo " Region:  \$REGION"
 echo "================================================"
+echo ""
+
+# Pre-flight checks
+echo "Running pre-flight checks..."
+ERRORS=0
+
+if ! aws sts get-caller-identity > /dev/null 2>&1; then
+    echo "  ❌ No valid AWS credentials found."
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ AWS credentials: OK"
+fi
+
+TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$REGION" --include-shadow-trails false --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+if [ "\$TRAIL_COUNT" -eq 0 ]; then
+    echo "  ❌ CloudTrail: no trail found in region \$REGION. CloudTrail must be enabled for auto-tagging to work."
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ CloudTrail: enabled"
+fi
+
+if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
+    echo "  ❌ CloudFormation: insufficient permissions. The deployer needs CloudFormation access."
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ CloudFormation: accessible"
+fi
+
+if [ "\$ERRORS" -gt 0 ]; then
+    echo ""
+    echo "❌ Pre-flight checks failed. Please resolve the issues above before deploying."
+    exit 1
+fi
+echo "✅ All pre-flight checks passed."
 echo ""
 
 # Write embedded template to temp file
@@ -1884,6 +1913,54 @@ echo " MAP Engagement ID: \$MPE"
 echo " Region:  \$REGION"
 echo " Account: \$ACCOUNT (management)"
 echo "================================================"
+echo ""
+
+# Pre-flight checks
+echo "Running pre-flight checks..."
+ERRORS=0
+
+if ! aws sts get-caller-identity > /dev/null 2>&1; then
+    echo "  ❌ No valid AWS credentials found."
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ AWS credentials: OK"
+fi
+
+TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$REGION" --include-shadow-trails false --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+if [ "\$TRAIL_COUNT" -eq 0 ]; then
+    echo "  ❌ CloudTrail: no trail found in region \$REGION. CloudTrail must be enabled for auto-tagging to work."
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ CloudTrail: enabled"
+fi
+
+if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
+    echo "  ❌ CloudFormation: insufficient permissions."
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ CloudFormation: accessible"
+fi
+
+if ! aws organizations describe-organization > /dev/null 2>&1; then
+    echo "  ❌ AWS Organizations: not accessible. This script must run from the management account."
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ AWS Organizations: accessible"
+fi
+
+STACKSETS_ACCESS=\$(aws organizations list-aws-service-access-for-organization --query "EnabledServicePrincipals[?ServicePrincipal=='stacksets.cloudformation.amazonaws.com'].ServicePrincipal" --output text 2>/dev/null)
+if [ -z "\$STACKSETS_ACCESS" ]; then
+    echo "  ⚠️  StackSets trusted access not yet enabled — will be enabled automatically during deployment."
+else
+    echo "  ✅ StackSets trusted access: enabled"
+fi
+
+if [ "\$ERRORS" -gt 0 ]; then
+    echo ""
+    echo "❌ Pre-flight checks failed. Please resolve the issues above before deploying."
+    exit 1
+fi
+echo "✅ All pre-flight checks passed."
 echo ""
 
 # Write embedded templates to temp files
