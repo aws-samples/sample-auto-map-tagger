@@ -1425,9 +1425,10 @@ it deploys one Lambda per account with zero cross-account complexity.`;
             const accounts = (config.stacksetAccounts || []);
             const regions = (config.regions || ['ap-northeast-2']);
             const regionsList = regions.map(r => `        - ${r}`).join('\n');
+            const accountIdsCsv = accounts.map(a => a.id).join(',');
             const accountsNote = accounts.length > 0
-                ? `  # Migration accounts for reference: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ')}`
-                : '  # Deploys to all accounts in the organization';
+                ? `      AccountIds: '${accountIdsCsv}'  # Specific accounts: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ')}`
+                : `      AccountIds: ''  # Empty = deploy to all accounts in the organization`;
 
             return `AWSTemplateFormatVersion: '2010-09-09'
 Description: >
@@ -1509,8 +1510,15 @@ Resources:
               stackset_name = props['StackSetName']
               if event['RequestType'] == 'Delete':
                   try:
+                      acct_ids = [a for a in props.get('AccountIds', '').split(',') if a.strip()]
+                      if acct_ids:
+                          del_targets = {'Accounts': acct_ids}
+                      else:
+                          org = boto3.client('organizations', region_name='us-east-1')
+                          root_id = org.list_roots()['Roots'][0]['Id']
+                          del_targets = {'OrganizationalUnitIds': [root_id]}
                       cf.delete_stack_instances(StackSetName=stackset_name,
-                          DeploymentTargets={'OrganizationalUnitIds': [props['RootId']]},
+                          DeploymentTargets=del_targets,
                           Regions=props.get('Regions', ['ap-northeast-2']),
                           RetainStacks=False)
                       time.sleep(90)
@@ -1520,14 +1528,21 @@ Resources:
                   respond(event, context, 'SUCCESS')
                   return
               try:
-                  org = boto3.client('organizations', region_name='us-east-1')
-                  try:
-                      org.enable_aws_service_access(ServicePrincipal='stacksets.cloudformation.amazonaws.com')
-                      print('StackSets service access enabled')
-                  except Exception as e:
-                      print('Service access already enabled or skipped:', e)
-                  root_id = org.list_roots()['Roots'][0]['Id']
-                  print('Root OU:', root_id)
+                  acct_ids = [a for a in props.get('AccountIds', '').split(',') if a.strip()]
+                  if acct_ids:
+                      targets = {'Accounts': acct_ids}
+                      root_id = 'N/A'
+                      print('Targeting specific accounts:', acct_ids)
+                  else:
+                      org = boto3.client('organizations', region_name='us-east-1')
+                      try:
+                          org.enable_aws_service_access(ServicePrincipal='stacksets.cloudformation.amazonaws.com')
+                          print('StackSets service access enabled')
+                      except Exception as e:
+                          print('Service access already enabled or skipped:', e)
+                      root_id = org.list_roots()['Roots'][0]['Id']
+                      print('Root OU:', root_id)
+                      targets = {'OrganizationalUnitIds': [root_id]}
                   s3 = boto3.client('s3')
                   url = props['TemplateURL']
                   bkt = url.split('.s3.')[0].replace('https://','')
@@ -1553,7 +1568,7 @@ Resources:
                   except cf.exceptions.NameAlreadyExistsException:
                       print('StackSet exists')
                   op = cf.create_stack_instances(StackSetName=stackset_name,
-                      DeploymentTargets={'OrganizationalUnitIds': [root_id]},
+                      DeploymentTargets=targets,
                       Regions=props.get('Regions', ['ap-northeast-2']))
                   op_id = op['OperationId']
                   print('Op:', op_id)
@@ -1583,7 +1598,6 @@ Resources:
       TemplateURL: !Ref PerAccountTemplateURL
       MpeId: !Ref MpeId
       AgreementStartDate: !Ref AgreementStartDate
-      RootId: placeholder
       Regions:
 ${regionsList}
 ${accountsNote}
