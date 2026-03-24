@@ -249,7 +249,16 @@
                         </label>
                     </div>
                     <div id="vpc-scope-fields" class="hidden">
-                        <label>VPC IDs <span class="hint">(only resources in these VPCs will be tagged)</span></label>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="tagNonVpcServices" checked>
+                                Also tag non-VPC resources (S3, DynamoDB, Lambda, SNS, SQS, etc.)
+                            </label>
+                            <div class="hint" style="margin-left: 22px; margin-top: 2px;">
+                                These services have no VPC association. Check to tag them all regardless of VPC scope (recommended for MAP eligibility).
+                            </div>
+                        </div>
+                        <label>VPC IDs <span class="hint">(only VPC-bound resources in these VPCs will be tagged)</span></label>
                         <div id="vpcList">
                             <div class="entry-row">
                                 <input type="text" class="vpc-input" placeholder="vpc-0abc1234def56789">
@@ -257,15 +266,6 @@
                             </div>
                         </div>
                         <button class="btn-add" onclick="addVpc()">+ Add another VPC</button>
-                        <div class="form-group" style="margin-top: 16px;">
-                            <label>
-                                <input type="checkbox" id="tagNonVpcServices" checked>
-                                Also tag non-VPC services (S3, DynamoDB, Lambda, SNS, SQS, etc.)
-                            </label>
-                            <div class="hint" style="margin-left: 22px; margin-top: 2px;">
-                                These services don't live in a VPC. If checked, all of them in the account will be tagged regardless of VPC scope.
-                            </div>
-                        </div>
                     </div>
                 </div>
 
