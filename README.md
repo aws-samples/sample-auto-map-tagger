@@ -52,7 +52,7 @@ EventBridge catches resource creation events and triggers a Lambda that applies 
 ## Components
 
 - **`map2-auto-tagger-optimized.yaml`** — Production CloudFormation template (v18, 190+ services, 79+ bugs fixed, AppSec hardened)
-- **`configurator.html`** — Configuration UI for the AWS account team to generate a customized `deploy.sh`
+- **`configurator.html`** — ⚠️ **Internal AWS use only.** Configuration UI for the AWS account team to generate a customized `deploy.sh`. Not included in the public distribution.
 
 ---
 
