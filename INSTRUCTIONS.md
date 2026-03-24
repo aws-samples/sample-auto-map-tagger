@@ -102,7 +102,7 @@ No redeployment needed — just update the config:
 
 ```bash
 aws ssm put-parameter \
-  --name /map-tagger/config \
+  --name /auto-map-tagger/config \
   --type String \
   --overwrite \
   --value '{

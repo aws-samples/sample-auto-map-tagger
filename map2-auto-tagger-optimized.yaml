@@ -50,7 +50,7 @@ Resources:
   MapConfig:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /map-tagger/config
+      Name: /auto-map-tagger/config
       Type: String
       Description: MAP 2.0 Auto-Tagger configuration
       Value: !Sub
@@ -269,7 +269,7 @@ Resources:
                 Effect: Allow
                 Action:
                   - ssm:GetParameter
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/map-tagger/config
+                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/auto-map-tagger/config
               - Sid: Logging
                 Effect: Allow
                 Action:
@@ -302,7 +302,7 @@ Resources:
       ReservedConcurrentExecutions: 10
       Environment:
         Variables:
-          CONFIG_PARAM: /map-tagger/config
+          CONFIG_PARAM: /auto-map-tagger/config
       Code:
         ZipFile: |
           import json, os, boto3, re
@@ -1781,7 +1781,7 @@ Resources:
   AlertTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: map-tagger-alerts
+      TopicName: auto-map-tagger-alerts
       DisplayName: MAP 2.0 Auto-Tagger Alerts
 
   # CloudWatch alarm - fires if Lambda errors spike
@@ -1809,7 +1809,7 @@ Outputs:
     Value: !GetAtt AutoTaggerFunction.Arn
   ConfigParameter:
     Description: SSM Parameter Store path for MAP tagger config
-    Value: /map-tagger/config
+    Value: /auto-map-tagger/config
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic

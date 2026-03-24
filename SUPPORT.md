@@ -28,7 +28,7 @@ No redeployment needed — update the SSM parameter directly:
 
 ```bash
 aws ssm put-parameter \
-  --name /map-tagger/config \
+  --name /auto-map-tagger/config \
   --type String \
   --overwrite \
   --value '{"mpe_id":"migNEWID","agreement_start_date":"2024-01-01","scope_mode":"account","scoped_account_ids":["ALL"],"scoped_vpc_ids":[]}'

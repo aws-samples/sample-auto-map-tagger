@@ -192,7 +192,7 @@ The following IAM permissions appear broader than pure tagging. This section doc
 | Error alerting | CloudWatch Alarm → SNS (>3 Lambda errors in 5 min) | Customer subscribes email to SNS topic |
 | No inbound attack surface | No web app, no API endpoint, no auth layer | Zero internet-facing components |
 | No external dependencies | All AWS-native services | No third-party APIs or libraries |
-| Config read-only for Lambda | Lambda role has `ssm:GetParameter` only on `/map-tagger/config` | Config cannot be modified via Lambda |
+| Config read-only for Lambda | Lambda role has `ssm:GetParameter` only on `/auto-map-tagger/config` | Config cannot be modified via Lambda |
 | Cross-account role removed | `sts:AssumeRole` on wildcard accounts removed from default template | Reduces blast radius; not needed for standard StackSet deployment |
 
 ---

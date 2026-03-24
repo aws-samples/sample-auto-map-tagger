@@ -919,7 +919,7 @@ Resources:
   MapConfig:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /map-tagger/config
+      Name: /auto-map-tagger/config
       Type: String
       Value: !Sub
         - |
@@ -969,7 +969,7 @@ ${permissionsList}
               - Sid: ReadConfig
                 Effect: Allow
                 Action: ssm:GetParameter
-                Resource: !Sub arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/map-tagger/config
+                Resource: !Sub arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/auto-map-tagger/config
               - Sid: Logging
                 Effect: Allow
                 Action:
@@ -992,7 +992,7 @@ ${permissionsList}
         TargetArn: !GetAtt DeadLetterQueue.Arn
       Environment:
         Variables:
-          CONFIG_PARAM: /map-tagger/config
+          CONFIG_PARAM: /auto-map-tagger/config
       Code:
         ZipFile: |
           import json, os, boto3, re
@@ -1453,7 +1453,7 @@ Resources:
   DeployRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: map-tagger-deploy-role
+      RoleName: auto-map-tagger-deploy-role
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -1486,7 +1486,7 @@ Resources:
     Type: AWS::Lambda::Function
     DependsOn: DeployRole
     Properties:
-      FunctionName: map-tagger-deploy-fn
+      FunctionName: auto-map-tagger-deploy-fn
       Runtime: python3.12
       Handler: index.handler
       Role: !GetAtt DeployRole.Arn
@@ -1668,7 +1668,7 @@ set -e
 MPE="${mpe}"
 REGION="${region}"
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-BUCKET="map-tagger-\${ACCOUNT}"
+BUCKET="auto-map-tagger-\${ACCOUNT}"
 STACK_NAME="map-auto-tagger"
 
 echo "================================================"
