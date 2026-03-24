@@ -187,15 +187,6 @@
             Customer cost: <strong>&lt; $2/month</strong>.
         </div>
 
-        <!-- Prerequisites disclaimer -->
-        <div class="info-box" id="prerequisites" style="border-left: 4px solid #d13212; background: #fdf3f1;">
-            <strong>Customer Prerequisites</strong> — the generated <code>deploy.sh</code> will verify these automatically before deploying:
-            <ul style="margin: 8px 0 0 0; padding-left: 20px;">
-                <li>CloudTrail must be enabled in the target region(s)</li>
-                <li>Deployer must have CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch)</li>
-                <li id="prereq-multi" style="display:none;">Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access</li>
-            </ul>
-        </div>
 
         <!-- Step 1: Configure -->
         <div id="step1">
@@ -204,18 +195,18 @@
                 <p class="subtitle">Enter the MAP agreement details from AWS Investments</p>
 
                 <div class="form-group">
-                    <label>MAP Engagement ID <span class="hint">(from AWS Investments — must start with 'mig')</span></label>
-                    <input type="text" id="mpeId" placeholder="mig1234567890">
+                    <label>MAP 2.0 Tag Value <span class="hint">(ex. migA1B2C3D4E5)</span></label>
+                    <input type="text" id="mpeId" placeholder="migA1B2C3D4E5">
                     <div class="error-msg" id="mpeId-error">MAP Engagement ID must start with 'mig' followed by alphanumeric characters</div>
                 </div>
 
                 <div class="form-group">
-                    <label>Agreement Start Date</label>
+                    <label>Agreement Start Date <span class="hint">(Date to start tagging newly created MAP 2.0 resources)</span></label>
                     <input type="date" id="agreementDate">
                     <div class="error-msg" id="agreementDate-error">Agreement start date is required</div>
                 </div>
                 <div class="form-group">
-                    <label>Agreement End Date</label>
+                    <label>Agreement End Date <span class="hint">(Date to stop tagging newly created resources)</span></label>
                     <input type="date" id="agreementEndDate">
                     <div class="error-msg" id="agreementEndDate-error">Agreement end date is required and must be after start date</div>
                 </div>
@@ -225,9 +216,9 @@
                     <input type="text" id="customerName" placeholder="e.g., Acme Corp">
                 </div>
                 <div class="form-group">
-                    <label>Alert Email <span class="hint">(optional — customer ops team email)</span></label>
-                    <input type="email" id="alertEmail" placeholder="e.g., ops@customer.com">
-                    <div class="hint" style="margin-top: 4px;">Receives tagging failure alerts. Customer must confirm the AWS subscription email after deployment.</div>
+                    <label>Alert Email <span class="hint">(optional — email to receive tagging failure alerts, ex. customer ops team)</span></label>
+                    <input type="email" id="alertEmail" placeholder="e.g., ops@customer.com" style="width: 100%; max-width: 480px;">
+                    <div class="hint" style="margin-top: 4px;">Customer must confirm the AWS subscription email after deployment.</div>
                 </div>
             </div>
 
@@ -241,6 +232,40 @@
                         Single Account
                     </h3>
                     <p>Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.</p>
+                </div>
+
+                <!-- Single-account optional: VPC scope -->
+                <div id="single-account-options">
+                    <div class="section-divider"></div>
+                    <div class="form-group">
+                        <label>Tagging Scope <span class="hint">(optional)</span></label>
+                        <div class="hint" style="margin-bottom: 8px;">By default all new resources in the account are tagged. Use VPC scoping if migration and non-migration workloads share the same account.</div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="useVpcScope" onchange="toggleVpcScope()">
+                            Limit tagging to specific VPCs only
+                        </label>
+                    </div>
+                    <div id="vpc-scope-fields" class="hidden">
+                        <label>VPC IDs <span class="hint">(only resources in these VPCs will be tagged)</span></label>
+                        <div id="vpcList">
+                            <div class="entry-row">
+                                <input type="text" class="vpc-input" placeholder="vpc-0abc1234def56789">
+                                <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                            </div>
+                        </div>
+                        <button class="btn-add" onclick="addVpc()">+ Add another VPC</button>
+                        <div class="form-group" style="margin-top: 16px;">
+                            <label>
+                                <input type="checkbox" id="tagNonVpcServices" checked>
+                                Also tag non-VPC services (S3, DynamoDB, Lambda, SNS, SQS, etc.)
+                            </label>
+                            <div class="hint" style="margin-left: 22px; margin-top: 2px;">
+                                These services don't live in a VPC. If checked, all of them in the account will be tagged regardless of VPC scope.
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="option-card" id="opt-multi" onclick="selectDeployMode('multi')">
@@ -358,39 +383,6 @@
                 </div>
             </div>
 
-            <!-- VPC scope -->
-            <div class="card" id="vpc-scope-card">
-                <h2>Tagging Scope <span class="hint">(optional)</span></h2>
-                <p class="subtitle">By default all new resources in the account(s) are tagged. Use VPC scoping if migration and non-migration workloads share the same account.</p>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="useVpcScope" onchange="toggleVpcScope()">
-                        Limit tagging to specific VPCs only
-                    </label>
-                </div>
-
-                <div id="vpc-scope-fields" class="hidden">
-                    <label>VPC IDs <span class="hint">(only resources in these VPCs will be tagged)</span></label>
-                    <div id="vpcList">
-                        <div class="entry-row">
-                            <input type="text" class="vpc-input" placeholder="vpc-0abc1234def56789">
-                            <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
-                        </div>
-                    </div>
-                    <button class="btn-add" onclick="addVpc()">+ Add another VPC</button>
-
-                    <div class="form-group" style="margin-top: 16px;">
-                        <label>
-                            <input type="checkbox" id="tagNonVpcServices" checked>
-                            Also tag non-VPC services (S3, DynamoDB, Lambda, SNS, SQS, etc.)
-                        </label>
-                        <div class="hint" style="margin-left: 22px; margin-top: 2px;">
-                            These services don't live in a VPC. If checked, all of them in the account will be tagged regardless of VPC scope.
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Service coverage summary -->
             <div class="card">
@@ -452,6 +444,15 @@
 
                 <div id="downloadButtons" style="margin: 16px 0; display: flex; gap: 12px; flex-wrap: wrap;"></div>
 
+                <div class="info-box" style="border-left: 4px solid #d13212; background: #fdf3f1; margin: 16px 0;">
+                    <strong>Customer Prerequisites</strong> — the generated <code>deploy.sh</code> will verify these automatically before deploying:
+                    <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                        <li>CloudTrail must be enabled in the target region(s)</li>
+                        <li>Deployer must have CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch)</li>
+                        <li id="prereq-multi" style="display:none;">Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access</li>
+                    </ul>
+                </div>
+
                 <h3 style="margin-top: 20px; font-size: 14px;">Customer Deployment Instructions</h3>
                 <div class="preview-box" id="instructions" style="color: #d4d4d4;"></div>
 
@@ -472,8 +473,8 @@
             document.getElementById('opt-single').classList.toggle('selected', mode === 'single');
             document.getElementById('opt-multi').classList.toggle('selected', mode === 'multi');
             document.getElementById('multi-account-options').classList.toggle('hidden', mode === 'single');
+            document.getElementById('single-account-options').classList.toggle('hidden', mode === 'multi');
             document.getElementById('prereq-multi').style.display = mode === 'multi' ? 'block' : 'none';
-            document.getElementById('vpc-scope-card').style.display = mode === 'multi' ? 'none' : '';
         }
 
         function selectEventMode(mode) {
