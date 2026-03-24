@@ -1336,6 +1336,15 @@ ${crossAccountCode}
                   elif event_name == 'CreateJob' and detail.get('eventSource') == 'glue.amazonaws.com':
                       n = req.get('name') or req.get('jobName') or req.get('Name')
                       arn = f"arn:{p}:glue:{region}:{account_id}:job/{n}" if n else None
+                  elif event_name == 'CreateWorkflow' and detail.get('eventSource') == 'glue.amazonaws.com':
+                      n = resp.get('name') or req.get('name')
+                      arn = f"arn:{p}:glue:{region}:{account_id}:workflow/{n}" if n else None
+                  elif event_name == 'CreateCrawler':
+                      n = req.get('name') or req.get('crawlerName')
+                      arn = f"arn:{p}:glue:{region}:{account_id}:crawler/{n}" if n else None
+                  elif event_name == 'CreateTrigger':
+                      n = req.get('name') or req.get('triggerName')
+                      arn = f"arn:{p}:glue:{region}:{account_id}:trigger/{n}" if n else None
                   elif event_name == 'CreateDomain' and detail.get('eventSource') == 'codeartifact.amazonaws.com':
                       n = req.get('domain')
                       arn = f"arn:{p}:codeartifact:{region}:{account_id}:domain/{n}" if n else None
