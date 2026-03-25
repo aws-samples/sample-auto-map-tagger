@@ -39,6 +39,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v19.1] - 2026-03-25
+
+### Security
+- Fixed ACAT finding: added `KmsMasterKeyId: alias/aws/sns` to SNS topic in both templates (commit 050d303)
+
+### Process
+- TALOS security engagement submitted (Review Requested) — SIM V2151667500
+- THREAT-MODEL.md updated: EventBridge prefix justification, StackSet all-accounts constraint documented, apigateway:PATCH MAP Taggr precedent noted
+
+---
+
 ## [v19] - 2026-03-24
 
 ### Added (configurator.html)
