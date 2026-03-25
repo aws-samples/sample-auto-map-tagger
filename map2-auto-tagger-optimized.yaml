@@ -1788,6 +1788,7 @@ Resources:
     Properties:
       TopicName: auto-map-tagger-alerts
       DisplayName: MAP 2.0 Auto-Tagger Alerts
+      KmsMasterKeyId: alias/aws/sns
 
   # CloudWatch alarm - fires if Lambda errors spike
   TaggerErrorAlarm:
