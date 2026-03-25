@@ -1359,6 +1359,9 @@ ${crossAccountCode}
                       api_id = resp.get('id') or resp.get('apiId')
                       api_type = 'restapis' if event_name == 'CreateRestApi' else 'apis'
                       arn = f"arn:{p}:apigateway:{region}::/{api_type}/{api_id}" if api_id else None
+                  elif event_name == 'CreateAutoScalingGroup':
+                      name = req.get('autoScalingGroupName')
+                      arn = f"arn:{p}:autoscaling:{region}:{account_id}:autoScalingGroup:*:autoScalingGroupName/{name}" if name else None
                   elif event_name == 'CreateNetworkInterface':
                       eni = resp.get('networkInterface', {})
                       eni_id = eni.get('networkInterfaceId')
