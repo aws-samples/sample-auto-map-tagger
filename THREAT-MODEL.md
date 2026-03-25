@@ -1,7 +1,7 @@
 # MAP 2.0 Auto-Tagger — Threat Model
 
-**Version:** v18 (IAM Access Analyzer run completed)
-**Date:** 2026-03-24
+**Version:** v19.1 (updated post E2E testing)
+**Date:** 2026-03-25
 **Status:** For AppSec / PCSR review
 
 ---
@@ -148,7 +148,7 @@ Lambda errors → CloudWatch Alarm → SNS Topic → customer email
 |----|--------|-----------|--------------|
 | D1 | Attacker creates resources en masse to flood Lambda | `ReservedConcurrentExecutions: 10` caps Lambda throughput; excess EventBridge events are queued and retried; failed events go to DLQ | **Low-Medium** — sustained burst delays tagging but causes no data loss |
 | D2 | Lambda throttling causes permanently missed tags | Failed events land in SQS DLQ (14-day retention); CloudWatch Alarm fires at error rate > 3 in 5 minutes | **Low** |
-| D3 | EventBridge rule fires on non-taggable events (broad pattern) | Lambda immediately skips events in `IGNORE_EVENTS` list and events where no ARN can be extracted; no side effects | **Low** |
+| D3 | EventBridge rule fires on non-taggable events (broad prefix pattern) | The EventBridge rule uses prefix matching (`Create*`, `Run*`, `Put*`, etc.) rather than an explicit event list. This is required because AWS enforces a 2048-character limit on EventBridge rule patterns, which an explicit list of 200+ event names would exceed. Lambda immediately skips events in the `IGNORE_EVENTS` list and returns `no_arn` for unrecognised events; no side effects occur. This solution does not use EventBridge for other purposes — the Lambda has no code path that acts on unrecognised event types. | **Low** |
 
 ### 6.6 Elevation of Privilege
 
@@ -157,7 +157,7 @@ Lambda errors → CloudWatch Alarm → SNS Topic → customer email
 | E1 | Lambda role used to modify resources beyond tagging | Lambda role grants only `TagResource` / `AddTags` / `CreateTags` type actions; no `Create*`, `Delete*`, `Update*` outside of service-specific tagging requirements (see §7) | **Low** |
 | E2 | Lambda role used to enumerate account resources | `MinimalReads` Sid grants only `ec2:DescribeInstances`, `ec2:DescribeVolumes` (VPC scope mode only), and `sts:GetCallerIdentity`; no broad `List*` or `Describe*` | **Low** |
 | E3 | `cloudformation:UpdateStack` / `UpdateStackSet` abused to modify stacks | Required by AWS platform — `tag:TagResources` on CF stacks routes through `UpdateStack` internally; Lambda has no code path to call UpdateStack directly; only reachable if Lambda is invoked outside of EventBridge | **Low-Medium** — documented accepted risk |
-| E4 | `apigateway:PUT` used to modify API GW resources | API GW v1 tagging requires `apigateway:PUT` (no narrower action exists); Lambda code only calls tagging operations; no arbitrary API GW mutation code paths exist | **Low-Medium** — documented accepted risk |
+| E4 | `apigateway:PUT`/`PATCH` used to modify API GW resources | API GW v1 REST API tagging requires both `PUT` and `PATCH` (confirmed via `AccessDenied` testing); Lambda code only calls tagging operations; no arbitrary API GW mutation code paths exist. **Precedent:** MAP Taggr (AppSec-approved) grants all five API GW methods including `DELETE` and `POST` | **Low-Medium** — documented accepted risk |
 | E5 | `servicecatalog:UpdateProduct` / `UpdatePortfolio` abused | Required by AWS platform — SC tagging routes through `UpdateProduct` internally; Lambda code only calls tagging operations | **Low-Medium** — documented accepted risk |
 | E6 | `codebuild:UpdateProject` abused to modify CodeBuild projects | Required for CodeBuild tagging (no standalone `TagResource` action); Lambda code only calls tagging operations | **Low-Medium** — documented accepted risk |
 
@@ -170,6 +170,7 @@ The following IAM permissions appear broader than pure tagging. This section doc
 | Permission | Why it looks broad | Root cause | Mitigating factor |
 |-----------|-------------------|-----------|--------------------|
 | `apigateway:PUT` | Allows modifying any API GW resource | API Gateway v1 uses `PUT /tags/{arn}` HTTP method; AWS maps this to `apigateway:PUT` with no path-based scoping in IAM | Lambda code only calls tag-related APIs; no mutation code paths exist |
+| `apigateway:PATCH` | Allows modifying any API GW resource | AWS `tag_resource()` on REST APIs internally requires `apigateway:PATCH`; confirmed via `AccessDenied` testing. **Precedent:** MAP Taggr (AppSec-approved) grants `apigateway:GET/PUT/PATCH/DELETE/POST` — our scope is more conservative (PUT and PATCH only) | Lambda code only calls tag-related APIs; no mutation code paths exist |
 | `cloudformation:UpdateStack` `cloudformation:UpdateStackSet` | Allows modifying any CF stack | AWS internally routes `tag:TagResources` on CF stacks through `UpdateStack`; confirmed via AccessDenied testing | Lambda code only calls `tag:TagResources`; `UpdateStack` is never called directly |
 | `servicecatalog:UpdateProduct` `servicecatalog:UpdatePortfolio` | Allows modifying SC products/portfolios | AWS internally routes SC tagging through `UpdateProduct`; confirmed via AccessDenied testing (v14 fix) | Lambda code only calls `tag:TagResources`; `UpdateProduct` is never called directly |
 | `codebuild:UpdateProject` | Allows modifying CodeBuild projects | CodeBuild has no standalone `TagResource` IAM action; tagging requires `UpdateProject` | Lambda code only calls `tag:TagResources`; `UpdateProject` is never called directly |
@@ -237,10 +238,19 @@ Total findings: 0
 - **Recommendation:** Publish to GitHub (aws-samples) so customers clone directly — tamper-evident via git history and commit signing
 
 ### 9.2 StackSet Deployment Scope
-- StackSets target the root organizational unit — all accounts in the org receive the Lambda
-- This is an AWS platform constraint for SERVICE_MANAGED StackSets (individual account IDs cannot be targeted)
-- Inactive accounts (audit, log archive) receive the deployment but Lambda only fires on resource creation; zero cost impact for inactive accounts
-- Customers are informed of this behavior in INSTRUCTIONS.md FAQ
+
+**Architectural constraint:** AWS SERVICE_MANAGED StackSets only accept `OrganizationalUnitIds` as deployment targets — individual account IDs cannot be targeted. This is a hard AWS platform limitation, not a design choice.
+
+**Consequence:** In multi-account mode, the Lambda is deployed to every account in the AWS Organization, including accounts not related to the MAP agreement. However, account-level filtering is enforced in the Lambda itself via the `scoped_account_ids` configuration in SSM:
+- Lambda in **in-scope accounts**: `is_in_scope()` returns True → resources are tagged
+- Lambda in **out-of-scope accounts**: `is_in_scope()` returns False → all events skipped, nothing tagged, no side effects
+
+**Additional mitigations:**
+- Lambda in out-of-scope accounts incurs negligible cost (sub-millisecond executions that return immediately)
+- No data is written, no resources are modified in out-of-scope accounts
+- The Lambda role in each account has only tagging permissions — it cannot read resources, enumerate accounts, or escalate
+
+**Note:** This constraint was validated by testing — attempting `DeploymentTargets={'Accounts': [...]}` with SERVICE_MANAGED StackSets results in `OrganizationalUnitIds are required` error from the AWS API.
 
 ### 9.3 CloudTrail Dependency
 - The solution requires CloudTrail to be enabled in each region
@@ -263,7 +273,8 @@ Total findings: 0
 | Risk | Severity | Decision |
 |------|---------|---------|
 | `deploy.sh` has no integrity check | Medium | **Pending** — will be resolved by publishing to GitHub (aws-samples) |
-| `apigateway:PUT`, `cloudformation:UpdateStack`, `servicecatalog:Update*`, `codebuild:UpdateProject` are broader than pure tagging | Medium | **Accepted** — required by AWS platform design; no narrower permissions exist; no exploitation code paths in Lambda |
+| `apigateway:PUT`/`PATCH`, `cloudformation:UpdateStack`, `servicecatalog:Update*`, `codebuild:UpdateProject` are broader than pure tagging | Medium | **Accepted** — required by AWS platform design; no narrower permissions exist; no exploitation code paths in Lambda. `apigateway:PATCH` precedent: MAP Taggr (AppSec-approved) grants all five API GW methods; our scope is limited to PUT and PATCH only |
+| Lambda deployed to all org accounts (StackSet constraint) | Low | **Accepted** — AWS hard constraint; account filtering enforced in Lambda via `scoped_account_ids`; out-of-scope Lambdas return immediately without side effects |
 | CloudWatch logs not KMS-encrypted | Low | **Accepted** — logs contain ARNs only, no sensitive data |
 | SSM parameter not KMS-encrypted (`String` not `SecureString`) | Low | **Accepted** — MPE ID is not a secret; it is visible as a tag value on every tagged resource |
 | Lambda concurrency cap may delay tagging during large resource creation bursts | Low | **Accepted** — MAP credit eligibility is not time-critical within minutes; DLQ captures any failed events |

@@ -806,6 +806,10 @@
             // Integration
             'sns:TagResource','sqs:TagQueue','states:TagResource','events:TagResource',
             'pipes:TagResource','scheduler:TagResource','appsync:TagResource','apigateway:TagResource',
+            // SECURITY NOTE: API Gateway v1 REST API tagging requires both PUT and PATCH.
+            // AWS maps tag_resource() to apigateway:PATCH internally (confirmed via AccessDenied testing).
+            // Precedent: MAP Taggr (AppSec-approved) grants all 5 API GW methods (GET/PUT/PATCH/DELETE/POST).
+            // We grant only PUT and PATCH — more conservative than the approved precedent.
             'apigateway:PUT','apigateway:PATCH',
             // Management & Monitoring
             'logs:TagResource','cloudwatch:TagResource','ssm:AddTagsToResource',
