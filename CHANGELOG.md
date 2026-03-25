@@ -26,9 +26,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - CodeDeploy App, Athena Workgroup, Glue Job, CodeArtifact Domain: no ARN construction → added handlers
 - ENI (CreateNetworkInterface): nested response structure → added handler
 - Deploy Lambda race condition (`OperationInProgressException`) → added wait loop for in-progress operations
+- `CreateAutoScalingGroup` ARN construction missing (ASG doesn't return ARN in response) → added handler
 
 **Both templates:**
 - VPC scope: `RunInstances` VPC detection fixed (same bug in standalone YAML)
+
+**THREAT-MODEL.md updated:**
+- EventBridge prefix pattern justified (AWS 2048-char hard limit)
+- StackSet all-accounts deployment documented as AWS architectural constraint with Lambda-level mitigation
+- `apigateway:PATCH` — MAP Taggr precedent noted (they grant all 5 methods; we grant only PUT+PATCH)
+- Residual risks updated
 
 ---
 
