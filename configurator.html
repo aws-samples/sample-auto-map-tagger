@@ -291,6 +291,7 @@
                             </div>
                         </div>
                         <button class="btn-add" onclick="addVpc()" data-i18n="ui_add_vpc">+ Add another VPC</button>
+                        <div class="error-msg" id="vpc-error" data-i18n="err_vpc_required">Please enter at least one VPC ID.</div>
                     </div>
                 </div>
 
@@ -358,6 +359,7 @@
                         <div class="form-group">
                             <label><span data-i18n="ui_central_account_id">Central Account ID</span> <span class="hint" data-i18n="ui_central_account_id_hint">(where the Lambda will be deployed)</span></label>
                             <input type="text" id="centralAccountId" placeholder="123456789012" maxlength="12">
+                            <div class="error-msg" id="centralAccountId-error" data-i18n="err_central_account_required">Please enter the central account ID (12 digits).</div>
                         </div>
                         <div class="form-group">
                             <label data-i18n="ui_member_accounts">Member Accounts in MAP Scope</label>
@@ -638,6 +640,35 @@
                 document.getElementById('opt-multi').style.outline = '';
             }
 
+            // VPC scope: at least one VPC ID required
+            if (document.getElementById('useVpcScope').checked) {
+                const vpcVals = getValues('.vpc-input').filter(v => v.trim());
+                const vpcErr = document.getElementById('vpc-error');
+                if (vpcVals.length === 0) {
+                    vpcErr.style.display = 'block';
+                    valid = false;
+                } else {
+                    vpcErr.style.display = 'none';
+                }
+            }
+
+            // Central Lambda: account ID required
+            const deployModeEl = document.querySelector('input[name="deployMode"]:checked');
+            const eventModeEl = document.querySelector('input[name="eventMode"]:checked');
+            if (deployModeEl && deployModeEl.value === 'multi' &&
+                eventModeEl && eventModeEl.value === 'central') {
+                const centralId = document.getElementById('centralAccountId').value.trim();
+                const centralErr = document.getElementById('centralAccountId-error');
+                if (!/^\d{12}$/.test(centralId)) {
+                    document.getElementById('centralAccountId').classList.add('error');
+                    centralErr.style.display = 'block';
+                    valid = false;
+                } else {
+                    document.getElementById('centralAccountId').classList.remove('error');
+                    centralErr.style.display = 'none';
+                }
+            }
+
             return valid;
         }
 
@@ -858,6 +889,8 @@
             err_mpe_invalid:"MAP Engagement ID must start with 'mig' followed by alphanumeric characters",
             err_date_required:'Agreement start date is required',
             err_date_end:'Agreement end date is required and must be after start date',
+            err_vpc_required:'Please enter at least one VPC ID.',
+            err_central_account_required:'Please enter the central account ID (12 digits).',
             // deploy.sh
             d_title:'MAP 2.0 Auto-Tagger Setup',
             d_tag_label:'Tag Value', d_region_label:'Region', d_account_label:'Account',
@@ -993,6 +1026,8 @@
             err_mpe_invalid:"MAP 참여 ID는 'mig'로 시작하고 영숫자만 포함해야 합니다",
             err_date_required:'협약 시작일을 입력해 주세요',
             err_date_end:'협약 종료일은 시작일 이후여야 합니다',
+            err_vpc_required:'VPC ID를 하나 이상 입력해 주세요.',
+            err_central_account_required:'중앙 계정 ID를 입력해 주세요 (12자리 숫자).',
             d_title:'MAP 2.0 자동 태거 설정',
             d_tag_label:'태그 값', d_region_label:'리전', d_account_label:'계정',
             d_step1:'1단계/3: 계정 확인 중...',
@@ -1126,6 +1161,8 @@
             err_mpe_invalid:"MAP IDは'mig'で始まり英数字のみを含む必要があります",
             err_date_required:'契約開始日を入力してください',
             err_date_end:'契約終了日は開始日より後である必要があります',
+            err_vpc_required:'VPC IDを1つ以上入力してください。',
+            err_central_account_required:'中央アカウントID（12桁）を入力してください。',
             d_title:'MAP 2.0 自動タガー セットアップ',
             d_tag_label:'タグ値', d_region_label:'リージョン', d_account_label:'アカウント',
             d_step1:'ステップ1/3：アカウントを確認しています...',
@@ -1259,6 +1296,8 @@
             err_mpe_invalid:"MAP参与ID必须以'mig'开头，后跟字母数字字符",
             err_date_required:'请填写协议开始日期',
             err_date_end:'协议结束日期必须晚于开始日期',
+            err_vpc_required:'请至少输入一个VPC ID。',
+            err_central_account_required:'请输入中央账户ID（12位数字）。',
             d_title:'MAP 2.0 自动标记器设置',
             d_tag_label:'标签值', d_region_label:'区域', d_account_label:'账户',
             d_step1:'第1步/共3步：正在检查您的账户...',
@@ -1392,6 +1431,8 @@
             err_mpe_invalid:"MAP ID harus diawali dengan 'mig' diikuti karakter alfanumerik",
             err_date_required:'Tanggal mulai perjanjian wajib diisi',
             err_date_end:'Tanggal berakhir harus setelah tanggal mulai',
+            err_vpc_required:'Harap masukkan setidaknya satu VPC ID.',
+            err_central_account_required:'Harap masukkan ID akun pusat (12 digit).',
             d_title:'Pengaturan MAP 2.0 Auto-Tagger',
             d_tag_label:'Nilai Tag', d_region_label:'Region', d_account_label:'Akun',
             d_step1:'Langkah 1 dari 3: Memeriksa akun Anda...',
@@ -1525,6 +1566,8 @@
             err_mpe_invalid:"MAP ID ต้องเริ่มต้นด้วย 'mig' ตามด้วยตัวอักษรและตัวเลข",
             err_date_required:'กรุณากรอกวันที่เริ่มต้นข้อตกลง',
             err_date_end:'วันที่สิ้นสุดต้องอยู่หลังวันที่เริ่มต้น',
+            err_vpc_required:'กรุณากรอก VPC ID อย่างน้อยหนึ่งรายการ',
+            err_central_account_required:'กรุณากรอก ID บัญชีกลาง (12 หลัก)',
             d_title:'การตั้งค่า MAP 2.0 Auto-Tagger',
             d_tag_label:'ค่า Tag', d_region_label:'Region', d_account_label:'บัญชี',
             d_step1:'ขั้นตอนที่ 1/3: กำลังตรวจสอบบัญชีของคุณ...',
@@ -1658,6 +1701,8 @@
             err_mpe_invalid:"MAP ID phải bắt đầu bằng 'mig' theo sau là ký tự chữ và số",
             err_date_required:'Vui lòng nhập ngày bắt đầu thỏa thuận',
             err_date_end:'Ngày kết thúc phải sau ngày bắt đầu',
+            err_vpc_required:'Vui lòng nhập ít nhất một VPC ID.',
+            err_central_account_required:'Vui lòng nhập ID tài khoản trung tâm (12 chữ số).',
             d_title:'Cài đặt MAP 2.0 Auto-Tagger',
             d_tag_label:'Giá trị Tag', d_region_label:'Region', d_account_label:'Tài khoản',
             d_step1:'Bước 1/3: Đang kiểm tra tài khoản của bạn...',
