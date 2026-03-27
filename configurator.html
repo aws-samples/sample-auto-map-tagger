@@ -895,8 +895,15 @@
             d_complete_title:'Setup Complete!',
             d_complete_single:'New resources will be automatically tagged within 1–2 minutes of creation (up to 15 min at peak).',
             d_complete_multi:'Auto-tagging is now active across all accounts in your organization.',
-            d_backfill_msg:'Backfill is scheduled to run in ~5 minutes.',
+            d_backfill_msg:'Backfill is scheduled to run shortly.',
             d_backfill_since:'It will tag existing resources created since',
+            d_backfill_waiting:'Waiting for backfill to complete...',
+            d_backfill_wait_info:'(Backfill will start shortly, may take up to 15 minutes)',
+            d_backfill_starting:'Backfill is running...',
+            d_backfill_in_progress:'Backfill in progress...',
+            d_backfill_timeout:'Backfill is still running. Report saved — check CloudWatch for final results:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'Backfill complete.',
+            r_backfill_result:'Backfill Result',
             d_report_saved:'Deployment report saved to:',
             d_share_report:'Share this file with your AWS account team.',
             // report
@@ -1022,7 +1029,14 @@
             d_complete_title:'설정 완료!',
             d_complete_single:'새 리소스는 생성 후 1~2분 이내에 자동으로 태그가 지정됩니다 (최대 15분 소요 가능).',
             d_complete_multi:'조직의 모든 계정에서 자동 태그 지정이 활성화되었습니다.',
-            d_backfill_msg:'백필이 약 5분 후에 실행될 예정입니다.',
+            d_backfill_msg:'백필이 곧 실행될 예정입니다.',
+            d_backfill_waiting:'백필 완료를 기다리는 중...',
+            d_backfill_wait_info:'(백필이 곧 시작되며 최대 15분이 소요될 수 있습니다)',
+            d_backfill_starting:'백필이 실행 중입니다...',
+            d_backfill_in_progress:'백필 진행 중...',
+            d_backfill_timeout:'백필이 아직 실행 중입니다. 보고서가 저장되었습니다 — 최종 결과는 CloudWatch에서 확인하세요:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'백필 완료.',
+            r_backfill_result:'백필 결과',
             d_backfill_since:'다음 날짜 이후에 생성된 기존 리소스에 태그를 지정합니다:',
             d_report_saved:'배포 보고서 저장 위치:',
             d_share_report:'이 파일을 AWS 계정 팀과 공유하세요.',
@@ -1148,7 +1162,14 @@
             d_complete_title:'設定完了！',
             d_complete_single:'新しいリソースは作成後1〜2分以内に自動的にタグ付けされます（最大15分かかる場合があります）。',
             d_complete_multi:'組織のすべてのアカウントで自動タグ付けが有効になりました。',
-            d_backfill_msg:'バックフィルは約5分後に実行される予定です。',
+            d_backfill_msg:'バックフィルはまもなく実行されます。',
+            d_backfill_waiting:'バックフィルの完了を待っています...',
+            d_backfill_wait_info:'（バックフィルはまもなく開始され、最大15分かかる場合があります）',
+            d_backfill_starting:'バックフィルが実行中です...',
+            d_backfill_in_progress:'バックフィル進行中...',
+            d_backfill_timeout:'バックフィルはまだ実行中です。レポートが保存されました — 最終結果はCloudWatchで確認してください:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'バックフィル完了。',
+            r_backfill_result:'バックフィル結果',
             d_backfill_since:'次の日付以降に作成された既存のリソースにタグを付けます：',
             d_report_saved:'デプロイメントレポートの保存先：',
             d_share_report:'このファイルをAWSアカウントチームと共有してください。',
@@ -1274,7 +1295,14 @@
             d_complete_title:'设置完成！',
             d_complete_single:'新资源将在创建后1-2分钟内自动添加标签（高峰期最长15分钟）。',
             d_complete_multi:'自动标记现已在组织的所有账户中激活。',
-            d_backfill_msg:'回填将在约5分钟后运行。',
+            d_backfill_msg:'回填即将运行。',
+            d_backfill_waiting:'等待回填完成...',
+            d_backfill_wait_info:'（回填即将开始，最多可能需要15分钟）',
+            d_backfill_starting:'回填正在运行...',
+            d_backfill_in_progress:'回填进行中...',
+            d_backfill_timeout:'回填仍在运行中。报告已保存 — 请在CloudWatch中查看最终结果:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'回填完成。',
+            r_backfill_result:'回填结果',
             d_backfill_since:'它将对以下日期后创建的现有资源打标签：',
             d_report_saved:'部署报告已保存至：',
             d_share_report:'请将此文件分享给您的AWS账户团队。',
@@ -1400,7 +1428,14 @@
             d_complete_title:'Pengaturan Selesai!',
             d_complete_single:'Resource baru akan secara otomatis diberi tag dalam 1-2 menit setelah dibuat (hingga 15 menit pada jam sibuk).',
             d_complete_multi:'Pemberian tag otomatis kini aktif di semua akun dalam organisasi Anda.',
-            d_backfill_msg:'Backfill dijadwalkan berjalan dalam ~5 menit.',
+            d_backfill_msg:'Backfill akan segera berjalan.',
+            d_backfill_waiting:'Menunggu backfill selesai...',
+            d_backfill_wait_info:'(Backfill akan segera dimulai, mungkin membutuhkan hingga 15 menit)',
+            d_backfill_starting:'Backfill sedang berjalan...',
+            d_backfill_in_progress:'Backfill sedang berlangsung...',
+            d_backfill_timeout:'Backfill masih berjalan. Laporan telah disimpan — periksa CloudWatch untuk hasil akhir:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'Backfill selesai.',
+            r_backfill_result:'Hasil Backfill',
             d_backfill_since:'Ini akan memberi tag pada resource yang dibuat sejak:',
             d_report_saved:'Laporan deployment disimpan di:',
             d_share_report:'Bagikan file ini ke tim akun AWS Anda.',
@@ -1526,7 +1561,14 @@
             d_complete_title:'ติดตั้งสำเร็จ!',
             d_complete_single:'ทรัพยากรใหม่จะได้รับ Tag โดยอัตโนมัติภายใน 1-2 นาทีหลังสร้าง (สูงสุด 15 นาทีในช่วงที่มีการใช้งานสูง)',
             d_complete_multi:'การติด Tag อัตโนมัติเปิดใช้งานแล้วในทุกบัญชีขององค์กรของคุณ',
-            d_backfill_msg:'การเติม Tag ย้อนหลังถูกกำหนดให้รันใน ~5 นาที',
+            d_backfill_msg:'การเติม Tag ย้อนหลังจะเริ่มในไม่ช้า',
+            d_backfill_waiting:'กำลังรอการเติม Tag ย้อนหลังเสร็จสิ้น...',
+            d_backfill_wait_info:'(การเติม Tag ย้อนหลังจะเริ่มในไม่ช้า อาจใช้เวลาสูงสุด 15 นาที)',
+            d_backfill_starting:'การเติม Tag ย้อนหลังกำลังทำงาน...',
+            d_backfill_in_progress:'กำลังเติม Tag ย้อนหลัง...',
+            d_backfill_timeout:'การเติม Tag ย้อนหลังยังคงทำงานอยู่ บันทึกรายงานแล้ว — ตรวจสอบผลลัพธ์สุดท้ายใน CloudWatch:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'เติม Tag ย้อนหลังเสร็จสิ้น',
+            r_backfill_result:'ผลการเติม Tag ย้อนหลัง',
             d_backfill_since:'จะติด Tag ให้ทรัพยากรที่สร้างตั้งแต่:',
             d_report_saved:'บันทึกรายงานการติดตั้งที่:',
             d_share_report:'แชร์ไฟล์นี้กับทีม AWS Account ของคุณ',
@@ -1652,7 +1694,14 @@
             d_complete_title:'Cài đặt hoàn tất!',
             d_complete_single:'Resource mới sẽ tự động được gắn tag trong vòng 1-2 phút sau khi tạo (tối đa 15 phút trong giờ cao điểm).',
             d_complete_multi:'Tính năng tự động gắn tag hiện đã hoạt động trên tất cả tài khoản trong tổ chức.',
-            d_backfill_msg:'Backfill được lên lịch chạy trong ~5 phút.',
+            d_backfill_msg:'Backfill sẽ chạy ngay sau đây.',
+            d_backfill_waiting:'Đang chờ backfill hoàn tất...',
+            d_backfill_wait_info:'(Backfill sẽ bắt đầu ngay, có thể mất tối đa 15 phút)',
+            d_backfill_starting:'Backfill đang chạy...',
+            d_backfill_in_progress:'Đang thực hiện backfill...',
+            d_backfill_timeout:'Backfill vẫn đang chạy. Báo cáo đã được lưu — kiểm tra CloudWatch để xem kết quả cuối cùng:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'Backfill hoàn tất.',
+            r_backfill_result:'Kết quả Backfill',
             d_backfill_since:'Nó sẽ gắn tag cho các resource được tạo từ:',
             d_report_saved:'Báo cáo triển khai đã được lưu tại:',
             d_share_report:'Chia sẻ file này với nhóm tài khoản AWS của bạn.',
@@ -3186,7 +3235,37 @@ rm -f "\$TEMPLATE"
 
 aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
 DEPLOY_STATUS="SUCCESS"
-
+${config.includeBackfill ? `
+# ── Backfill wait ────────────────────────────
+echo ""
+echo "${t('d_backfill_waiting')}"
+echo "  ${t('d_backfill_wait_info')}"
+echo ""
+BACKFILL_RESULT="${t('d_backfill_timeout')}"
+WAIT=0
+while [ \$WAIT -lt 1200 ]; do
+  RULE_STATE=\$(aws events describe-rule --name map-auto-tagger-backfill --region "\$REGION" --query 'State' --output text 2>/dev/null)
+  if [ "\$RULE_STATE" = "DISABLED" ]; then
+    echo "  ${t('d_backfill_starting')}"
+    START_MS=\$(( \$(date +%s) * 1000 - 1800000 ))
+    COMPLETE=\$(aws logs filter-log-events \\
+      --log-group-name "/aws/lambda/map-auto-tagger-backfill" \\
+      --filter-pattern '"Backfill complete"' \\
+      --start-time "\$START_MS" \\
+      --max-items 1 \\
+      --query 'events[0].message' \\
+      --output text 2>/dev/null)
+    if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
+      BACKFILL_RESULT="\$COMPLETE"
+      echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
+      break
+    fi
+  fi
+  sleep 30
+  WAIT=\$((WAIT + 30))
+  echo "  ${t('d_backfill_in_progress')} (\${WAIT}s)"
+done
+echo ""` : ''}
 # ── Step 3: Done ─────────────────────────────
 echo "${t('d_step3')}"
 echo ""
@@ -3219,10 +3298,9 @@ echo ""
   echo "  ${t('r_verify2')}"
   echo "  ${t('r_verify3')} \$MPE"
   echo ""
-  ${config.includeBackfill ? `echo "${t('r_backfill')}"
+  ${config.includeBackfill ? `echo "${t('r_backfill_result')}"
   echo "----------------"
-  echo "  ${t('d_backfill_msg')} ${t('d_backfill_since')} ${config.agreementDate}"
-  echo "  aws logs tail /aws/lambda/map-auto-tagger-backfill --follow"
+  echo "  \$BACKFILL_RESULT"
   echo ""` : ''}
   echo "${t('r_support')}"
   echo "--------"
@@ -3235,8 +3313,6 @@ echo "  │   ✅ ${t('d_complete_title')}               │"
 echo "  │   ${t('d_complete_single')}  │"
 echo "  └─────────────────────────────────────────┘"
 echo ""
-${config.includeBackfill ? `echo "  ⏳ ${t('d_backfill_msg')} ${t('d_backfill_since')} ${config.agreementDate}"
-echo ""` : ''}
 echo "  📄 ${t('d_report_saved')} \$REPORT_FILE"
 echo "     ${t('d_share_report')}"
 echo ""
@@ -3430,7 +3506,39 @@ while true; do
   WAIT_SECS=\$((WAIT_SECS + 30))
   echo "  ${t('d_still_deploying')} (\${WAIT_SECS}s ${t('d_elapsed')})"
 done
-
+${config.includeBackfill ? `
+# ── Backfill wait ────────────────────────────
+if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
+  echo ""
+  echo "${t('d_backfill_waiting')}"
+  echo "  ${t('d_backfill_wait_info')}"
+  echo ""
+  BACKFILL_RESULT="${t('d_backfill_timeout')}"
+  WAIT=0
+  while [ \$WAIT -lt 1200 ]; do
+    RULE_STATE=\$(aws events describe-rule --name map-auto-tagger-backfill --region "\$REGION" --query 'State' --output text 2>/dev/null)
+    if [ "\$RULE_STATE" = "DISABLED" ]; then
+      echo "  ${t('d_backfill_starting')}"
+      START_MS=\$(( \$(date +%s) * 1000 - 1800000 ))
+      COMPLETE=\$(aws logs filter-log-events \\
+        --log-group-name "/aws/lambda/map-auto-tagger-backfill" \\
+        --filter-pattern '"Backfill complete"' \\
+        --start-time "\$START_MS" \\
+        --max-items 1 \\
+        --query 'events[0].message' \\
+        --output text 2>/dev/null)
+      if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
+        BACKFILL_RESULT="\$COMPLETE"
+        echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
+        break
+      fi
+    fi
+    sleep 30
+    WAIT=\$((WAIT + 30))
+    echo "  ${t('d_backfill_in_progress')} (\${WAIT}s)"
+  done
+  echo ""
+fi` : ''}
 # ── Step 3: Report ───────────────────────────
 echo ""
 echo "${t('d_step3')}"
@@ -3462,9 +3570,9 @@ echo "${t('d_step3')}"
     echo "  ${t('r_verify2')}"
     echo "  ${t('r_verify3')} \$MPE"
     echo ""
-    ${config.includeBackfill ? `echo "${t('r_backfill')}"
+    ${config.includeBackfill ? `echo "${t('r_backfill_result')}"
     echo "----------------"
-    echo "  ${t('d_backfill_msg')} ${t('d_backfill_since')} ${config.agreementDate}"
+    echo "  \$BACKFILL_RESULT"
     echo ""` : ''}
     echo "${t('r_perstatus')}"
     echo "-------------------"
@@ -3488,8 +3596,6 @@ if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
   echo "  │   ${t('d_complete_multi')}  │"
   echo "  └─────────────────────────────────────────┘"
   echo ""
-  ${config.includeBackfill ? `echo "  ⏳ ${t('d_backfill_msg')} ${t('d_backfill_since')} ${config.agreementDate}"
-  echo ""` : ''}
 fi
 
 echo "  📄 ${t('d_report_saved')} \$REPORT_FILE"
