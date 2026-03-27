@@ -747,6 +747,32 @@
           en: {
             // UI
             ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_btn_download:'Download',
+            ui_instr_single_title:'DEPLOYMENT INSTRUCTIONS — Single Account',
+            ui_instr_multi_title:'DEPLOYMENT INSTRUCTIONS — Multi-Account',
+            ui_instr_login_single:'Log into the AWS Console for your migration account.',
+            ui_instr_login_multi:'Log into the AWS Console for your MANAGEMENT account.',
+            ui_instr_open_cloudshell:'Open CloudShell (click the terminal icon in the top menu bar).',
+            ui_instr_upload_files:'Upload the files (CloudShell → Actions → Upload file):',
+            ui_instr_upload_all:'Upload all 3 files (CloudShell → Actions → Upload file):',
+            ui_instr_run:'Run:',
+            ui_instr_done_single:'Done. The script deploys and confirms when complete.',
+            ui_instr_done_multi:'Done. Auto-tagging is now active across all accounts.',
+            ui_instr_verify_title:'Verify tagging is working (after deployment):',
+            ui_instr_expected:'Expected',
+            ui_instr_thats_it:"That's it. Auto-tagging is active for all 190+ supported resource types.",
+            ui_instr_existing_only:'Existing resources are NOT affected — only newly created ones.',
+            ui_instr_auto_handles:'The script handles everything automatically:',
+            ui_instr_uploads_s3:'Uploads templates to S3',
+            ui_instr_enables_stacksets:'Enables StackSets in your organization',
+            ui_instr_discovers_org:'Discovers your org structure',
+            ui_instr_deploys_all:'Deploys to all accounts (~10 minutes)',
+            ui_instr_check_status:'Check status after running',
+            ui_instr_files_received:'You received 3 files',
+            ui_instr_target_accounts:'Target accounts',
+            ui_instr_all_accounts:'(no accounts specified)',
+            ui_instr_all_org:'all accounts in org',
+            ui_instr_cloudtrail_note:'NOTE: CloudTrail must be enabled in each account and target region.',
             ui_sample_notice_title:'Sample Code Notice:',
             ui_sample_notice_body:"This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SNS, SQS, and SSM. See the",
             ui_shared_responsibility:'AWS Shared Responsibility Model',
@@ -911,6 +937,32 @@
           },
           ko: {
             ui_title:'MAP 2.0 자동 태거 구성기',
+            ui_btn_download:'다운로드',
+            ui_instr_single_title:'배포 지침 — 단일 계정',
+            ui_instr_multi_title:'배포 지침 — 여러 계정',
+            ui_instr_login_single:'마이그레이션 계정의 AWS 콘솔에 로그인하세요.',
+            ui_instr_login_multi:'관리 계정의 AWS 콘솔에 로그인하세요.',
+            ui_instr_open_cloudshell:'CloudShell을 여세요 (상단 메뉴 바의 터미널 아이콘 클릭).',
+            ui_instr_upload_files:'파일 업로드 (CloudShell → 작업 → 파일 업로드):',
+            ui_instr_upload_all:'파일 3개 모두 업로드 (CloudShell → 작업 → 파일 업로드):',
+            ui_instr_run:'실행:',
+            ui_instr_done_single:'완료. 스크립트가 배포를 진행하고 완료되면 확인해 줍니다.',
+            ui_instr_done_multi:'완료. 모든 계정에서 자동 태그 지정이 활성화되었습니다.',
+            ui_instr_verify_title:'태그 지정 작동 확인 (배포 후):',
+            ui_instr_expected:'예상 결과',
+            ui_instr_thats_it:'완료되었습니다. 190개 이상의 지원 리소스 유형에 자동 태그 지정이 활성화되었습니다.',
+            ui_instr_existing_only:'기존 리소스는 영향을 받지 않습니다 — 새로 생성된 리소스에만 적용됩니다.',
+            ui_instr_auto_handles:'스크립트가 모든 것을 자동으로 처리합니다:',
+            ui_instr_uploads_s3:'S3에 템플릿 업로드',
+            ui_instr_enables_stacksets:'조직에서 StackSets 활성화',
+            ui_instr_discovers_org:'조직 구조 자동 감지',
+            ui_instr_deploys_all:'모든 계정에 배포 (약 10분)',
+            ui_instr_check_status:'실행 후 상태 확인',
+            ui_instr_files_received:'3개의 파일을 받으셨습니다',
+            ui_instr_target_accounts:'대상 계정',
+            ui_instr_all_accounts:'(지정된 계정 없음)',
+            ui_instr_all_org:'조직의 모든 계정',
+            ui_instr_cloudtrail_note:'참고: 각 계정과 대상 리전에서 CloudTrail이 활성화되어 있어야 합니다.',
             ui_sample_notice_title:'샘플 코드 안내:',
             ui_sample_notice_body:"이 코드는 비프로덕션 용도의 샘플입니다. 배포 전에 조직의 보안, 규정 및 컴플라이언스 요구 사항을 충족하도록 솔루션을 테스트, 보안 강화 및 최적화할 책임은 귀하에게 있습니다. 이 솔루션 배포 시 Lambda, EventBridge, CloudWatch, SNS, SQS, SSM에 대한 AWS 요금이 발생할 수 있습니다. 다음을 참조하세요:",
             ui_shared_responsibility:'AWS 공동 책임 모델',
@@ -1072,6 +1124,32 @@
           },
           ja: {
             ui_title:'MAP 2.0 自動タガー 設定ツール',
+            ui_btn_download:'ダウンロード',
+            ui_instr_single_title:'デプロイ手順 — シングルアカウント',
+            ui_instr_multi_title:'デプロイ手順 — マルチアカウント',
+            ui_instr_login_single:'移行アカウントのAWSコンソールにログインします。',
+            ui_instr_login_multi:'管理アカウントのAWSコンソールにログインします。',
+            ui_instr_open_cloudshell:'CloudShellを開きます（上部メニューバーのターミナルアイコンをクリック）。',
+            ui_instr_upload_files:'ファイルをアップロードします（CloudShell → アクション → ファイルをアップロード）:',
+            ui_instr_upload_all:'3つのファイルをすべてアップロードします（CloudShell → アクション → ファイルをアップロード）:',
+            ui_instr_run:'実行:',
+            ui_instr_done_single:'完了。スクリプトがデプロイし、完了時に確認します。',
+            ui_instr_done_multi:'完了。全アカウントで自動タグ付けが有効になりました。',
+            ui_instr_verify_title:'タグ付けの動作確認（デプロイ後）:',
+            ui_instr_expected:'期待される結果',
+            ui_instr_thats_it:'完了です。190以上のリソースタイプで自動タグ付けが有効になりました。',
+            ui_instr_existing_only:'既存リソースには影響しません — 新しく作成されたリソースのみに適用されます。',
+            ui_instr_auto_handles:'スクリプトがすべてを自動的に処理します:',
+            ui_instr_uploads_s3:'S3へテンプレートをアップロード',
+            ui_instr_enables_stacksets:'組織でStackSetsを有効化',
+            ui_instr_discovers_org:'組織構造を自動検出',
+            ui_instr_deploys_all:'全アカウントにデプロイ（約10分）',
+            ui_instr_check_status:'実行後のステータス確認',
+            ui_instr_files_received:'3つのファイルを受け取りました',
+            ui_instr_target_accounts:'対象アカウント',
+            ui_instr_all_accounts:'（アカウント未指定）',
+            ui_instr_all_org:'組織内の全アカウント',
+            ui_instr_cloudtrail_note:'注意: 各アカウントと対象リージョンでCloudTrailが有効になっている必要があります。',
             ui_sample_notice_title:'サンプルコードに関する注意:',
             ui_sample_notice_body:"これは非本番環境向けのサンプルコードです。デプロイ前に、組織のセキュリティ・規制・コンプライアンス要件を満たすようにテスト、セキュリティ強化、最適化を行う責任はお客様にあります。このソリューションのデプロイにより、Lambda、EventBridge、CloudWatch、SNS、SQS、SSMのAWS料金が発生する場合があります。詳細:",
             ui_shared_responsibility:'AWS責任共有モデル',
@@ -1233,6 +1311,32 @@
           },
           zh: {
             ui_title:'MAP 2.0 自动标记器配置工具',
+            ui_btn_download:'下载',
+            ui_instr_single_title:'部署说明 — 单账户',
+            ui_instr_multi_title:'部署说明 — 多账户',
+            ui_instr_login_single:'登录迁移账户的AWS控制台。',
+            ui_instr_login_multi:'登录管理账户的AWS控制台。',
+            ui_instr_open_cloudshell:'打开CloudShell（单击顶部菜单栏中的终端图标）。',
+            ui_instr_upload_files:'上传文件（CloudShell → 操作 → 上传文件）:',
+            ui_instr_upload_all:'上传全部3个文件（CloudShell → 操作 → 上传文件）:',
+            ui_instr_run:'运行:',
+            ui_instr_done_single:'完成。脚本将部署并在完成时确认。',
+            ui_instr_done_multi:'完成。所有账户的自动标记现已激活。',
+            ui_instr_verify_title:'验证标记是否正常（部署后）:',
+            ui_instr_expected:'预期结果',
+            ui_instr_thats_it:'就这些。190多种支持的资源类型的自动标记已激活。',
+            ui_instr_existing_only:'现有资源不受影响 — 仅适用于新创建的资源。',
+            ui_instr_auto_handles:'脚本自动处理所有事项:',
+            ui_instr_uploads_s3:'将模板上传到S3',
+            ui_instr_enables_stacksets:'在您的组织中启用StackSets',
+            ui_instr_discovers_org:'自动发现组织结构',
+            ui_instr_deploys_all:'部署到所有账户（约10分钟）',
+            ui_instr_check_status:'运行后检查状态',
+            ui_instr_files_received:'您收到了3个文件',
+            ui_instr_target_accounts:'目标账户',
+            ui_instr_all_accounts:'（未指定账户）',
+            ui_instr_all_org:'组织中的所有账户',
+            ui_instr_cloudtrail_note:'注意：每个账户和目标区域都必须启用CloudTrail。',
             ui_sample_notice_title:'示例代码说明:',
             ui_sample_notice_body:"这是用于非生产环境的示例代码。在部署前，您有责任对此解决方案进行测试、安全加固和优化，以满足您组织的安全、合规要求。部署此解决方案可能会产生Lambda、EventBridge、CloudWatch、SNS、SQS、SSM的AWS费用。请参阅:",
             ui_shared_responsibility:'AWS责任共担模型',
@@ -1394,6 +1498,32 @@
           },
           id: {
             ui_title:'Konfigurator MAP 2.0 Auto-Tagger',
+            ui_btn_download:'Unduh',
+            ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
+            ui_instr_multi_title:'INSTRUKSI DEPLOYMENT — Beberapa Akun',
+            ui_instr_login_single:'Login ke AWS Console untuk akun migrasi Anda.',
+            ui_instr_login_multi:'Login ke AWS Console untuk akun MANAJEMEN Anda.',
+            ui_instr_open_cloudshell:'Buka CloudShell (klik ikon terminal di menu bar atas).',
+            ui_instr_upload_files:'Unggah file (CloudShell → Actions → Upload file):',
+            ui_instr_upload_all:'Unggah semua 3 file (CloudShell → Actions → Upload file):',
+            ui_instr_run:'Jalankan:',
+            ui_instr_done_single:'Selesai. Skrip akan men-deploy dan mengonfirmasi ketika selesai.',
+            ui_instr_done_multi:'Selesai. Pemberian tag otomatis kini aktif di semua akun.',
+            ui_instr_verify_title:'Verifikasi tagging berfungsi (setelah deployment):',
+            ui_instr_expected:'Yang diharapkan',
+            ui_instr_thats_it:'Selesai. Pemberian tag otomatis aktif untuk 190+ jenis resource yang didukung.',
+            ui_instr_existing_only:'Resource yang ada TIDAK terpengaruh — hanya berlaku untuk resource yang baru dibuat.',
+            ui_instr_auto_handles:'Skrip menangani semuanya secara otomatis:',
+            ui_instr_uploads_s3:'Mengunggah template ke S3',
+            ui_instr_enables_stacksets:'Mengaktifkan StackSets di organisasi Anda',
+            ui_instr_discovers_org:'Menemukan struktur org Anda',
+            ui_instr_deploys_all:'Men-deploy ke semua akun (~10 menit)',
+            ui_instr_check_status:'Periksa status setelah berjalan',
+            ui_instr_files_received:'Anda menerima 3 file',
+            ui_instr_target_accounts:'Akun target',
+            ui_instr_all_accounts:'(tidak ada akun yang ditentukan)',
+            ui_instr_all_org:'semua akun dalam org',
+            ui_instr_cloudtrail_note:'CATATAN: CloudTrail harus diaktifkan di setiap akun dan region target.',
             ui_sample_notice_title:'Catatan Kode Sampel:',
             ui_sample_notice_body:"Ini adalah kode sampel untuk penggunaan non-produksi. Anda bertanggung jawab untuk menguji, mengamankan, dan mengoptimalkan solusi ini sesuai persyaratan keamanan, regulasi, dan kepatuhan organisasi Anda sebelum deployment. Men-deploy solusi ini dapat menimbulkan biaya AWS untuk Lambda, EventBridge, CloudWatch, SNS, SQS, dan SSM. Lihat:",
             ui_shared_responsibility:'Model Tanggung Jawab Bersama AWS',
@@ -1555,6 +1685,32 @@
           },
           th: {
             ui_title:'เครื่องมือตั้งค่า MAP 2.0 Auto-Tagger',
+            ui_btn_download:'ดาวน์โหลด',
+            ui_instr_single_title:'คำแนะนำการติดตั้ง — บัญชีเดียว',
+            ui_instr_multi_title:'คำแนะนำการติดตั้ง — หลายบัญชี',
+            ui_instr_login_single:'เข้าสู่ระบบ AWS Console สำหรับบัญชีการย้ายระบบของคุณ',
+            ui_instr_login_multi:'เข้าสู่ระบบ AWS Console สำหรับบัญชีจัดการของคุณ',
+            ui_instr_open_cloudshell:'เปิด CloudShell (คลิกไอคอนเทอร์มินัลในแถบเมนูด้านบน)',
+            ui_instr_upload_files:'อัปโหลดไฟล์ (CloudShell → Actions → Upload file):',
+            ui_instr_upload_all:'อัปโหลดไฟล์ทั้ง 3 ไฟล์ (CloudShell → Actions → Upload file):',
+            ui_instr_run:'รัน:',
+            ui_instr_done_single:'เสร็จสิ้น สคริปต์จะทำการติดตั้งและแจ้งเมื่อเสร็จสมบูรณ์',
+            ui_instr_done_multi:'เสร็จสิ้น การติด Tag อัตโนมัติเปิดใช้งานแล้วในทุกบัญชี',
+            ui_instr_verify_title:'ตรวจสอบการทำงานของการติด Tag (หลังการติดตั้ง):',
+            ui_instr_expected:'ผลลัพธ์ที่คาดหวัง',
+            ui_instr_thats_it:'เสร็จแล้ว การติด Tag อัตโนมัติเปิดใช้งานสำหรับทรัพยากรที่รองรับกว่า 190 ประเภท',
+            ui_instr_existing_only:'ทรัพยากรที่มีอยู่ไม่ได้รับผลกระทบ — ใช้กับทรัพยากรที่สร้างใหม่เท่านั้น',
+            ui_instr_auto_handles:'สคริปต์จัดการทุกอย่างโดยอัตโนมัติ:',
+            ui_instr_uploads_s3:'อัปโหลดเทมเพลตไปยัง S3',
+            ui_instr_enables_stacksets:'เปิดใช้งาน StackSets ในองค์กรของคุณ',
+            ui_instr_discovers_org:'ค้นหาโครงสร้างองค์กรโดยอัตโนมัติ',
+            ui_instr_deploys_all:'ติดตั้งไปยังทุกบัญชี (~10 นาที)',
+            ui_instr_check_status:'ตรวจสอบสถานะหลังการรัน',
+            ui_instr_files_received:'คุณได้รับไฟล์ 3 ไฟล์',
+            ui_instr_target_accounts:'บัญชีเป้าหมาย',
+            ui_instr_all_accounts:'(ไม่ได้ระบุบัญชี)',
+            ui_instr_all_org:'บัญชีทั้งหมดในองค์กร',
+            ui_instr_cloudtrail_note:'หมายเหตุ: ต้องเปิดใช้งาน CloudTrail ในแต่ละบัญชีและ Region เป้าหมาย',
             ui_sample_notice_title:'หมายเหตุเกี่ยวกับโค้ดตัวอย่าง:',
             ui_sample_notice_body:"นี่คือโค้ดตัวอย่างสำหรับการใช้งานที่ไม่ใช่สภาพแวดล้อมการผลิต คุณมีหน้าที่รับผิดชอบในการทดสอบ รักษาความปลอดภัย และปรับแต่งโซลูชันนี้ให้ตรงตามข้อกำหนดด้านความปลอดภัย กฎระเบียบ และการปฏิบัติตามข้อกำหนดขององค์กรก่อนการติดตั้ง การติดตั้งโซลูชันนี้อาจมีค่าใช้จ่าย AWS สำหรับ Lambda, EventBridge, CloudWatch, SNS, SQS และ SSM โปรดดู:",
             ui_shared_responsibility:'โมเดลความรับผิดชอบร่วมกันของ AWS',
@@ -1716,6 +1872,32 @@
           },
           vi: {
             ui_title:'Công cụ cấu hình MAP 2.0 Auto-Tagger',
+            ui_btn_download:'Tải xuống',
+            ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
+            ui_instr_multi_title:'HƯỚNG DẪN TRIỂN KHAI — Nhiều tài khoản',
+            ui_instr_login_single:'Đăng nhập vào AWS Console cho tài khoản di chuyển của bạn.',
+            ui_instr_login_multi:'Đăng nhập vào AWS Console cho tài khoản QUẢN LÝ của bạn.',
+            ui_instr_open_cloudshell:'Mở CloudShell (nhấp vào biểu tượng terminal trên thanh menu).',
+            ui_instr_upload_files:'Tải file lên (CloudShell → Actions → Upload file):',
+            ui_instr_upload_all:'Tải lên tất cả 3 file (CloudShell → Actions → Upload file):',
+            ui_instr_run:'Chạy:',
+            ui_instr_done_single:'Xong. Script sẽ triển khai và xác nhận khi hoàn tất.',
+            ui_instr_done_multi:'Xong. Tính năng tự động gắn tag đã hoạt động trên tất cả tài khoản.',
+            ui_instr_verify_title:'Xác minh tính năng gắn tag hoạt động (sau triển khai):',
+            ui_instr_expected:'Kết quả mong đợi',
+            ui_instr_thats_it:'Vậy là xong. Tính năng tự động gắn tag đã hoạt động cho 190+ loại resource được hỗ trợ.',
+            ui_instr_existing_only:'Resource hiện có KHÔNG bị ảnh hưởng — chỉ áp dụng cho resource mới tạo.',
+            ui_instr_auto_handles:'Script xử lý mọi thứ tự động:',
+            ui_instr_uploads_s3:'Tải template lên S3',
+            ui_instr_enables_stacksets:'Kích hoạt StackSets trong tổ chức',
+            ui_instr_discovers_org:'Tự động phát hiện cấu trúc org',
+            ui_instr_deploys_all:'Triển khai đến tất cả tài khoản (~10 phút)',
+            ui_instr_check_status:'Kiểm tra trạng thái sau khi chạy',
+            ui_instr_files_received:'Bạn nhận được 3 file',
+            ui_instr_target_accounts:'Tài khoản mục tiêu',
+            ui_instr_all_accounts:'(chưa chỉ định tài khoản)',
+            ui_instr_all_org:'tất cả tài khoản trong org',
+            ui_instr_cloudtrail_note:'LƯU Ý: CloudTrail phải được bật trong mỗi tài khoản và region mục tiêu.',
             ui_sample_notice_title:'Lưu ý về Mã mẫu:',
             ui_sample_notice_body:"Đây là mã mẫu cho mục đích phi sản xuất. Bạn có trách nhiệm kiểm tra, bảo mật và tối ưu hóa giải pháp này để đáp ứng các yêu cầu bảo mật, pháp lý và tuân thủ của tổ chức trước khi triển khai. Việc triển khai giải pháp này có thể phát sinh phí AWS cho Lambda, EventBridge, CloudWatch, SNS, SQS và SSM. Xem:",
             ui_shared_responsibility:'Mô hình Trách nhiệm Chung AWS',
@@ -2897,80 +3079,77 @@ Outputs:
             const mpe = config.mpeId;
 
             if (config.deployMode === 'single') {
-                return `DEPLOYMENT INSTRUCTIONS — Single Account
+                return `${t('ui_instr_single_title')}
 =========================================
 
-1. Log into the AWS Console for your migration account.
+1. ${t('ui_instr_login_single')}
 
-2. Open CloudShell (click the terminal icon in the top menu bar).
+2. ${t('ui_instr_open_cloudshell')}
 
-3. Upload the files (CloudShell → Actions → Upload file):
+3. ${t('ui_instr_upload_files')}
      deploy.sh
      map-auto-tagger-${mpe}.yaml
 
-4. Run:
+4. ${t('ui_instr_run')}
    bash deploy.sh
 
-Done. The script deploys and confirms when complete.
+${t('ui_instr_done_single')}
 
 ─────────────────────────────────────────────────
-Verify tagging is working (after deployment):
+${t('ui_instr_verify_title')}
    aws s3 mb s3://test-map-$(date +%s)
    sleep 90
    aws s3api get-bucket-tagging --bucket test-map-XXXX
-   # Expected: {"TagSet": [{"Key": "map-migrated", "Value": "${mpe}"}]}
+   # ${t('ui_instr_expected')}: {"TagSet": [{"Key": "map-migrated", "Value": "${mpe}"}]}
 
-That's it. Auto-tagging is active for all 190+ supported resource types.
-Existing resources are NOT affected — only newly created ones.`;
+${t('ui_instr_thats_it')}
+${t('ui_instr_existing_only')}`;
             }
 
             if (config.deployMode === 'multi') {
                 const accounts = (config.stacksetAccounts || []);
-                const accountIdArgs = accounts.map(a => `"${a.id}"`).join(' ');
-                const regions = (config.regions || ['ap-northeast-2']);
-                const regionArgs = regions.map(r => `"${r}"`).join(' ');
-                const accountList = accounts.map(a => `   - ${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('\n') || '   (no accounts specified)';
+                const accountList = accounts.map(a => `   - ${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('\n') || `   ${t('ui_instr_all_accounts')}`;
 
-                return `DEPLOYMENT INSTRUCTIONS — Multi-Account
+                return `${t('ui_instr_multi_title')}
 ==========================================
 
-You received 3 files: deploy.sh, map-auto-tagger-org-${mpe}.yaml, map-auto-tagger-accounts-${mpe}.yaml
-Target accounts: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ') || 'all accounts in org'}
+${t('ui_instr_files_received')}: deploy.sh, map-auto-tagger-org-${mpe}.yaml, map-auto-tagger-accounts-${mpe}.yaml
+${t('ui_instr_target_accounts')}: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ') || t('ui_instr_all_org')}
 
 ─────────────────────────────────────────────────
 
-1. Log into the AWS Console for your MANAGEMENT account.
+1. ${t('ui_instr_login_multi')}
 
-2. Open CloudShell (click the terminal icon in the top menu bar).
+2. ${t('ui_instr_open_cloudshell')}
 
-3. Upload all 3 files (CloudShell → Actions → Upload file):
+3. ${t('ui_instr_upload_all')}
      deploy.sh
      map-auto-tagger-org-${mpe}.yaml
      map-auto-tagger-accounts-${mpe}.yaml
 
-4. Run:
+4. ${t('ui_instr_run')}
    bash deploy.sh
 
-The script handles everything automatically:
-  - Uploads templates to S3
-  - Enables StackSets in your organization
-  - Discovers your org structure
-  - Deploys to all accounts (~10 minutes)
+${t('ui_instr_auto_handles')}
+  - ${t('ui_instr_uploads_s3')}
+  - ${t('ui_instr_enables_stacksets')}
+  - ${t('ui_instr_discovers_org')}
+  - ${t('ui_instr_deploys_all')}
 
 ─────────────────────────────────────────────────
 
-Check status after running:
+${t('ui_instr_check_status')}:
 
    aws cloudformation list-stack-instances \\
      --stack-set-name map-auto-tagger-${mpe} \\
      --query "Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]" \\
      --output table
-   # Expected: SUCCEEDED for all accounts
+   # ${t('ui_instr_expected')}: SUCCEEDED
 
 ─────────────────────────────────────────────────
 
-Done. Auto-tagging is now active across all accounts.
-NOTE: CloudTrail must be enabled in each account and target region.`;
+${t('ui_instr_done_multi')}
+${t('ui_instr_cloudtrail_note')}`;
         }
         }
 
@@ -3704,7 +3883,7 @@ echo ""
             const isMulti = isStackset;
             const accountLabel = t(isMulti ? 'ui_mgmt_account' : 'ui_migration_account_label');
             btnDiv.innerHTML = `
-                <button class="btn-primary" onclick="downloadFile('script')" style="font-size:16px;padding:14px 32px;">⬇ Download deploy.sh</button>
+                <button class="btn-primary" onclick="downloadFile('script')" style="font-size:16px;padding:14px 32px;">⬇ ${t('ui_btn_download')} deploy.sh</button>
                 <button class="btn-secondary" onclick="copyInstructions()">📋 ${t('ui_btn_copy')}</button>
                 <div style="margin-top:12px;padding:12px 16px;background:#f2fcf3;border-left:4px solid #1d8102;border-radius:0 4px 4px 0;font-size:13px;">
                   <strong>${t('ui_one_file_step')}</strong> ${t('ui_send_script')} <code>deploy.sh</code> ${t('ui_to_customer')}<br>
