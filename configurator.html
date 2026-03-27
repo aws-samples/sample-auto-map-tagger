@@ -170,7 +170,7 @@
 <body>
     <div class="header">
         <h1>MAP 2.0 Auto-Tagger Configurator</h1>
-        <span class="badge">INTERNAL</span>
+        <span class="badge">AWS SAMPLE</span>
         <span class="version">v2.0 — 190+ services E2E tested</span>
     </div>
 
@@ -185,6 +185,14 @@
             Generates a CloudFormation template that auto-tags new AWS resources with <code>map-migrated</code> within <strong>60–90 seconds</strong> of creation.
             Covers <strong>190+ resource types</strong> across all major AWS services (CT org E2E tested).
             Customer cost: <strong>&lt; $2/month</strong>.
+        </div>
+
+        <div class="info-box" style="background:#fff8e1;border-left:4px solid #f9a825;font-size:13px;">
+            <strong>Sample Code Notice:</strong> This is sample code for non-production usage.
+            You are responsible for testing, securing, and optimizing this solution to meet your organization's
+            security, regulatory, and compliance requirements before deployment.
+            Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SNS, SQS, and SSM.
+            See the <a href="https://aws.amazon.com/security/shared-responsibility/" target="_blank" rel="noopener">AWS Shared Responsibility Model</a>.
         </div>
 
 
@@ -391,18 +399,18 @@
                 <p class="subtitle">190+ resource types confirmed working via multi-account CT org testing (4 accounts × 4 regions)</p>
                 <div class="coverage-grid">
                     <div class="coverage-item">✅ EC2, Lambda, ECS, EKS, Auto Scaling, App Runner</div>
-                    <div class="coverage-item">✅ S3, EFS, FSx, ECR, EBS Snapshots, AMIs</div>
-                    <div class="coverage-item">✅ RDS (all types + snapshots), Aurora, Neptune, DynamoDB</div>
-                    <div class="coverage-item">✅ Redshift, DocumentDB, MemoryDB, OpenSearch, MSK</div>
-                    <div class="coverage-item">✅ VPC, Subnets, Load Balancers, Transit Gateway, VPN</div>
-                    <div class="coverage-item">✅ CloudFront, Route53, Global Accelerator, Network Firewall</div>
-                    <div class="coverage-item">✅ Kinesis, Firehose, Kinesis Analytics, Glue, Athena, EMR</div>
-                    <div class="coverage-item">✅ SNS, SQS, Step Functions, EventBridge, API Gateway</div>
-                    <div class="coverage-item">✅ SageMaker (all types), Comprehend, Rekognition</div>
-                    <div class="coverage-item">✅ Bedrock (Agents, Guardrails, Flows, Prompts, Inference Profiles)</div>
-                    <div class="coverage-item">✅ CodeBuild, CodeDeploy, CodePipeline, Amplify, CloudFormation</div>
-                    <div class="coverage-item">✅ Cognito, Macie, GuardDuty, WAFv2, KMS, ACM</div>
-                    <div class="coverage-item">✅ WorkSpaces, QuickSight, IVS, EventBridge Pipes, EKS Add-ons</div>
+                    <div class="coverage-item">✅ Amazon S3, Amazon EFS, Amazon FSx, Amazon ECR, EBS Snapshots, AMIs</div>
+                    <div class="coverage-item">✅ Amazon RDS (all types + snapshots), Amazon Aurora, Amazon Neptune, Amazon DynamoDB</div>
+                    <div class="coverage-item">✅ Amazon Redshift, Amazon DocumentDB, Amazon MemoryDB, Amazon OpenSearch Service, Amazon MSK</div>
+                    <div class="coverage-item">✅ Amazon VPC, Subnets, Load Balancers, AWS Transit Gateway, VPN</div>
+                    <div class="coverage-item">✅ Amazon CloudFront, Amazon Route 53, AWS Global Accelerator, AWS Network Firewall</div>
+                    <div class="coverage-item">✅ Amazon Kinesis, Kinesis Firehose, Kinesis Analytics, AWS Glue, Amazon Athena, Amazon EMR</div>
+                    <div class="coverage-item">✅ Amazon SNS, Amazon SQS, AWS Step Functions, Amazon EventBridge, Amazon API Gateway</div>
+                    <div class="coverage-item">✅ Amazon SageMaker (all types), Amazon Comprehend, Amazon Rekognition</div>
+                    <div class="coverage-item">✅ Amazon Bedrock (Agents, Guardrails, Flows, Prompts, Inference Profiles)</div>
+                    <div class="coverage-item">✅ AWS CodeBuild, AWS CodeDeploy, AWS CodePipeline, AWS Amplify, AWS CloudFormation</div>
+                    <div class="coverage-item">✅ Amazon Cognito, Amazon Macie, Amazon GuardDuty, AWS WAFv2, AWS KMS, AWS ACM</div>
+                    <div class="coverage-item">✅ Amazon WorkSpaces, Amazon QuickSight, Amazon IVS, Amazon EventBridge Pipes, Amazon EKS Add-ons</div>
                     <div class="coverage-item">✅ DMS, DataSync, Transfer Family, MSK Serverless</div>
                     <div class="coverage-item limited">⚠️ IoT Things, Lambda Layers/Aliases — not taggable (AWS API limitation)</div>
                     <div class="coverage-item limited">⚠️ NAT Gateways, ElastiCache — timing delay, retry logic built in</div>
@@ -1490,6 +1498,7 @@ ${crossAccountCode}
       QueueName: auto-map-tagger-retry
       VisibilityTimeout: 120
       MessageRetentionPeriod: 3600
+      KmsMasterKeyId: alias/aws/sqs
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
         maxReceiveCount: 3
@@ -1507,6 +1516,7 @@ ${crossAccountCode}
     Properties:
       QueueName: map-auto-tagger-dlq
       MessageRetentionPeriod: 1209600
+      KmsMasterKeyId: alias/aws/sqs
 
   AlertTopic:
     Type: AWS::SNS::Topic
@@ -2063,6 +2073,9 @@ ACCOUNTS_TEMPLATE_EOF
 # Upload templates to S3 (in customer's own account)
 echo "Creating S3 bucket and uploading templates..."
 aws s3 mb "s3://\${BUCKET}" --region "\${REGION}" 2>/dev/null || true
+aws s3api put-public-access-block --bucket "\${BUCKET}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"DenyHTTP\",\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::\${BUCKET}\",\"arn:aws:s3:::\${BUCKET}/*\"],\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}"
 aws s3 cp "\$ORG_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-org.yaml"
 aws s3 cp "\$ACCOUNTS_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts.yaml"
 rm -f "\$ORG_TEMPLATE" "\$ACCOUNTS_TEMPLATE"

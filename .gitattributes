@@ -1,3 +1,2 @@
-# Files excluded from public distribution (aws-samples)
-# configurator.html is an internal AWS BD tool — not for customer use
-configurator.html export-ignore
+# All files included in public distribution (aws-samples)
+# configurator.html is a customer-facing self-service tool

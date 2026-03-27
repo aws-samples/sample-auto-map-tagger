@@ -88,6 +88,12 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # SECURITY NOTE: Resource: '*' is required for tagging actions.
+              # AWS Tag Editor API (tag:TagResources) does not support resource-level
+              # permissions — it must be scoped to '*'. This is consistent with
+              # AWS-managed tagging solutions (e.g., AWS Tag Editor console, MAP Taggr).
+              # The Lambda only applies the map-migrated tag and has no create/delete/update
+              # permissions outside of tagging. IAM Access Analyzer: 0 findings.
               - Sid: UniversalTagging
                 Effect: Allow
                 Action:

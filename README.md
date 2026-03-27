@@ -1,6 +1,6 @@
 # MAP 2.0 Auto-Tagger
 
-> **Disclaimer:** This solution is AWS Content, as defined in the [AWS Online Customer Agreement](https://aws.amazon.com/agreement/). You are responsible for testing, securing, and optimizing this AWS Content as appropriate for production use based on your specific quality control practices and standards. Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SSM Parameter Store, SQS, and SNS.
+> **Disclaimer:** This is sample code for non-production usage. You should work with your security and legal teams to meet your organizational security, regulatory, and compliance requirements before deployment. You are responsible for testing, securing, and optimizing this solution as appropriate for production use based on your specific quality control practices and standards. Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SSM Parameter Store, SQS, and SNS. Under the [AWS Shared Responsibility Model](https://aws.amazon.com/compliance/shared-responsibility-model/), you are responsible for security decisions in the cloud, including the IAM roles and policies deployed by this solution.
 
 **Automatic AWS resource tagging for MAP 2.0 credit tracking**
 
