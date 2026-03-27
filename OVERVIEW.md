@@ -20,7 +20,7 @@ In practice, customers miss credits because:
 
 ## The Solution
 
-The MAP Auto-Tagger is a lightweight tool that **automatically applies the `map-migrated` tag to every new AWS resource within 60–90 seconds of creation** — with no action required from the customer's team.
+The MAP Auto-Tagger is a lightweight tool that **automatically applies the `map-migrated` tag to every new AWS resource within typically 60–90 seconds (up to 15 minutes during high-volume activity) of creation** — with no action required from the customer's team.
 
 It runs silently in the background. Engineers work normally. Credits are captured automatically.
 
@@ -56,7 +56,7 @@ It runs silently in the background. Engineers work normally. Credits are capture
 │                      ▼                                           │
 │   ✅ Resource tagged. Credits captured.                           │
 │                                                                   │
-│   Total time from creation to tagged:  60–90 seconds             │
+│   Total time from creation to tagged:  typically 60–90 seconds (up to 15 minutes during high-volume activity)             │
 │                                                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -213,7 +213,7 @@ The configurator takes ~2 minutes to use and produces a ready-to-deploy script w
 |------|--------|
 | **Purpose** | Auto-tag AWS resources for MAP 2.0 credits |
 | **Coverage** | 190+ resource types, all major AWS services |
-| **Latency** | 60–90 seconds from creation to tagged |
+| **Latency** | typically 60–90 seconds (up to 15 minutes during high-volume activity) from creation to tagged |
 | **Deployment** | 1 command in CloudShell (single or org-wide) |
 | **Cost** | < $2/month per account |
 | **Customer effort** | Run one script, zero ongoing maintenance |

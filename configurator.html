@@ -165,24 +165,55 @@
             background: #f2f3f3; padding: 1px 5px; border-radius: 3px;
             font-family: 'SF Mono', monospace; font-size: 12px;
         }
+        .lang-selector { position: relative; margin-left: 8px; }
+        .lang-btn {
+            background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+            color: white; border-radius: 4px; padding: 4px 10px; font-size: 12px;
+            cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;
+        }
+        .lang-btn:hover { background: rgba(255,255,255,0.25); }
+        .lang-menu {
+            position: absolute; top: 100%; right: 0; margin-top: 4px;
+            background: white; border: 1px solid #d5dbdb; border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 100; min-width: 190px;
+        }
+        .lang-menu a {
+            display: block; padding: 8px 14px; font-size: 13px; color: #16191f;
+            cursor: pointer; text-decoration: none; border-bottom: 1px solid #f2f3f3;
+        }
+        .lang-menu a:last-child { border-bottom: none; }
+        .lang-menu a:hover { background: #f2f8fd; }
+        .lang-menu a.active { background: #f2f8fd; font-weight: 600; color: #0073bb; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>MAP 2.0 Auto-Tagger Configurator</h1>
+        <h1 data-i18n="ui_title">MAP 2.0 Auto-Tagger Configurator</h1>
         <span class="badge">AWS SAMPLE</span>
         <span class="version">v2.0 — 190+ services E2E tested</span>
+        <div class="lang-selector">
+            <button class="lang-btn" onclick="toggleLangMenu()" id="langBtn">🌐 <span id="langLabel">English</span></button>
+            <div class="lang-menu hidden" id="langMenu">
+                <a onclick="setLanguage('en')" class="active" id="lang-en">🇺🇸 English</a>
+                <a onclick="setLanguage('ko')" id="lang-ko">🇰🇷 한국어</a>
+                <a onclick="setLanguage('ja')" id="lang-ja">🇯🇵 日本語</a>
+                <a onclick="setLanguage('zh')" id="lang-zh">🇨🇳 中文简体</a>
+                <a onclick="setLanguage('id')" id="lang-id">🇮🇩 Bahasa Indonesia</a>
+                <a onclick="setLanguage('th')" id="lang-th">🇹🇭 ภาษาไทย</a>
+                <a onclick="setLanguage('vi')" id="lang-vi">🇻🇳 Tiếng Việt</a>
+            </div>
+        </div>
     </div>
 
     <div class="container">
         <div class="step-indicator">
-            <div class="step active" id="step1-indicator">1. Configure</div>
-            <div class="step" id="step2-indicator">2. Review</div>
-            <div class="step" id="step3-indicator">3. Download</div>
+            <div class="step active" id="step1-indicator" data-i18n="ui_step1">1. Configure</div>
+            <div class="step" id="step2-indicator" data-i18n="ui_step2">2. Review</div>
+            <div class="step" id="step3-indicator" data-i18n="ui_step3">3. Download</div>
         </div>
 
         <div class="info-box">
-            Generates a CloudFormation template that auto-tags new AWS resources with <code>map-migrated</code> within <strong>60–90 seconds</strong> of creation.
+            Generates a CloudFormation template that auto-tags new AWS resources with <code>map-migrated</code> within <strong>typically 60–90 seconds (up to 15 minutes during high-volume activity)</strong> of creation.
             Covers <strong>190+ resource types</strong> across all major AWS services (CT org E2E tested).
             Customer cost: <strong>&lt; $2/month</strong>.
         </div>
@@ -199,48 +230,48 @@
         <!-- Step 1: Configure -->
         <div id="step1">
             <div class="card">
-                <h2>MAP 2.0 Deal Details</h2>
-                <p class="subtitle">Enter the MAP agreement details from AWS Investments</p>
+                <h2 data-i18n="ui_card_deal_title">MAP 2.0 Deal Details</h2>
+                <p class="subtitle" data-i18n="ui_card_deal_subtitle">Enter the MAP agreement details from AWS Investments</p>
 
                 <div class="form-group">
-                    <label>Customer Name <span class="hint">(used for filename generation only)</span></label>
-                    <input type="text" id="customerName" placeholder="e.g., Acme Corp">
+                    <label><span data-i18n="ui_customer_name">Customer Name</span> <span class="hint" data-i18n="ui_customer_name_hint">(used for filename generation only)</span></label>
+                    <input type="text" id="customerName" data-i18n-placeholder="ui_customer_name_placeholder" placeholder="e.g., Acme Corp">
                 </div>
 
                 <div class="form-group">
-                    <label>MAP 2.0 Tag Value <span class="hint">(ex. migA1B2C3D4E5)</span></label>
+                    <label><span data-i18n="ui_mpe_tag">MAP 2.0 Tag Value</span> <span class="hint">(ex. migA1B2C3D4E5)</span></label>
                     <input type="text" id="mpeId" placeholder="migA1B2C3D4E5">
-                    <div class="error-msg" id="mpeId-error">MAP Engagement ID must start with 'mig' followed by alphanumeric characters</div>
+                    <div class="error-msg" id="mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must start with 'mig' followed by alphanumeric characters</div>
                 </div>
 
                 <div class="form-group">
-                    <label>Agreement Start Date <span class="hint">(Date to start tagging newly created MAP 2.0 resources)</span></label>
+                    <label><span data-i18n="ui_agree_start">Agreement Start Date</span> <span class="hint" data-i18n="ui_agree_start_hint">(Date to start tagging newly created MAP 2.0 resources)</span></label>
                     <input type="date" id="agreementDate">
-                    <div class="error-msg" id="agreementDate-error">Agreement start date is required</div>
+                    <div class="error-msg" id="agreementDate-error" data-i18n="err_date_required">Agreement start date is required</div>
                 </div>
                 <div class="form-group">
-                    <label>Agreement End Date <span class="hint">(Date to stop tagging newly created resources)</span></label>
+                    <label><span data-i18n="ui_agree_end">Agreement End Date</span> <span class="hint" data-i18n="ui_agree_end_hint">(Date to stop tagging newly created resources)</span></label>
                     <input type="date" id="agreementEndDate">
-                    <div class="error-msg" id="agreementEndDate-error">Agreement end date is required and must be after start date</div>
+                    <div class="error-msg" id="agreementEndDate-error" data-i18n="err_date_end">Agreement end date is required and must be after start date</div>
                 </div>
 
                 <div class="form-group">
-                    <label>Alert Email <span class="hint">(optional — email to receive tagging failure alerts, ex. customer ops team)</span></label>
+                    <label><span data-i18n="ui_alert_email">Alert Email</span> <span class="hint" data-i18n="ui_alert_email_hint">(optional — email to receive tagging failure alerts, ex. customer ops team)</span></label>
                     <input type="email" id="alertEmail" placeholder="e.g., ops@customer.com">
                     <div class="hint" style="margin-top: 4px;">Customer must confirm the AWS subscription email after deployment.</div>
                 </div>
             </div>
 
             <div class="card">
-                <h2>Deployment Mode</h2>
-                <p class="subtitle">How many AWS accounts will be used for migration?</p>
+                <h2 data-i18n="ui_deploy_mode">Deployment Mode</h2>
+                <p class="subtitle" data-i18n="ui_deploy_mode_subtitle">How many AWS accounts will be used for migration?</p>
 
                 <div class="option-card selected" id="opt-single" onclick="selectDeployMode('single')">
                     <h3>
                         <input type="radio" name="deployMode" value="single" checked>
-                        Single Account
+                        <span data-i18n="ui_single_title">Single Account</span>
                     </h3>
-                    <p>Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.</p>
+                    <p data-i18n="ui_single_desc">Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.</p>
                 </div>
 
                 <!-- Single-account optional: VPC scope -->
@@ -280,9 +311,9 @@
                 <div class="option-card" id="opt-multi" onclick="selectDeployMode('multi')">
                     <h3>
                         <input type="radio" name="deployMode" value="multi">
-                        Multiple Accounts (AWS Organizations)
+                        <span data-i18n="ui_multi_title">Multiple Accounts (AWS Organizations)</span>
                     </h3>
-                    <p>Customer has multiple linked accounts under an AWS Organization. One StackSet command deploys to all accounts simultaneously.</p>
+                    <p data-i18n="ui_multi_desc">Customer has multiple linked accounts under an AWS Organization. One StackSet command deploys to all accounts simultaneously.</p>
                 </div>
 
                 <!-- Multi-account options -->
@@ -393,9 +424,22 @@
             </div>
 
 
+            <!-- Backfill option -->
+            <div class="card">
+                <h2><span data-i18n="ui_backfill_title">One-Time Backfill</span> <span class="hint" style="font-weight:normal;font-size:13px;" data-i18n="ui_optional">(optional)</span></h2>
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="includeBackfill" style="margin-top:3px;flex-shrink:0;">
+                    <div>
+                        <strong>Tag existing resources created since agreement start date</strong>
+                        <p class="hint" style="margin-top:4px;">Deploys a one-time Lambda that queries CloudTrail history from your agreement start date and tags all matching resources that were created before this solution was deployed. Runs automatically ~5 minutes after deployment. Results appear in CloudWatch Logs (<code>map-auto-tagger-backfill</code>).</p>
+                        <p class="hint" style="margin-top:4px;color:#d13212;"><strong>Note:</strong> CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.</p>
+                    </div>
+                </label>
+            </div>
+
             <!-- Service coverage summary -->
             <div class="card">
-                <h2>What Gets Tagged</h2>
+                <h2 data-i18n="ui_coverage_title">What Gets Tagged</h2>
                 <p class="subtitle">190+ resource types confirmed working via multi-account CT org testing (4 accounts × 4 regions)</p>
                 <div class="coverage-grid">
                     <div class="coverage-item">✅ EC2, Lambda, ECS, EKS, Auto Scaling, App Runner</div>
@@ -418,7 +462,7 @@
             </div>
 
             <div class="actions">
-                <button class="btn-primary" onclick="reviewConfig()">Review Configuration →</button>
+                <button class="btn-primary" onclick="reviewConfig()" data-i18n="ui_btn_next">Review Configuration →</button>
             </div>
         </div>
 
@@ -440,8 +484,8 @@
             </div>
 
             <div class="actions">
-                <button class="btn-secondary" onclick="backToConfig()">← Back</button>
-                <button class="btn-primary" onclick="generateAndDownload()">Generate & Download →</button>
+                <button class="btn-secondary" onclick="backToConfig()" data-i18n="ui_btn_back">← Back</button>
+                <button class="btn-primary" onclick="generateAndDownload()" data-i18n="ui_btn_generate">Generate & Download →</button>
             </div>
         </div>
 
@@ -459,6 +503,15 @@
                         <li>CloudTrail must be enabled in the target region(s)</li>
                         <li>Deployer must have CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch)</li>
                         <li id="prereq-multi" style="display:none;">Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access</li>
+                    </ul>
+                </div>
+
+                <div class="info-box" style="border-left: 4px solid #f90; background: #fffbf0; margin: 16px 0;">
+                    <strong>⚠️ Service Control Policy (SCP) Advisory</strong><br>
+                    If the customer's organization uses SCPs, verify the following before deployment:
+                    <ul style="margin: 8px 0 0 0; padding-left: 20px;">
+                        <li><strong>Tagging SCPs</strong> — ensure SCPs do not deny <code>tag:TagResources</code>, <code>ec2:CreateTags</code>, or other tagging actions for Lambda execution roles. The <code>deploy.sh</code> will run a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.</li>
+                        <li><strong>Mandatory tagging SCPs</strong> — if SCPs require tags to be present <em>at resource creation time</em>, this solution will not satisfy that requirement (tags are applied typically 60–90 seconds (up to 15 minutes during high-volume activity) after creation). The customer must exempt the tag key <code>map-migrated</code> from creation-time enforcement, or use a grace period.</li>
                     </ul>
                 </div>
 
@@ -607,6 +660,7 @@
                 scopeMode: useVpcScope ? 'vpc' : 'account',
                 scopedVpcIds: useVpcScope ? getValues('.vpc-input') : ['NONE'],
                 tagNonVpcServices,
+                includeBackfill: document.getElementById('includeBackfill').checked,
             };
 
             if (deployMode === 'multi') {
@@ -680,6 +734,8 @@
                 rows.push(['Tagging Scope', 'All resources in target account(s)']);
             }
 
+            rows.push(['One-Time Backfill', config.includeBackfill ? 'Enabled — tags existing resources since agreement start date (CloudTrail, ~5 min after deploy)' : 'Disabled']);
+
             table.innerHTML = rows.map(([k, v]) =>
                 `<tr style="border-bottom: 1px solid #eaeded;">
                     <td style="padding: 8px; font-weight: 600; width: 200px; vertical-align: top;">${k}</td>
@@ -726,6 +782,602 @@
         }
 
         // --- Template generation ---
+
+        // ── i18n ─────────────────────────────────────────────────────────────
+        let currentLang = 'en';
+
+        const LANG_LABELS = { en:'English', ko:'한국어', ja:'日本語', zh:'中文简体', id:'Bahasa Indonesia', th:'ภาษาไทย', vi:'Tiếng Việt' };
+
+        const TRANSLATIONS = {
+          en: {
+            // UI
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_step1:'1. Configure', ui_step2:'2. Review', ui_step3:'3. Download',
+            ui_card_deal_title:'MAP 2.0 Deal Details',
+            ui_card_deal_subtitle:'Enter the MAP agreement details from AWS Investments',
+            ui_customer_name:'Customer Name', ui_customer_name_hint:'(used for filename generation only)',
+            ui_customer_name_placeholder:'e.g., Acme Corp',
+            ui_mpe_tag:'MAP 2.0 Tag Value',
+            ui_agree_start:'Agreement Start Date', ui_agree_start_hint:'(Date to start tagging newly created MAP 2.0 resources)',
+            ui_agree_end:'Agreement End Date', ui_agree_end_hint:'(Date to stop tagging newly created resources)',
+            ui_alert_email:'Alert Email', ui_alert_email_hint:'(optional — email to receive tagging failure alerts)',
+            ui_deploy_mode:'Deployment Mode', ui_deploy_mode_subtitle:'How many AWS accounts will be used for migration?',
+            ui_single_title:'Single Account', ui_single_desc:'Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.',
+            ui_multi_title:'Multiple Accounts (AWS Organizations)', ui_multi_desc:'Customer has multiple linked accounts under an AWS Organization. One StackSet command deploys to all accounts simultaneously.',
+            ui_backfill_title:'One-Time Backfill', ui_optional:'(optional)',
+            ui_coverage_title:'What Gets Tagged',
+            ui_btn_next:'Review Configuration →', ui_btn_back:'← Back', ui_btn_generate:'Generate & Download →',
+            err_mpe_invalid:"MAP Engagement ID must start with 'mig' followed by alphanumeric characters",
+            err_date_required:'Agreement start date is required',
+            err_date_end:'Agreement end date is required and must be after start date',
+            // deploy.sh
+            d_title:'MAP 2.0 Auto-Tagger Setup',
+            d_tag_label:'Tag Value', d_region_label:'Region', d_account_label:'Account',
+            d_step1:'Step 1 of 3: Checking your account...',
+            d_step2:'Step 2 of 3: Setting up auto-tagger...',
+            d_step2_wait:'(This usually takes 1–2 minutes)',
+            d_step2_wait_multi:'(This usually takes 10–15 minutes)',
+            d_step3:'Step 3 of 3: Saving deployment report...',
+            d_ok_creds:'Connected to AWS account successfully.',
+            d_fail_creds:'Cannot connect to your AWS account.',
+            d_fix_creds:'Your session may have expired. Close and reopen AWS CloudShell, then run this script again.',
+            d_ok_trail:'Activity logging is enabled in',
+            d_fail_trail:'Activity logging is not enabled in region',
+            d_fix_trail1:'Go to AWS Console → CloudTrail → Create trail.',
+            d_fix_trail2:'Make sure to include region',
+            d_ok_perms:'Deployment permissions are in place.',
+            d_fail_perms:'Your account does not have the required deployment permissions.',
+            d_fix_perms:'Ask your AWS administrator to grant you CloudFormation, IAM, Lambda, EventBridge, SSM, SNS, SQS, and CloudWatch permissions.',
+            d_ok_org:'Running from the correct management account.',
+            d_fail_org:"This script must be run from your organization's main (management) account.",
+            d_fix_org:'Switch to your management account in AWS CloudShell and run this script again. If you are unsure which account that is, contact your AWS account team.',
+            d_warn_stacksets:'Multi-account deployment integration not yet enabled — will be set up automatically.',
+            d_ok_stacksets:'Multi-account deployment integration is enabled.',
+            d_ok_scp:'No security policies are blocking the tagging service.',
+            d_fail_scp:'A security policy in your organization is blocking the tagging service.',
+            d_fix_scp:"Contact your AWS security team and ask them to allow the 'tag:TagResources' action for Lambda execution roles.",
+            d_scp_note:"(Note: if your org requires tags at resource creation time, ask your security team to exempt the 'map-migrated' tag key.)",
+            d_all_passed:'All checks passed.',
+            d_checks_failed:'check(s) failed. Please follow the steps above, then run this script again.',
+            d_fix_label:'→ Fix:',
+            d_deploying:'Deployment is running. You can safely press Ctrl+C — it will continue in the background.',
+            d_still_deploying:'Still setting up...',
+            d_elapsed:'elapsed',
+            d_deploy_failed:'Setup failed. Please share the report below with your AWS account team.',
+            d_complete_title:'Setup Complete!',
+            d_complete_single:'New resources will be automatically tagged within 1–2 minutes of creation (up to 15 min at peak).',
+            d_complete_multi:'Auto-tagging is now active across all accounts in your organization.',
+            d_backfill_msg:'Backfill is scheduled to run in ~5 minutes.',
+            d_backfill_since:'It will tag existing resources created since',
+            d_report_saved:'Deployment report saved to:',
+            d_share_report:'Share this file with your AWS account team.',
+            // report
+            r_title:'MAP 2.0 Auto-Tagger — Deployment Report',
+            r_customer:'Customer', r_mpe:'MPE ID', r_region:'Region', r_account:'Account',
+            r_date:'Date / Time', r_result:'Result',
+            r_preflight:'Pre-flight Check Results:',
+            r_deployed:'What Was Deployed:',
+            r_verify:'How to Verify:',
+            r_backfill:'Backfill Status:',
+            r_perstatus:'Per-Account Status:',
+            r_support:'Support:',
+            r_action:'Action Required:',
+            r_verify1:'1. Create any resource in your AWS account',
+            r_verify2:'2. Wait 1–2 minutes (up to 15 minutes during busy periods)',
+            r_verify3:'3. Check that the resource has the tag: map-migrated =',
+            r_share_help:'Please share this report with your AWS account team if you need help.',
+            r_contact:'Contact your AWS account team if you need assistance.',
+            r_action_desc:'Please resolve the failed checks above and re-run deploy.sh.'
+          },
+          ko: {
+            ui_title:'MAP 2.0 자동 태거 구성기',
+            ui_step1:'1. 구성', ui_step2:'2. 검토', ui_step3:'3. 다운로드',
+            ui_card_deal_title:'MAP 2.0 계약 정보',
+            ui_card_deal_subtitle:'AWS Investments의 MAP 계약 정보를 입력하세요',
+            ui_customer_name:'고객명', ui_customer_name_hint:'(파일 이름 생성에만 사용됨)',
+            ui_customer_name_placeholder:'예: 홍길동 기업',
+            ui_mpe_tag:'MAP 2.0 태그 값',
+            ui_agree_start:'협약 시작일', ui_agree_start_hint:'(MAP 2.0 리소스 태그 적용 시작일)',
+            ui_agree_end:'협약 종료일', ui_agree_end_hint:'(신규 리소스 태그 적용 종료일)',
+            ui_alert_email:'알림 이메일', ui_alert_email_hint:'(선택 — 태그 오류 알림 수신 이메일)',
+            ui_deploy_mode:'배포 모드', ui_deploy_mode_subtitle:'마이그레이션에 사용할 AWS 계정 수를 선택하세요',
+            ui_single_title:'단일 계정', ui_single_desc:'하나의 마이그레이션 계정에 배포합니다. 약 2분 소요됩니다.',
+            ui_multi_title:'여러 계정 (AWS Organizations)', ui_multi_desc:'AWS 조직의 모든 계정에 StackSet으로 동시에 배포합니다.',
+            ui_backfill_title:'일회성 백필', ui_optional:'(선택)',
+            ui_coverage_title:'태그 적용 대상',
+            ui_btn_next:'다음: 검토 →', ui_btn_back:'← 이전', ui_btn_generate:'생성 및 다운로드 →',
+            err_mpe_invalid:"MAP 참여 ID는 'mig'로 시작하고 영숫자만 포함해야 합니다",
+            err_date_required:'협약 시작일을 입력해 주세요',
+            err_date_end:'협약 종료일은 시작일 이후여야 합니다',
+            d_title:'MAP 2.0 자동 태거 설정',
+            d_tag_label:'태그 값', d_region_label:'리전', d_account_label:'계정',
+            d_step1:'1단계/3: 계정 확인 중...',
+            d_step2:'2단계/3: 자동 태거 설정 중...',
+            d_step2_wait:'(보통 1~2분 소요됩니다)',
+            d_step2_wait_multi:'(보통 10~15분 소요됩니다)',
+            d_step3:'3단계/3: 배포 보고서 저장 중...',
+            d_ok_creds:'AWS 계정에 성공적으로 연결되었습니다.',
+            d_fail_creds:'AWS 계정에 연결할 수 없습니다.',
+            d_fix_creds:'세션이 만료되었을 수 있습니다. AWS CloudShell을 닫고 다시 열어 스크립트를 실행하세요.',
+            d_ok_trail:'활동 로깅이 활성화되어 있습니다:',
+            d_fail_trail:'활동 로깅(CloudTrail)이 활성화되어 있지 않습니다:',
+            d_fix_trail1:'AWS 콘솔 → CloudTrail → 트레일 생성으로 이동하세요.',
+            d_fix_trail2:'다음 리전을 반드시 포함해야 합니다:',
+            d_ok_perms:'배포 권한이 설정되어 있습니다.',
+            d_fail_perms:'계정에 필요한 배포 권한이 없습니다.',
+            d_fix_perms:'AWS 관리자에게 CloudFormation, IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch 권한을 요청하세요.',
+            d_ok_org:'올바른 관리 계정에서 실행 중입니다.',
+            d_fail_org:'이 스크립트는 조직의 관리(루트) 계정에서 실행해야 합니다.',
+            d_fix_org:'AWS CloudShell을 관리 계정으로 전환하고 스크립트를 다시 실행하세요. 어느 계정인지 모르는 경우 AWS 계정 팀에 문의하세요.',
+            d_warn_stacksets:'다중 계정 배포 통합이 아직 활성화되지 않았습니다 — 배포 중에 자동으로 설정됩니다.',
+            d_ok_stacksets:'다중 계정 배포 통합이 활성화되어 있습니다.',
+            d_ok_scp:'태그 서비스를 차단하는 보안 정책이 없습니다.',
+            d_fail_scp:'조직의 보안 정책이 태그 서비스를 차단하고 있습니다.',
+            d_fix_scp:"AWS 보안 팀에 연락하여 Lambda 실행 역할에 'tag:TagResources' 작업을 허용해 달라고 요청하세요.",
+            d_scp_note:"(참고: 조직에서 리소스 생성 시 태그를 요구하는 경우 보안 팀에 'map-migrated' 태그 키를 제외해 달라고 요청하세요.)",
+            d_all_passed:'모든 확인이 통과되었습니다.',
+            d_checks_failed:'개의 확인이 실패했습니다. 위의 단계를 따른 후 스크립트를 다시 실행하세요.',
+            d_fix_label:'→ 해결 방법:',
+            d_deploying:'배포가 진행 중입니다. Ctrl+C를 눌러도 안전합니다 — 백그라운드에서 계속 진행됩니다.',
+            d_still_deploying:'아직 설정 중...',
+            d_elapsed:'경과',
+            d_deploy_failed:'설정에 실패했습니다. 아래 보고서를 AWS 계정 팀과 공유해 주세요.',
+            d_complete_title:'설정 완료!',
+            d_complete_single:'새 리소스는 생성 후 1~2분 이내에 자동으로 태그가 지정됩니다 (최대 15분 소요 가능).',
+            d_complete_multi:'조직의 모든 계정에서 자동 태그 지정이 활성화되었습니다.',
+            d_backfill_msg:'백필이 약 5분 후에 실행될 예정입니다.',
+            d_backfill_since:'다음 날짜 이후에 생성된 기존 리소스에 태그를 지정합니다:',
+            d_report_saved:'배포 보고서 저장 위치:',
+            d_share_report:'이 파일을 AWS 계정 팀과 공유하세요.',
+            r_title:'MAP 2.0 자동 태거 — 배포 보고서',
+            r_customer:'고객', r_mpe:'MPE ID', r_region:'리전', r_account:'계정',
+            r_date:'날짜 / 시간', r_result:'결과',
+            r_preflight:'사전 점검 결과:',
+            r_deployed:'배포된 항목:',
+            r_verify:'확인 방법:',
+            r_backfill:'백필 상태:',
+            r_perstatus:'계정별 상태:',
+            r_support:'지원:',
+            r_action:'필요한 조치:',
+            r_verify1:'1. AWS 계정에서 임의의 리소스를 생성하세요',
+            r_verify2:'2. 1~2분 대기하세요 (바쁜 시간에는 최대 15분)',
+            r_verify3:'3. 리소스에 다음 태그가 있는지 확인하세요: map-migrated =',
+            r_share_help:'도움이 필요하시면 이 보고서를 AWS 계정 팀과 공유하세요.',
+            r_contact:'도움이 필요하시면 AWS 계정 팀에 문의하세요.',
+            r_action_desc:'위의 실패한 항목을 해결한 후 deploy.sh를 다시 실행하세요.'
+          },
+          ja: {
+            ui_title:'MAP 2.0 自動タガー 設定ツール',
+            ui_step1:'1. 設定', ui_step2:'2. 確認', ui_step3:'3. ダウンロード',
+            ui_card_deal_title:'MAP 2.0 契約情報',
+            ui_card_deal_subtitle:'AWS InvestmentsのMAP契約情報を入力してください',
+            ui_customer_name:'顧客名', ui_customer_name_hint:'（ファイル名生成にのみ使用）',
+            ui_customer_name_placeholder:'例：株式会社ABC',
+            ui_mpe_tag:'MAP 2.0 タグ値',
+            ui_agree_start:'契約開始日', ui_agree_start_hint:'（MAPリソースへのタグ付け開始日）',
+            ui_agree_end:'契約終了日', ui_agree_end_hint:'（タグ付け停止日）',
+            ui_alert_email:'アラートメール', ui_alert_email_hint:'（任意 — タグエラー通知を受信するメールアドレス）',
+            ui_deploy_mode:'デプロイモード', ui_deploy_mode_subtitle:'マイグレーションに使用するAWSアカウント数を選択してください',
+            ui_single_title:'シングルアカウント', ui_single_desc:'1つのマイグレーションアカウントにデプロイします。約2分で完了します。',
+            ui_multi_title:'マルチアカウント (AWS Organizations)', ui_multi_desc:'AWS Organizationの全アカウントにStackSetで同時にデプロイします。',
+            ui_backfill_title:'既存リソースの一括タグ付け', ui_optional:'（任意）',
+            ui_coverage_title:'タグ付け対象',
+            ui_btn_next:'次へ：確認 →', ui_btn_back:'← 戻る', ui_btn_generate:'生成してダウンロード →',
+            err_mpe_invalid:"MAP IDは'mig'で始まり英数字のみを含む必要があります",
+            err_date_required:'契約開始日を入力してください',
+            err_date_end:'契約終了日は開始日より後である必要があります',
+            d_title:'MAP 2.0 自動タガー セットアップ',
+            d_tag_label:'タグ値', d_region_label:'リージョン', d_account_label:'アカウント',
+            d_step1:'ステップ1/3：アカウントを確認しています...',
+            d_step2:'ステップ2/3：自動タガーを設定しています...',
+            d_step2_wait:'（通常1〜2分かかります）',
+            d_step2_wait_multi:'（通常10〜15分かかります）',
+            d_step3:'ステップ3/3：デプロイメントレポートを保存しています...',
+            d_ok_creds:'AWSアカウントに正常に接続されました。',
+            d_fail_creds:'AWSアカウントに接続できません。',
+            d_fix_creds:'セッションの有効期限が切れている可能性があります。AWS CloudShellを閉じて再度開き、スクリプトを実行してください。',
+            d_ok_trail:'アクティビティログが有効です：',
+            d_fail_trail:'アクティビティログ（CloudTrail）が有効になっていません：',
+            d_fix_trail1:'AWSコンソール → CloudTrail → トレイルの作成に移動してください。',
+            d_fix_trail2:'次のリージョンを含める必要があります：',
+            d_ok_perms:'デプロイメント権限が設定されています。',
+            d_fail_perms:'アカウントに必要なデプロイメント権限がありません。',
+            d_fix_perms:'AWS管理者にCloudFormation、IAM、Lambda、EventBridge、SSM、SNS、SQS、CloudWatchの権限付与を依頼してください。',
+            d_ok_org:'正しい管理アカウントから実行しています。',
+            d_fail_org:'このスクリプトは組織の管理（ルート）アカウントから実行する必要があります。',
+            d_fix_org:'AWS CloudShellを管理アカウントに切り替えてスクリプトを再実行してください。不明な場合はAWSアカウントチームにお問い合わせください。',
+            d_warn_stacksets:'マルチアカウントデプロイ連携がまだ有効になっていません — デプロイ中に自動的に設定されます。',
+            d_ok_stacksets:'マルチアカウントデプロイ連携が有効です。',
+            d_ok_scp:'タグサービスをブロックするセキュリティポリシーはありません。',
+            d_fail_scp:'組織のセキュリティポリシーがタグサービスをブロックしています。',
+            d_fix_scp:"AWSセキュリティチームに連絡し、Lambda実行ロールに'tag:TagResources'アクションを許可するよう依頼してください。",
+            d_scp_note:"（注：組織がリソース作成時にタグを要求する場合、セキュリティチームに'map-migrated'タグキーの除外を依頼してください。）",
+            d_all_passed:'すべての確認が完了しました。',
+            d_checks_failed:'件の確認が失敗しました。上記の手順に従ってスクリプトを再実行してください。',
+            d_fix_label:'→ 解決方法：',
+            d_deploying:'デプロイが実行中です。Ctrl+Cを押しても安全です — バックグラウンドで継続されます。',
+            d_still_deploying:'セットアップ中...',
+            d_elapsed:'経過',
+            d_deploy_failed:'セットアップに失敗しました。以下のレポートをAWSアカウントチームと共有してください。',
+            d_complete_title:'設定完了！',
+            d_complete_single:'新しいリソースは作成後1〜2分以内に自動的にタグ付けされます（最大15分かかる場合があります）。',
+            d_complete_multi:'組織のすべてのアカウントで自動タグ付けが有効になりました。',
+            d_backfill_msg:'バックフィルは約5分後に実行される予定です。',
+            d_backfill_since:'次の日付以降に作成された既存のリソースにタグを付けます：',
+            d_report_saved:'デプロイメントレポートの保存先：',
+            d_share_report:'このファイルをAWSアカウントチームと共有してください。',
+            r_title:'MAP 2.0 自動タガー — デプロイメントレポート',
+            r_customer:'顧客', r_mpe:'MPE ID', r_region:'リージョン', r_account:'アカウント',
+            r_date:'日時', r_result:'結果',
+            r_preflight:'事前確認結果：',
+            r_deployed:'デプロイされた内容：',
+            r_verify:'確認方法：',
+            r_backfill:'バックフィル状態：',
+            r_perstatus:'アカウント別ステータス：',
+            r_support:'サポート：',
+            r_action:'必要なアクション：',
+            r_verify1:'1. AWSアカウントで任意のリソースを作成してください',
+            r_verify2:'2. 1〜2分待ってください（混雑時は最大15分）',
+            r_verify3:'3. リソースに次のタグがあることを確認してください：map-migrated =',
+            r_share_help:'サポートが必要な場合は、このレポートをAWSアカウントチームと共有してください。',
+            r_contact:'サポートが必要な場合は、AWSアカウントチームにお問い合わせください。',
+            r_action_desc:'上記の失敗した項目を解決してからdeploy.shを再実行してください。'
+          },
+          zh: {
+            ui_title:'MAP 2.0 自动标记器配置工具',
+            ui_step1:'1. 配置', ui_step2:'2. 审核', ui_step3:'3. 下载',
+            ui_card_deal_title:'MAP 2.0 协议信息',
+            ui_card_deal_subtitle:'请输入AWS Investments提供的MAP协议信息',
+            ui_customer_name:'客户名称', ui_customer_name_hint:'（仅用于生成文件名）',
+            ui_customer_name_placeholder:'例如：ABC公司',
+            ui_mpe_tag:'MAP 2.0 标签值',
+            ui_agree_start:'协议开始日期', ui_agree_start_hint:'（开始对MAP 2.0资源打标签的日期）',
+            ui_agree_end:'协议结束日期', ui_agree_end_hint:'（停止对新建资源打标签的日期）',
+            ui_alert_email:'告警邮件', ui_alert_email_hint:'（可选 — 接收标签错误通知的邮箱）',
+            ui_deploy_mode:'部署模式', ui_deploy_mode_subtitle:'请选择用于迁移的AWS账户数量',
+            ui_single_title:'单账户', ui_single_desc:'将工作负载部署到一个AWS账户。约2分钟完成。',
+            ui_multi_title:'多账户 (AWS Organizations)', ui_multi_desc:'通过StackSet同时部署到AWS组织中的所有账户。',
+            ui_backfill_title:'一次性回填', ui_optional:'（可选）',
+            ui_coverage_title:'标签覆盖范围',
+            ui_btn_next:'下一步：审核 →', ui_btn_back:'← 返回', ui_btn_generate:'生成并下载 →',
+            err_mpe_invalid:"MAP参与ID必须以'mig'开头，后跟字母数字字符",
+            err_date_required:'请填写协议开始日期',
+            err_date_end:'协议结束日期必须晚于开始日期',
+            d_title:'MAP 2.0 自动标记器设置',
+            d_tag_label:'标签值', d_region_label:'区域', d_account_label:'账户',
+            d_step1:'第1步/共3步：正在检查您的账户...',
+            d_step2:'第2步/共3步：正在设置自动标记器...',
+            d_step2_wait:'（通常需要1-2分钟）',
+            d_step2_wait_multi:'（通常需要10-15分钟）',
+            d_step3:'第3步/共3步：正在保存部署报告...',
+            d_ok_creds:'已成功连接到AWS账户。',
+            d_fail_creds:'无法连接到您的AWS账户。',
+            d_fix_creds:'您的会话可能已过期。请关闭并重新打开AWS CloudShell，然后重新运行此脚本。',
+            d_ok_trail:'区域的活动日志已启用：',
+            d_fail_trail:'区域未启用活动日志记录（CloudTrail）：',
+            d_fix_trail1:'请前往AWS控制台 → CloudTrail → 创建跟踪。',
+            d_fix_trail2:'请确保包含区域：',
+            d_ok_perms:'部署权限已就位。',
+            d_fail_perms:'您的账户没有所需的部署权限。',
+            d_fix_perms:'请联系AWS管理员授予CloudFormation、IAM、Lambda、EventBridge、SSM、SNS、SQS和CloudWatch权限。',
+            d_ok_org:'正在从正确的管理账户运行。',
+            d_fail_org:'此脚本必须从组织的管理（根）账户运行。',
+            d_fix_org:'请在AWS CloudShell中切换到管理账户并重新运行脚本。如不确定是哪个账户，请联系您的AWS账户团队。',
+            d_warn_stacksets:'多账户部署集成尚未启用 — 将在部署过程中自动设置。',
+            d_ok_stacksets:'多账户部署集成已启用。',
+            d_ok_scp:'没有安全策略阻止标签服务。',
+            d_fail_scp:'您组织中的安全策略正在阻止标签服务。',
+            d_fix_scp:"请联系AWS安全团队，允许Lambda执行角色使用'tag:TagResources'操作。",
+            d_scp_note:"（注意：如果您的组织要求在资源创建时必须存在标签，请让安全团队豁免'map-migrated'标签键。）",
+            d_all_passed:'所有检查均已通过。',
+            d_checks_failed:'项检查失败。请按照上述步骤操作，然后重新运行脚本。',
+            d_fix_label:'→ 解决方法：',
+            d_deploying:'部署正在进行中。您可以安全地按Ctrl+C — 部署将在后台继续。',
+            d_still_deploying:'仍在设置中...',
+            d_elapsed:'已用时',
+            d_deploy_failed:'设置失败。请将以下报告分享给您的AWS账户团队。',
+            d_complete_title:'设置完成！',
+            d_complete_single:'新资源将在创建后1-2分钟内自动添加标签（高峰期最长15分钟）。',
+            d_complete_multi:'自动标记现已在组织的所有账户中激活。',
+            d_backfill_msg:'回填将在约5分钟后运行。',
+            d_backfill_since:'它将对以下日期后创建的现有资源打标签：',
+            d_report_saved:'部署报告已保存至：',
+            d_share_report:'请将此文件分享给您的AWS账户团队。',
+            r_title:'MAP 2.0 自动标记器 — 部署报告',
+            r_customer:'客户', r_mpe:'MPE ID', r_region:'区域', r_account:'账户',
+            r_date:'日期/时间', r_result:'结果',
+            r_preflight:'预检查结果：',
+            r_deployed:'已部署内容：',
+            r_verify:'验证方法：',
+            r_backfill:'回填状态：',
+            r_perstatus:'账户状态：',
+            r_support:'技术支持：',
+            r_action:'需要采取的措施：',
+            r_verify1:'1. 在您的AWS账户中创建任意资源',
+            r_verify2:'2. 等待1-2分钟（繁忙时段最多15分钟）',
+            r_verify3:'3. 确认资源上有以下标签：map-migrated =',
+            r_share_help:'如需帮助，请将此报告分享给您的AWS账户团队。',
+            r_contact:'如需帮助，请联系您的AWS账户团队。',
+            r_action_desc:'请解决上述失败项后重新运行deploy.sh。'
+          },
+          id: {
+            ui_title:'Konfigurator MAP 2.0 Auto-Tagger',
+            ui_step1:'1. Konfigurasi', ui_step2:'2. Tinjau', ui_step3:'3. Unduh',
+            ui_card_deal_title:'Detail Perjanjian MAP 2.0',
+            ui_card_deal_subtitle:'Masukkan detail perjanjian MAP dari AWS Investments',
+            ui_customer_name:'Nama Pelanggan', ui_customer_name_hint:'(hanya digunakan untuk pembuatan nama file)',
+            ui_customer_name_placeholder:'cth. PT ABC Indonesia',
+            ui_mpe_tag:'Nilai Tag MAP 2.0',
+            ui_agree_start:'Tanggal Mulai Perjanjian', ui_agree_start_hint:'(Tanggal mulai pemberian tag pada resource MAP 2.0)',
+            ui_agree_end:'Tanggal Berakhir Perjanjian', ui_agree_end_hint:'(Tanggal penghentian pemberian tag pada resource baru)',
+            ui_alert_email:'Email Peringatan', ui_alert_email_hint:'(opsional — email untuk menerima peringatan kesalahan tag)',
+            ui_deploy_mode:'Mode Deployment', ui_deploy_mode_subtitle:'Pilih jumlah akun AWS yang digunakan untuk migrasi',
+            ui_single_title:'Satu Akun', ui_single_desc:'Deploy ke satu akun migrasi. Selesai dalam 2 menit.',
+            ui_multi_title:'Beberapa Akun (AWS Organizations)', ui_multi_desc:'Deploy ke semua akun AWS Organization sekaligus menggunakan StackSet.',
+            ui_backfill_title:'Backfill Satu Kali', ui_optional:'(opsional)',
+            ui_coverage_title:'Resource yang Akan Diberi Tag',
+            ui_btn_next:'Berikutnya: Tinjau →', ui_btn_back:'← Kembali', ui_btn_generate:'Buat & Unduh →',
+            err_mpe_invalid:"MAP ID harus diawali dengan 'mig' diikuti karakter alfanumerik",
+            err_date_required:'Tanggal mulai perjanjian wajib diisi',
+            err_date_end:'Tanggal berakhir harus setelah tanggal mulai',
+            d_title:'Pengaturan MAP 2.0 Auto-Tagger',
+            d_tag_label:'Nilai Tag', d_region_label:'Region', d_account_label:'Akun',
+            d_step1:'Langkah 1 dari 3: Memeriksa akun Anda...',
+            d_step2:'Langkah 2 dari 3: Menyiapkan auto-tagger...',
+            d_step2_wait:'(Biasanya membutuhkan 1-2 menit)',
+            d_step2_wait_multi:'(Biasanya membutuhkan 10-15 menit)',
+            d_step3:'Langkah 3 dari 3: Menyimpan laporan deployment...',
+            d_ok_creds:'Berhasil terhubung ke akun AWS.',
+            d_fail_creds:'Tidak dapat terhubung ke akun AWS Anda.',
+            d_fix_creds:'Sesi Anda mungkin telah kedaluwarsa. Tutup dan buka kembali AWS CloudShell, lalu jalankan skrip ini kembali.',
+            d_ok_trail:'Pencatatan aktivitas diaktifkan di region:',
+            d_fail_trail:'Pencatatan aktivitas (CloudTrail) tidak diaktifkan di region:',
+            d_fix_trail1:'Buka AWS Console → CloudTrail → Buat trail.',
+            d_fix_trail2:'Pastikan menyertakan region:',
+            d_ok_perms:'Izin deployment sudah tersedia.',
+            d_fail_perms:'Akun Anda tidak memiliki izin deployment yang diperlukan.',
+            d_fix_perms:'Minta administrator AWS Anda untuk memberikan izin CloudFormation, IAM, Lambda, EventBridge, SSM, SNS, SQS, dan CloudWatch.',
+            d_ok_org:'Berjalan dari akun manajemen yang benar.',
+            d_fail_org:'Skrip ini harus dijalankan dari akun manajemen (root) organisasi Anda.',
+            d_fix_org:'Beralih ke akun manajemen di AWS CloudShell dan jalankan skrip kembali. Jika tidak yakin, hubungi tim akun AWS Anda.',
+            d_warn_stacksets:'Integrasi deployment multi-akun belum diaktifkan — akan diatur otomatis saat deployment.',
+            d_ok_stacksets:'Integrasi deployment multi-akun sudah diaktifkan.',
+            d_ok_scp:'Tidak ada kebijakan keamanan yang memblokir layanan tag.',
+            d_fail_scp:'Kebijakan keamanan di organisasi Anda memblokir layanan tag.',
+            d_fix_scp:"Hubungi tim keamanan AWS Anda dan minta mereka mengizinkan tindakan 'tag:TagResources' untuk peran eksekusi Lambda.",
+            d_scp_note:"(Catatan: jika organisasi Anda mengharuskan tag ada saat resource dibuat, minta tim keamanan untuk mengecualikan kunci tag 'map-migrated'.)",
+            d_all_passed:'Semua pemeriksaan berhasil.',
+            d_checks_failed:'pemeriksaan gagal. Ikuti langkah-langkah di atas, lalu jalankan skrip kembali.',
+            d_fix_label:'→ Solusi:',
+            d_deploying:'Deployment sedang berjalan. Anda dapat menekan Ctrl+C dengan aman — akan terus berjalan di latar belakang.',
+            d_still_deploying:'Masih menyiapkan...',
+            d_elapsed:'telah berlalu',
+            d_deploy_failed:'Pengaturan gagal. Bagikan laporan di bawah ini ke tim akun AWS Anda.',
+            d_complete_title:'Pengaturan Selesai!',
+            d_complete_single:'Resource baru akan secara otomatis diberi tag dalam 1-2 menit setelah dibuat (hingga 15 menit pada jam sibuk).',
+            d_complete_multi:'Pemberian tag otomatis kini aktif di semua akun dalam organisasi Anda.',
+            d_backfill_msg:'Backfill dijadwalkan berjalan dalam ~5 menit.',
+            d_backfill_since:'Ini akan memberi tag pada resource yang dibuat sejak:',
+            d_report_saved:'Laporan deployment disimpan di:',
+            d_share_report:'Bagikan file ini ke tim akun AWS Anda.',
+            r_title:'MAP 2.0 Auto-Tagger — Laporan Deployment',
+            r_customer:'Pelanggan', r_mpe:'MPE ID', r_region:'Region', r_account:'Akun',
+            r_date:'Tanggal / Waktu', r_result:'Hasil',
+            r_preflight:'Hasil Pemeriksaan Awal:',
+            r_deployed:'Yang Telah Diinstal:',
+            r_verify:'Cara Verifikasi:',
+            r_backfill:'Status Backfill:',
+            r_perstatus:'Status Per-Akun:',
+            r_support:'Dukungan:',
+            r_action:'Tindakan yang Diperlukan:',
+            r_verify1:'1. Buat resource apa pun di akun AWS Anda',
+            r_verify2:'2. Tunggu 1-2 menit (hingga 15 menit saat jam sibuk)',
+            r_verify3:'3. Periksa bahwa resource memiliki tag: map-migrated =',
+            r_share_help:'Bagikan laporan ini ke tim akun AWS Anda jika membutuhkan bantuan.',
+            r_contact:'Hubungi tim akun AWS Anda jika membutuhkan bantuan.',
+            r_action_desc:'Selesaikan pemeriksaan yang gagal di atas, lalu jalankan kembali deploy.sh.'
+          },
+          th: {
+            ui_title:'เครื่องมือตั้งค่า MAP 2.0 Auto-Tagger',
+            ui_step1:'1. ตั้งค่า', ui_step2:'2. ตรวจสอบ', ui_step3:'3. ดาวน์โหลด',
+            ui_card_deal_title:'รายละเอียดข้อตกลง MAP 2.0',
+            ui_card_deal_subtitle:'กรอกรายละเอียดข้อตกลง MAP จาก AWS Investments',
+            ui_customer_name:'ชื่อลูกค้า', ui_customer_name_hint:'(ใช้สำหรับสร้างชื่อไฟล์เท่านั้น)',
+            ui_customer_name_placeholder:'เช่น บริษัท ABC จำกัด',
+            ui_mpe_tag:'ค่า Tag MAP 2.0',
+            ui_agree_start:'วันที่เริ่มต้นข้อตกลง', ui_agree_start_hint:'(วันที่เริ่มติด Tag ให้ทรัพยากร MAP 2.0)',
+            ui_agree_end:'วันที่สิ้นสุดข้อตกลง', ui_agree_end_hint:'(วันที่หยุดติด Tag ให้ทรัพยากรใหม่)',
+            ui_alert_email:'อีเมลแจ้งเตือน', ui_alert_email_hint:'(ไม่บังคับ — อีเมลสำหรับรับการแจ้งเตือนข้อผิดพลาด)',
+            ui_deploy_mode:'โหมดการติดตั้ง', ui_deploy_mode_subtitle:'เลือกจำนวนบัญชี AWS ที่ใช้สำหรับการย้ายระบบ',
+            ui_single_title:'บัญชีเดียว', ui_single_desc:'ติดตั้งในบัญชี AWS เดียว ใช้เวลาประมาณ 2 นาที',
+            ui_multi_title:'หลายบัญชี (AWS Organizations)', ui_multi_desc:'ติดตั้งพร้อมกันในทุกบัญชีของ AWS Organization ผ่าน StackSet',
+            ui_backfill_title:'การเติม Tag ย้อนหลังครั้งเดียว', ui_optional:'(ไม่บังคับ)',
+            ui_coverage_title:'ทรัพยากรที่จะได้รับ Tag',
+            ui_btn_next:'ถัดไป: ตรวจสอบ →', ui_btn_back:'← ย้อนกลับ', ui_btn_generate:'สร้างและดาวน์โหลด →',
+            err_mpe_invalid:"MAP ID ต้องเริ่มต้นด้วย 'mig' ตามด้วยตัวอักษรและตัวเลข",
+            err_date_required:'กรุณากรอกวันที่เริ่มต้นข้อตกลง',
+            err_date_end:'วันที่สิ้นสุดต้องอยู่หลังวันที่เริ่มต้น',
+            d_title:'การตั้งค่า MAP 2.0 Auto-Tagger',
+            d_tag_label:'ค่า Tag', d_region_label:'Region', d_account_label:'บัญชี',
+            d_step1:'ขั้นตอนที่ 1/3: กำลังตรวจสอบบัญชีของคุณ...',
+            d_step2:'ขั้นตอนที่ 2/3: กำลังติดตั้งระบบ Auto-Tagger...',
+            d_step2_wait:'(โดยทั่วไปใช้เวลา 1-2 นาที)',
+            d_step2_wait_multi:'(โดยทั่วไปใช้เวลา 10-15 นาที)',
+            d_step3:'ขั้นตอนที่ 3/3: กำลังบันทึกรายงานการติดตั้ง...',
+            d_ok_creds:'เชื่อมต่อกับบัญชี AWS สำเร็จแล้ว',
+            d_fail_creds:'ไม่สามารถเชื่อมต่อกับบัญชี AWS ของคุณได้',
+            d_fix_creds:'เซสชันของคุณอาจหมดอายุ โปรดปิดและเปิด AWS CloudShell ใหม่ แล้วรันสคริปต์อีกครั้ง',
+            d_ok_trail:'การบันทึกกิจกรรมเปิดใช้งานแล้วใน Region:',
+            d_fail_trail:'การบันทึกกิจกรรม (CloudTrail) ยังไม่เปิดใช้งานใน Region:',
+            d_fix_trail1:'ไปที่ AWS Console → CloudTrail → สร้าง Trail',
+            d_fix_trail2:'ต้องรวม Region:',
+            d_ok_perms:'สิทธิ์การติดตั้งพร้อมใช้งานแล้ว',
+            d_fail_perms:'บัญชีของคุณไม่มีสิทธิ์การติดตั้งที่จำเป็น',
+            d_fix_perms:'ขอให้ผู้ดูแลระบบ AWS ของคุณให้สิทธิ์ CloudFormation, IAM, Lambda, EventBridge, SSM, SNS, SQS และ CloudWatch',
+            d_ok_org:'กำลังรันจากบัญชีจัดการที่ถูกต้อง',
+            d_fail_org:'สคริปต์นี้ต้องรันจากบัญชีหลัก (management) ขององค์กรของคุณ',
+            d_fix_org:'เปลี่ยนไปใช้บัญชีจัดการใน AWS CloudShell แล้วรันสคริปต์อีกครั้ง หากไม่แน่ใจว่าเป็นบัญชีไหน ติดต่อทีม AWS Account ของคุณ',
+            d_warn_stacksets:'การผสานการติดตั้งแบบหลายบัญชียังไม่เปิดใช้งาน — จะถูกตั้งค่าอัตโนมัติระหว่างการติดตั้ง',
+            d_ok_stacksets:'การผสานการติดตั้งแบบหลายบัญชีเปิดใช้งานแล้ว',
+            d_ok_scp:'ไม่มีนโยบายความปลอดภัยที่บล็อกบริการ Tag',
+            d_fail_scp:'นโยบายความปลอดภัยในองค์กรของคุณกำลังบล็อกบริการ Tag',
+            d_fix_scp:"ติดต่อทีมความปลอดภัย AWS ของคุณเพื่อขออนุญาตให้ใช้ 'tag:TagResources' สำหรับ Lambda execution role",
+            d_scp_note:"(หมายเหตุ: หากองค์กรของคุณกำหนดให้ต้องมี Tag ตั้งแต่ตอนสร้าง Resource โปรดขอให้ทีมความปลอดภัยยกเว้น Tag key 'map-migrated')",
+            d_all_passed:'การตรวจสอบทั้งหมดผ่านแล้ว',
+            d_checks_failed:'การตรวจสอบล้มเหลว โปรดทำตามขั้นตอนด้านบน แล้วรันสคริปต์อีกครั้ง',
+            d_fix_label:'→ วิธีแก้ไข:',
+            d_deploying:'กำลังติดตั้ง คุณกด Ctrl+C ได้อย่างปลอดภัย — การติดตั้งจะดำเนินต่อในพื้นหลัง',
+            d_still_deploying:'ยังคงตั้งค่าอยู่...',
+            d_elapsed:'ที่ผ่านไป',
+            d_deploy_failed:'การตั้งค่าล้มเหลว โปรดแชร์รายงานด้านล่างนี้กับทีม AWS Account ของคุณ',
+            d_complete_title:'ติดตั้งสำเร็จ!',
+            d_complete_single:'ทรัพยากรใหม่จะได้รับ Tag โดยอัตโนมัติภายใน 1-2 นาทีหลังสร้าง (สูงสุด 15 นาทีในช่วงที่มีการใช้งานสูง)',
+            d_complete_multi:'การติด Tag อัตโนมัติเปิดใช้งานแล้วในทุกบัญชีขององค์กรของคุณ',
+            d_backfill_msg:'การเติม Tag ย้อนหลังถูกกำหนดให้รันใน ~5 นาที',
+            d_backfill_since:'จะติด Tag ให้ทรัพยากรที่สร้างตั้งแต่:',
+            d_report_saved:'บันทึกรายงานการติดตั้งที่:',
+            d_share_report:'แชร์ไฟล์นี้กับทีม AWS Account ของคุณ',
+            r_title:'MAP 2.0 Auto-Tagger — รายงานการติดตั้ง',
+            r_customer:'ลูกค้า', r_mpe:'MPE ID', r_region:'Region', r_account:'บัญชี',
+            r_date:'วันที่ / เวลา', r_result:'ผลลัพธ์',
+            r_preflight:'ผลการตรวจสอบเบื้องต้น:',
+            r_deployed:'สิ่งที่ติดตั้งแล้ว:',
+            r_verify:'วิธีการตรวจสอบ:',
+            r_backfill:'สถานะการเติม Tag ย้อนหลัง:',
+            r_perstatus:'สถานะแต่ละบัญชี:',
+            r_support:'การสนับสนุน:',
+            r_action:'การดำเนินการที่จำเป็น:',
+            r_verify1:'1. สร้างทรัพยากรใดก็ได้ในบัญชี AWS ของคุณ',
+            r_verify2:'2. รอ 1-2 นาที (สูงสุด 15 นาทีในช่วงที่มีการใช้งานสูง)',
+            r_verify3:'3. ตรวจสอบว่าทรัพยากรมี Tag: map-migrated =',
+            r_share_help:'แชร์รายงานนี้กับทีม AWS Account ของคุณหากต้องการความช่วยเหลือ',
+            r_contact:'ติดต่อทีม AWS Account ของคุณหากต้องการความช่วยเหลือ',
+            r_action_desc:'โปรดแก้ไขการตรวจสอบที่ล้มเหลวข้างต้น แล้วรัน deploy.sh อีกครั้ง'
+          },
+          vi: {
+            ui_title:'Công cụ cấu hình MAP 2.0 Auto-Tagger',
+            ui_step1:'1. Cấu hình', ui_step2:'2. Xem xét', ui_step3:'3. Tải xuống',
+            ui_card_deal_title:'Thông tin thỏa thuận MAP 2.0',
+            ui_card_deal_subtitle:'Nhập thông tin thỏa thuận MAP từ AWS Investments',
+            ui_customer_name:'Tên khách hàng', ui_customer_name_hint:'(chỉ dùng để tạo tên file)',
+            ui_customer_name_placeholder:'Ví dụ: Công ty ABC',
+            ui_mpe_tag:'Giá trị Tag MAP 2.0',
+            ui_agree_start:'Ngày bắt đầu thỏa thuận', ui_agree_start_hint:'(Ngày bắt đầu gắn tag cho resource MAP 2.0)',
+            ui_agree_end:'Ngày kết thúc thỏa thuận', ui_agree_end_hint:'(Ngày dừng gắn tag cho resource mới)',
+            ui_alert_email:'Email cảnh báo', ui_alert_email_hint:'(tùy chọn — email nhận thông báo lỗi tag)',
+            ui_deploy_mode:'Chế độ triển khai', ui_deploy_mode_subtitle:'Chọn số lượng tài khoản AWS dùng cho quá trình di chuyển',
+            ui_single_title:'Một tài khoản', ui_single_desc:'Triển khai vào một tài khoản AWS. Hoàn thành trong 2 phút.',
+            ui_multi_title:'Nhiều tài khoản (AWS Organizations)', ui_multi_desc:'Triển khai đồng thời vào tất cả tài khoản trong AWS Organization qua StackSet.',
+            ui_backfill_title:'Backfill một lần', ui_optional:'(tùy chọn)',
+            ui_coverage_title:'Những gì sẽ được gắn Tag',
+            ui_btn_next:'Tiếp theo: Xem xét →', ui_btn_back:'← Quay lại', ui_btn_generate:'Tạo và Tải xuống →',
+            err_mpe_invalid:"MAP ID phải bắt đầu bằng 'mig' theo sau là ký tự chữ và số",
+            err_date_required:'Vui lòng nhập ngày bắt đầu thỏa thuận',
+            err_date_end:'Ngày kết thúc phải sau ngày bắt đầu',
+            d_title:'Cài đặt MAP 2.0 Auto-Tagger',
+            d_tag_label:'Giá trị Tag', d_region_label:'Region', d_account_label:'Tài khoản',
+            d_step1:'Bước 1/3: Đang kiểm tra tài khoản của bạn...',
+            d_step2:'Bước 2/3: Đang cài đặt auto-tagger...',
+            d_step2_wait:'(Thường mất 1-2 phút)',
+            d_step2_wait_multi:'(Thường mất 10-15 phút)',
+            d_step3:'Bước 3/3: Đang lưu báo cáo triển khai...',
+            d_ok_creds:'Đã kết nối thành công với tài khoản AWS.',
+            d_fail_creds:'Không thể kết nối với tài khoản AWS của bạn.',
+            d_fix_creds:'Phiên làm việc của bạn có thể đã hết hạn. Đóng và mở lại AWS CloudShell, sau đó chạy lại script này.',
+            d_ok_trail:'Ghi nhật ký hoạt động đã được bật trong Region:',
+            d_fail_trail:'Ghi nhật ký hoạt động (CloudTrail) chưa được bật trong Region:',
+            d_fix_trail1:'Vào AWS Console → CloudTrail → Tạo trail.',
+            d_fix_trail2:'Đảm bảo bao gồm Region:',
+            d_ok_perms:'Quyền triển khai đã sẵn sàng.',
+            d_fail_perms:'Tài khoản của bạn không có quyền triển khai cần thiết.',
+            d_fix_perms:'Yêu cầu quản trị viên AWS cấp quyền CloudFormation, IAM, Lambda, EventBridge, SSM, SNS, SQS và CloudWatch.',
+            d_ok_org:'Đang chạy từ tài khoản quản lý đúng.',
+            d_fail_org:'Script này phải được chạy từ tài khoản quản lý (root) của tổ chức.',
+            d_fix_org:'Chuyển sang tài khoản quản lý trong AWS CloudShell và chạy lại script. Nếu không chắc, hãy liên hệ nhóm tài khoản AWS của bạn.',
+            d_warn_stacksets:'Tích hợp triển khai đa tài khoản chưa được kích hoạt — sẽ được thiết lập tự động trong quá trình triển khai.',
+            d_ok_stacksets:'Tích hợp triển khai đa tài khoản đã được kích hoạt.',
+            d_ok_scp:'Không có chính sách bảo mật nào chặn dịch vụ tag.',
+            d_fail_scp:'Chính sách bảo mật trong tổ chức của bạn đang chặn dịch vụ tag.',
+            d_fix_scp:"Liên hệ nhóm bảo mật AWS để cho phép hành động 'tag:TagResources' cho Lambda execution role.",
+            d_scp_note:"(Lưu ý: nếu tổ chức yêu cầu tag phải có khi tạo resource, hãy yêu cầu nhóm bảo mật miễn trừ tag key 'map-migrated'.)",
+            d_all_passed:'Tất cả các kiểm tra đã thông qua.',
+            d_checks_failed:'kiểm tra thất bại. Hãy làm theo các bước trên, sau đó chạy lại script.',
+            d_fix_label:'→ Cách khắc phục:',
+            d_deploying:'Đang triển khai. Bạn có thể nhấn Ctrl+C an toàn — quá trình sẽ tiếp tục trong nền.',
+            d_still_deploying:'Vẫn đang cài đặt...',
+            d_elapsed:'đã trôi qua',
+            d_deploy_failed:'Cài đặt thất bại. Vui lòng chia sẻ báo cáo dưới đây với nhóm tài khoản AWS của bạn.',
+            d_complete_title:'Cài đặt hoàn tất!',
+            d_complete_single:'Resource mới sẽ tự động được gắn tag trong vòng 1-2 phút sau khi tạo (tối đa 15 phút trong giờ cao điểm).',
+            d_complete_multi:'Tính năng tự động gắn tag hiện đã hoạt động trên tất cả tài khoản trong tổ chức.',
+            d_backfill_msg:'Backfill được lên lịch chạy trong ~5 phút.',
+            d_backfill_since:'Nó sẽ gắn tag cho các resource được tạo từ:',
+            d_report_saved:'Báo cáo triển khai đã được lưu tại:',
+            d_share_report:'Chia sẻ file này với nhóm tài khoản AWS của bạn.',
+            r_title:'MAP 2.0 Auto-Tagger — Báo cáo Triển khai',
+            r_customer:'Khách hàng', r_mpe:'MPE ID', r_region:'Region', r_account:'Tài khoản',
+            r_date:'Ngày / Giờ', r_result:'Kết quả',
+            r_preflight:'Kết quả kiểm tra trước:',
+            r_deployed:'Những gì đã được triển khai:',
+            r_verify:'Cách xác minh:',
+            r_backfill:'Trạng thái backfill:',
+            r_perstatus:'Trạng thái từng tài khoản:',
+            r_support:'Hỗ trợ:',
+            r_action:'Hành động cần thực hiện:',
+            r_verify1:'1. Tạo bất kỳ resource nào trong tài khoản AWS của bạn',
+            r_verify2:'2. Chờ 1-2 phút (tối đa 15 phút trong giờ cao điểm)',
+            r_verify3:'3. Kiểm tra resource có tag: map-migrated =',
+            r_share_help:'Chia sẻ báo cáo này với nhóm tài khoản AWS của bạn nếu cần hỗ trợ.',
+            r_contact:'Liên hệ nhóm tài khoản AWS của bạn nếu c��n hỗ trợ.',
+            r_action_desc:'Vui lòng giải quyết các kiểm tra thất bại ở trên rồi chạy lại deploy.sh.'
+          }
+        };
+
+        function t(key) {
+            return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key])
+                || TRANSLATIONS['en'][key] || key;
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            // Update button label
+            document.getElementById('langLabel').textContent = LANG_LABELS[lang];
+            // Update active state in menu
+            Object.keys(LANG_LABELS).forEach(l => {
+                const el = document.getElementById('lang-' + l);
+                if (el) el.classList.toggle('active', l === lang);
+            });
+            // Update html lang attribute
+            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
+            // Apply translations to DOM
+            applyTranslations();
+            // Close menu
+            document.getElementById('langMenu').classList.add('hidden');
+        }
+
+        function applyTranslations() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = t(key);
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                el.placeholder = t(key);
+            });
+        }
+
+        function toggleLangMenu() {
+            document.getElementById('langMenu').classList.toggle('hidden');
+        }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', function(e) {
+            const sel = document.getElementById('langMenu');
+            const btn = document.getElementById('langBtn');
+            if (sel && btn && !sel.contains(e.target) && !btn.contains(e.target)) {
+                sel.classList.add('hidden');
+            }
+        });
 
         // Complete list of event names (200+ proven events)
         const ALL_EVENT_NAMES = [
@@ -880,6 +1532,169 @@
                 : '[]';
             const alertEmail = config.alertEmail || '';
 
+            const backfillEventNamesList = [...new Set(ALL_EVENT_NAMES)].map(e => `            '${e}'`).join(',\n');
+
+            const backfillResources = config.includeBackfill ? `
+  BackfillRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'map-auto-tagger-backfill-\${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: backfill-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # SECURITY NOTE: cloudtrail:LookupEvents is read-only. Used transiently by the
+              # one-time backfill Lambda to retrieve historical resource creation events since
+              # the agreement start date. No CloudTrail data is stored or transmitted.
+              - Sid: BackfillCloudTrail
+                Effect: Allow
+                Action: cloudtrail:LookupEvents
+                Resource: '*'
+              - Sid: BackfillInvokeMain
+                Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt AutoTaggerFunction.Arn
+              - Sid: BackfillDisableRule
+                Effect: Allow
+                Action: events:DisableRule
+                Resource: !Sub 'arn:aws:events:\${AWS::Region}:\${AWS::AccountId}:rule/map-auto-tagger-backfill'
+              - Sid: BackfillLogging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*'
+
+  BackfillFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: map-auto-tagger-backfill
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt BackfillRole.Arn
+      Timeout: 900
+      MemorySize: 256
+      Environment:
+        Variables:
+          AUTO_TAGGER_FUNCTION: !Ref AutoTaggerFunction
+          BACKFILL_RULE_NAME: map-auto-tagger-backfill
+          AGREEMENT_START_DATE: '${config.agreementDate}'
+      Code:
+        ZipFile: |
+          import json, os, boto3, time
+          from datetime import datetime, timezone
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+
+          lambda_client = boto3.client('lambda')
+          cloudtrail_client = boto3.client('cloudtrail')
+          events_client = boto3.client('events')
+
+          FUNCTION_NAME = os.environ['AUTO_TAGGER_FUNCTION']
+          RULE_NAME = os.environ['BACKFILL_RULE_NAME']
+          AGREEMENT_START_DATE = os.environ['AGREEMENT_START_DATE']
+
+          EVENT_NAMES = [
+${backfillEventNamesList}
+          ]
+
+          def lookup_events(event_name, start_time):
+              results = []
+              kwargs = {
+                  'LookupAttributes': [{'AttributeKey': 'EventName', 'AttributeValue': event_name}],
+                  'StartTime': start_time,
+                  'MaxResults': 50
+              }
+              while True:
+                  try:
+                      resp = cloudtrail_client.lookup_events(**kwargs)
+                      for ev in resp.get('Events', []):
+                          ct = json.loads(ev['CloudTrailEvent'])
+                          if ct.get('errorCode') or ct.get('errorMessage'):
+                              continue
+                          results.append(ct)
+                      next_token = resp.get('NextToken')
+                      if next_token:
+                          kwargs['NextToken'] = next_token
+                      else:
+                          break
+                  except Exception as e:
+                      print(f"LookupEvents error for {event_name}: {e}")
+                      time.sleep(1)
+                      break
+              return results
+
+          def handler(event, context):
+              # Disable the backfill rule immediately so it does not fire again
+              try:
+                  events_client.disable_rule(Name=RULE_NAME)
+                  print(f"Disabled backfill schedule rule: {RULE_NAME}")
+              except Exception as e:
+                  print(f"Warning: could not disable rule: {e}")
+
+              start_time = datetime.strptime(AGREEMENT_START_DATE, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              print(f"Backfill: querying CloudTrail from {AGREEMENT_START_DATE} for {len(EVENT_NAMES)} event types")
+
+              all_events = []
+              with ThreadPoolExecutor(max_workers=10) as executor:
+                  futures = {executor.submit(lookup_events, name, start_time): name for name in EVENT_NAMES}
+                  for future in as_completed(futures):
+                      all_events.extend(future.result())
+
+              print(f"Backfill: found {len(all_events)} creation events")
+
+              invoked = 0
+              errors = 0
+              for ct_event in all_events:
+                  eb_event = {
+                      'version': '0',
+                      'source': f"aws.{ct_event.get('eventSource','').split('.')[0]}",
+                      'detail-type': 'AWS API Call via CloudTrail',
+                      'detail': ct_event
+                  }
+                  try:
+                      lambda_client.invoke(
+                          FunctionName=FUNCTION_NAME,
+                          InvocationType='Event',
+                          Payload=json.dumps(eb_event).encode()
+                      )
+                      invoked += 1
+                  except Exception as e:
+                      print(f"Invoke error for {ct_event.get('eventName','?')}: {e}")
+                      errors += 1
+
+              print(f"Backfill complete: {invoked} events dispatched, {errors} errors")
+              return {'invoked': invoked, 'errors': errors}
+
+  BackfillScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: map-auto-tagger-backfill
+      Description: One-time trigger for MAP auto-tagger backfill Lambda
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Targets:
+        - Id: BackfillTarget
+          Arn: !GetAtt BackfillFunction.Arn
+
+  BackfillLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt BackfillFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt BackfillScheduleRule.Arn
+` : '';
+
+
             const crossAccountPermission = isCentral ? `
               - Sid: CrossAccountAssumeRole
                 Effect: Allow
@@ -926,7 +1741,7 @@
             return `AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
-  Auto-tags 190+ AWS resource types within 60-90 seconds of creation.
+  Auto-tags 190+ AWS resource types within typically 60–90 seconds (up to 15 minutes during high-volume activity) of creation.
   ${isMulti && config.eventMode === 'stackset' ? 'Deploy via StackSet to all accounts in org.' : isMulti ? 'Central Lambda — deploy in the designated central account.' : 'Deploy in the migration account.'}
   Generated by MAP 2.0 Auto-Tagger Configurator v18.
 
@@ -1047,8 +1862,9 @@ ${permissionsList}
           RETRY_QUEUE_URL: !Ref RetryQueue
       Code:
         ZipFile: |
-          import json, os, boto3, re
+          import json, os, boto3, re, time, random
           from datetime import datetime, timezone
+          from botocore.exceptions import ClientError
 
           ssm = boto3.client('ssm')
           ec2 = boto3.client('ec2')
@@ -1155,10 +1971,21 @@ ${crossAccountCode}
                   elif ':lightsail:' in arn:
                       get_svc('lightsail').tag_resource(resourceName=arn.split('/')[-1], tags=[{'key': tag_key, 'value': tag_value}])
                   else:
-                      resp2 = _t.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
-                      if resp2.get('FailedResourcesMap'):
-                          err = resp2['FailedResourcesMap'].get(arn, {}).get('ErrorMessage', 'Unknown')
-                          raise Exception(f"Tagging API: {err}")
+                      THROTTLE_CODES = {'ThrottlingException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+                      for attempt in range(4):
+                          try:
+                              resp2 = _t.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
+                              if resp2.get('FailedResourcesMap'):
+                                  err = resp2['FailedResourcesMap'].get(arn, {}).get('ErrorMessage', 'Unknown')
+                                  raise Exception(f"Tagging API: {err}")
+                              break
+                          except ClientError as ce:
+                              if ce.response['Error']['Code'] in THROTTLE_CODES and attempt < 3:
+                                  sleep_time = (2 ** attempt) * 1.0 * (1 + random.uniform(-0.25, 0.25))
+                                  print(f"Throttled on attempt {attempt + 1}, retrying in {sleep_time:.1f}s")
+                                  time.sleep(sleep_time)
+                              else:
+                                  raise
                   print(f'Tagged {arn} with {tag_key}={tag_value}')
               except Exception as e:
                   if ':ec2:' in arn:
@@ -1566,7 +2393,7 @@ ${crossAccountCode}
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
         - !Ref AlertTopic
-
+${backfillResources}
 Outputs:
   LambdaArn:
     Value: !GetAtt AutoTaggerFunction.Arn
@@ -1900,86 +2727,196 @@ Outputs:
             // Escape backticks and dollar signs in template content for safe embedding in heredoc
             const escapeHeredoc = (s) => s.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
 
+            // Sanitize customer name for safe use in shell — keep display name as-is (supports Unicode),
+            // use MPE ID for filename (always ASCII-safe)
+            const customerDisplay = (config.customerName || 'Customer').replace(/'/g, "'\\''");
+            const reportFile = `map-tagger-report-${mpe}-\$(date +%Y%m%d-%H%M%S).txt`;
+
             if (config.deployMode === 'single') {
                 const tpl = escapeHeredoc(mainTemplate);
                 return `#!/bin/bash
 # MAP 2.0 Auto-Tagger — Deployment Script
-# Generated for: ${config.customerName || 'Customer'} (MPE: ${mpe})
-#
-# Run from the migration account:
-#   Open AWS CloudShell in the migration account, upload this file, then run:
-#   bash deploy.sh
+# Customer: ${config.customerName || 'Customer'} | MPE: ${mpe}
+# Run this file in AWS CloudShell: bash deploy.sh
 set -e
 
 STACK_NAME="map-auto-tagger"
 REGION="${region}"
+MPE="${mpe}"
+CUSTOMER="${customerDisplay}"
+REPORT_FILE="${reportFile}"
+DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
+PREFLIGHT_LOG=""
+DEPLOY_STATUS="NOT STARTED"
 
-echo "================================================"
-echo " MAP 2.0 Auto-Tagger — Single Account Deployment"
-echo " MAP Engagement ID: ${mpe}"
-echo " Region:  \$REGION"
-echo "================================================"
+# ────────────────────────────────────────────
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ${t('d_title')}              │"
+echo "  │   ${t('d_tag_label')}: \$MPE"
+echo "  │   ${t('d_region_label')}: \$REGION"
+echo "  └─────────────────────────────────────────┘"
 echo ""
 
-# Pre-flight checks
-echo "Running pre-flight checks..."
+# ── Step 1: Pre-flight checks ────────────────
+echo "${t('d_step1')}"
+echo ""
 ERRORS=0
 
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
-    echo "  ❌ No valid AWS credentials found."
+    echo "  ❌ ${t('d_fail_creds')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_creds')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_creds')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
-    echo "  ✅ AWS credentials: OK"
+    echo "  ✅ ${t('d_ok_creds')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_creds')}\\n"
 fi
 
 TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$REGION" --include-shadow-trails false --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
 if [ "\$TRAIL_COUNT" -eq 0 ]; then
-    echo "  ❌ CloudTrail: no trail found in region \$REGION. CloudTrail must be enabled for auto-tagging to work."
+    echo "  ❌ ${t('d_fail_trail')} \$REGION"
+    echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
+    echo "            ${t('d_fix_trail2')} \$REGION"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_trail')} \$REGION\\n"
     ERRORS=\$((ERRORS + 1))
 else
-    echo "  ✅ CloudTrail: enabled"
+    echo "  ✅ ${t('d_ok_trail')} \$REGION"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_trail')} \$REGION\\n"
 fi
 
 if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
-    echo "  ❌ CloudFormation: insufficient permissions. The deployer needs CloudFormation access."
+    echo "  ❌ ${t('d_fail_perms')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_perms')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_perms')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
-    echo "  ✅ CloudFormation: accessible"
+    echo "  ✅ ${t('d_ok_perms')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_perms')}\\n"
+fi
+
+SCP_RESULT=\$(aws iam simulate-principal-policy \\
+    --policy-source-arn "arn:aws:iam::\$(aws sts get-caller-identity --query Account --output text):root" \\
+    --action-names "tag:TagResources" \\
+    --query 'EvaluationResults[0].EvalDecision' \\
+    --output text 2>/dev/null)
+if [ "\$SCP_RESULT" = "explicitDeny" ]; then
+    echo "  ❌ ${t('d_fail_scp')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_scp')}\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_scp')}"
+    echo "     ${t('d_scp_note')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_scp')}\\n"
 fi
 
 if [ "\$ERRORS" -gt 0 ]; then
     echo ""
-    echo "❌ Pre-flight checks failed. Please resolve the issues above before deploying."
+    echo "  ────────────────────────────────────────────"
+    echo "  ❌ \$ERRORS ${t('d_checks_failed')}"
+    echo "  ────────────────────────────────────────────"
+    DEPLOY_STATUS="FAILED"
+    {
+      echo "${t('r_title')}"
+      echo "========================================"
+      echo "${t('r_customer').padEnd ? '${t('r_customer')}' : '${t('r_customer')}'}    : \$CUSTOMER"
+      echo "${t('r_mpe')}      : \$MPE"
+      echo "${t('r_region')}   : \$REGION"
+      echo "${t('r_date')}     : \$DEPLOY_TIME"
+      echo "${t('r_result')}   : \$DEPLOY_STATUS"
+      echo ""
+      echo "${t('r_preflight')}"
+      echo "-------------------------"
+      printf "\$PREFLIGHT_LOG"
+      echo ""
+      echo "${t('r_action')}"
+      echo "  ${t('r_action_desc')}"
+      echo "  ${t('r_share_help')}"
+    } > "\$REPORT_FILE"
+    echo ""
+    echo "  📄 \$REPORT_FILE"
+    echo "     ${t('d_share_report')}"
     exit 1
 fi
-echo "✅ All pre-flight checks passed."
+echo ""
+echo "  ✅ ${t('d_all_passed')}"
 echo ""
 
-# Write embedded template to temp file
-TEMPLATE=$(mktemp /tmp/map-auto-tagger-XXXX.yaml)
+# ── Step 2: Deploy ───────────────────────────
+echo "${t('d_step2')}"
+echo "  ${t('d_step2_wait')}"
+echo ""
+
+TEMPLATE=\$(mktemp /tmp/map-auto-tagger-XXXX.yaml)
 cat > "\$TEMPLATE" << 'MAP_TEMPLATE_EOF'
 ${tpl}
 MAP_TEMPLATE_EOF
 
-echo "Deploying CloudFormation stack..."
 aws cloudformation create-stack \\
   --stack-name "\$STACK_NAME" \\
   --template-body "file://\$TEMPLATE" \\
   --capabilities CAPABILITY_NAMED_IAM \\
-  --region "\$REGION"
+  --region "\$REGION" > /dev/null
 
 rm -f "\$TEMPLATE"
 
-echo "Waiting for deployment (~2 min)..."
 aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+DEPLOY_STATUS="SUCCESS"
 
+# ── Step 3: Done ─────────────────────────────
+echo "${t('d_step3')}"
 echo ""
-echo "✅ Done! Auto-tagging is now active."
+
+{
+  echo "${t('r_title')}"
+  echo "========================================"
+  echo "${t('r_customer')}    : \$CUSTOMER"
+  echo "${t('r_mpe')}      : \$MPE"
+  echo "${t('r_region')}   : \$REGION"
+  echo "${t('r_date')}     : \$DEPLOY_TIME"
+  echo "${t('r_result')}   : \$DEPLOY_STATUS"
+  echo ""
+  echo "${t('r_preflight')}"
+  echo "-------------------------"
+  printf "\$PREFLIGHT_LOG"
+  echo ""
+  echo "${t('r_deployed')}"
+  echo "------------------"
+  echo "  - Auto-tagger Lambda (map-auto-tagger)"
+  echo "  - EventBridge rule"
+  echo "  - Dead letter queue (14-day retention)"
+  echo "  - CloudWatch alarm"
+  echo "  - SSM config (/auto-map-tagger/config)"
+  ${config.includeBackfill ? `echo "  - Backfill Lambda"` : ''}
+  echo ""
+  echo "${t('r_verify')}"
+  echo "--------------"
+  echo "  ${t('r_verify1')}"
+  echo "  ${t('r_verify2')}"
+  echo "  ${t('r_verify3')} \$MPE"
+  echo ""
+  ${config.includeBackfill ? `echo "${t('r_backfill')}"
+  echo "----------------"
+  echo "  ${t('d_backfill_msg')} ${t('d_backfill_since')} ${config.agreementDate}"
+  echo "  aws logs tail /aws/lambda/map-auto-tagger-backfill --follow"
+  echo ""` : ''}
+  echo "${t('r_support')}"
+  echo "--------"
+  echo "  aws logs tail /aws/lambda/map-auto-tagger --follow"
+  echo "  ${t('r_contact')}"
+} > "\$REPORT_FILE"
+
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ✅ ${t('d_complete_title')}               │"
+echo "  │   ${t('d_complete_single')}  │"
+echo "  └─────────────────────────────────────────┘"
 echo ""
-echo "Verify: create any resource and check for tag after 90 seconds."
-echo "  aws s3 mb s3://test-map-\$(date +%s) --region \$REGION"
-echo "  sleep 90"
-echo "  aws s3api get-bucket-tagging --bucket test-map-XXXX"
+${config.includeBackfill ? `echo "  ⏳ ${t('d_backfill_msg')} ${t('d_backfill_since')} ${config.agreementDate}"
+echo ""` : ''}
+echo "  📄 ${t('d_report_saved')} \$REPORT_FILE"
+echo "     ${t('d_share_report')}"
+echo ""
 `;
             }
 
@@ -1989,78 +2926,145 @@ echo "  aws s3api get-bucket-tagging --bucket test-map-XXXX"
 
             return `#!/bin/bash
 # MAP 2.0 Auto-Tagger — Deployment Script
-# Generated for: ${config.customerName || 'Customer'} (MPE: ${mpe})
-#
-# Run from the MANAGEMENT account:
-#   Open AWS CloudShell in the management account, upload this file, then run:
-#   bash deploy.sh
+# Customer: ${config.customerName || 'Customer'} | MPE: ${mpe}
+# Run this file in AWS CloudShell (management account): bash deploy.sh
 set -e
 
 MPE="${mpe}"
 REGION="${region}"
-ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+ACCOUNT=\$(aws sts get-caller-identity --query Account --output text)
 BUCKET="auto-map-tagger-\${ACCOUNT}"
 STACK_NAME="map-auto-tagger"
+CUSTOMER="${customerDisplay}"
+REPORT_FILE="${reportFile}"
+DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
+PREFLIGHT_LOG=""
+DEPLOY_STATUS="NOT STARTED"
 
-echo "================================================"
-echo " MAP 2.0 Auto-Tagger — Multi-Account Deployment"
-echo " MAP Engagement ID: \$MPE"
-echo " Region:  \$REGION"
-echo " Account: \$ACCOUNT (management)"
-echo "================================================"
+# ────────────────────────────────────────────
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ${t('d_title')}              │"
+echo "  │   ${t('d_tag_label')}: \$MPE"
+echo "  │   ${t('d_region_label')}: \$REGION"
+echo "  │   ${t('d_account_label')}: \$ACCOUNT"
+echo "  └─────────────────────────────────────────┘"
 echo ""
 
-# Pre-flight checks
-echo "Running pre-flight checks..."
+# ── Step 1: Pre-flight checks ────────────────
+echo "${t('d_step1')}"
+echo ""
 ERRORS=0
 
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
-    echo "  ❌ No valid AWS credentials found."
+    echo "  ❌ ${t('d_fail_creds')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_creds')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_creds')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
-    echo "  ✅ AWS credentials: OK"
-fi
-
-TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$REGION" --include-shadow-trails false --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
-if [ "\$TRAIL_COUNT" -eq 0 ]; then
-    echo "  ❌ CloudTrail: no trail found in region \$REGION. CloudTrail must be enabled for auto-tagging to work."
-    ERRORS=\$((ERRORS + 1))
-else
-    echo "  ✅ CloudTrail: enabled"
+    echo "  ✅ ${t('d_ok_creds')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_creds')}\\n"
 fi
 
 if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
-    echo "  ❌ CloudFormation: insufficient permissions."
+    echo "  ❌ ${t('d_fail_perms')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_perms')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_perms')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
-    echo "  ✅ CloudFormation: accessible"
+    echo "  ✅ ${t('d_ok_perms')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_perms')}\\n"
 fi
 
 if ! aws organizations describe-organization > /dev/null 2>&1; then
-    echo "  ❌ AWS Organizations: not accessible. This script must run from the management account."
+    echo "  ❌ ${t('d_fail_org')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_org')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_org')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
-    echo "  ✅ AWS Organizations: accessible"
+    echo "  ✅ ${t('d_ok_org')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_org')}\\n"
 fi
 
 STACKSETS_ACCESS=\$(aws organizations list-aws-service-access-for-organization --query "EnabledServicePrincipals[?ServicePrincipal=='stacksets.cloudformation.amazonaws.com'].ServicePrincipal" --output text 2>/dev/null)
 if [ -z "\$STACKSETS_ACCESS" ]; then
-    echo "  ⚠️  StackSets trusted access not yet enabled — will be enabled automatically during deployment."
+    echo "  ⚠️  ${t('d_warn_stacksets')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}WARN: ${t('d_warn_stacksets')}\\n"
 else
-    echo "  ✅ StackSets trusted access: enabled"
+    echo "  ✅ ${t('d_ok_stacksets')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_stacksets')}\\n"
+fi
+
+for CHECK_REGION in ${regionArgs}; do
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --include-shadow-trails false --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    if [ "\$TRAIL_COUNT" -eq 0 ]; then
+        echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
+        echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
+        echo "            ${t('d_fix_trail2')} \$CHECK_REGION"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_trail')} \$CHECK_REGION\\n"
+        ERRORS=\$((ERRORS + 1))
+    else
+        echo "  ✅ ${t('d_ok_trail')} \$CHECK_REGION"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_trail')} \$CHECK_REGION\\n"
+    fi
+done
+
+SCP_RESULT=\$(aws iam simulate-principal-policy \\
+    --policy-source-arn "arn:aws:iam::\$ACCOUNT:root" \\
+    --action-names "tag:TagResources" \\
+    --query 'EvaluationResults[0].EvalDecision' \\
+    --output text 2>/dev/null)
+if [ "\$SCP_RESULT" = "explicitDeny" ]; then
+    echo "  ❌ ${t('d_fail_scp')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_scp')}\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_scp')}"
+    echo "     ${t('d_scp_note')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_scp')}\\n"
 fi
 
 if [ "\$ERRORS" -gt 0 ]; then
     echo ""
-    echo "❌ Pre-flight checks failed. Please resolve the issues above before deploying."
+    echo "  ────────────────────────────────────────────"
+    echo "  ❌ \$ERRORS ${t('d_checks_failed')}"
+    echo "  ────────────────────────────────────────────"
+    DEPLOY_STATUS="FAILED"
+    {
+      echo "${t('r_title')}"
+      echo "========================================"
+      echo "${t('r_customer')}    : \$CUSTOMER"
+      echo "${t('r_mpe')}      : \$MPE"
+      echo "${t('r_region')}   : \$REGION"
+      echo "${t('r_account')}  : \$ACCOUNT"
+      echo "${t('r_date')}     : \$DEPLOY_TIME"
+      echo "${t('r_result')}   : \$DEPLOY_STATUS"
+      echo ""
+      echo "${t('r_preflight')}"
+      echo "-------------------------"
+      printf "\$PREFLIGHT_LOG"
+      echo ""
+      echo "${t('r_action')}"
+      echo "  ${t('r_action_desc')}"
+      echo "  ${t('r_share_help')}"
+    } > "\$REPORT_FILE"
+    echo ""
+    echo "  📄 \$REPORT_FILE"
+    echo "     ${t('d_share_report')}"
     exit 1
 fi
-echo "✅ All pre-flight checks passed."
+echo ""
+echo "  ✅ ${t('d_all_passed')}"
 echo ""
 
-# Write embedded templates to temp files
-ORG_TEMPLATE=$(mktemp /tmp/map-auto-tagger-org-XXXX.yaml)
-ACCOUNTS_TEMPLATE=$(mktemp /tmp/map-auto-tagger-accounts-XXXX.yaml)
+# ── Step 2: Deploy ───────────────────────────
+echo "${t('d_step2')}"
+echo "  ${t('d_step2_wait_multi')}"
+echo ""
+
+ORG_TEMPLATE=\$(mktemp /tmp/map-auto-tagger-org-XXXX.yaml)
+ACCOUNTS_TEMPLATE=\$(mktemp /tmp/map-auto-tagger-accounts-XXXX.yaml)
 
 cat > "\$ORG_TEMPLATE" << 'ORG_TEMPLATE_EOF'
 ${orgTpl}
@@ -2070,35 +3074,104 @@ cat > "\$ACCOUNTS_TEMPLATE" << 'ACCOUNTS_TEMPLATE_EOF'
 ${accountsTpl}
 ACCOUNTS_TEMPLATE_EOF
 
-# Upload templates to S3 (in customer's own account)
-echo "Creating S3 bucket and uploading templates..."
 aws s3 mb "s3://\${BUCKET}" --region "\${REGION}" 2>/dev/null || true
 aws s3api put-public-access-block --bucket "\${BUCKET}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
 aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"DenyHTTP\",\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::\${BUCKET}\",\"arn:aws:s3:::\${BUCKET}/*\"],\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}"
-aws s3 cp "\$ORG_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-org.yaml"
-aws s3 cp "\$ACCOUNTS_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts.yaml"
+aws s3 cp "\$ORG_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-org.yaml" > /dev/null
+aws s3 cp "\$ACCOUNTS_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts.yaml" > /dev/null
 rm -f "\$ORG_TEMPLATE" "\$ACCOUNTS_TEMPLATE"
-echo "Done."
-echo ""
 
-# Deploy — one command, auto-discovers org structure, deploys to all accounts
-echo "Deploying stack (this discovers your org and deploys to all accounts)..."
 aws cloudformation create-stack \\
   --stack-name "\$STACK_NAME" \\
   --template-url "https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-org.yaml" \\
   --parameters "ParameterKey=PerAccountTemplateURL,ParameterValue=https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-accounts.yaml" \\
   --capabilities CAPABILITY_NAMED_IAM \\
-  --region "\$REGION"
+  --region "\$REGION" > /dev/null
 
+echo "  ${t('d_deploying')}"
 echo ""
-echo "✅ Deployment started. Rolling out to all accounts (~10 minutes)."
+
+WAIT_SECS=0
+while true; do
+  STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null)
+  if [ "\$STATUS" = "CREATE_COMPLETE" ] || [ "\$STATUS" = "UPDATE_COMPLETE" ]; then
+    DEPLOY_STATUS="SUCCESS"
+    break
+  elif [ "\$STATUS" = "CREATE_FAILED" ] || [ "\$STATUS" = "ROLLBACK_COMPLETE" ] || [ "\$STATUS" = "UPDATE_ROLLBACK_COMPLETE" ]; then
+    DEPLOY_STATUS="FAILED — \$STATUS"
+    echo "  ❌ ${t('d_deploy_failed')}"
+    break
+  fi
+  sleep 30
+  WAIT_SECS=\$((WAIT_SECS + 30))
+  echo "  ${t('d_still_deploying')} (\${WAIT_SECS}s ${t('d_elapsed')})"
+done
+
+# ── Step 3: Report ───────────────────────────
 echo ""
-echo "Check overall status:"
-echo "  aws cloudformation describe-stacks --stack-name \$STACK_NAME --query 'Stacks[0].StackStatus' --region \$REGION"
+echo "${t('d_step3')}"
+
+{
+  echo "${t('r_title')}"
+  echo "========================================"
+  echo "${t('r_customer')}    : \$CUSTOMER"
+  echo "${t('r_mpe')}      : \$MPE"
+  echo "${t('r_region')}   : \$REGION"
+  echo "${t('r_account')}  : \$ACCOUNT"
+  echo "${t('r_date')}     : \$DEPLOY_TIME"
+  echo "${t('r_result')}   : \$DEPLOY_STATUS"
+  echo ""
+  echo "${t('r_preflight')}"
+  echo "-------------------------"
+  printf "\$PREFLIGHT_LOG"
+  echo ""
+  if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
+    echo "${t('r_deployed')}"
+    echo "------------------"
+    echo "  - Auto-tagger: ${regions.join(', ')}"
+    echo "  - EventBridge, DLQ, CloudWatch alarm, SSM config"
+    ${config.includeBackfill ? `echo "  - Backfill Lambda"` : ''}
+    echo ""
+    echo "${t('r_verify')}"
+    echo "--------------"
+    echo "  ${t('r_verify1')}"
+    echo "  ${t('r_verify2')}"
+    echo "  ${t('r_verify3')} \$MPE"
+    echo ""
+    ${config.includeBackfill ? `echo "${t('r_backfill')}"
+    echo "----------------"
+    echo "  ${t('d_backfill_msg')} ${t('d_backfill_since')} ${config.agreementDate}"
+    echo ""` : ''}
+    echo "${t('r_perstatus')}"
+    echo "-------------------"
+    echo "  aws cloudformation list-stack-instances --stack-set-name map-auto-tagger-\$MPE \\"
+    echo "    --query 'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]' \\"
+    echo "    --output table --region \$REGION"
+  else
+    echo "${t('r_action')}"
+    echo "  ${t('r_action_desc')}"
+  fi
+  echo ""
+  echo "${t('r_support')}"
+  echo "--------"
+  echo "  ${t('r_contact')}"
+} > "\$REPORT_FILE"
+
+if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
+  echo ""
+  echo "  ┌─────────────────────────────────────────┐"
+  echo "  │   ✅ ${t('d_complete_title')}               │"
+  echo "  │   ${t('d_complete_multi')}  │"
+  echo "  └─────────────────────────────────────────┘"
+  echo ""
+  ${config.includeBackfill ? `echo "  ⏳ ${t('d_backfill_msg')} ${t('d_backfill_since')} ${config.agreementDate}"
+  echo ""` : ''}
+fi
+
+echo "  📄 ${t('d_report_saved')} \$REPORT_FILE"
+echo "     ${t('d_share_report')}"
 echo ""
-echo "Check per-account status:"
-echo "  aws cloudformation list-stack-instances --stack-set-name map-auto-tagger-\$MPE --query 'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]' --output table --region \$REGION"
 `;
         }
 

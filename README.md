@@ -19,7 +19,7 @@ Customer-deployable CloudFormation solution that automatically tags newly create
 
 - ✅ **190+ resource types proven working** — validated in real CT org (4 accounts × 4 regions)
 - ✅ **100% success rate** on all taggable MAP-eligible resources
-- ✅ **60-90 seconds** automatic tagging latency (CloudTrail → EventBridge → Lambda → Tag)
+- ✅ **typically typically 60–90 seconds (up to 15 minutes during high-volume activity) (up to 15 minutes during high-volume activity)** automatic tagging latency (CloudTrail → EventBridge → Lambda → Tag)
 - ✅ **76+ bugs found and fixed** across two phases of testing
 - ✅ **Multi-account + multi-region** — StackSet deploys to entire org automatically
 - ✅ **< $2/month** customer cost per account
@@ -33,7 +33,7 @@ Customers manually tag resources for MAP 2.0 credits. They forget, tag incorrect
 
 ## Solution
 
-EventBridge catches resource creation events and triggers a Lambda that applies the correct `map-migrated` tag automatically — within 60-90 seconds of creation, across 190+ resource types spanning every major AWS service category.
+EventBridge catches resource creation events and triggers a Lambda that applies the correct `map-migrated` tag automatically — within typically typically 60–90 seconds (up to 15 minutes during high-volume activity) (up to 15 minutes during high-volume activity) of creation, across 190+ resource types spanning every major AWS service category.
 
 ---
 
@@ -164,7 +164,7 @@ AWS Resource Created
         │
         ▼
   Resource tagged: map-migrated=mig123...
-  ⏱️ Total time: 60-90 seconds
+  ⏱️ Total time: typically typically 60–90 seconds (up to 15 minutes during high-volume activity) (up to 15 minutes during high-volume activity)
 ```
 
 **Multi-region coverage — global services need Lambda in matching region:**
@@ -224,10 +224,20 @@ AWS Resource Created
 ## Known Limitations
 
 - **Amazon Bedrock** — Bedrock spend is MAP-eligible but requires customers to create [Application Inference Profiles](https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-create.html) first. Once a profile is created, this solution automatically tags it. Without an inference profile, Bedrock API calls are not MAP-trackable.
-- **Existing resources** not automatically tagged — use bulk tagging tools for backfill
+- **Existing resources** not automatically tagged — enable the one-time backfill option in the configurator (covers resources created up to 90 days before deployment)
+- **Management account not covered in multi-account mode** — `SERVICE_MANAGED` StackSets cannot deploy to the management account (AWS hard constraint). In multi-account StackSet deployments, the management account runs the deployment but does not receive the auto-tagger Lambda. Resources created in the management account will not be tagged. AWS best practice is to not run workloads in the management account. If tagging is required there, additionally run a single-account deployment targeting the management account after the StackSet deployment completes.
+- **New AWS accounts added post-deployment** — if a new account joins the organization after the StackSet has been deployed, it will not automatically receive the Lambda. Resources created in that account will not be tagged. Re-run `deploy.sh` to extend the StackSet to cover new accounts.
+- **Service Control Policies (SCPs)** — two scenarios require manual verification before deployment:
+  - *Tagging SCPs*: if your organization's SCPs deny `tag:TagResources` or service-specific tagging actions for Lambda execution roles, the auto-tagger will silently fail and events will accumulate in the DLQ. The `deploy.sh` preflight check runs an IAM simulation (`iam:SimulatePrincipalPolicy`) to detect explicit denies, but SCPs are not evaluated by IAM simulation and require manual review in the AWS Organizations console.
+  - *Mandatory tagging SCPs*: if SCPs require the `map-migrated` tag to be present at resource creation time, this solution will not satisfy that requirement — tags are applied typically 60–90 seconds (up to 15 minutes during high-volume activity) after creation. Either exempt `map-migrated` from creation-time enforcement or configure a grace period in the SCP.
 - **ECS task tag propagation** requires `propagateTags: SERVICE` in ECS service definition
 - **EKS Auto Mode nodes** — tagged via NodePool config, not standard tagging
 - **Multi-region coverage** — deploy to us-east-1 and us-west-2 for CloudFront, Route53, IVS, GA
+- **EventBridge 256KB event size limit** — CloudTrail events exceeding 256KB are silently dropped by EventBridge and will never trigger the Lambda. This is an AWS platform hard limit. In practice this is extremely rare, only possible for unusually complex resource creation events (e.g., a Lambda function with a very large inline policy). No workaround exists within this architecture.
+- **API throttling during large bursts** — if hundreds of resources are created simultaneously, multiple Lambda invocations may hit `tag:TagResources` rate limits. The Lambda retries up to 3 times with exponential backoff (0.5s → 1s → 2s with ±25% jitter). Events that exhaust all retries go to the DLQ for manual review.
+- **CloudTrail delivery latency** — typical tagging latency is 60–90 seconds but CloudTrail delivery to EventBridge can take up to 15 minutes during high API activity (e.g., large Terraform/CDK deployments). Tags will always be applied eventually — this is a latency variance, not a reliability issue.
+- **CloudTrail must be enabled in all deployment regions** — the `deploy.sh` preflight verifies CloudTrail in each selected region. Resources created in a region without an active CloudTrail trail will never trigger the Lambda and will not be tagged.
+- **MPE ID change mid-migration** — if the MAP Engagement ID changes, the Lambda automatically uses the new value from SSM for all future resources. Previously tagged resources retain the old value and must be re-tagged manually via AWS Tag Editor. **Do not use automated bulk re-tagging scripts** in accounts with multiple concurrent MAP engagements — different resources may intentionally carry different MPE IDs.
 - **`comm` tag prefix** — deprecated, use `mig` only
 - **Cost allocation tag** — automatically activated for MAP agreements
 

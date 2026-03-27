@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-The MAP 2.0 Auto-Tagger is a CloudFormation-deployed solution that listens to CloudTrail events via EventBridge and automatically applies the `map-migrated` tag to newly created AWS resources within 60–90 seconds of creation.
+The MAP 2.0 Auto-Tagger is a CloudFormation-deployed solution that listens to CloudTrail events via EventBridge and automatically applies the `map-migrated` tag to newly created AWS resources within typically 60–90 seconds (up to 15 minutes during high-volume activity) of creation.
 
 It runs entirely within the customer's AWS account(s) with:
 - No internet-facing endpoints

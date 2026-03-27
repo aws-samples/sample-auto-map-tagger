@@ -6,7 +6,7 @@ Description: >
   MAP 2.0 Auto-Tagger v18 - Automatically tags newly created AWS resources with the
   map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
   across all major AWS services. Deploy once; tagging happens automatically within
-  60-90 seconds of resource creation. v18: AppSec hardening - removed cross-account
+  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v18: AppSec hardening - removed cross-account
   AssumeRole, removed discontinued service permissions, added security justification
   comments, added threat model.
 
@@ -311,8 +311,9 @@ Resources:
           CONFIG_PARAM: /auto-map-tagger/config
       Code:
         ZipFile: |
-          import json, os, boto3, re
+          import json, os, boto3, re, time, random
           from datetime import datetime, timezone
+          from botocore.exceptions import ClientError
 
           ssm = boto3.client('ssm')
           ec2 = boto3.client('ec2')
@@ -1672,20 +1673,35 @@ Resources:
                   return True
               else:
                   # Use universal Resource Groups Tagging API (with optional cross-account client)
-                  try:
-                      response = _tagging.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
-                      if response.get('FailedResourcesMap'):
-                          failures = response['FailedResourcesMap']
-                          error_msg = failures.get(arn, {}).get('ErrorMessage', 'Unknown error')
-                          raise Exception(f"Tagging API failed: {error_msg}")
-                      return True
-                  except Exception as e:
-                      # Fallback to EC2 tagging for VPC resources
-                      if ':ec2:' in arn:
-                          resource_id = arn.split('/')[-1]
-                          _ec2.create_tags(Resources=[resource_id], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  # Retry up to 3 times with exponential backoff for throttling errors
+                  THROTTLE_CODES = {'ThrottlingException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+                  for attempt in range(4):
+                      try:
+                          response = _tagging.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
+                          if response.get('FailedResourcesMap'):
+                              failures = response['FailedResourcesMap']
+                              error_msg = failures.get(arn, {}).get('ErrorMessage', 'Unknown error')
+                              raise Exception(f"Tagging API failed: {error_msg}")
                           return True
-                      raise e
+                      except ClientError as e:
+                          code = e.response['Error']['Code']
+                          if code in THROTTLE_CODES and attempt < 3:
+                              sleep_time = (2 ** attempt) * 1.0 * (1 + random.uniform(-0.25, 0.25))
+                              print(f"Throttled on attempt {attempt + 1}, retrying in {sleep_time:.1f}s")
+                              time.sleep(sleep_time)
+                              continue
+                          # Fallback to EC2 tagging for VPC resources
+                          if ':ec2:' in arn:
+                              resource_id = arn.split('/')[-1]
+                              _ec2.create_tags(Resources=[resource_id], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                              return True
+                          raise e
+                      except Exception as e:
+                          if ':ec2:' in arn:
+                              resource_id = arn.split('/')[-1]
+                              _ec2.create_tags(Resources=[resource_id], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                              return True
+                          raise e
 
           def handler(event, context):
               config = get_config()
