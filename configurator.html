@@ -307,35 +307,6 @@
                 <div id="multi-account-options" class="hidden">
                     <div class="section-divider"></div>
 
-                    <div class="form-group">
-                        <label>Multi-Account Architecture</label>
-                        <div class="hint" style="margin-bottom: 8px;">Choose how the auto-tagger covers all accounts.</div>
-                    </div>
-
-                    <div class="option-card selected" id="opt-stackset" onclick="selectEventMode('stackset')">
-                        <h3>
-                            <input type="radio" name="eventMode" value="stackset" checked>
-                            StackSet — Deploy to every account
-                            <span class="tag tag-recommended">Recommended · Simplest</span>
-                        </h3>
-                        <p>The <strong>same CloudFormation stack</strong> deploys to every specified account via a single StackSet. Each account gets its own Lambda that tags its own resources. No cross-account IAM. The template auto-discovers the organization structure — the customer never needs to know or enter any OU IDs.</p>
-                        <div class="success-box">
-                            <strong>1 command total.</strong> Enter specific account IDs to target only those accounts, or leave empty to cover every account in the org. The template figures out the rest automatically.
-                        </div>
-                    </div>
-
-                    <div class="option-card" id="opt-central" onclick="selectEventMode('central')">
-                        <h3>
-                            <input type="radio" name="eventMode" value="central">
-                            Central Lambda — Single account tags all others
-                            <span class="tag tag-advanced">Advanced</span>
-                        </h3>
-                        <p>One Lambda in a central account. Member accounts forward CloudTrail events to it via EventBridge. Lambda assumes a cross-account role to tag resources in each member account.</p>
-                        <div class="warn-box hidden" id="central-note">
-                            <strong>Requires per-account setup:</strong> Each member account needs an IAM role (<code>MapAutoTaggerCrossAccount</code>) and an EventBridge forwarding rule. Deploy these via StackSet or manually.
-                        </div>
-                    </div>
-
                     <!-- StackSet: Account documentation only -->
                     <div id="stackset-options" style="margin-top: 12px;">
                         <div class="form-group">
@@ -351,27 +322,6 @@
                                 </div>
                             </div>
                             <button class="btn-add" onclick="addStacksetAccount()" data-i18n="ui_add_account">+ Add another account</button>
-                        </div>
-                    </div>
-
-                    <!-- Central: linked account list -->
-                    <div id="central-options" class="hidden">
-                        <div class="form-group">
-                            <label><span data-i18n="ui_central_account_id">Central Account ID</span> <span class="hint" data-i18n="ui_central_account_id_hint">(where the Lambda will be deployed)</span></label>
-                            <input type="text" id="centralAccountId" placeholder="123456789012" maxlength="12">
-                            <div class="error-msg" id="centralAccountId-error" data-i18n="err_central_account_required">Please enter the central account ID (12 digits).</div>
-                        </div>
-                        <div class="form-group">
-                            <label data-i18n="ui_member_accounts">Member Accounts in MAP Scope</label>
-                            <div class="hint" style="margin-bottom: 8px;">Accounts whose resources the central Lambda will tag.</div>
-                            <div id="linkedAccountList">
-                                <div class="entry-row">
-                                    <input type="text" class="linked-account-id" placeholder="123456789012" maxlength="12">
-                                    <input type="text" class="linked-account-label account-label" placeholder="e.g., Migration Prod">
-                                    <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
-                                </div>
-                            </div>
-                            <button class="btn-add" onclick="addLinkedAccount()" data-i18n="ui_add_account">+ Add another account</button>
                         </div>
                     </div>
 
@@ -529,28 +479,11 @@
             document.getElementById('prereq-multi').style.display = mode === 'multi' ? 'block' : 'none';
         }
 
-        function selectEventMode(mode) {
-            document.querySelector(`input[name="eventMode"][value="${mode}"]`).checked = true;
-            document.getElementById('opt-stackset').classList.toggle('selected', mode === 'stackset');
-            document.getElementById('opt-central').classList.toggle('selected', mode === 'central');
-            document.getElementById('central-note').classList.toggle('hidden', mode !== 'central');
-            document.getElementById('stackset-options').classList.toggle('hidden', mode !== 'stackset');
-            document.getElementById('central-options').classList.toggle('hidden', mode !== 'central');
-        }
-
         function toggleVpcScope() {
             document.getElementById('vpc-scope-fields').classList.toggle('hidden', !document.getElementById('useVpcScope').checked);
         }
 
         // --- Dynamic lists ---
-        function addLinkedAccount() {
-            const list = document.getElementById('linkedAccountList');
-            const row = document.createElement('div');
-            row.className = 'entry-row';
-            row.innerHTML = '<input type="text" class="linked-account-id" placeholder="123456789012" maxlength="12"><input type="text" class="linked-account-label account-label" placeholder="e.g., Prod Account"><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>';
-            list.appendChild(row);
-        }
-
         function addStacksetAccount() {
             const list = document.getElementById('stacksetAccountList');
             const row = document.createElement('div');
@@ -585,17 +518,6 @@
             return Array.from(document.querySelectorAll(selector)).map(i => i.value.trim()).filter(v => v);
         }
 
-        function getLinkedAccounts() {
-            const ids = document.querySelectorAll('.linked-account-id');
-            const labels = document.querySelectorAll('.linked-account-label');
-            const accounts = [];
-            ids.forEach((input, i) => {
-                const id = input.value.trim();
-                const label = labels[i] ? labels[i].value.trim() : '';
-                if (id) accounts.push({ id, label: label || id });
-            });
-            return accounts;
-        }
 
         // --- Validation ---
         function validate() {
@@ -652,23 +574,6 @@
                 }
             }
 
-            // Central Lambda: account ID required
-            const deployModeEl = document.querySelector('input[name="deployMode"]:checked');
-            const eventModeEl = document.querySelector('input[name="eventMode"]:checked');
-            if (deployModeEl && deployModeEl.value === 'multi' &&
-                eventModeEl && eventModeEl.value === 'central') {
-                const centralId = document.getElementById('centralAccountId').value.trim();
-                const centralErr = document.getElementById('centralAccountId-error');
-                if (!/^\d{12}$/.test(centralId)) {
-                    document.getElementById('centralAccountId').classList.add('error');
-                    centralErr.style.display = 'block';
-                    valid = false;
-                } else {
-                    document.getElementById('centralAccountId').classList.remove('error');
-                    centralErr.style.display = 'none';
-                }
-            }
-
             return valid;
         }
 
@@ -693,21 +598,15 @@
             };
 
             if (deployMode === 'multi') {
-                config.eventMode = document.querySelector('input[name="eventMode"]:checked').value;
                 config.regions = getValues('.region-select');
-                if (config.eventMode === 'stackset') {
-                    const ssIds = document.querySelectorAll('.stackset-account-id');
-                    const ssLabels = document.querySelectorAll('.stackset-account-label');
-                    config.stacksetAccounts = [];
-                    ssIds.forEach((input, i) => {
-                        const id = input.value.trim();
-                        const label = ssLabels[i] ? ssLabels[i].value.trim() : '';
-                        if (id) config.stacksetAccounts.push({ id, label: label || id });
-                    });
-                } else {
-                    config.centralAccountId = document.getElementById('centralAccountId').value.trim();
-                    config.linkedAccounts = getLinkedAccounts();
-                }
+                const ssIds = document.querySelectorAll('.stackset-account-id');
+                const ssLabels = document.querySelectorAll('.stackset-account-label');
+                config.stacksetAccounts = [];
+                ssIds.forEach((input, i) => {
+                    const id = input.value.trim();
+                    const label = ssLabels[i] ? ssLabels[i].value.trim() : '';
+                    if (id) config.stacksetAccounts.push({ id, label: label || id });
+                });
             }
 
             return config;
@@ -742,15 +641,8 @@
             ];
 
             if (config.deployMode === 'multi') {
-                rows.push([t('rv_multi_method'), config.eventMode === 'stackset' ? t('rv_stackset') : t('rv_central')]);
-                if (config.eventMode === 'stackset') {
-                    const acctDisplay = (config.stacksetAccounts || []).map(a => `${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('<br>');
-                    rows.push([t('rv_target_accounts'), acctDisplay || t('rv_none_specified')]);
-                } else {
-                    rows.push([t('ui_central_account_id'), config.centralAccountId || t('rv_not_specified')]);
-                    const acctDisplay = (config.linkedAccounts || []).map(a => `${a.id} (${a.label})`).join('<br>');
-                    rows.push([t('ui_member_accounts'), acctDisplay || t('rv_none_specified')]);
-                }
+                const acctDisplay = (config.stacksetAccounts || []).map(a => `${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('<br>');
+                if (acctDisplay) rows.push([t('rv_target_accounts'), acctDisplay]);
                 if (config.regions && config.regions.length > 0) {
                     rows.push([t('ui_deployment_regions'), config.regions.join(', ')]);
                 }
@@ -786,7 +678,7 @@
             if (config.deployMode === 'single') {
                 desc.textContent = t('rv_desc_single');
                 templateListEl.innerHTML = `<table style="width:100%;font-size:14px;border-collapse:collapse;">${baseResources}</table>`;
-            } else if (config.eventMode === 'stackset') {
+            } else {
                 const accts = config.stacksetAccounts || [];
                 const scopeDesc = accts.length > 0
                     ? `${t('rv_targets')} ${accts.length} ${t('rv_specific_accounts')}: ${accts.map(a=>a.id).join(', ')}`
@@ -798,12 +690,6 @@
                     <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;padding-left:20px;">AWS::CloudFormation::StackSet</td><td style="padding:8px;">${scopeDesc}</td></tr>
                     <tr style="border-bottom:1px solid #eaeded;background:#f2f8fd;"><td style="padding:8px;font-weight:600;" colspan="2">📄 map-auto-tagger-accounts-${config.mpeId}.yaml — ${t('rv_deploy_accounts')}</td></tr>
                     ${baseResources}
-                    </table>`;
-            } else {
-                desc.textContent = t('rv_desc_central');
-                templateListEl.innerHTML = `<table style="width:100%;font-size:14px;border-collapse:collapse;">${baseResources}
-                    <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">${t('rv_res_xaccount')}</td><td style="padding:8px;">${t('rv_res_xaccount_desc')}</td></tr>
-                    <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">${t('rv_res_eb_fwd')}</td><td style="padding:8px;">${t('rv_res_eb_fwd_desc')}</td></tr>
                     </table>`;
             }
 
@@ -1935,12 +1821,9 @@
         function generateMainTemplate(config) {
             const mpe = config.mpeId;
             const isMulti = config.deployMode === 'multi';
-            const isCentral = isMulti && config.eventMode === 'central';
             const scopeMode = config.scopeMode;
             const vpcIds = JSON.stringify(config.scopedVpcIds);
             const tagNonVpc = config.tagNonVpcServices;
-
-            const linkedAccountIds = isCentral ? (config.linkedAccounts || []).map(a => a.id) : [];
             const scopedAccountIdsJson = (config.stacksetAccounts && config.stacksetAccounts.length > 0)
                 ? JSON.stringify(config.stacksetAccounts.map(a => a.id))
                 : '["ALL"]';
@@ -2120,45 +2003,12 @@ ${backfillEventNamesList}
 ` : '';
 
 
-            const crossAccountPermission = isCentral ? `
-              - Sid: CrossAccountAssumeRole
-                Effect: Allow
-                Action:
-                  - sts:AssumeRole
-                Resource: "arn:aws:iam::*:role/MapAutoTaggerCrossAccount"` : '';
-
             const permissionsList = TAGGING_PERMISSIONS.map(p => `                  - ${p}`).join('\n');
 
             const eventNamesList = [...new Set(ALL_EVENT_NAMES)].map(e => `            - ${e}`).join('\n');
             const sourcesList = ALL_SOURCES.map(s => `          - ${s}`).join('\n');
 
-            const crossAccountCode = isCentral ? `
-          _cross_account_clients = {}
-
-          def get_cross_account_client(service, target_account_id, region):
-              cache_key = f"{service}:{target_account_id}:{region}"
-              if cache_key not in _cross_account_clients:
-                  sts = boto3.client('sts')
-                  role_arn = f"arn:aws:iam::{target_account_id}:role/MapAutoTaggerCrossAccount"
-                  try:
-                      creds = sts.assume_role(
-                          RoleArn=role_arn,
-                          RoleSessionName="map-auto-tagger-cross-account"
-                      )['Credentials']
-                      _cross_account_clients[cache_key] = boto3.client(
-                          service, region_name=region,
-                          aws_access_key_id=creds['AccessKeyId'],
-                          aws_secret_access_key=creds['SecretAccessKey'],
-                          aws_session_token=creds['SessionToken']
-                      )
-                  except Exception as e:
-                      print(f'Cannot assume cross-account role in {target_account_id}: {e}')
-                      return None
-              return _cross_account_clients[cache_key]
-
-          def get_account_from_arn(arn):
-              parts = arn.split(':')
-              return parts[4] if len(parts) > 4 else None` : `
+            const crossAccountCode = `
           def get_account_from_arn(arn):
               parts = arn.split(':')
               return parts[4] if len(parts) > 4 else None`;
@@ -2167,7 +2017,7 @@ ${backfillEventNamesList}
 Description: >
   MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
   Auto-tags 190+ AWS resource types within typically 60–90 seconds (up to 15 minutes during high-volume activity) of creation.
-  ${isMulti && config.eventMode === 'stackset' ? 'Deploy via StackSet to all accounts in org.' : isMulti ? 'Central Lambda — deploy in the designated central account.' : 'Deploy in the migration account.'}
+  ${isMulti ? 'Deploy via StackSet to all accounts in org.' : 'Deploy in the migration account.'}
   Generated by MAP 2.0 Auto-Tagger Configurator v18.
 
 Parameters:
@@ -2236,7 +2086,7 @@ Resources:
                 Effect: Allow
                 Action:
 ${permissionsList}
-                Resource: '*'${crossAccountPermission}
+                Resource: '*'
               - Sid: DLQ
                 Effect: Allow
                 Action: sqs:SendMessage
@@ -2479,14 +2329,8 @@ ${crossAccountCode}
               target_account = get_account_from_arn(
                   (detail.get('responseElements') or {}).get('arn', '')
               ) or account_id
-              use_cross = target_account and target_account != local_account
-
-              if use_cross:
-                  ${isCentral ? `_tag = get_cross_account_client('resourcegroupstaggingapi', target_account, region) or tagging
-                  _ec2c = get_cross_account_client('ec2', target_account, region) or ec2` : '_tag = tagging\n                  _ec2c = ec2'}
-              else:
-                  _tag = tagging
-                  _ec2c = ec2
+              _tag = tagging
+              _ec2c = ec2
 
               # Extract ARN from event
               resp = detail.get('responseElements') or {}
@@ -2640,9 +2484,6 @@ ${crossAccountCode}
               # Service-specific tagging (services that don't support Resource Groups API)
               try:
                   def get_svc(svc):
-                      ${isCentral ? `if use_cross:
-                              c = get_cross_account_client(svc, target_account, region)
-                              if c: return c` : ''}
                       return boto3.client(svc, region_name=region)
 
                   if ':s3:::' in arn:
@@ -2861,7 +2702,7 @@ That's it. Auto-tagging is active for all 190+ supported resource types.
 Existing resources are NOT affected — only newly created ones.`;
             }
 
-            if (config.deployMode === 'multi' && config.eventMode === 'stackset') {
+            if (config.deployMode === 'multi') {
                 const accounts = (config.stacksetAccounts || []);
                 const accountIdArgs = accounts.map(a => `"${a.id}"`).join(' ');
                 const regions = (config.regions || ['ap-northeast-2']);
@@ -2907,38 +2748,7 @@ Check status after running:
 ─────────────────────────────────────────────────
 
 Done. Auto-tagging is now active across all accounts.
-New accounts added to the org automatically receive the auto-tagger.
 NOTE: CloudTrail must be enabled in each account and target region.`;
-            }
-
-            // Central Lambda mode
-            const memberList = (config.linkedAccounts || []).map(a => `   - ${a.id} (${a.label})`).join('\n');
-            return `DEPLOYMENT INSTRUCTIONS — Central Lambda (Cross-Account)
-==========================================================
-
-STEP 1: Deploy central Lambda in the designated account (${config.centralAccountId || 'YOUR-CENTRAL-ACCOUNT'})
-   aws cloudformation create-stack \\
-     --stack-name map-auto-tagger-central \\
-     --template-url https://YOUR-BUCKET.s3.REGION.amazonaws.com/map-auto-tagger-${mpe}.yaml \\
-     --capabilities CAPABILITY_NAMED_IAM
-
-STEP 2: Deploy cross-account IAM role to each member account via StackSet
-   (Create a separate template with the MapAutoTaggerCrossAccount role and deploy via StackSet)
-
-   Role required in each member account:
-   - Role name: MapAutoTaggerCrossAccount
-   - Trust policy: allows arn:aws:iam::${config.centralAccountId || 'CENTRAL-ACCOUNT'}:role/map-auto-tagger-role
-   - Permissions: tag:TagResources, ec2:CreateTags, s3:PutBucketTagging, and all service-specific TagResource actions
-
-STEP 3: Set up EventBridge forwarding in each member account
-   - EventBridge rule forwards Create* events to: arn:aws:events:REGION:${config.centralAccountId || 'CENTRAL-ACCOUNT'}:event-bus/map-auto-tagger-org-bus
-   - EventBridge execution IAM role: allows events:PutEvents on the central bus
-
-Member accounts to configure:
-${memberList}
-
-SIMPLER ALTERNATIVE: Use the StackSet deployment method above —
-it deploys one Lambda per account with zero cross-account complexity.`;
         }
 
         function generatePerAccountTemplate(config) {
@@ -3659,7 +3469,7 @@ echo ""
 
         function generateAndDownload() {
             const config = getConfig();
-            const isStackset = config.deployMode === 'multi' && config.eventMode === 'stackset';
+            const isStackset = config.deployMode === 'multi';
             const mainTemplate = isStackset ? generateOrgTemplate(config) : generateMainTemplate(config);
             const perAccountTemplate = isStackset ? generatePerAccountTemplate(config) : null;
             // Pass templates into script so everything is embedded — customer gets ONE file
