@@ -1960,6 +1960,7 @@
           AUTO_TAGGER_FUNCTION: !Ref AutoTaggerFunction
           BACKFILL_RULE_NAME: map-auto-tagger-backfill
           AGREEMENT_START_DATE: '${config.agreementDate}'
+          SCOPED_ACCOUNT_IDS: '${scopedAccountIdsJson}'
       Code:
         ZipFile: |
           import json, os, boto3, time
@@ -1973,6 +1974,7 @@
           FUNCTION_NAME = os.environ['AUTO_TAGGER_FUNCTION']
           RULE_NAME = os.environ['BACKFILL_RULE_NAME']
           AGREEMENT_START_DATE = os.environ['AGREEMENT_START_DATE']
+          SCOPED_ACCOUNT_IDS = json.loads(os.environ.get('SCOPED_ACCOUNT_IDS', '["ALL"]'))
 
           EVENT_NAMES = [
 ${backfillEventNamesList}
@@ -2011,6 +2013,12 @@ ${backfillEventNamesList}
                   print(f"Disabled backfill schedule rule: {RULE_NAME}")
               except Exception as e:
                   print(f"Warning: could not disable rule: {e}")
+
+              # Account scope pre-check — skip early if this account is out of scope
+              local_account = boto3.client('sts').get_caller_identity()['Account']
+              if SCOPED_ACCOUNT_IDS != ['ALL'] and local_account not in SCOPED_ACCOUNT_IDS:
+                  print(f"Backfill: account {local_account} not in scope {SCOPED_ACCOUNT_IDS}, skipping.")
+                  return {'status': 'skipped', 'reason': 'account_out_of_scope'}
 
               start_time = datetime.strptime(AGREEMENT_START_DATE, '%Y-%m-%d').replace(tzinfo=timezone.utc)
               print(f"Backfill: querying CloudTrail from {AGREEMENT_START_DATE} for {len(EVENT_NAMES)} event types")
