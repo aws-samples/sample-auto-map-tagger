@@ -199,17 +199,13 @@
         </div>
 
         <div class="info-box" style="background:#fff8e1;border-left:4px solid #f9a825;font-size:13px;">
-            <strong>Sample Code Notice:</strong> This is sample code for non-production usage.
-            You are responsible for testing, securing, and optimizing this solution to meet your organization's
-            security, regulatory, and compliance requirements before deployment.
-            Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SNS, SQS, and SSM.
-            See the <a href="https://aws.amazon.com/security/shared-responsibility/" target="_blank" rel="noopener">AWS Shared Responsibility Model</a>.
+            <strong data-i18n="ui_sample_notice_title">Sample Code Notice:</strong> <span data-i18n="ui_sample_notice_body">This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SNS, SQS, and SSM. See the</span> <a href="https://aws.amazon.com/security/shared-responsibility/" target="_blank" rel="noopener" data-i18n="ui_shared_responsibility">AWS Shared Responsibility Model</a>.
         </div>
 
         <div class="info-box">
-            Generates a CloudFormation template that auto-tags new AWS resources with <code>map-migrated</code> within <strong>typically 60–90 seconds (up to 15 minutes during high-volume activity)</strong> of creation.
-            Covers <strong>190+ resource types</strong> across all major AWS services (CT org E2E tested).
-            Customer cost: <strong>&lt; $2/month</strong>.
+            <span data-i18n="ui_main_desc1">Generates a CloudFormation template that auto-tags new AWS resources with</span> <code>map-migrated</code> <span data-i18n="ui_main_desc2">within</span> <strong data-i18n="ui_main_desc3">typically 60–90 seconds (up to 15 minutes during high-volume activity)</strong> <span data-i18n="ui_main_desc4">of creation.</span>
+            <span data-i18n="ui_main_desc5">Covers</span> <strong>190+ <span data-i18n="ui_main_desc6">resource types across all major AWS services (CT org E2E tested).</span></strong>
+            <span data-i18n="ui_main_desc7">Customer cost:</span> <strong>&lt; $2/month</strong>.
         </div>
 
 
@@ -244,7 +240,7 @@
                 <div class="form-group">
                     <label><span data-i18n="ui_alert_email">Alert Email</span> <span class="hint" data-i18n="ui_alert_email_hint">(optional — email to receive tagging failure alerts, ex. customer ops team)</span></label>
                     <input type="email" id="alertEmail" placeholder="e.g., ops@customer.com">
-                    <div class="hint" style="margin-top: 4px;">Customer must confirm the AWS subscription email after deployment.</div>
+                    <div class="hint" style="margin-top: 4px;" data-i18n="ui_email_confirm_hint">Customer must confirm the AWS subscription email after deployment.</div>
                 </div>
             </div>
 
@@ -307,13 +303,18 @@
                 <div id="multi-account-options" class="hidden">
                     <div class="section-divider"></div>
 
-                    <!-- StackSet: Account documentation only -->
+                    <!-- Account Scoping -->
                     <div id="stackset-options" style="margin-top: 12px;">
                         <div class="form-group">
-                            <label><span data-i18n="ui_migration_account_ids">Migration Account IDs</span> <span class="hint" data-i18n="ui_migration_account_ids_hint">(for reference — the stack deploys to the entire org automatically)</span></label>
-                            <div class="warn-box" style="margin-bottom: 10px;" data-i18n="ui_stackset_note">
-                                AWS deploys SERVICE_MANAGED StackSets by Organizational Unit, not by account ID. The template auto-discovers your org's root OU and deploys to all accounts. The IDs you enter here are for documentation only and appear in the deployment instructions.
+                            <div class="info-box" style="margin-bottom:10px;" data-i18n="ui_stackset_note">
+                                The Lambda is deployed to every account in your org via the root OU. By default, all accounts' resources are tagged. You can optionally limit tagging to specific accounts below.
                             </div>
+                            <label>
+                                <input type="checkbox" id="useAccountScope" onchange="toggleAccountScope()">
+                                <span data-i18n="ui_account_limit">Limit tagging to specific accounts only</span>
+                            </label>
+                        </div>
+                        <div id="account-scope-fields" class="hidden">
                             <div id="stacksetAccountList">
                                 <div class="entry-row">
                                     <input type="text" class="stackset-account-id" placeholder="123456789012" maxlength="12">
@@ -322,6 +323,7 @@
                                 </div>
                             </div>
                             <button class="btn-add" onclick="addStacksetAccount()" data-i18n="ui_add_account">+ Add another account</button>
+                            <div class="error-msg" id="account-scope-error" data-i18n="err_account_scope_required">Please enter at least one account ID.</div>
                         </div>
                     </div>
 
@@ -371,6 +373,7 @@
                         <strong data-i18n="ui_backfill_strong">Tag existing resources created since agreement start date</strong>
                         <p class="hint" style="margin-top:4px;" data-i18n="ui_backfill_desc">Deploys a one-time Lambda that queries CloudTrail history from your agreement start date and tags all matching resources that were created before this solution was deployed. Runs automatically ~5 minutes after deployment. Results appear in CloudWatch Logs (map-auto-tagger-backfill).</p>
                         <p class="hint" style="margin-top:4px;color:#d13212;" data-i18n="ui_backfill_note">Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.</p>
+                        <p class="hint" id="backfill-scope-note" style="margin-top:4px;display:none;" data-i18n="ui_backfill_scope_note"></p>
                     </div>
                 </label>
             </div>
@@ -481,6 +484,25 @@
 
         function toggleVpcScope() {
             document.getElementById('vpc-scope-fields').classList.toggle('hidden', !document.getElementById('useVpcScope').checked);
+            updateBackfillScopeNote();
+        }
+
+        function toggleAccountScope() {
+            document.getElementById('account-scope-fields').classList.toggle('hidden', !document.getElementById('useAccountScope').checked);
+            updateBackfillScopeNote();
+        }
+
+        function updateBackfillScopeNote() {
+            const note = document.getElementById('backfill-scope-note');
+            if (!note) return;
+            const vpcScoped = document.getElementById('useVpcScope') && document.getElementById('useVpcScope').checked;
+            const acctScoped = document.getElementById('useAccountScope') && document.getElementById('useAccountScope').checked;
+            if (vpcScoped || acctScoped) {
+                note.textContent = t('ui_backfill_scope_note');
+                note.style.display = 'block';
+            } else {
+                note.style.display = 'none';
+            }
         }
 
         // --- Dynamic lists ---
@@ -562,6 +584,19 @@
                 document.getElementById('opt-multi').style.outline = '';
             }
 
+            // Account scope: at least one account ID required
+            const useAcctScope = document.getElementById('useAccountScope');
+            if (useAcctScope && useAcctScope.checked) {
+                const acctVals = getValues('.stackset-account-id').filter(v => v.trim());
+                const acctErr = document.getElementById('account-scope-error');
+                if (acctVals.length === 0) {
+                    acctErr.style.display = 'block';
+                    valid = false;
+                } else {
+                    acctErr.style.display = 'none';
+                }
+            }
+
             // VPC scope: at least one VPC ID required
             if (document.getElementById('useVpcScope').checked) {
                 const vpcVals = getValues('.vpc-input').filter(v => v.trim());
@@ -599,6 +634,7 @@
 
             if (deployMode === 'multi') {
                 config.regions = getValues('.region-select');
+                config.useAccountScope = document.getElementById('useAccountScope').checked;
                 const ssIds = document.querySelectorAll('.stackset-account-id');
                 const ssLabels = document.querySelectorAll('.stackset-account-label');
                 config.stacksetAccounts = [];
@@ -641,8 +677,12 @@
             ];
 
             if (config.deployMode === 'multi') {
-                const acctDisplay = (config.stacksetAccounts || []).map(a => `${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('<br>');
-                if (acctDisplay) rows.push([t('rv_target_accounts'), acctDisplay]);
+                if (config.useAccountScope) {
+                    const acctDisplay = (config.stacksetAccounts || []).map(a => `${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('<br>');
+                    rows.push([t('rv_target_accounts'), acctDisplay || t('rv_none_specified')]);
+                } else {
+                    rows.push([t('rv_target_accounts'), t('rv_targets_all')]);
+                }
                 if (config.regions && config.regions.length > 0) {
                     rows.push([t('ui_deployment_regions'), config.regions.join(', ')]);
                 }
@@ -707,6 +747,28 @@
           en: {
             // UI
             ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_sample_notice_title:'Sample Code Notice:',
+            ui_sample_notice_body:"This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SNS, SQS, and SSM. See the",
+            ui_shared_responsibility:'AWS Shared Responsibility Model',
+            ui_btn_copy:'Copy Instructions',
+            ui_one_file_step:'One file. One step.',
+            ui_send_script:'Send',
+            ui_to_customer:'to the customer.',
+            ui_cloudshell_open:'They open',
+            ui_in_account:'in the',
+            ui_upload_and_run:'upload this file, and run',
+            ui_mgmt_account:'management account',
+            ui_migration_account_label:'migration account',
+            d_log_pass:'PASS:',
+            d_log_fail:'FAIL:',
+            d_log_warn:'WARN:',
+            ui_main_desc1:'Generates a CloudFormation template that auto-tags new AWS resources with',
+            ui_main_desc2:'within',
+            ui_main_desc3:'typically 60–90 seconds (up to 15 minutes during high-volume activity)',
+            ui_main_desc4:'of creation.',
+            ui_main_desc5:'Covers',
+            ui_main_desc6:'resource types across all major AWS services (CT org E2E tested).',
+            ui_main_desc7:'Customer cost:',
             ui_step1:'1. Configure', ui_step2:'2. Review', ui_step3:'3. Download',
             ui_card_deal_title:'MAP 2.0 Deal Details',
             ui_card_deal_subtitle:'Enter the MAP agreement details from AWS Investments',
@@ -716,6 +778,7 @@
             ui_agree_start:'Agreement Start Date', ui_agree_start_hint:'(Date to start tagging newly created MAP 2.0 resources)',
             ui_agree_end:'Agreement End Date', ui_agree_end_hint:'(Date to stop tagging newly created resources)',
             ui_alert_email:'Alert Email', ui_alert_email_hint:'(optional — email to receive tagging failure alerts)',
+            ui_email_confirm_hint:'Customer must confirm the AWS subscription email after deployment.',
             ui_deploy_mode:'Deployment Mode', ui_deploy_mode_subtitle:'How many AWS accounts will be used for migration?',
             ui_single_title:'Single Account', ui_single_desc:'Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.',
             ui_multi_title:'Multiple Accounts (AWS Organizations)', ui_multi_desc:'Customer has multiple linked accounts under an AWS Organization. One StackSet command deploys to all accounts simultaneously.',
@@ -729,11 +792,13 @@
             ui_vpc_ids:'VPC IDs', ui_vpc_ids_hint:'(only VPC-bound resources in these VPCs will be tagged)',
             ui_add_vpc:'+ Add another VPC', ui_add_account:'+ Add another account', ui_add_region:'+ Add another region',
             ui_migration_account_ids:'Migration Account IDs', ui_migration_account_ids_hint:'(for reference — the stack deploys to the entire org automatically)',
-            ui_stackset_note:'AWS deploys SERVICE_MANAGED StackSets by Organizational Unit, not by account ID. The template auto-discovers your org\'s root OU and deploys to all accounts. The IDs you enter here are for documentation only.',
+            ui_stackset_note:'The Lambda is deployed to every account in your org via the root OU. By default, all accounts\' resources are tagged. You can optionally limit tagging to specific accounts below.',
+            ui_account_limit:'Limit tagging to specific accounts only',
             ui_central_account_id:'Central Account ID', ui_central_account_id_hint:'(where the Lambda will be deployed)',
             ui_member_accounts:'Member Accounts in MAP Scope',
             ui_deployment_regions:'Deployment Regions', ui_deployment_regions_hint:'(regions where the customer creates resources)',
             ui_backfill_strong:'Tag existing resources created since agreement start date',
+            ui_backfill_scope_note:'✓ Scoping applied: backfill will follow the same VPC / account scope settings selected above.',
             ui_backfill_desc:'Deploys a one-time Lambda that queries CloudTrail history from your agreement start date and tags all matching resources created before this solution was deployed. Runs automatically ~5 minutes after deployment.',
             ui_backfill_note:'Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.',
             ui_coverage_subtitle:'190+ resource types confirmed working via multi-account CT org testing (4 accounts × 4 regions)',
@@ -777,6 +842,7 @@
             err_date_end:'Agreement end date is required and must be after start date',
             err_vpc_required:'Please enter at least one VPC ID.',
             err_central_account_required:'Please enter the central account ID (12 digits).',
+            err_account_scope_required:'Please enter at least one account ID.',
             // deploy.sh
             d_title:'MAP 2.0 Auto-Tagger Setup',
             d_tag_label:'Tag Value', d_region_label:'Region', d_account_label:'Account',
@@ -845,6 +911,28 @@
           },
           ko: {
             ui_title:'MAP 2.0 자동 태거 구성기',
+            ui_sample_notice_title:'샘플 코드 안내:',
+            ui_sample_notice_body:"이 코드는 비프로덕션 용도의 샘플입니다. 배포 전에 조직의 보안, 규정 및 컴플라이언스 요구 사항을 충족하도록 솔루션을 테스트, 보안 강화 및 최적화할 책임은 귀하에게 있습니다. 이 솔루션 배포 시 Lambda, EventBridge, CloudWatch, SNS, SQS, SSM에 대한 AWS 요금이 발생할 수 있습니다. 다음을 참조하세요:",
+            ui_shared_responsibility:'AWS 공동 책임 모델',
+            ui_btn_copy:'지침 복사',
+            ui_one_file_step:'파일 하나. 단계 하나.',
+            ui_send_script:'',
+            ui_to_customer:'를 고객에게 전달하세요.',
+            ui_cloudshell_open:'고객은',
+            ui_in_account:'에서',
+            ui_upload_and_run:'AWS CloudShell을 열고 이 파일을 업로드한 후 실행:',
+            ui_mgmt_account:'관리 계정',
+            ui_migration_account_label:'마이그레이션 계정',
+            d_log_pass:'성공:',
+            d_log_fail:'실패:',
+            d_log_warn:'경고:',
+            ui_main_desc1:'새 AWS 리소스에 자동으로',
+            ui_main_desc2:'태그를 지정하는 CloudFormation 템플릿을 생성합니다.',
+            ui_main_desc3:'일반적으로 60~90초 이내 (트래픽이 많을 때 최대 15분)',
+            ui_main_desc4:'생성 후',
+            ui_main_desc5:'커버 범위',
+            ui_main_desc6:'가지 이상의 리소스 유형 (모든 주요 AWS 서비스, CT org E2E 테스트 완료).',
+            ui_main_desc7:'고객 비용:',
             ui_step1:'1. 구성', ui_step2:'2. 검토', ui_step3:'3. 다운로드',
             ui_card_deal_title:'MAP 2.0 계약 정보',
             ui_card_deal_subtitle:'AWS Investments의 MAP 계약 정보를 입력하세요',
@@ -854,6 +942,7 @@
             ui_agree_start:'협약 시작일', ui_agree_start_hint:'(MAP 2.0 리소스 태그 적용 시작일)',
             ui_agree_end:'협약 종료일', ui_agree_end_hint:'(신규 리소스 태그 적용 종료일)',
             ui_alert_email:'알림 이메일', ui_alert_email_hint:'(선택 — 태그 오류 알림 수신 이메일)',
+            ui_email_confirm_hint:'고객은 배포 후 AWS 구독 확인 이메일을 승인해야 합니다.',
             ui_deploy_mode:'배포 모드', ui_deploy_mode_subtitle:'마이그레이션에 사용할 AWS 계정 수를 선택하세요',
             ui_single_title:'단일 계정', ui_single_desc:'하나의 마이그레이션 계정에 배포합니다. 약 2분 소요됩니다.',
             ui_multi_title:'여러 계정 (AWS Organizations)', ui_multi_desc:'AWS 조직의 모든 계정에 StackSet으로 동시에 배포합니다.',
@@ -867,11 +956,14 @@
             ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(이 VPC의 VPC 바인딩 리소스만 태그가 지정됨)',
             ui_add_vpc:'+ VPC 추가', ui_add_account:'+ 계정 추가', ui_add_region:'+ 리전 추가',
             ui_migration_account_ids:'마이그레이션 계정 ID', ui_migration_account_ids_hint:'(참조용 — 스택은 전체 조직에 자동으로 배포됨)',
-            ui_stackset_note:'AWS는 계정 ID가 아닌 조직 단위(OU)별로 SERVICE_MANAGED StackSet을 배포합니다. 템플릿이 조직의 루트 OU를 자동으로 감지하여 모든 계정에 배포합니다. 여기에 입력한 ID는 문서용입니다.',
+            ui_stackset_note:'Lambda는 루트 OU를 통해 조직의 모든 계정에 배포됩니다. 기본적으로 모든 계정의 리소스에 태그가 지정됩니다. 선택적으로 특정 계정으로 태그 지정을 제한할 수 있습니다.',
+            ui_account_limit:'특정 계정으로만 태그 지정 제한',
+            err_account_scope_required:'계정 ID를 하나 이상 입력해 주세요.',
             ui_central_account_id:'중앙 계정 ID', ui_central_account_id_hint:'(Lambda가 배포될 계정)',
             ui_member_accounts:'MAP 범위의 멤버 계정',
             ui_deployment_regions:'배포 리전', ui_deployment_regions_hint:'(고객이 리소스를 생성하는 리전)',
             ui_backfill_strong:'협약 시작일 이후 생성된 기존 리소스에 태그 지정',
+            ui_backfill_scope_note:'✓ 범위 적용됨: 백필은 위에서 선택한 VPC / 계정 범위 설정을 동일하게 따릅니다.',
             ui_backfill_desc:'협약 시작일부터 CloudTrail 기록을 조회하여 이 솔루션 배포 전에 생성된 리소스에 태그를 지정하는 일회성 Lambda를 배포합니다. 배포 후 약 5분 후에 자동으로 실행됩니다.',
             ui_backfill_note:'참고: CloudTrail 기록은 최근 90일로 제한됩니다. 그 이전에 생성된 리소스는 수동으로 태그를 지정해야 합니다.',
             ui_coverage_subtitle:'다중 계정 CT 조직 테스트에서 확인된 190+ 리소스 유형 (계정 4개 × 리전 4개)',
@@ -980,6 +1072,28 @@
           },
           ja: {
             ui_title:'MAP 2.0 自動タガー 設定ツール',
+            ui_sample_notice_title:'サンプルコードに関する注意:',
+            ui_sample_notice_body:"これは非本番環境向けのサンプルコードです。デプロイ前に、組織のセキュリティ・規制・コンプライアンス要件を満たすようにテスト、セキュリティ強化、最適化を行う責任はお客様にあります。このソリューションのデプロイにより、Lambda、EventBridge、CloudWatch、SNS、SQS、SSMのAWS料金が発生する場合があります。詳細:",
+            ui_shared_responsibility:'AWS責任共有モデル',
+            ui_btn_copy:'手順をコピー',
+            ui_one_file_step:'1ファイル。1ステップ。',
+            ui_send_script:'',
+            ui_to_customer:'をお客様に送付してください。',
+            ui_cloudshell_open:'お客様は',
+            ui_in_account:'の',
+            ui_upload_and_run:'でAWS CloudShellを開き、このファイルをアップロードして実行:',
+            ui_mgmt_account:'管理アカウント',
+            ui_migration_account_label:'移行アカウント',
+            d_log_pass:'成功:',
+            d_log_fail:'失敗:',
+            d_log_warn:'警告:',
+            ui_main_desc1:'新しいAWSリソースに自動でタグ付けするCloudFormationテンプレートを生成します。タグ:',
+            ui_main_desc2:'の付与は通常',
+            ui_main_desc3:'60〜90秒以内（高負荷時は最大15分）',
+            ui_main_desc4:'で完了します。',
+            ui_main_desc5:'対応範囲:',
+            ui_main_desc6:'種類以上のリソースタイプ（主要AWSサービス全対応、CT org E2Eテスト済み）。',
+            ui_main_desc7:'お客様のコスト:',
             ui_step1:'1. 設定', ui_step2:'2. 確認', ui_step3:'3. ダウンロード',
             ui_card_deal_title:'MAP 2.0 契約情報',
             ui_card_deal_subtitle:'AWS InvestmentsのMAP契約情報を入力してください',
@@ -989,6 +1103,7 @@
             ui_agree_start:'契約開始日', ui_agree_start_hint:'（MAPリソースへのタグ付け開始日）',
             ui_agree_end:'契約終了日', ui_agree_end_hint:'（タグ付け停止日）',
             ui_alert_email:'アラートメール', ui_alert_email_hint:'（任意 — タグエラー通知を受信するメールアドレス）',
+            ui_email_confirm_hint:'デプロイ後、お客様はAWSサブスクリプション確認メールを承認する必要があります。',
             ui_deploy_mode:'デプロイモード', ui_deploy_mode_subtitle:'マイグレーションに使用するAWSアカウント数を選択してください',
             ui_single_title:'シングルアカウント', ui_single_desc:'1つのマイグレーションアカウントにデプロイします。約2分で完了します。',
             ui_multi_title:'マルチアカウント (AWS Organizations)', ui_multi_desc:'AWS Organizationの全アカウントにStackSetで同時にデプロイします。',
@@ -1002,11 +1117,14 @@
             ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(これらのVPC内のVPCバインドリソースのみタグが付けられます)',
             ui_add_vpc:'+ VPCを追加', ui_add_account:'+ アカウントを追加', ui_add_region:'+ リージョンを追加',
             ui_migration_account_ids:'移行アカウントID', ui_migration_account_ids_hint:'(参考情報 — スタックは組織全体に自動的にデプロイされます)',
-            ui_stackset_note:'AWSはアカウントIDではなく組織単位(OU)ごとにSERVICE_MANAGED StackSetをデプロイします。テンプレートは組織のルートOUを自動検出してすべてのアカウントにデプロイします。ここで入力したIDはドキュメント用です。',
+            ui_stackset_note:'Lambdaはルート OUを経由して組織内の全アカウントにデプロイされます。デフォルトでは全アカウントのリソースにタグ付けされます。特定アカウントのみにタグ付けを制限することもできます。',
+            ui_account_limit:'特定のアカウントのみにタグ付けを制限',
+            err_account_scope_required:'アカウントIDを1つ以上入力してください。',
             ui_central_account_id:'中央アカウントID', ui_central_account_id_hint:'(Lambdaがデプロイされるアカウント)',
             ui_member_accounts:'MAPスコープのメンバーアカウント',
             ui_deployment_regions:'デプロイリージョン', ui_deployment_regions_hint:'(お客様がリソースを作成するリージョン)',
             ui_backfill_strong:'契約開始日以降に作成された既存リソースにタグを付ける',
+            ui_backfill_scope_note:'✓ スコープ適用中：バックフィルは上記で選択したVPC／アカウントのスコープ設定に従います。',
             ui_backfill_desc:'契約開始日からCloudTrail履歴を照会し、このソリューションのデプロイ前に作成されたリソースにタグを付ける一回限りのLambdaをデプロイします。デプロイ後約5分で自動的に実行されます。',
             ui_backfill_note:'注意: CloudTrail履歴は過去90日間に限定されます。それ以前に作成されたリソースは手動でタグを付ける必要があります。',
             ui_coverage_subtitle:'マルチアカウントCT組織テストで確認済み190+リソースタイプ (4アカウント × 4リージョン)',
@@ -1115,6 +1233,28 @@
           },
           zh: {
             ui_title:'MAP 2.0 自动标记器配置工具',
+            ui_sample_notice_title:'示例代码说明:',
+            ui_sample_notice_body:"这是用于非生产环境的示例代码。在部署前，您有责任对此解决方案进行测试、安全加固和优化，以满足您组织的安全、合规要求。部署此解决方案可能会产生Lambda、EventBridge、CloudWatch、SNS、SQS、SSM的AWS费用。请参阅:",
+            ui_shared_responsibility:'AWS责任共担模型',
+            ui_btn_copy:'复制说明',
+            ui_one_file_step:'一个文件。一个步骤。',
+            ui_send_script:'将',
+            ui_to_customer:'发送给客户。',
+            ui_cloudshell_open:'客户在',
+            ui_in_account:'中',
+            ui_upload_and_run:'打开AWS CloudShell，上传此文件并运行:',
+            ui_mgmt_account:'管理账户',
+            ui_migration_account_label:'迁移账户',
+            d_log_pass:'成功:',
+            d_log_fail:'失败:',
+            d_log_warn:'警告:',
+            ui_main_desc1:'生成CloudFormation模板，自动为新AWS资源打标签',
+            ui_main_desc2:'，通常在创建后',
+            ui_main_desc3:'60–90秒内完成（高负载时最长15分钟）',
+            ui_main_desc4:'。',
+            ui_main_desc5:'覆盖',
+            ui_main_desc6:'种以上资源类型（所有主要AWS服务，CT org E2E测试通过）。',
+            ui_main_desc7:'客户费用:',
             ui_step1:'1. 配置', ui_step2:'2. 审核', ui_step3:'3. 下载',
             ui_card_deal_title:'MAP 2.0 协议信息',
             ui_card_deal_subtitle:'请输入AWS Investments提供的MAP协议信息',
@@ -1124,6 +1264,7 @@
             ui_agree_start:'协议开始日期', ui_agree_start_hint:'（开始对MAP 2.0资源打标签的日期）',
             ui_agree_end:'协议结束日期', ui_agree_end_hint:'（停止对新建资源打标签的日期）',
             ui_alert_email:'告警邮件', ui_alert_email_hint:'（可选 — 接收标签错误通知的邮箱）',
+            ui_email_confirm_hint:'部署后，客户必须确认AWS订阅确认邮件。',
             ui_deploy_mode:'部署模式', ui_deploy_mode_subtitle:'请选择用于迁移的AWS账户数量',
             ui_single_title:'单账户', ui_single_desc:'将工作负载部署到一个AWS账户。约2分钟完成。',
             ui_multi_title:'多账户 (AWS Organizations)', ui_multi_desc:'通过StackSet同时部署到AWS组织中的所有账户。',
@@ -1137,11 +1278,14 @@
             ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'（仅对这些VPC中的VPC绑定资源打标签）',
             ui_add_vpc:'+ 添加VPC', ui_add_account:'+ 添加账户', ui_add_region:'+ 添加区域',
             ui_migration_account_ids:'迁移账户ID', ui_migration_account_ids_hint:'（仅供参考 — 堆栈会自动部署到整个组织）',
-            ui_stackset_note:'AWS按组织单位（OU）而非账户ID部署SERVICE_MANAGED StackSet。模板会自动发现组织的根OU并部署到所有账户。此处输入的ID仅供文档参考。',
+            ui_stackset_note:'Lambda通过根OU部署到组织中的每个账户。默认情况下，所有账户的资源都会被打标签。您也可以选择将打标签限制在特定账户。',
+            ui_account_limit:'仅限特定账户打标签',
+            err_account_scope_required:'请至少输入一个账户ID。',
             ui_central_account_id:'中央账户ID', ui_central_account_id_hint:'（Lambda将部署到的账户）',
             ui_member_accounts:'MAP范围内的成员账户',
             ui_deployment_regions:'部署区域', ui_deployment_regions_hint:'（客户创建资源的区域）',
             ui_backfill_strong:'对协议开始日期后创建的现有资源打标签',
+            ui_backfill_scope_note:'✓ 范围已应用：回填将遵循上方选择的VPC/账户范围设置。',
             ui_backfill_desc:'部署一个一次性Lambda，从协议开始日期查询CloudTrail历史，并对在此解决方案部署之前创建的所有匹配资源打标签。部署后约5分钟自动运行。',
             ui_backfill_note:'注意：CloudTrail历史记录限于最近90天。在此时间窗口之前创建的资源需要手动打标签。',
             ui_coverage_subtitle:'通过多账户CT组织测试验证的190+资源类型（4个账户 × 4个区域）',
@@ -1250,6 +1394,28 @@
           },
           id: {
             ui_title:'Konfigurator MAP 2.0 Auto-Tagger',
+            ui_sample_notice_title:'Catatan Kode Sampel:',
+            ui_sample_notice_body:"Ini adalah kode sampel untuk penggunaan non-produksi. Anda bertanggung jawab untuk menguji, mengamankan, dan mengoptimalkan solusi ini sesuai persyaratan keamanan, regulasi, dan kepatuhan organisasi Anda sebelum deployment. Men-deploy solusi ini dapat menimbulkan biaya AWS untuk Lambda, EventBridge, CloudWatch, SNS, SQS, dan SSM. Lihat:",
+            ui_shared_responsibility:'Model Tanggung Jawab Bersama AWS',
+            ui_btn_copy:'Salin Instruksi',
+            ui_one_file_step:'Satu file. Satu langkah.',
+            ui_send_script:'Kirim',
+            ui_to_customer:'ke pelanggan.',
+            ui_cloudshell_open:'Mereka membuka',
+            ui_in_account:'di',
+            ui_upload_and_run:'AWS CloudShell, unggah file ini, dan jalankan:',
+            ui_mgmt_account:'akun manajemen',
+            ui_migration_account_label:'akun migrasi',
+            d_log_pass:'BERHASIL:',
+            d_log_fail:'GAGAL:',
+            d_log_warn:'PERINGATAN:',
+            ui_main_desc1:'Menghasilkan template CloudFormation yang secara otomatis memberi tag',
+            ui_main_desc2:'pada resource AWS baru dalam',
+            ui_main_desc3:'60–90 detik (hingga 15 menit saat aktivitas tinggi)',
+            ui_main_desc4:'setelah dibuat.',
+            ui_main_desc5:'Mencakup',
+            ui_main_desc6:'jenis resource di semua layanan AWS utama (diuji E2E di CT org).',
+            ui_main_desc7:'Biaya pelanggan:',
             ui_step1:'1. Konfigurasi', ui_step2:'2. Tinjau', ui_step3:'3. Unduh',
             ui_card_deal_title:'Detail Perjanjian MAP 2.0',
             ui_card_deal_subtitle:'Masukkan detail perjanjian MAP dari AWS Investments',
@@ -1259,6 +1425,7 @@
             ui_agree_start:'Tanggal Mulai Perjanjian', ui_agree_start_hint:'(Tanggal mulai pemberian tag pada resource MAP 2.0)',
             ui_agree_end:'Tanggal Berakhir Perjanjian', ui_agree_end_hint:'(Tanggal penghentian pemberian tag pada resource baru)',
             ui_alert_email:'Email Peringatan', ui_alert_email_hint:'(opsional — email untuk menerima peringatan kesalahan tag)',
+            ui_email_confirm_hint:'Pelanggan harus mengonfirmasi email langganan AWS setelah deployment.',
             ui_deploy_mode:'Mode Deployment', ui_deploy_mode_subtitle:'Pilih jumlah akun AWS yang digunakan untuk migrasi',
             ui_single_title:'Satu Akun', ui_single_desc:'Deploy ke satu akun migrasi. Selesai dalam 2 menit.',
             ui_multi_title:'Beberapa Akun (AWS Organizations)', ui_multi_desc:'Deploy ke semua akun AWS Organization sekaligus menggunakan StackSet.',
@@ -1272,11 +1439,14 @@
             ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(hanya resource yang terikat VPC dalam VPC ini yang akan diberi tag)',
             ui_add_vpc:'+ Tambah VPC', ui_add_account:'+ Tambah akun', ui_add_region:'+ Tambah region',
             ui_migration_account_ids:'ID Akun Migrasi', ui_migration_account_ids_hint:'(untuk referensi — stack akan otomatis di-deploy ke seluruh org)',
-            ui_stackset_note:'AWS men-deploy SERVICE_MANAGED StackSet berdasarkan Organizational Unit, bukan ID akun. Template akan otomatis menemukan root OU organisasi dan men-deploy ke semua akun. ID yang Anda masukkan hanya untuk dokumentasi.',
+            ui_stackset_note:'Lambda di-deploy ke setiap akun dalam org melalui root OU. Secara default, resource semua akun akan diberi tag. Anda dapat membatasi pemberian tag hanya pada akun tertentu.',
+            ui_account_limit:'Batasi pemberian tag hanya pada akun tertentu',
+            err_account_scope_required:'Harap masukkan setidaknya satu ID akun.',
             ui_central_account_id:'ID Akun Pusat', ui_central_account_id_hint:'(akun tempat Lambda akan di-deploy)',
             ui_member_accounts:'Akun Anggota dalam Cakupan MAP',
             ui_deployment_regions:'Region Deployment', ui_deployment_regions_hint:'(region tempat pelanggan membuat resource)',
             ui_backfill_strong:'Beri tag pada resource yang dibuat sejak tanggal mulai perjanjian',
+            ui_backfill_scope_note:'✓ Cakupan diterapkan: backfill akan mengikuti pengaturan cakupan VPC/akun yang dipilih di atas.',
             ui_backfill_desc:'Men-deploy Lambda satu kali yang mengquery riwayat CloudTrail dari tanggal mulai perjanjian dan memberi tag pada semua resource yang dibuat sebelum solusi ini di-deploy. Berjalan otomatis ~5 menit setelah deployment.',
             ui_backfill_note:'Catatan: Riwayat CloudTrail terbatas pada 90 hari terakhir. Resource yang dibuat sebelum periode tersebut harus diberi tag secara manual.',
             ui_coverage_subtitle:'190+ jenis resource yang telah diverifikasi melalui pengujian multi-akun CT org (4 akun × 4 region)',
@@ -1385,6 +1555,28 @@
           },
           th: {
             ui_title:'เครื่องมือตั้งค่า MAP 2.0 Auto-Tagger',
+            ui_sample_notice_title:'หมายเหตุเกี่ยวกับโค้ดตัวอย่าง:',
+            ui_sample_notice_body:"นี่คือโค้ดตัวอย่างสำหรับการใช้งานที่ไม่ใช่สภาพแวดล้อมการผลิต คุณมีหน้าที่รับผิดชอบในการทดสอบ รักษาความปลอดภัย และปรับแต่งโซลูชันนี้ให้ตรงตามข้อกำหนดด้านความปลอดภัย กฎระเบียบ และการปฏิบัติตามข้อกำหนดขององค์กรก่อนการติดตั้ง การติดตั้งโซลูชันนี้อาจมีค่าใช้จ่าย AWS สำหรับ Lambda, EventBridge, CloudWatch, SNS, SQS และ SSM โปรดดู:",
+            ui_shared_responsibility:'โมเดลความรับผิดชอบร่วมกันของ AWS',
+            ui_btn_copy:'คัดลอกคำแนะนำ',
+            ui_one_file_step:'หนึ่งไฟล์ หนึ่งขั้นตอน',
+            ui_send_script:'ส่ง',
+            ui_to_customer:'ให้ลูกค้า',
+            ui_cloudshell_open:'ลูกค้าเปิด',
+            ui_in_account:'ใน',
+            ui_upload_and_run:'AWS CloudShell อัปโหลดไฟล์นี้ และรัน:',
+            ui_mgmt_account:'บัญชีจัดการ',
+            ui_migration_account_label:'บัญชีการย้ายระบบ',
+            d_log_pass:'สำเร็จ:',
+            d_log_fail:'ล้มเหลว:',
+            d_log_warn:'คำเตือน:',
+            ui_main_desc1:'สร้าง CloudFormation template ที่ติด Tag',
+            ui_main_desc2:'ให้ทรัพยากร AWS ใหม่โดยอัตโนมัติภายใน',
+            ui_main_desc3:'60–90 วินาที (สูงสุด 15 นาทีในช่วงที่มีการใช้งานสูง)',
+            ui_main_desc4:'หลังจากสร้าง',
+            ui_main_desc5:'รองรับ',
+            ui_main_desc6:'ประเภททรัพยากรครอบคลุมทุกบริการ AWS หลัก (ผ่านการทดสอบ E2E บน CT org)',
+            ui_main_desc7:'ค่าใช้จ่ายของลูกค้า:',
             ui_step1:'1. ตั้งค่า', ui_step2:'2. ตรวจสอบ', ui_step3:'3. ดาวน์โหลด',
             ui_card_deal_title:'รายละเอียดข้อตกลง MAP 2.0',
             ui_card_deal_subtitle:'กรอกรายละเอียดข้อตกลง MAP จาก AWS Investments',
@@ -1394,6 +1586,7 @@
             ui_agree_start:'วันที่เริ่มต้นข้อตกลง', ui_agree_start_hint:'(วันที่เริ่มติด Tag ให้ทรัพยากร MAP 2.0)',
             ui_agree_end:'วันที่สิ้นสุดข้อตกลง', ui_agree_end_hint:'(วันที่หยุดติด Tag ให้ทรัพยากรใหม่)',
             ui_alert_email:'อีเมลแจ้งเตือน', ui_alert_email_hint:'(ไม่บังคับ — อีเมลสำหรับรับการแจ้งเตือนข้อผิดพลาด)',
+            ui_email_confirm_hint:'ลูกค้าต้องยืนยันอีเมลการสมัครสมาชิก AWS หลังการติดตั้ง',
             ui_deploy_mode:'โหมดการติดตั้ง', ui_deploy_mode_subtitle:'เลือกจำนวนบัญชี AWS ที่ใช้สำหรับการย้ายระบบ',
             ui_single_title:'บัญชีเดียว', ui_single_desc:'ติดตั้งในบัญชี AWS เดียว ใช้เวลาประมาณ 2 นาที',
             ui_multi_title:'หลายบัญชี (AWS Organizations)', ui_multi_desc:'ติดตั้งพร้อมกันในทุกบัญชีของ AWS Organization ผ่าน StackSet',
@@ -1407,11 +1600,14 @@
             ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(เฉพาะทรัพยากรที่ผูกกับ VPC เหล่านี้จะได้รับ Tag)',
             ui_add_vpc:'+ เพิ่ม VPC', ui_add_account:'+ เพิ่มบัญชี', ui_add_region:'+ เพิ่ม Region',
             ui_migration_account_ids:'ID บัญชีการย้ายระบบ', ui_migration_account_ids_hint:'(สำหรับอ้างอิง — stack จะถูกติดตั้งไปยังทั้งองค์กรโดยอัตโนมัติ)',
-            ui_stackset_note:'AWS ติดตั้ง SERVICE_MANAGED StackSet ตาม Organizational Unit ไม่ใช่ตาม ID บัญชี เทมเพลตจะค้นหา root OU ขององค์กรโดยอัตโนมัติและติดตั้งไปยังทุกบัญชี ID ที่กรอกที่นี่ใช้สำหรับเอกสารอ้างอิงเท่านั้น',
+            ui_stackset_note:'Lambda ถูกติดตั้งไปยังทุกบัญชีในองค์กรผ่าน root OU โดยค่าเริ่มต้น ทรัพยากรของทุกบัญชีจะได้รับ Tag คุณสามารถเลือกจำกัดการติด Tag เฉพาะบัญชีที่ระบุได้',
+            ui_account_limit:'จำกัดการติด Tag เฉพาะบัญชีที่ระบุเท่านั้น',
+            err_account_scope_required:'กรุณากรอก ID บัญชีอย่างน้อยหนึ่งรายการ',
             ui_central_account_id:'ID บัญชีกลาง', ui_central_account_id_hint:'(บัญชีที่ Lambda จะถูกติดตั้ง)',
             ui_member_accounts:'บัญชีสมาชิกในขอบเขต MAP',
             ui_deployment_regions:'Region ที่ติดตั้ง', ui_deployment_regions_hint:'(Region ที่ลูกค้าสร้างทรัพยากร)',
             ui_backfill_strong:'ติด Tag ทรัพยากรที่มีอยู่ซึ่งสร้างตั้งแต่วันที่เริ่มต้นข้อตกลง',
+            ui_backfill_scope_note:'✓ ใช้ขอบเขตแล้ว: การเติม Tag ย้อนหลังจะทำตามการตั้งค่าขอบเขต VPC/บัญชีที่เลือกด้านบน',
             ui_backfill_desc:'ติดตั้ง Lambda แบบครั้งเดียวที่ค้นหาประวัติ CloudTrail ตั้งแต่วันที่เริ่มต้นข้อตกลง และติด Tag ให้ทรัพยากรทั้งหมดที่สร้างก่อนติดตั้งโซลูชันนี้ จะรันอัตโนมัติประมาณ 5 นาทีหลังติดตั้ง',
             ui_backfill_note:'หมายเหตุ: ประวัติ CloudTrail จำกัดที่ 90 วันล่าสุด ทรัพยากรที่สร้างก่อนช่วงเวลานั้นต้องติด Tag ด้วยตนเอง',
             ui_coverage_subtitle:'190+ ประเภททรัพยากรที่ผ่านการทดสอบผ่าน CT org หลายบัญชี (4 บัญชี × 4 Region)',
@@ -1520,6 +1716,28 @@
           },
           vi: {
             ui_title:'Công cụ cấu hình MAP 2.0 Auto-Tagger',
+            ui_sample_notice_title:'Lưu ý về Mã mẫu:',
+            ui_sample_notice_body:"Đây là mã mẫu cho mục đích phi sản xuất. Bạn có trách nhiệm kiểm tra, bảo mật và tối ưu hóa giải pháp này để đáp ứng các yêu cầu bảo mật, pháp lý và tuân thủ của tổ chức trước khi triển khai. Việc triển khai giải pháp này có thể phát sinh phí AWS cho Lambda, EventBridge, CloudWatch, SNS, SQS và SSM. Xem:",
+            ui_shared_responsibility:'Mô hình Trách nhiệm Chung AWS',
+            ui_btn_copy:'Sao chép Hướng dẫn',
+            ui_one_file_step:'Một file. Một bước.',
+            ui_send_script:'Gửi',
+            ui_to_customer:'cho khách hàng.',
+            ui_cloudshell_open:'Họ mở',
+            ui_in_account:'trong',
+            ui_upload_and_run:'AWS CloudShell, tải file lên và chạy:',
+            ui_mgmt_account:'tài khoản quản lý',
+            ui_migration_account_label:'tài khoản di chuyển',
+            d_log_pass:'THÀNH CÔNG:',
+            d_log_fail:'THẤT BẠI:',
+            d_log_warn:'CẢNH BÁO:',
+            ui_main_desc1:'Tạo template CloudFormation tự động gắn tag',
+            ui_main_desc2:'cho resource AWS mới trong vòng',
+            ui_main_desc3:'60–90 giây (tối đa 15 phút khi tải cao)',
+            ui_main_desc4:'sau khi tạo.',
+            ui_main_desc5:'Bao gồm',
+            ui_main_desc6:'loại resource trên tất cả dịch vụ AWS chính (đã kiểm thử E2E trên CT org).',
+            ui_main_desc7:'Chi phí khách hàng:',
             ui_step1:'1. Cấu hình', ui_step2:'2. Xem xét', ui_step3:'3. Tải xuống',
             ui_card_deal_title:'Thông tin thỏa thuận MAP 2.0',
             ui_card_deal_subtitle:'Nhập thông tin thỏa thuận MAP từ AWS Investments',
@@ -1529,6 +1747,7 @@
             ui_agree_start:'Ngày bắt đầu thỏa thuận', ui_agree_start_hint:'(Ngày bắt đầu gắn tag cho resource MAP 2.0)',
             ui_agree_end:'Ngày kết thúc thỏa thuận', ui_agree_end_hint:'(Ngày dừng gắn tag cho resource mới)',
             ui_alert_email:'Email cảnh báo', ui_alert_email_hint:'(tùy chọn — email nhận thông báo lỗi tag)',
+            ui_email_confirm_hint:'Khách hàng phải xác nhận email đăng ký AWS sau khi triển khai.',
             ui_deploy_mode:'Chế độ triển khai', ui_deploy_mode_subtitle:'Chọn số lượng tài khoản AWS dùng cho quá trình di chuyển',
             ui_single_title:'Một tài khoản', ui_single_desc:'Triển khai vào một tài khoản AWS. Hoàn thành trong 2 phút.',
             ui_multi_title:'Nhiều tài khoản (AWS Organizations)', ui_multi_desc:'Triển khai đồng thời vào tất cả tài khoản trong AWS Organization qua StackSet.',
@@ -1542,11 +1761,14 @@
             ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(chỉ resource liên kết VPC trong các VPC này sẽ được gắn tag)',
             ui_add_vpc:'+ Thêm VPC', ui_add_account:'+ Thêm tài khoản', ui_add_region:'+ Thêm region',
             ui_migration_account_ids:'ID tài khoản di chuyển', ui_migration_account_ids_hint:'(để tham khảo — stack sẽ tự động triển khai đến toàn bộ org)',
-            ui_stackset_note:'AWS triển khai SERVICE_MANAGED StackSet theo Organizational Unit, không phải theo ID tài khoản. Template sẽ tự động tìm root OU của tổ chức và triển khai đến tất cả tài khoản. ID nhập vào đây chỉ để tham khảo.',
+            ui_stackset_note:'Lambda được triển khai đến mọi tài khoản trong org qua root OU. Mặc định, resource của tất cả tài khoản đều được gắn tag. Bạn có thể giới hạn việc gắn tag chỉ cho các tài khoản cụ thể.',
+            ui_account_limit:'Giới hạn gắn tag chỉ cho các tài khoản cụ thể',
+            err_account_scope_required:'Vui lòng nhập ít nhất một ID tài khoản.',
             ui_central_account_id:'ID tài khoản trung tâm', ui_central_account_id_hint:'(tài khoản nơi Lambda sẽ được triển khai)',
             ui_member_accounts:'Tài khoản thành viên trong phạm vi MAP',
             ui_deployment_regions:'Region triển khai', ui_deployment_regions_hint:'(region nơi khách hàng tạo resource)',
             ui_backfill_strong:'Gắn tag cho resource hiện có được tạo từ ngày bắt đầu thỏa thuận',
+            ui_backfill_scope_note:'✓ Đã áp dụng phạm vi: backfill sẽ tuân theo cài đặt phạm vi VPC/tài khoản đã chọn ở trên.',
             ui_backfill_desc:'Triển khai Lambda một lần để truy vấn lịch sử CloudTrail từ ngày bắt đầu thỏa thuận và gắn tag cho tất cả resource được tạo trước khi giải pháp này được triển khai. Tự động chạy khoảng 5 phút sau khi triển khai.',
             ui_backfill_note:'Lưu ý: Lịch sử CloudTrail giới hạn trong 90 ngày gần nhất. Resource được tạo trước khoảng thời gian đó cần gắn tag thủ công.',
             ui_coverage_subtitle:'190+ loại resource đã được xác minh qua kiểm thử CT org đa tài khoản (4 tài khoản × 4 region)',
@@ -1824,7 +2046,7 @@
             const scopeMode = config.scopeMode;
             const vpcIds = JSON.stringify(config.scopedVpcIds);
             const tagNonVpc = config.tagNonVpcServices;
-            const scopedAccountIdsJson = (config.stacksetAccounts && config.stacksetAccounts.length > 0)
+            const scopedAccountIdsJson = (config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0)
                 ? JSON.stringify(config.stacksetAccounts.map(a => a.id))
                 : '["ALL"]';
             const scopedVpcIdsJson = (config.scopedVpcIds && config.scopedVpcIds.length > 0 && config.scopedVpcIds[0] !== 'NONE')
@@ -2750,6 +2972,7 @@ Check status after running:
 Done. Auto-tagging is now active across all accounts.
 NOTE: CloudTrail must be enabled in each account and target region.`;
         }
+        }
 
         function generatePerAccountTemplate(config) {
             // Generate the single-account auto-tagger template (Lambda + EventBridge + IAM)
@@ -3001,11 +3224,11 @@ ERRORS=0
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_creds')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_creds')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_creds')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_creds')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_creds')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_creds')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_creds')}\\n"
 fi
 
 TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$REGION" --include-shadow-trails false --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
@@ -3013,21 +3236,21 @@ if [ "\$TRAIL_COUNT" -eq 0 ]; then
     echo "  ❌ ${t('d_fail_trail')} \$REGION"
     echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
     echo "            ${t('d_fix_trail2')} \$REGION"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_trail')} \$REGION\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_trail')} \$REGION\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_trail')} \$REGION"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_trail')} \$REGION\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_trail')} \$REGION\\n"
 fi
 
 if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_perms')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_perms')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_perms')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_perms')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_perms')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_perms')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_perms')}\\n"
 fi
 
 SCP_RESULT=\$(aws iam simulate-principal-policy \\
@@ -3038,12 +3261,12 @@ SCP_RESULT=\$(aws iam simulate-principal-policy \\
 if [ "\$SCP_RESULT" = "explicitDeny" ]; then
     echo "  ❌ ${t('d_fail_scp')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_scp')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_scp')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_scp')}"
     echo "     ${t('d_scp_note')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_scp')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_scp')}\\n"
 fi
 
 if [ "\$ERRORS" -gt 0 ]; then
@@ -3221,40 +3444,40 @@ ERRORS=0
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_creds')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_creds')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_creds')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_creds')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_creds')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_creds')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_creds')}\\n"
 fi
 
 if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_perms')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_perms')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_perms')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_perms')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_perms')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_perms')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_perms')}\\n"
 fi
 
 if ! aws organizations describe-organization > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_org')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_org')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_org')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_org')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_org')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_org')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_org')}\\n"
 fi
 
 STACKSETS_ACCESS=\$(aws organizations list-aws-service-access-for-organization --query "EnabledServicePrincipals[?ServicePrincipal=='stacksets.cloudformation.amazonaws.com'].ServicePrincipal" --output text 2>/dev/null)
 if [ -z "\$STACKSETS_ACCESS" ]; then
     echo "  ⚠️  ${t('d_warn_stacksets')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}WARN: ${t('d_warn_stacksets')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_warn')} ${t('d_warn_stacksets')}\\n"
 else
     echo "  ✅ ${t('d_ok_stacksets')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_stacksets')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_stacksets')}\\n"
 fi
 
 for CHECK_REGION in ${regionArgs}; do
@@ -3263,11 +3486,11 @@ for CHECK_REGION in ${regionArgs}; do
         echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
         echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
         echo "            ${t('d_fix_trail2')} \$CHECK_REGION"
-        PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_trail')} \$CHECK_REGION\\n"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_trail')} \$CHECK_REGION\\n"
         ERRORS=\$((ERRORS + 1))
     else
         echo "  ✅ ${t('d_ok_trail')} \$CHECK_REGION"
-        PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_trail')} \$CHECK_REGION\\n"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_trail')} \$CHECK_REGION\\n"
     fi
 done
 
@@ -3279,12 +3502,12 @@ SCP_RESULT=\$(aws iam simulate-principal-policy \\
 if [ "\$SCP_RESULT" = "explicitDeny" ]; then
     echo "  ❌ ${t('d_fail_scp')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: ${t('d_fail_scp')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_scp')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_scp')}"
     echo "     ${t('d_scp_note')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}PASS: ${t('d_ok_scp')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_scp')}\\n"
 fi
 
 if [ "\$ERRORS" -gt 0 ]; then
@@ -3479,13 +3702,13 @@ echo ""
 
             const btnDiv = document.getElementById('downloadButtons');
             const isMulti = isStackset;
-            const accountLabel = isMulti ? 'management account' : 'migration account';
+            const accountLabel = t(isMulti ? 'ui_mgmt_account' : 'ui_migration_account_label');
             btnDiv.innerHTML = `
                 <button class="btn-primary" onclick="downloadFile('script')" style="font-size:16px;padding:14px 32px;">⬇ Download deploy.sh</button>
-                <button class="btn-secondary" onclick="copyInstructions()">📋 Copy Instructions</button>
+                <button class="btn-secondary" onclick="copyInstructions()">📋 ${t('ui_btn_copy')}</button>
                 <div style="margin-top:12px;padding:12px 16px;background:#f2fcf3;border-left:4px solid #1d8102;border-radius:0 4px 4px 0;font-size:13px;">
-                  <strong>One file. One step.</strong> Send <code>deploy.sh</code> to the customer.<br>
-                  They open <strong>AWS CloudShell</strong> in the ${accountLabel}, upload this file, and run: <code>bash deploy.sh</code>
+                  <strong>${t('ui_one_file_step')}</strong> ${t('ui_send_script')} <code>deploy.sh</code> ${t('ui_to_customer')}<br>
+                  ${t('ui_cloudshell_open')} <strong>AWS CloudShell</strong> ${t('ui_in_account')} ${accountLabel}, ${t('ui_upload_and_run')}: <code>bash deploy.sh</code>
                 </div>`;
 
             document.getElementById('instructions').textContent = instructions;
