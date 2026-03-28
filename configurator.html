@@ -3341,7 +3341,7 @@ Resources:
       Runtime: python3.12
       Handler: index.handler
       Role: !GetAtt DeployRole.Arn
-      Timeout: 600
+      Timeout: 900
       Code:
         ZipFile: |
           import boto3, json, time, urllib.request
@@ -3418,17 +3418,28 @@ Resources:
                       print('StackSet created')
                   except cf.exceptions.NameAlreadyExistsException:
                       print('StackSet exists — waiting for any in-progress operations...')
-                      for _ in range(30):
+                      last_op_id = None
+                      for _ in range(55):
                           ops = cf.list_stack_set_operations(StackSetName=stackset_name, MaxResults=1).get('Summaries', [])
-                          if not ops or ops[0]['Status'] not in ('RUNNING', 'STOPPING'):
+                          if not ops:
+                              break
+                          last_op_id = ops[0]['OperationId']
+                          if ops[0]['Status'] not in ('RUNNING', 'STOPPING'):
                               break
                           time.sleep(10)
+                      if last_op_id:
+                          prev = cf.describe_stack_set_operation(StackSetName=stackset_name, OperationId=last_op_id)['StackSetOperation']['Status']
+                          print(f'Previous operation {last_op_id} status: {prev}')
+                          if prev == 'SUCCEEDED':
+                              print('Instances already deployed — responding SUCCESS')
+                              respond(event, context, 'SUCCESS', {'StackSetName': stackset_name, 'RootId': root_id})
+                              return
                   op = cf.create_stack_instances(StackSetName=stackset_name,
                       DeploymentTargets=targets,
                       Regions=props.get('Regions', ['ap-northeast-2']))
                   op_id = op['OperationId']
                   print('Op:', op_id)
-                  for _ in range(30):
+                  for _ in range(40):
                       time.sleep(20)
                       status = cf.describe_stack_set_operation(
                           StackSetName=stackset_name, OperationId=op_id
@@ -3550,7 +3561,7 @@ SCP_RESULT=\$(aws iam simulate-principal-policy \\
     --policy-source-arn "\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)" \\
     --action-names "tag:TagResources" \\
     --query 'EvaluationResults[0].EvalDecision' \\
-    --output text 2>/dev/null)
+    --output text 2>/dev/null) || SCP_RESULT=""
 if [ "\$SCP_RESULT" = "explicitDeny" ]; then
     echo "  ❌ ${t('d_fail_scp')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
@@ -3835,7 +3846,7 @@ SCP_RESULT=\$(aws iam simulate-principal-policy \\
     --policy-source-arn "\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)" \\
     --action-names "tag:TagResources" \\
     --query 'EvaluationResults[0].EvalDecision' \\
-    --output text 2>/dev/null)
+    --output text 2>/dev/null) || SCP_RESULT=""
 if [ "\$SCP_RESULT" = "explicitDeny" ]; then
     echo "  ❌ ${t('d_fail_scp')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
