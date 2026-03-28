@@ -67,15 +67,26 @@ EventBridge catches resource creation events and triggers a Lambda that applies 
 
 ### For the Customer
 
+**Option 1 — AWS CloudShell (Recommended, no setup required):**
 Open **AWS CloudShell** in the AWS Console (top menu bar), upload `deploy.sh`, and run:
 
 ```bash
 bash deploy.sh
 ```
 
+**Option 2 — Local AWS CLI:**
+If the customer already uses the AWS CLI, no upload needed. Just download `deploy.sh` and run from any terminal:
+
+```bash
+# Ensure AWS CLI v2 is installed and credentials are configured for the target account
+bash deploy.sh
+```
+
+Works on Linux, macOS, and Windows (via WSL or Git Bash).
+
 **One file. One command. Done.**
 
-The script auto-detects the account type (single or multi-account), handles all infrastructure, and confirms when complete.
+The script handles everything automatically — preflight checks, deployment, backfill (if enabled), and generates a deployment report.
 
 ### Verify
 
