@@ -309,6 +309,9 @@
                             <div class="info-box" style="margin-bottom:10px;" data-i18n="ui_stackset_note">
                                 The Lambda is deployed to every account in your org via the root OU. By default, all accounts' resources are tagged. You can optionally limit tagging to specific accounts below.
                             </div>
+                            <div class="warn-box" style="margin-bottom:10px;font-size:12px;" data-i18n="ui_stackset_bucket_note">
+                                ⓘ This deployment creates a temporary S3 bucket (<code>auto-map-tagger-{account-id}</code>) to stage CloudFormation templates for the StackSet. The bucket is retained after deployment as the StackSet requires it to deploy to new accounts that join your organization in the future.
+                            </div>
                             <label>
                                 <input type="checkbox" id="useAccountScope" onchange="toggleAccountScope()">
                                 <span data-i18n="ui_account_limit">Limit tagging to specific accounts only</span>
@@ -819,6 +822,7 @@
             ui_add_vpc:'+ Add another VPC', ui_add_account:'+ Add another account', ui_add_region:'+ Add another region',
             ui_migration_account_ids:'Migration Account IDs', ui_migration_account_ids_hint:'(for reference — the stack deploys to the entire org automatically)',
             ui_stackset_note:'The Lambda is deployed to every account in your org via the root OU. By default, all accounts\' resources are tagged. You can optionally limit tagging to specific accounts below.',
+            ui_stackset_bucket_note:'ⓘ This deployment creates a temporary S3 bucket (auto-map-tagger-{account-id}) to stage CloudFormation templates for the StackSet. The bucket is retained after deployment as the StackSet requires it to deploy to new accounts that join your organization in the future.',
             ui_account_limit:'Limit tagging to specific accounts only',
             ui_central_account_id:'Central Account ID', ui_central_account_id_hint:'(where the Lambda will be deployed)',
             ui_member_accounts:'Member Accounts in MAP Scope',
@@ -1009,6 +1013,7 @@
             ui_add_vpc:'+ VPC 추가', ui_add_account:'+ 계정 추가', ui_add_region:'+ 리전 추가',
             ui_migration_account_ids:'마이그레이션 계정 ID', ui_migration_account_ids_hint:'(참조용 — 스택은 전체 조직에 자동으로 배포됨)',
             ui_stackset_note:'Lambda는 루트 OU를 통해 조직의 모든 계정에 배포됩니다. 기본적으로 모든 계정의 리소스에 태그가 지정됩니다. 선택적으로 특정 계정으로 태그 지정을 제한할 수 있습니다.',
+            ui_stackset_bucket_note:'이 배포는 StackSet용 CloudFormation 템플릿을 준비하기 위해 임시 S3 버킷(auto-map-tagger-{account-id})을 생성합니다. StackSet이 향후 조직에 새로 추가되는 계정에 배포하기 위해 이 버킷이 필요하므로 배포 후에도 유지됩니다.',
             ui_account_limit:'특정 계정으로만 태그 지정 제한',
             err_account_scope_required:'계정 ID를 하나 이상 입력해 주세요.',
             ui_central_account_id:'중앙 계정 ID', ui_central_account_id_hint:'(Lambda가 배포될 계정)',
@@ -1196,6 +1201,7 @@
             ui_add_vpc:'+ VPCを追加', ui_add_account:'+ アカウントを追加', ui_add_region:'+ リージョンを追加',
             ui_migration_account_ids:'移行アカウントID', ui_migration_account_ids_hint:'(参考情報 — スタックは組織全体に自動的にデプロイされます)',
             ui_stackset_note:'Lambdaはルート OUを経由して組織内の全アカウントにデプロイされます。デフォルトでは全アカウントのリソースにタグ付けされます。特定アカウントのみにタグ付けを制限することもできます。',
+            ui_stackset_bucket_note:'このデプロイメントは、StackSet用のCloudFormationテンプレートをステージするために一時的なS3バケット（auto-map-tagger-{account-id}）を作成します。StackSetが将来組織に追加される新しいアカウントへのデプロイに使用するため、バケットはデプロイ後も保持されます。',
             ui_account_limit:'特定のアカウントのみにタグ付けを制限',
             err_account_scope_required:'アカウントIDを1つ以上入力してください。',
             ui_central_account_id:'中央アカウントID', ui_central_account_id_hint:'(Lambdaがデプロイされるアカウント)',
@@ -1383,6 +1389,7 @@
             ui_add_vpc:'+ 添加VPC', ui_add_account:'+ 添加账户', ui_add_region:'+ 添加区域',
             ui_migration_account_ids:'迁移账户ID', ui_migration_account_ids_hint:'（仅供参考 — 堆栈会自动部署到整个组织）',
             ui_stackset_note:'Lambda通过根OU部署到组织中的每个账户。默认情况下，所有账户的资源都会被打标签。您也可以选择将打标签限制在特定账户。',
+            ui_stackset_bucket_note:'此部署将创建一个临时S3存储桶（auto-map-tagger-{account-id}）来暂存StackSet的CloudFormation模板。由于StackSet需要该存储桶向未来加入组织的新账户进行部署，因此部署后将保留该存储桶。',
             ui_account_limit:'仅限特定账户打标签',
             err_account_scope_required:'请至少输入一个账户ID。',
             ui_central_account_id:'中央账户ID', ui_central_account_id_hint:'（Lambda将部署到的账户）',
@@ -1570,6 +1577,7 @@
             ui_add_vpc:'+ Tambah VPC', ui_add_account:'+ Tambah akun', ui_add_region:'+ Tambah region',
             ui_migration_account_ids:'ID Akun Migrasi', ui_migration_account_ids_hint:'(untuk referensi — stack akan otomatis di-deploy ke seluruh org)',
             ui_stackset_note:'Lambda di-deploy ke setiap akun dalam org melalui root OU. Secara default, resource semua akun akan diberi tag. Anda dapat membatasi pemberian tag hanya pada akun tertentu.',
+            ui_stackset_bucket_note:'Deployment ini membuat bucket S3 sementara (auto-map-tagger-{account-id}) untuk menyimpan template CloudFormation bagi StackSet. Bucket dipertahankan setelah deployment karena StackSet memerlukannya untuk men-deploy ke akun baru yang bergabung dengan organisasi Anda di masa mendatang.',
             ui_account_limit:'Batasi pemberian tag hanya pada akun tertentu',
             err_account_scope_required:'Harap masukkan setidaknya satu ID akun.',
             ui_central_account_id:'ID Akun Pusat', ui_central_account_id_hint:'(akun tempat Lambda akan di-deploy)',
@@ -1757,6 +1765,7 @@
             ui_add_vpc:'+ เพิ่ม VPC', ui_add_account:'+ เพิ่มบัญชี', ui_add_region:'+ เพิ่ม Region',
             ui_migration_account_ids:'ID บัญชีการย้ายระบบ', ui_migration_account_ids_hint:'(สำหรับอ้างอิง — stack จะถูกติดตั้งไปยังทั้งองค์กรโดยอัตโนมัติ)',
             ui_stackset_note:'Lambda ถูกติดตั้งไปยังทุกบัญชีในองค์กรผ่าน root OU โดยค่าเริ่มต้น ทรัพยากรของทุกบัญชีจะได้รับ Tag คุณสามารถเลือกจำกัดการติด Tag เฉพาะบัญชีที่ระบุได้',
+            ui_stackset_bucket_note:'การติดตั้งนี้จะสร้าง S3 bucket ชั่วคราว (auto-map-tagger-{account-id}) เพื่อจัดเก็บ CloudFormation template สำหรับ StackSet โดย bucket จะถูกเก็บไว้หลังการติดตั้ง เนื่องจาก StackSet ต้องการสำหรับการติดตั้งในบัญชีใหม่ที่เข้าร่วมองค์กรในอนาคต',
             ui_account_limit:'จำกัดการติด Tag เฉพาะบัญชีที่ระบุเท่านั้น',
             err_account_scope_required:'กรุณากรอก ID บัญชีอย่างน้อยหนึ่งรายการ',
             ui_central_account_id:'ID บัญชีกลาง', ui_central_account_id_hint:'(บัญชีที่ Lambda จะถูกติดตั้ง)',
@@ -1944,6 +1953,7 @@
             ui_add_vpc:'+ Thêm VPC', ui_add_account:'+ Thêm tài khoản', ui_add_region:'+ Thêm region',
             ui_migration_account_ids:'ID tài khoản di chuyển', ui_migration_account_ids_hint:'(để tham khảo — stack sẽ tự động triển khai đến toàn bộ org)',
             ui_stackset_note:'Lambda được triển khai đến mọi tài khoản trong org qua root OU. Mặc định, resource của tất cả tài khoản đều được gắn tag. Bạn có thể giới hạn việc gắn tag chỉ cho các tài khoản cụ thể.',
+            ui_stackset_bucket_note:'Quá trình triển khai này tạo một S3 bucket tạm thời (auto-map-tagger-{account-id}) để lưu trữ template CloudFormation cho StackSet. Bucket được giữ lại sau khi triển khai vì StackSet cần nó để triển khai đến các tài khoản mới tham gia tổ chức trong tương lai.',
             ui_account_limit:'Giới hạn gắn tag chỉ cho các tài khoản cụ thể',
             err_account_scope_required:'Vui lòng nhập ít nhất một ID tài khoản.',
             ui_central_account_id:'ID tài khoản trung tâm', ui_central_account_id_hint:'(tài khoản nơi Lambda sẽ được triển khai)',
@@ -3589,6 +3599,11 @@ while [ \$WAIT -lt 1200 ]; do
   echo "  ${t('d_backfill_in_progress')} (\${WAIT}s)"
 done
 echo ""` : ''}
+# ── S3 cleanup (if template was staged to S3) ─
+if echo "\$TEMPLATE_REF" | grep -q "template-url"; then
+    aws s3 rm "s3://\${BUCKET}/map-auto-tagger-\${MPE}.yaml" > /dev/null 2>&1 || true
+    aws s3 rb "s3://\${BUCKET}" 2>/dev/null || true
+fi
 # ── Step 3: Done ─────────────────────────────
 echo "${t('d_step3')}"
 echo ""
