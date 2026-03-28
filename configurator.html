@@ -2187,6 +2187,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'CreateBackupPlan','CreateLogGroup','CreateUserPool','CreateIdentityPool','CreateApplication',
             'CreateMemory','CreateAgentRuntime','CreateKey','CreateCoreNetwork','CreateGlobalNetwork',
             'CreateServiceNetwork','CreateService','CreateWorkspaceInstance',
+            'CreateKeyspace','CreateDatastore','EnableSecurityHub',
             'CreateIndex','CreateChannel','CreateInput','CreateEnvironment','CreateApp','CreateSequenceStore',
             'CreateRunGroup','CreateWorkgroup','CreateNamespace','CreateDocumentClassifier',
             'CreateEntityRecognizer','CreateConnection','CreateHsm','CreateVault','CreateSnapshot',
@@ -2310,6 +2311,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'mobiletargeting:TagResource','managedblockchain:TagResource',
             'gamelift:TagResource','geo:TagResource','timestream:TagResource','scn:TagResource',
             'healthlake:TagResource','omics:TagResource','datazone:TagResource',
+            'resiliencehub:TagResource','deadline:TagResource','medical-imaging:TagResource',
+            'securityhub:TagResource','cassandra:Alter',
             'qbusiness:TagResource','frauddetector:TagResource',
             // IAM role tagging (iam:TagRole not covered by tag:TagResources)
             'iam:TagRole'
@@ -2849,6 +2852,7 @@ ${crossAccountCode}
               # Universal ARN field search
               ARN_FIELDS = ['arn','Arn','ARN','aRN','resourceArn','ResourceArn','clusterArn',
                   'functionArn','topicArn','tableArn','streamArn','streamARN','stateMachineArn','pipelineArn',
+                  'certificateArn','farmArn','queueArn',
                   'backupVaultArn','dBInstanceArn','dBClusterArn','queueArn','loadBalancerArn',
                   'eventBusArn','notebookInstanceArn','documentClassifierArn','applicationArn',
                   'ApplicationARN','backupPlanArn','locationArn','computeEnvironmentArn','appArn',
@@ -2955,6 +2959,14 @@ ${crossAccountCode}
                       arn = f"arn:{p}:codedeploy:{region}:{account_id}:application:{n}" if n else None
                   elif event_name == 'CreateApplication' and 'kinesisanalytics' in detail.get('eventSource',''):
                       arn = (resp.get('applicationDetail') or {}).get('applicationARN')
+                  elif event_name == 'CreateKeyspace':
+                      n = req.get('keyspaceName')
+                      arn = f"arn:{p}:cassandra:{region}:{account_id}:/keyspace/{n}/" if n else None
+                  elif event_name == 'EnableSecurityHub':
+                      arn = f"arn:{p}:securityhub:{region}:{account_id}:hub/default"
+                  elif event_name == 'CreateDatastore' and 'medical-imaging' in detail.get('eventSource',''):
+                      ds_id = resp.get('datastoreId')
+                      arn = f"arn:{p}:medical-imaging:{region}:{account_id}:datastore/{ds_id}" if ds_id else None
                   elif event_name == 'CreateWorkGroup':
                       n = req.get('name') or req.get('workGroup', {}).get('name') or req.get('Name')
                       arn = f"arn:{p}:athena:{region}:{account_id}:workgroup/{n}" if n else None
@@ -3046,6 +3058,8 @@ ${crossAccountCode}
                       get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':dsql:' in arn:
                       get_svc('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':cassandra:' in arn:
+                      get_svc('keyspaces').tag_resource(resourceArn=arn, tags=[{'key': tag_key, 'value': tag_value}])
                   elif ':vpc-lattice:' in arn:
                       get_svc('vpc-lattice').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
                   elif ':bedrock-agentcore:' in arn:
@@ -3118,6 +3132,7 @@ ${crossAccountCode}
             - prefix: "Launch"
             - prefix: "Import"
             - prefix: "Publish"
+            - prefix: "Enable"
       Targets:
         - Arn: !GetAtt AutoTaggerFunction.Arn
           Id: MapAutoTagger
