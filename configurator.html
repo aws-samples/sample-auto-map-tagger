@@ -3417,40 +3417,20 @@ Resources:
                           AutoDeployment={'Enabled': False})
                       print('StackSet created')
                   except cf.exceptions.NameAlreadyExistsException:
-                      print('StackSet exists — waiting for any in-progress operations...')
-                      last_op_id = None
-                      for _ in range(55):
-                          ops = cf.list_stack_set_operations(StackSetName=stackset_name, MaxResults=1).get('Summaries', [])
-                          if not ops:
-                              break
-                          last_op_id = ops[0]['OperationId']
-                          if ops[0]['Status'] not in ('RUNNING', 'STOPPING'):
-                              break
-                          time.sleep(10)
-                      if last_op_id:
-                          prev = cf.describe_stack_set_operation(StackSetName=stackset_name, OperationId=last_op_id)['StackSetOperation']['Status']
-                          print(f'Previous operation {last_op_id} status: {prev}')
-                          if prev == 'SUCCEEDED':
-                              print('Instances already deployed — responding SUCCESS')
-                              respond(event, context, 'SUCCESS', {'StackSetName': stackset_name, 'RootId': root_id})
-                              return
-                  op = cf.create_stack_instances(StackSetName=stackset_name,
-                      DeploymentTargets=targets,
-                      Regions=props.get('Regions', ['ap-northeast-2']))
-                  op_id = op['OperationId']
-                  print('Op:', op_id)
-                  for _ in range(40):
-                      time.sleep(20)
-                      status = cf.describe_stack_set_operation(
-                          StackSetName=stackset_name, OperationId=op_id
-                      )['StackSetOperation']['Status']
-                      print('Status:', status)
-                      if status in ('SUCCEEDED','FAILED','STOPPED'):
-                          break
-                  if status == 'SUCCEEDED':
-                      respond(event, context, 'SUCCESS', {'StackSetName': stackset_name, 'RootId': root_id})
-                  else:
-                      respond(event, context, 'FAILED', reason=f'Operation {status}')
+                      print('StackSet exists — checking in-progress operations...')
+                      ops = cf.list_stack_set_operations(StackSetName=stackset_name, MaxResults=1).get('Summaries', [])
+                      if ops and ops[0]['Status'] in ('RUNNING', 'STOPPING'):
+                          print(f"Operation {ops[0]['OperationId']} already in progress — responding SUCCESS to let deploy.sh poll")
+                          respond(event, context, 'SUCCESS', {'StackSetName': stackset_name, 'RootId': root_id})
+                          return
+                  try:
+                      op = cf.create_stack_instances(StackSetName=stackset_name,
+                          DeploymentTargets=targets,
+                          Regions=props.get('Regions', ['ap-northeast-2']))
+                      print('Op:', op['OperationId'])
+                  except cf.exceptions.OperationInProgressException:
+                      print('OperationInProgress — responding SUCCESS to let deploy.sh poll')
+                  respond(event, context, 'SUCCESS', {'StackSetName': stackset_name, 'RootId': root_id})
               except Exception as e:
                   import traceback
                   print(traceback.format_exc())
@@ -3957,7 +3937,6 @@ WAIT_SECS=0
 while true; do
   STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null)
   if [ "\$STATUS" = "CREATE_COMPLETE" ] || [ "\$STATUS" = "UPDATE_COMPLETE" ]; then
-    DEPLOY_STATUS="SUCCESS"
     break
   elif [ "\$STATUS" = "CREATE_FAILED" ] || [ "\$STATUS" = "ROLLBACK_COMPLETE" ] || [ "\$STATUS" = "UPDATE_ROLLBACK_COMPLETE" ]; then
     DEPLOY_STATUS="FAILED — \$STATUS"
@@ -3968,6 +3947,39 @@ while true; do
   WAIT_SECS=\$((WAIT_SECS + 30))
   echo "  ${t('d_still_deploying')} (\${WAIT_SECS}s ${t('d_elapsed')})"
 done
+# Wait for StackSet instances to reach CURRENT (stack may be COMPLETE before StackSet finishes)
+if [ -z "\$DEPLOY_STATUS" ]; then
+  STACKSET_NAME=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" \\
+    --query "Stacks[0].Outputs[?OutputKey=='StackSetName'].OutputValue" --output text 2>/dev/null)
+  if [ -n "\$STACKSET_NAME" ] && [ "\$STACKSET_NAME" != "None" ]; then
+    echo ""
+    echo "  Waiting for StackSet instances to deploy..."
+    SS_WAIT=0
+    while [ \$SS_WAIT -lt 1200 ]; do
+      OUTDATED=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "Summaries[?Status!='CURRENT'].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
+      FAILED=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "Summaries[?Status=='CANCELLED'||Status=='FAILED'].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
+      TOTAL=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "Summaries[*].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
+      CURRENT=\$((TOTAL - OUTDATED))
+      echo "  StackSet progress: \${CURRENT}/\${TOTAL} accounts ready... (\${SS_WAIT}s)"
+      if [ "\$OUTDATED" -eq 0 ]; then
+        DEPLOY_STATUS="SUCCESS"
+        break
+      elif [ "\$FAILED" -gt 0 ]; then
+        DEPLOY_STATUS="FAILED — \$FAILED account(s) failed in StackSet"
+        echo "  ❌ \$FAILED account(s) failed. Check CloudFormation StackSet for details."
+        break
+      fi
+      sleep 30
+      SS_WAIT=\$((SS_WAIT + 30))
+    done
+    if [ -z "\$DEPLOY_STATUS" ]; then DEPLOY_STATUS="SUCCESS"; fi
+  else
+    DEPLOY_STATUS="SUCCESS"
+  fi
+fi
 ${config.includeBackfill ? `
 # ── Backfill wait ────────────────────────────
 if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
