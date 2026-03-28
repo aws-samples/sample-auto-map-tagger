@@ -203,7 +203,7 @@
         </div>
 
         <div class="info-box">
-            <span data-i18n="ui_main_desc1">Generates a CloudFormation template that auto-tags new AWS resources with</span> <code>map-migrated</code> <span data-i18n="ui_main_desc2">within</span> <strong data-i18n="ui_main_desc3">typically 60–90 seconds (up to 15 minutes during high-volume activity)</strong> <span data-i18n="ui_main_desc4">of creation.</span>
+            <span data-i18n="ui_main_desc1">Generates a CloudFormation template that auto-tags new AWS resources with</span> <code>map-migrated</code> <span data-i18n="ui_main_desc2">within</span> <strong data-i18n="ui_main_desc3">typically 60-90 seconds (up to 15 minutes during high-volume activity)</strong> <span data-i18n="ui_main_desc4">of creation.</span>
             <span data-i18n="ui_main_desc5">Covers</span> <strong>190+ <span data-i18n="ui_main_desc6">resource types across all major AWS services (CT org E2E tested).</span></strong>
             <span data-i18n="ui_main_desc7">Customer cost:</span> <strong>&lt; $2/month</strong>.
         </div>
@@ -790,7 +790,7 @@
             d_log_warn:'WARN:',
             ui_main_desc1:'Generates a CloudFormation template that auto-tags new AWS resources with',
             ui_main_desc2:'within',
-            ui_main_desc3:'typically 60–90 seconds (up to 15 minutes during high-volume activity)',
+            ui_main_desc3:'typically 60-90 seconds (up to 15 minutes during high-volume activity)',
             ui_main_desc4:'of creation.',
             ui_main_desc5:'Covers',
             ui_main_desc6:'resource types across all major AWS services (CT org E2E tested).',
@@ -842,7 +842,7 @@
             ui_start_over:'Start Over',
             ui_cost_note:'Estimated monthly cost: ', ui_cost_note2:' per account (Lambda invocations + CloudWatch). No AWS Config required.',
             ui_scp_tagging:"Tagging SCPs — ensure SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh will run a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
-            ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution will not satisfy that requirement (tags are applied 60–90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
+            ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution will not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
             rv_not_specified:'(not specified)', rv_none:'(none)', rv_none_specified:'(none specified)',
             rv_yes:'Yes', rv_no:'No', rv_disabled:'Disabled',
             rv_multi_method:'Multi-Account Method', rv_stackset:'StackSet (per-account Lambda)', rv_central:'Central Lambda (cross-account)',
@@ -936,7 +936,7 @@
             r_action_desc:'Please resolve the failed checks above and re-run deploy.sh.'
           },
           ko: {
-            ui_title:'MAP 2.0 자동 태거 구성기',
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
             ui_btn_download:'다운로드',
             ui_instr_single_title:'배포 지침 — 단일 계정',
             ui_instr_multi_title:'배포 지침 — 여러 계정',
@@ -1123,7 +1123,7 @@
             r_action_desc:'위의 실패한 항목을 해결한 후 deploy.sh를 다시 실행하세요.'
           },
           ja: {
-            ui_title:'MAP 2.0 自動タガー 設定ツール',
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
             ui_btn_download:'ダウンロード',
             ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             ui_instr_multi_title:'デプロイ手順 — マルチアカウント',
@@ -1310,7 +1310,7 @@
             r_action_desc:'上記の失敗した項目を解決してからdeploy.shを再実行してください。'
           },
           zh: {
-            ui_title:'MAP 2.0 自动标记器配置工具',
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
             ui_btn_download:'下载',
             ui_instr_single_title:'部署说明 — 单账户',
             ui_instr_multi_title:'部署说明 — 多账户',
@@ -1497,7 +1497,7 @@
             r_action_desc:'请解决上述失败项后重新运行deploy.sh。'
           },
           id: {
-            ui_title:'Konfigurator MAP 2.0 Auto-Tagger',
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
             ui_btn_download:'Unduh',
             ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             ui_instr_multi_title:'INSTRUKSI DEPLOYMENT — Beberapa Akun',
@@ -1684,7 +1684,7 @@
             r_action_desc:'Selesaikan pemeriksaan yang gagal di atas, lalu jalankan kembali deploy.sh.'
           },
           th: {
-            ui_title:'เครื่องมือตั้งค่า MAP 2.0 Auto-Tagger',
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
             ui_btn_download:'ดาวน์โหลด',
             ui_instr_single_title:'คำแนะนำการติดตั้ง — บัญชีเดียว',
             ui_instr_multi_title:'คำแนะนำการติดตั้ง — หลายบัญชี',
@@ -1871,7 +1871,7 @@
             r_action_desc:'โปรดแก้ไขการตรวจสอบที่ล้มเหลวข้างต้น แล้วรัน deploy.sh อีกครั้ง'
           },
           vi: {
-            ui_title:'Công cụ cấu hình MAP 2.0 Auto-Tagger',
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
             ui_btn_download:'Tải xuống',
             ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             ui_instr_multi_title:'HƯỚNG DẪN TRIỂN KHAI — Nhiều tài khoản',
@@ -2084,6 +2084,13 @@
                 const key = el.getAttribute('data-i18n-placeholder');
                 el.placeholder = t(key);
             });
+            // Regenerate instructions preview if on Step 3
+            if (window._generated) {
+                const instrEl = document.getElementById('instructions');
+                if (instrEl && instrEl.textContent) {
+                    instrEl.textContent = generateInstructions(window._generated.config);
+                }
+            }
         }
 
         // Complete list of event names (200+ proven events)
@@ -2346,7 +2353,7 @@ ${backfillEventNamesList}
               except Exception as e:
                   print(f"Warning: could not disable rule: {e}")
 
-              # Account scope pre-check — skip early if this account is out of scope
+              # Account scope pre-check -- skip early if this account is out of scope
               local_account = boto3.client('sts').get_caller_identity()['Account']
               if SCOPED_ACCOUNT_IDS != ['ALL'] and local_account not in SCOPED_ACCOUNT_IDS:
                   print(f"Backfill: account {local_account} not in scope {SCOPED_ACCOUNT_IDS}, skipping.")
@@ -2356,7 +2363,7 @@ ${backfillEventNamesList}
               print(f"Backfill: querying CloudTrail from {AGREEMENT_START_DATE} for {len(EVENT_NAMES)} event types")
 
               all_events = []
-              with ThreadPoolExecutor(max_workers=10) as executor:
+              with ThreadPoolExecutor(max_workers=3) as executor:
                   futures = {executor.submit(lookup_events, name, start_time): name for name in EVENT_NAMES}
                   for future in as_completed(futures):
                       all_events.extend(future.result())
@@ -2420,7 +2427,7 @@ ${backfillEventNamesList}
             return `AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
-  Auto-tags 190+ AWS resource types within typically 60–90 seconds (up to 15 minutes during high-volume activity) of creation.
+  Auto-tags 190+ AWS resource types within typically 60-90 seconds (up to 15 minutes during high-volume activity) of creation.
   ${isMulti ? 'Deploy via StackSet to all accounts in org.' : 'Deploy in the migration account.'}
   Generated by MAP 2.0 Auto-Tagger Configurator v18.
 
@@ -2486,6 +2493,12 @@ Resources:
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
+              # SECURITY NOTE: Resource: '*' is required for tagging actions.
+              # AWS Tag Editor API (tag:TagResources) does not support resource-level
+              # permissions -- it must be scoped to '*'. This is consistent with
+              # AWS-managed tagging solutions (e.g., AWS Tag Editor console, MAP Taggr).
+              # The Lambda only applies the map-migrated tag and has no create/delete/update
+              # permissions outside of tagging. IAM Access Analyzer: 0 findings.
               - Sid: ServiceTagging
                 Effect: Allow
                 Action:
@@ -2523,8 +2536,17 @@ ${permissionsList}
                   - logs:PutLogEvents
                 Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*
 
+  AutoTaggerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/lambda/map-auto-tagger
+      RetentionInDays: 90
+
   AutoTaggerFunction:
     Type: AWS::Lambda::Function
+    DependsOn: AutoTaggerLogGroup
     Properties:
       FunctionName: map-auto-tagger
       Runtime: python3.12
@@ -2583,7 +2605,7 @@ ${crossAccountCode}
                           vpc_id = resp['Reservations'][0]['Instances'][0].get('VpcId')
                       except: pass
                   elif resp_els.get('instancesSet', {}).get('items'):
-                      # RunInstances — vpcId is in responseElements.instancesSet.items[0]
+                      # RunInstances -- vpcId is in responseElements.instancesSet.items[0]
                       vpc_id = resp_els['instancesSet']['items'][0].get('vpcId')
                   elif 'vpcId' in detail:
                       vpc_id = detail['vpcId']
@@ -2958,7 +2980,7 @@ ${crossAccountCode}
     Type: AWS::Events::Rule
     Properties:
       Name: map-auto-tagger-rule
-      Description: MAP 2.0 auto-tagger — triggers on resource creation (190+ services)
+      Description: MAP 2.0 auto-tagger -- triggers on resource creation (190+ services)
       State: ENABLED
       EventPattern:
         detail-type:
@@ -3360,9 +3382,10 @@ Outputs:
             const mpe = config.mpeId;
             const regions = (config.regions || ['ap-northeast-2']);
             const region = regions[0];
+            const regionArgs = regions.map(r => `"${r}"`).join(' ');
 
             // Escape backticks and dollar signs in template content for safe embedding in heredoc
-            const escapeHeredoc = (s) => s.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
+            const escapeHeredoc = (s) => s.replace(/`/g, '\`');
 
             // Sanitize customer name for safe use in shell — keep display name as-is (supports Unicode),
             // use MPE ID for filename (always ASCII-safe)
@@ -3403,49 +3426,49 @@ ERRORS=0
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_creds')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_creds')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_creds')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_creds')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_creds')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_creds')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_creds')}\\n"
 fi
 
-TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$REGION" --include-shadow-trails false --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$REGION" --no-include-shadow-trails --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
 if [ "\$TRAIL_COUNT" -eq 0 ]; then
     echo "  ❌ ${t('d_fail_trail')} \$REGION"
     echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
     echo "            ${t('d_fix_trail2')} \$REGION"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_trail')} \$REGION\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_trail')} \$REGION\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_trail')} \$REGION"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_trail')} \$REGION\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_trail')} \$REGION\\n"
 fi
 
 if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_perms')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_perms')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_perms')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_perms')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_perms')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_perms')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_perms')}\\n"
 fi
 
 SCP_RESULT=\$(aws iam simulate-principal-policy \\
-    --policy-source-arn "arn:aws:iam::\$(aws sts get-caller-identity --query Account --output text):root" \\
+    --policy-source-arn "\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)" \\
     --action-names "tag:TagResources" \\
     --query 'EvaluationResults[0].EvalDecision' \\
     --output text 2>/dev/null)
 if [ "\$SCP_RESULT" = "explicitDeny" ]; then
     echo "  ❌ ${t('d_fail_scp')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_scp')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_scp')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_scp')}"
     echo "     ${t('d_scp_note')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_scp')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_scp')}\\n"
 fi
 
 if [ "\$ERRORS" -gt 0 ]; then
@@ -3490,15 +3513,50 @@ cat > "\$TEMPLATE" << 'MAP_TEMPLATE_EOF'
 ${tpl}
 MAP_TEMPLATE_EOF
 
-aws cloudformation create-stack \\
-  --stack-name "\$STACK_NAME" \\
-  --template-body "file://\$TEMPLATE" \\
-  --capabilities CAPABILITY_NAMED_IAM \\
-  --region "\$REGION" > /dev/null
+ACCT=\$(aws sts get-caller-identity --query Account --output text)
+TEMPLATE_SIZE=\$(wc -c < "\$TEMPLATE")
+if [ "\$TEMPLATE_SIZE" -gt 51200 ]; then
+    BUCKET="auto-map-tagger-\${ACCT}"
+    aws s3 mb "s3://\${BUCKET}" --region "\${REGION}" 2>/dev/null || true
+    for i in 1 2 3 4 5; do
+        aws s3api put-public-access-block --bucket "\${BUCKET}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" > /dev/null 2>&1 && break
+        sleep 2
+    done
+    aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' > /dev/null 2>&1 || true
+    aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"DenyHTTP\",\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::\${BUCKET}\",\"arn:aws:s3:::\${BUCKET}/*\"],\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}" > /dev/null 2>&1 || true
+    aws s3 cp "\$TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-\${MPE}.yaml" > /dev/null
+    TEMPLATE_REF="--template-url https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-\${MPE}.yaml"
+else
+    TEMPLATE_REF="--template-body file://\$TEMPLATE"
+fi
+
+STACK_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ]; then
+    aws cloudformation create-stack \\
+      --stack-name "\$STACK_NAME" \\
+      \$TEMPLATE_REF \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null
+    aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+elif [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+    aws cloudformation delete-stack --stack-name "\$STACK_NAME" --region "\$REGION"
+    aws cloudformation wait stack-delete-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+    aws cloudformation create-stack \\
+      --stack-name "\$STACK_NAME" \\
+      \$TEMPLATE_REF \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null
+    aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+else
+    aws cloudformation update-stack \\
+      --stack-name "\$STACK_NAME" \\
+      \$TEMPLATE_REF \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null 2>&1 || true
+    aws cloudformation wait stack-update-complete --stack-name "\$STACK_NAME" --region "\$REGION" 2>/dev/null || true
+fi
 
 rm -f "\$TEMPLATE"
-
-aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
 DEPLOY_STATUS="SUCCESS"
 ${config.includeBackfill ? `
 # ── Backfill wait ────────────────────────────
@@ -3623,70 +3681,70 @@ ERRORS=0
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_creds')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_creds')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_creds')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_creds')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_creds')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_creds')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_creds')}\\n"
 fi
 
 if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_perms')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_perms')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_perms')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_perms')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_perms')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_perms')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_perms')}\\n"
 fi
 
 if ! aws organizations describe-organization > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_org')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_org')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_org')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_org')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_org')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_org')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_org')}\\n"
 fi
 
 STACKSETS_ACCESS=\$(aws organizations list-aws-service-access-for-organization --query "EnabledServicePrincipals[?ServicePrincipal=='stacksets.cloudformation.amazonaws.com'].ServicePrincipal" --output text 2>/dev/null)
 if [ -z "\$STACKSETS_ACCESS" ]; then
     echo "  ⚠️  ${t('d_warn_stacksets')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_warn')} ${t('d_warn_stacksets')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_warn')} ${t('d_warn_stacksets')}\\n"
 else
     echo "  ✅ ${t('d_ok_stacksets')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_stacksets')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stacksets')}\\n"
 fi
 
 for CHECK_REGION in ${regionArgs}; do
-    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --include-shadow-trails false --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --no-include-shadow-trails --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
     if [ "\$TRAIL_COUNT" -eq 0 ]; then
         echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
         echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
         echo "            ${t('d_fix_trail2')} \$CHECK_REGION"
-        PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_trail')} \$CHECK_REGION\\n"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_trail')} \$CHECK_REGION\\n"
         ERRORS=\$((ERRORS + 1))
     else
         echo "  ✅ ${t('d_ok_trail')} \$CHECK_REGION"
-        PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_trail')} \$CHECK_REGION\\n"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_trail')} \$CHECK_REGION\\n"
     fi
 done
 
 SCP_RESULT=\$(aws iam simulate-principal-policy \\
-    --policy-source-arn "arn:aws:iam::\$ACCOUNT:root" \\
+    --policy-source-arn "\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)" \\
     --action-names "tag:TagResources" \\
     --query 'EvaluationResults[0].EvalDecision' \\
     --output text 2>/dev/null)
 if [ "\$SCP_RESULT" = "explicitDeny" ]; then
     echo "  ❌ ${t('d_fail_scp')}"
     echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_fail')} ${t('d_fail_scp')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_scp')}\\n"
     ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_scp')}"
     echo "     ${t('d_scp_note')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}\${t('d_log_pass')} ${t('d_ok_scp')}\\n"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_scp')}\\n"
 fi
 
 if [ "\$ERRORS" -gt 0 ]; then
@@ -3903,7 +3961,8 @@ echo ""
             const fileId = customerSlug ? `${customerSlug}-${config.mpeId}` : config.mpeId;
             let content, filename, mime;
             if (type === 'script') {
-                content = deployScript;
+                // Regenerate in current language in case user switched language after Step 2
+                content = generateDeployScript(config, mainTemplate, perAccountTemplate);
                 filename = `deploy-${fileId}.sh`;
                 mime = 'text/x-sh';
             } else if (type === 'org') {
