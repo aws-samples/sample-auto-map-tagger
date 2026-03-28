@@ -191,7 +191,9 @@ AWS Resource Created
 
 - **Single Account** — deploy once per region where you create resources
 - **Multi-Account** — deploy via StackSets across all member accounts
+  - Must be run from the management account or a [delegated administrator](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-orgs-delegated-admin.html) account for CloudFormation StackSets
   - Lambda Custom Resource auto-discovers org root OU and deploys to all accounts
+  - Use **account scoping** in the configurator to target only specific linked accounts under a MAP engagement — useful when a payer account contains accounts across multiple MAP engagements with different MPE IDs
   - New accounts added to the org automatically receive the auto-tagger
 
 ---
@@ -336,8 +338,8 @@ aws logs filter-log-events \
 - ✅ All known limitations documented
 
 **Recommended deployment:**
-1. AWS account team generates `deploy.sh` via `configurator.html`
-2. Customer runs `bash deploy.sh` in CloudShell (single or management account)
+1. Generate `deploy.sh` via `configurator.html`
+2. Run `bash deploy.sh` in CloudShell or local CLI (from the target account)
 3. Monitor via CloudWatch for 1 week
 4. Expand regions as needed (us-east-1 for CloudFront/Route53; us-west-2 for GA)
 
