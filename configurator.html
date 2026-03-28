@@ -2185,6 +2185,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'ActivateGateway','CreateFleet','CreateImageBuilder','CreateDirectory','CreateMicrosoftAD',
             'RequestCertificate','CreateGraphqlApi','CreateProject','CreatePipeline','CreateBackupVault',
             'CreateBackupPlan','CreateLogGroup','CreateUserPool','CreateIdentityPool','CreateApplication',
+            'CreateMemory','CreateAgentRuntime','CreateKey','CreateCoreNetwork','CreateGlobalNetwork',
+            'CreateServiceNetwork','CreateService','CreateWorkspaceInstance',
             'CreateIndex','CreateChannel','CreateInput','CreateEnvironment','CreateApp','CreateSequenceStore',
             'CreateRunGroup','CreateWorkgroup','CreateNamespace','CreateDocumentClassifier',
             'CreateEntityRecognizer','CreateConnection','CreateHsm','CreateVault','CreateSnapshot',
@@ -2230,7 +2232,9 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'aws.bedrock-agent','aws.quicksight','aws.ivs','aws.apprunner','aws.pipes',
             'aws.macie2','aws.guardduty','aws.inspector2','aws.securityhub','aws.xray',
             'aws.athena','aws.batch','aws.codecommit','aws.codedeploy','aws.amplify',
-            'aws.servicecatalog','aws.ram','aws.acm-pca','aws.aoss','aws.events'
+            'aws.servicecatalog','aws.ram','aws.acm-pca','aws.aoss','aws.events',
+            'aws.kinesisvideo','aws.dsql','aws.vpc-lattice','aws.bedrock-agentcore',
+            'aws.payment-cryptography','aws.networkmanager','aws.workspaces-instances'
         ];
 
         const TAGGING_PERMISSIONS = [
@@ -2294,6 +2298,9 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             // IoT
             'iot:TagResource','iotanalytics:TagResource','iotevents:TagResource',
             'iotsitewise:TagResource','iottwinmaker:TagResource','greengrass:TagResource',
+            'kinesisvideo:TagStream','dsql:TagResource','vpc-lattice:TagResource',
+            'bedrock-agentcore-control:TagResource','payment-cryptography:TagResource',
+            'networkmanager:TagResource',
             // Media
             'ivs:TagResource','ivschat:TagResource','mediaconvert:TagResource',
             'medialive:CreateTags','mediapackage:TagResource',
@@ -2841,7 +2848,7 @@ ${crossAccountCode}
 
               # Universal ARN field search
               ARN_FIELDS = ['arn','Arn','ARN','aRN','resourceArn','ResourceArn','clusterArn',
-                  'functionArn','topicArn','tableArn','streamArn','stateMachineArn','pipelineArn',
+                  'functionArn','topicArn','tableArn','streamArn','streamARN','stateMachineArn','pipelineArn',
                   'backupVaultArn','dBInstanceArn','dBClusterArn','queueArn','loadBalancerArn',
                   'eventBusArn','notebookInstanceArn','documentClassifierArn','applicationArn',
                   'ApplicationARN','backupPlanArn','locationArn','computeEnvironmentArn','appArn',
@@ -2874,7 +2881,10 @@ ${crossAccountCode}
                   elif event_name == 'CreateBucket':
                       b = req.get('bucketName'); arn = f"arn:{p}:s3:::{b}" if b else None
                   elif event_name == 'CreateStream':
-                      n = req.get('streamName'); arn = f"arn:{p}:kinesis:{region}:{account_id}:stream/{n}" if n else None
+                      n = req.get('streamName')
+                      if 'kinesisvideo' not in detail.get('eventSource',''):
+                          arn = f"arn:{p}:kinesis:{region}:{account_id}:stream/{n}" if n else None
+                      # KVS: streamARN is in response, picked up by ARN_FIELDS scan above
                   elif event_name == 'CreateQueue':
                       url = resp.get('queueUrl',''); parts = url.rstrip('/').split('/')
                       arn = f"arn:{p}:sqs:{region}:{account_id}:{parts[-1]}" if parts else None
@@ -2943,6 +2953,8 @@ ${crossAccountCode}
                   elif event_name == 'CreateApplication' and detail.get('eventSource') == 'codedeploy.amazonaws.com':
                       n = req.get('applicationName')
                       arn = f"arn:{p}:codedeploy:{region}:{account_id}:application:{n}" if n else None
+                  elif event_name == 'CreateApplication' and 'kinesisanalytics' in detail.get('eventSource',''):
+                      arn = (resp.get('applicationDetail') or {}).get('applicationARN')
                   elif event_name == 'CreateWorkGroup':
                       n = req.get('name') or req.get('workGroup', {}).get('name') or req.get('Name')
                       arn = f"arn:{p}:athena:{region}:{account_id}:workgroup/{n}" if n else None
@@ -3032,6 +3044,18 @@ ${crossAccountCode}
                       get_svc('memorydb').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':iot:' in arn and ':policy/' in arn:
                       get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':dsql:' in arn:
+                      get_svc('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':vpc-lattice:' in arn:
+                      get_svc('vpc-lattice').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':bedrock-agentcore:' in arn:
+                      boto3.client('bedrock-agentcore-control', region_name=arn.split(':')[3] or region).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':payment-cryptography:' in arn:
+                      boto3.client('payment-cryptography', region_name=arn.split(':')[3] or region).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  elif ':networkmanager:' in arn:
+                      boto3.client('networkmanager', region_name='us-east-1').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':kinesisvideo:' in arn:
+                      get_svc('kinesisvideo').tag_stream(StreamARN=arn, Tags={tag_key: tag_value})
                   elif ':lightsail:' in arn:
                       get_svc('lightsail').tag_resource(resourceName=arn.split('/')[-1], tags=[{'key': tag_key, 'value': tag_value}])
                   else:
