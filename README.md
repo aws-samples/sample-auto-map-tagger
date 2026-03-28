@@ -58,35 +58,24 @@ EventBridge catches resource creation events and triggers a Lambda that applies 
 
 ## 🚀 Quick Start
 
-### For the AWS Account Team
+### Step 1 — Generate deploy.sh
 
 1. Open `configurator.html` in a browser
 2. Fill in MPE ID, agreement date, deployment mode, regions
 3. Click **Generate & Download** → downloads `deploy.sh` (fully self-contained)
-4. Run `deploy.sh` from the target account (see deployment models below)
 
-### Deployment Models
+### Step 2 — Run deploy.sh
 
-**Direct customer (customer owns their own AWS account):**
-Send `deploy.sh` to the customer. They run it from their own account via CloudShell or local CLI.
-
-**MSP / Partner-managed (partner owns the payer account):**
-The MAP 2.0 agreement is between the **partner and AWS** — the MPE ID belongs to the partner. The partner runs `deploy.sh` directly from their management account. Customers typically don't interact with this tool at all.
-- *Single customer account*: run in single-account mode, credentials for that linked account
-- *Multiple customer accounts under same MPE*: run in multi-account mode, use account scoping to target only the relevant linked account IDs
-
-**Running deploy.sh:**
-
-Open **AWS CloudShell** in the target account and run:
+**Option 1 — AWS CloudShell (no setup required):**
+Open **AWS CloudShell** in the target account, upload `deploy.sh`, and run:
 
 ```bash
 bash deploy.sh
 ```
 
-Or from a local terminal with AWS CLI v2:
-
+**Option 2 — Local AWS CLI:**
 ```bash
-# Credentials must be configured for the target account (or management account for multi-account)
+# Credentials must be configured for the target account
 bash deploy.sh
 ```
 
@@ -258,7 +247,7 @@ AWS Resource Created
 - **Existing resources** not automatically tagged — enable the one-time backfill option in the configurator (covers resources created up to 90 days before deployment)
 - **S3 staging bucket (multi-account only)** — the multi-account deployment creates an S3 bucket named `auto-map-tagger-{account-id}` in the management account to stage CloudFormation templates for the StackSet. This bucket is intentionally retained after deployment — CloudFormation StackSets require a persistent template URL to automatically deploy to new accounts that join your organization in the future. The bucket contains only the per-account CloudFormation template (~40KB) and has Block Public Access, AES-256 encryption, and HTTPS-only enforcement applied. Single-account deployments do not create a persistent S3 bucket.
 - **Delegated administrator accounts supported** — in large enterprises the management account is often locked down and a "shared services" account is designated as the [delegated administrator](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-orgs-delegated-admin.html) for CloudFormation StackSets. Running `deploy.sh` from a delegated admin account is fully supported. The preflight check verifies the caller is either the management account or a registered delegated admin for `stacksets.cloudformation.amazonaws.com`.
-- **One active MAP engagement per linked account** — all Lambda, EventBridge, IAM, and SSM resources use fixed names (`map-auto-tagger`, `/auto-map-tagger/config`). If a customer has two concurrent MAP engagements scoped to the same linked account, the second deployment will conflict with the first. In practice this is rare — a single linked account typically participates in one MAP engagement at a time. If re-tagging with a new MPE ID is needed, delete the existing stack first and redeploy.
+- **One active MAP engagement per linked account** — all Lambda, EventBridge, IAM, and SSM resources use fixed names (`map-auto-tagger`, `/auto-map-tagger/config`). Deploying a second engagement scoped to the same account will conflict with an existing deployment. If re-tagging with a new MPE ID is needed, delete the existing stack first and redeploy.
 - **Management account not covered in multi-account mode** — `SERVICE_MANAGED` StackSets cannot deploy to the management account (AWS hard constraint). In multi-account StackSet deployments, the management account runs the deployment but does not receive the auto-tagger Lambda. Resources created in the management account will not be tagged. AWS best practice is to not run workloads in the management account. If tagging is required there, additionally run a single-account deployment targeting the management account after the StackSet deployment completes.
 - **New AWS accounts added post-deployment** — if a new account joins the organization after the StackSet has been deployed, it will not automatically receive the Lambda. Resources created in that account will not be tagged. Re-run `deploy.sh` to extend the StackSet to cover new accounts.
 - **Service Control Policies (SCPs)** — two scenarios require manual verification before deployment:
