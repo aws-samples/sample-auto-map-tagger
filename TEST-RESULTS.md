@@ -1,7 +1,51 @@
 # MAP 2.0 Auto-Tagger — Service Coverage & Test Results
 
-**Template version:** v17 | **Accounts tested:** 4 (CT org) | **Regions:** ap-northeast-2, ap-northeast-1, us-east-1, us-west-2
-**Total bugs fixed:** 79+ | **False positives:** 0
+**Template version:** v19.24 | **Accounts tested:** 9 (single + CT org with 5 linked + 2 security OU) | **Regions:** ap-northeast-2, us-east-1
+**Total bugs fixed:** 99+ | **False positives:** 0 | **Last full MAP 2.0 service sweep:** 2026-03-29
+
+---
+
+## MAP 2.0 Full Service Coverage — v19.21–v19.24 Additions
+
+Services added to MAP 2.0 since Phase 2 (all verified working):
+
+| Service | Status | Notes |
+|---------|--------|-------|
+| Kinesis Video Streams | ✅ Fixed v19.21 | `streamARN` in ARN_FIELDS; `TagStream(StreamARN=)` |
+| Aurora DSQL | ✅ Fixed v19.21 | `dsql:TagResource` direct call |
+| VPC Lattice | ✅ Fixed v19.21 | Added `vpc-lattice:TagResource` IAM |
+| Kinesis Analytics v2 | ✅ Fixed v19.21 | `applicationDetail.applicationARN` response field |
+| Bedrock AgentCore | ✅ Fixed v19.22 | SigV4 urllib request (Lambda boto3 too old); `bedrock-agentcore:TagResource` IAM |
+| Payment Cryptography | ✅ Fixed v19.22 | `payment-cryptography:TagResource(ResourceArn, Tags=[list])` |
+| Cloud WAN | ✅ Fixed v19.22 | `networkmanager:TagResource` via us-east-1; list format |
+| AWS Certificate Manager | ✅ Fixed v19.23 | `certificateArn` added to ARN_FIELDS |
+| Amazon Keyspaces | ✅ Fixed v19.23 | ARN from `requestParameters.keyspaceName`; `cassandra:Alter` IAM; `keyspaces:TagResource` |
+| AWS Security Hub | ✅ Fixed v19.23 | `EnableSecurityHub` → `hub/default` ARN; `Enable` prefix added to EventBridge |
+| AWS HealthImaging | ✅ Fixed v19.23 | `datastoreId` → ARN construction (us-east-1) |
+| AWS Deadline Cloud | ✅ Fixed v19.23 | `deadline:TagResource` IAM added |
+| AWS Resilience Hub | ✅ Fixed v19.23 | `resiliencehub:TagResource` IAM added |
+| AWS Systems Manager OpsCenter | ✅ Fixed v19.24 | `opsItemArn` added to ARN_FIELDS |
+| AppSync | ✅ Confirmed | Was working, not previously documented |
+| Athena Workgroups | ✅ Confirmed | Was working, not previously documented |
+| Cognito User Pools | ✅ Confirmed | Was working, not previously documented |
+| AWS Elastic Beanstalk | ✅ Confirmed | Was working, not previously documented |
+| EBS Volumes (CreateVolume) | ✅ Fixed v19.15 | `volumeId` ARN construction was missing |
+
+Services with test-environment limitations (handlers in place, account restrictions prevented live testing):
+
+| Service | Handler Status | Limitation |
+|---------|---------------|------------|
+| Amazon Timestream | ✅ Handler in place (`timestream:TagResource` + `CreateDatabase` event) | Requires Timestream LiveAnalytics customer enrollment |
+| AWS Elastic Disaster Recovery | ✅ Handler in place (`tag:TagResources`, `CreateSourceServer` event) | DRS SLR creation blocked in Isengard test accounts |
+| AWS Storage Gateway | ✅ Handler in place (`storagegateway:AddTagsToResource`, `ActivateGateway` event) | Requires EC2 instance with SGW software |
+| Amazon WorkSpaces | ✅ Handler in place (`workspaces:CreateTags`, `CreateWorkspaces` event) | Requires AWS Directory Service |
+| AWS Mainframe Modernization | ✅ Handler in place (`m2:TagResource`, `CreateApplication` event) | Not accessible in Isengard test accounts |
+| WorkSpaces Core Managed Instances | ✅ Handler added v19.21 (`CreateWorkspaceInstance` event) | Requires WorkSpaces directory environment |
+| AWS Direct Connect | ✅ Handler in place (`directconnect:TagResource`) | Physical infrastructure required |
+| AWS CloudHSM | ✅ Handler in place (`CreateHsm` event, `cloudhsm:TagResource`) | Expensive/complex setup |
+| AWS Directory Service | ✅ Handler in place (`CreateDirectory` event, `ds:AddTagsToResource`) | AD setup required |
+| Amazon S3 Glacier | ✅ Via S3 bucket tagging | Old Glacier API deprecated for new accounts; MAP 2.0 uses S3 Glacier storage class via S3 |
+| AWS CodeStar | ✅ N/A | Service deprecated and removed from AWS CLI |
 
 ---
 
