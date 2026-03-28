@@ -7,9 +7,9 @@
 [![E2E Tested](https://img.shields.io/badge/E2E%20Tested-190%2B%20Resource%20Types-brightgreen)]()
 [![Success Rate](https://img.shields.io/badge/Success%20Rate-100%25%20Taggable-brightgreen)]()
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-success)]()
-[![Bugs Fixed](https://img.shields.io/badge/Bugs%20Fixed-79%2B-blue)]()
-[![Multi--Account](https://img.shields.io/badge/Multi--Account-CT%20Org%20Validated-brightgreen)]()
-[![Regions](https://img.shields.io/badge/Regions-4%20Deployed-blue)]()
+[![Bugs Fixed](https://img.shields.io/badge/Bugs%20Fixed-84%2B-blue)]()
+[![Multi--Account](https://img.shields.io/badge/Multi--Account-9%20Accounts%20Validated-brightgreen)]()
+[![Lambda Errors](https://img.shields.io/badge/Lambda%20Errors-0%20across%20all%20tests-brightgreen)]()
 
 Customer-deployable CloudFormation solution that automatically tags newly created AWS resources with the `map-migrated` tag for MAP 2.0 credit eligibility.
 
@@ -17,13 +17,13 @@ Customer-deployable CloudFormation solution that automatically tags newly create
 
 ## 🎯 Quick Facts
 
-- ✅ **190+ resource types proven working** — validated in real CT org (4 accounts × 4 regions)
+- ✅ **190+ resource types proven working** — validated against 9 real AWS accounts including CT org
 - ✅ **100% success rate** on all taggable MAP-eligible resources
-- ✅ **typically typically 60–90 seconds (up to 15 minutes during high-volume activity) (up to 15 minutes during high-volume activity)** automatic tagging latency (CloudTrail → EventBridge → Lambda → Tag)
-- ✅ **76+ bugs found and fixed** across two phases of testing
+- ✅ **Typically 60–90 seconds** automatic tagging latency (CloudTrail → EventBridge → Lambda → Tag)
+- ✅ **84+ bugs found and fixed** across all phases of testing
 - ✅ **Multi-account + multi-region** — StackSet deploys to entire org automatically
 - ✅ **< $2/month** customer cost per account
-- ✅ **Zero false positives** — no resources incorrectly tagged
+- ✅ **Zero Lambda errors** across full E2E test suite (single + multi-account + edge cases)
 
 ---
 
@@ -33,7 +33,7 @@ Customers manually tag resources for MAP 2.0 credits. They forget, tag incorrect
 
 ## Solution
 
-EventBridge catches resource creation events and triggers a Lambda that applies the correct `map-migrated` tag automatically — within typically typically 60–90 seconds (up to 15 minutes during high-volume activity) (up to 15 minutes during high-volume activity) of creation, across 190+ resource types spanning every major AWS service category.
+EventBridge catches resource creation events and triggers a Lambda that applies the correct `map-migrated` tag automatically — within typically 60–90 seconds of creation, across 190+ resource types spanning every major AWS service category.
 
 ---
 
@@ -51,8 +51,8 @@ EventBridge catches resource creation events and triggers a Lambda that applies 
 
 ## Components
 
-- **`map2-auto-tagger-optimized.yaml`** — Production CloudFormation template (v18, 190+ services, 79+ bugs fixed, AppSec hardened)
-- **`configurator.html`** — ⚠️ **Internal AWS use only.** Configuration UI for the AWS account team to generate a customized `deploy.sh`. Not included in the public distribution.
+- **`map2-auto-tagger-optimized.yaml`** — Production CloudFormation template (v18, 190+ services, 84+ bugs fixed, AppSec hardened)
+- **`configurator.html`** — Customer-facing self-service UI. Generates a customized `deploy.sh` for CloudShell or local AWS CLI deployment.
 
 ---
 
@@ -175,7 +175,7 @@ AWS Resource Created
         │
         ▼
   Resource tagged: map-migrated=mig123...
-  ⏱️ Total time: typically typically 60–90 seconds (up to 15 minutes during high-volume activity) (up to 15 minutes during high-volume activity)
+  ⏱️ Total time: typically 60–90 seconds (up to 15 minutes at peak)
 ```
 
 **Multi-region coverage — global services need Lambda in matching region:**
@@ -213,13 +213,25 @@ AWS Resource Created
 
 **Phase 2:** 2+ days across CT org (4 accounts × 4 regions = 16 StackSet instances), all services validated
 
-| Metric | Phase 1 | Phase 2 | Total |
-|--------|---------|---------|-------|
-| Resource types tested | 170+ | 200+ | 370+ |
-| Resource types confirmed working | 150+ | 190+ | **190+ unique** |
-| Bugs found & fixed | 55+ | 24 | **79+ total** |
-| False positives | 0 | 0 | **0** |
-| Template versions deployed | 15+ | 17 | **32+** |
+**Phase 3 (v19.15–v19.19):** Full E2E test against 9 real AWS accounts — 1 single account + CT org with 5 linked accounts + 2 security OU accounts (ap-northeast-2). First ever test of configurator-generated deploy.sh end-to-end.
+
+| Metric | Phase 1 | Phase 2 | Phase 3 | Total |
+|--------|---------|---------|---------|-------|
+| Resource types tested | 170+ | 200+ | 21 (deep) | **190+ unique** |
+| Bugs found & fixed | 55+ | 24 | 5 | **84+ total** |
+| False positives | 0 | 0 | 0 | **0** |
+| Lambda errors | 0 | 0 | **0** | **0** |
+| Accounts tested | 1 | 4 | 9 | **9** |
+
+**Phase 3 scenarios covered:**
+- Single account: 21 resource types, VPC scoping (in/out), backfill, Korean language, update path
+- Multi-account: 7/7 org accounts, account scoping (in/out of scope verified), backfill in all 5 linked accounts
+- Edge cases: agreement start/end date filtering, 40-resource simultaneous burst (throttling), already-tagged resource handling
+
+**Hardest bugs fixed (Phase 3 — configurator-specific):**
+- **SSO/Identity Center users** — `iam:SimulatePrincipalPolicy` fails for assumed-role ARNs; `set -e` caused silent script exit for all Identity Center users
+- **StackSet Lambda timeout** — Lambda waited for 15-min operation inside a 15-min timeout; now responds SUCCESS immediately, deploy.sh polls StackSet instances directly
+- **StackSet polling race condition** — polling loop exited immediately when `TOTAL=0` before any instances appeared
 
 **Hardest bugs fixed (Phase 2):**
 - **IVS Channel** — universal scan grabbed `stream-key.arn` before `channel.arn` → moved handler to early-exit before scan

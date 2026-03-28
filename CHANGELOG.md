@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v19.15–v19.19] - 2026-03-28/29
+
+### Fixed (configurator.html) — Phase 3 full E2E test findings
+
+5 bugs discovered during the first-ever end-to-end test of configurator-generated `deploy.sh` against real AWS infrastructure (9 accounts: single + CT org with 5 linked + 2 security OU accounts).
+
+- **EBS volumes never tagged** (`CreateVolume`) — event was captured by EventBridge but had no ARN construction handler. Lambda logged "No ARN found for CreateVolume" and skipped all EBS volumes. Added `volumeId → arn:ec2:{region}:{account}:volume/{id}` handler. (v19.15)
+
+- **Re-deploy hangs indefinitely on unchanged stack** — `update-stack` returns "No updates are to be performed" suppressed by `|| true`, then `wait stack-update-complete` blocked forever. Fixed by detecting the "No updates" message and skipping the wait. (v19.15)
+
+- **Script silently exits for all IAM Identity Center (SSO) users** — `iam:SimulatePrincipalPolicy` fails with `InvalidInput` for assumed-role ARNs used by SSO. Under `set -e`, this silently killed deploy.sh immediately after the CloudTrail check for every Identity Center user. Fixed with `|| SCP_RESULT=""`. (v19.16)
+
+- **StackSet Lambda timeout on large orgs** — Lambda waited for the full StackSet operation within a 900s timeout. With 7 accounts, operations take 12–20 minutes, causing timeout → rollback → retry loop. Fixed: Lambda responds SUCCESS immediately after starting `create_stack_instances`; deploy.sh polls `list-stack-instances` directly and shows per-account progress. (v19.17)
+
+- **StackSet polling race condition** — polling loop exited immediately on fresh deployment because `TOTAL=0` before instances appear made `OUTDATED=0` trivially true. Fixed by requiring `TOTAL > 0 AND OUTDATED == 0`. (v19.19)
+
+### Added
+- Per-account StackSet deployment progress in deploy.sh: "StackSet progress: X/N accounts ready... (Ys)" (v19.17)
+- Completion confirmation "✅ StackSet: all N accounts ready" (v19.18)
+
+---
+
+## [v19.14] - 2026-03-28
+
+### Added
+- **Local AWS CLI deployment option** — deploy.sh works identically from local terminal (Linux/macOS/WSL). Configurator now presents both CloudShell and local CLI paths in instructions and Step 3 box, across all 7 languages.
+
+---
+
+## [v19.11–v19.13] - 2026-03-28
+
+### Fixed (configurator.html) — Additional E2E test findings
+
+- **S3 staging bucket not cleaned up on failure** — added EXIT trap so bucket is deleted even if script fails mid-deployment
+- **Multi-account stack state detection** — deploy.sh now handles create / update / rollback-recovery for multi-account, consistent with single-account
+- **Backfill throttle retry** — added exponential backoff (0.5→1→2→4s, 4 retries) on `ThrottlingException` instead of silently dropping events
+- **Backfill false positive** — timestamp captured at wait-loop start prevents old "Backfill complete" log entries from being mistaken as fresh
+- **Multi-account S3 setup** — missing `|| true` on `put-public-access-block` caused `set -e` exit if bucket not immediately available; added retry loop with 2s sleep
+- **AutoTaggerLogGroup conflict in member accounts** — removed `AutoTaggerLogGroup` from per-account CF template (caused "already exists" error in accounts that previously had the tagger); log retention now set via `put-retention-policy` in deploy.sh instead
+- **IAM credential propagation in StackSet Lambda** — added retry loop with backoff on `InvalidClientToken`/`UnrecognizedClient` during `EnableAWSServiceAccess`
+
+---
+
 ## [v19.1] - 2026-03-25
 
 ### Fixed (configurator.html + map2-auto-tagger-optimized.yaml) — E2E test findings
