@@ -2299,7 +2299,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'iot:TagResource','iotanalytics:TagResource','iotevents:TagResource',
             'iotsitewise:TagResource','iottwinmaker:TagResource','greengrass:TagResource',
             'kinesisvideo:TagStream','dsql:TagResource','vpc-lattice:TagResource',
-            'bedrock-agentcore-control:TagResource','payment-cryptography:TagResource',
+            'bedrock-agentcore:TagResource','payment-cryptography:TagResource',
             'networkmanager:TagResource',
             // Media
             'ivs:TagResource','ivschat:TagResource','mediaconvert:TagResource',
@@ -3049,9 +3049,25 @@ ${crossAccountCode}
                   elif ':vpc-lattice:' in arn:
                       get_svc('vpc-lattice').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
                   elif ':bedrock-agentcore:' in arn:
-                      boto3.client('bedrock-agentcore-control', region_name=arn.split(':')[3] or region).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                      r = arn.split(':')[3] or region
+                      import urllib.parse, json as _json
+                      creds = boto3.Session().get_credentials().get_frozen_credentials()
+                      encoded = urllib.parse.quote(arn, safe='')
+                      url = f"https://bedrock-agentcore-control.{r}.amazonaws.com/tags/{encoded}"
+                      body = _json.dumps({'tags': {tag_key: tag_value}}).encode()
+                      req = urllib.request.Request(url, data=body, method='POST')
+                      req.add_header('Content-Type', 'application/json')
+                      from botocore.auth import SigV4Auth
+                      from botocore.awsrequest import AWSRequest
+                      from botocore.credentials import Credentials
+                      aws_req = AWSRequest(method='POST', url=url, data=body, headers={'Content-Type': 'application/json'})
+                      SigV4Auth(creds, 'bedrock-agentcore', r).add_auth(aws_req)
+                      for h,v in aws_req.headers.items():
+                          req.add_header(h, v)
+                      urllib.request.urlopen(req)
                   elif ':payment-cryptography:' in arn:
-                      boto3.client('payment-cryptography', region_name=arn.split(':')[3] or region).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                      r = arn.split(':')[3] or region
+                      boto3.client('payment-cryptography', region_name=r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':networkmanager:' in arn:
                       boto3.client('networkmanager', region_name='us-east-1').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':kinesisvideo:' in arn:
