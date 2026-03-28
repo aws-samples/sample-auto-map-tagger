@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v19.20] - 2026-03-29
+
+### Added (configurator.html)
+- **Delegated administrator support** — multi-account `deploy.sh` preflight check now accepts delegated administrator accounts for CloudFormation StackSets, not just the management account. Enterprises commonly designate a "shared services" account as the StackSets delegated admin to keep the management account locked down. The check now: (1) verifies the caller can reach the org, (2) passes immediately if it's the management account, (3) calls `organizations:ListDelegatedServicesForAccount` to verify StackSets delegation otherwise. Updated error messages and all 7 language translations.
+
+---
+
 ## [v19.15–v19.19] - 2026-03-28/29
 
 ### Fixed (configurator.html) — Phase 3 full E2E test findings
