@@ -2907,6 +2907,9 @@ ${crossAccountCode}
                           for k,v2 in rtype_map.items():
                               if k in k_last: rt = v2; break
                           arn = f"arn:{p}:ec2:{region}:{account_id}:{rt}/{val}"
+                  elif event_name == 'CreateVolume':
+                      vid = resp.get('volumeId')
+                      arn = f"arn:{p}:ec2:{region}:{account_id}:volume/{vid}" if vid else None
                   elif event_name == 'AllocateAddress':
                       aid = resp.get('allocationId')
                       arn = f"arn:{p}:ec2:{region}:{account_id}:elastic-ip/{aid}" if aid else None
@@ -3641,12 +3644,14 @@ elif [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
       --region "\$REGION" > /dev/null
     aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
 else
-    aws cloudformation update-stack \\
+    UPDATE_OUT=\$(aws cloudformation update-stack \\
       --stack-name "\$STACK_NAME" \\
       \$TEMPLATE_REF \\
       --capabilities CAPABILITY_NAMED_IAM \\
-      --region "\$REGION" > /dev/null 2>&1 || true
-    aws cloudformation wait stack-update-complete --stack-name "\$STACK_NAME" --region "\$REGION" 2>/dev/null || true
+      --region "\$REGION" 2>&1) || true
+    if ! echo "\$UPDATE_OUT" | grep -q "No updates are to be performed"; then
+      aws cloudformation wait stack-update-complete --stack-name "\$STACK_NAME" --region "\$REGION" 2>/dev/null || true
+    fi
 fi
 
 rm -f "\$TEMPLATE"
