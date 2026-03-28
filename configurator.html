@@ -2336,9 +2336,11 @@ ${backfillEventNamesList}
                   'StartTime': start_time,
                   'MaxResults': 50
               }
+              throttle_retry = 0
               while True:
                   try:
                       resp = cloudtrail_client.lookup_events(**kwargs)
+                      throttle_retry = 0
                       for ev in resp.get('Events', []):
                           ct = json.loads(ev['CloudTrailEvent'])
                           if ct.get('errorCode') or ct.get('errorMessage'):
@@ -2350,8 +2352,12 @@ ${backfillEventNamesList}
                       else:
                           break
                   except Exception as e:
+                      err_str = str(e)
+                      if ('ThrottlingException' in err_str or 'Rate exceeded' in err_str) and throttle_retry < 4:
+                          throttle_retry += 1
+                          time.sleep((2 ** throttle_retry) * 0.5)
+                          continue
                       print(f"LookupEvents error for {event_name}: {e}")
-                      time.sleep(1)
                       break
               return results
 
@@ -2546,17 +2552,8 @@ ${permissionsList}
                   - logs:PutLogEvents
                 Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*
 
-  AutoTaggerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      LogGroupName: /aws/lambda/map-auto-tagger
-      RetentionInDays: 90
-
   AutoTaggerFunction:
     Type: AWS::Lambda::Function
-    DependsOn: AutoTaggerLogGroup
     Properties:
       FunctionName: map-auto-tagger
       Runtime: python3.12
@@ -3287,7 +3284,7 @@ Resources:
                   headers={'Content-Type': ''}, method='PUT')
               urllib.request.urlopen(req)
           def handler(event, context):
-              time.sleep(10)
+              time.sleep(15)
               props = event.get('ResourceProperties', {})
               cf = boto3.client('cloudformation')
               stackset_name = props['StackSetName']
@@ -3306,7 +3303,18 @@ Resources:
                   respond(event, context, 'SUCCESS')
                   return
               try:
-                  org = boto3.client('organizations', region_name='us-east-1')
+                  org = None
+                  for attempt in range(5):
+                      try:
+                          org = boto3.client('organizations', region_name='us-east-1')
+                          org.list_roots()  # test credentials
+                          break
+                      except Exception as e:
+                          if 'security token' in str(e).lower() or 'InvalidClientToken' in str(e) or 'UnrecognizedClient' in str(e):
+                              print(f'Credential propagation wait (attempt {attempt+1}): {e}')
+                              time.sleep(10)
+                          else:
+                              raise
                   try:
                       org.enable_aws_service_access(ServicePrincipal='stacksets.cloudformation.amazonaws.com')
                       print('StackSets service access enabled')
@@ -3418,6 +3426,9 @@ REPORT_FILE="${reportFile}"
 DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
 PREFLIGHT_LOG=""
 DEPLOY_STATUS="NOT STARTED"
+TEMPLATE_REF=""
+BUCKET=""
+trap 'if [ -n "\$BUCKET" ] && [ -n "\$TEMPLATE_REF" ]; then aws s3 rm "s3://\${BUCKET}/map-auto-tagger-\${MPE}.yaml" > /dev/null 2>&1 || true; aws s3 rb "s3://\${BUCKET}" --force > /dev/null 2>&1 || true; fi' EXIT
 
 # ────────────────────────────────────────────
 echo ""
@@ -3541,6 +3552,11 @@ else
 fi
 
 STACK_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ] || [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+    # Pre-delete Lambda log groups to avoid "already exists" on fresh create
+    aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger" --region "\$REGION" 2>/dev/null || true
+    aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-backfill" --region "\$REGION" 2>/dev/null || true
+fi
 if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ]; then
     aws cloudformation create-stack \\
       --stack-name "\$STACK_NAME" \\
@@ -3568,6 +3584,8 @@ fi
 
 rm -f "\$TEMPLATE"
 DEPLOY_STATUS="SUCCESS"
+aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger" --retention-in-days 90 --region "\$REGION" 2>/dev/null || true
+${config.includeBackfill ? 'aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger-backfill" --retention-in-days 90 --region "\\$REGION" 2>/dev/null || true' : ''}
 ${config.includeBackfill ? `
 # ── Backfill wait ────────────────────────────
 echo ""
@@ -3575,16 +3593,16 @@ echo "${t('d_backfill_waiting')}"
 echo "  ${t('d_backfill_wait_info')}"
 echo ""
 BACKFILL_RESULT="${t('d_backfill_timeout')}"
+BACKFILL_WAIT_START_MS=\$(( \$(date +%s) * 1000 ))
 WAIT=0
 while [ \$WAIT -lt 1200 ]; do
   RULE_STATE=\$(aws events describe-rule --name map-auto-tagger-backfill --region "\$REGION" --query 'State' --output text 2>/dev/null)
   if [ "\$RULE_STATE" = "DISABLED" ]; then
     echo "  ${t('d_backfill_starting')}"
-    START_MS=\$(( \$(date +%s) * 1000 - 1800000 ))
     COMPLETE=\$(aws logs filter-log-events \\
       --log-group-name "/aws/lambda/map-auto-tagger-backfill" \\
       --filter-pattern '"Backfill complete"' \\
-      --start-time "\$START_MS" \\
+      --start-time "\$BACKFILL_WAIT_START_MS" \\
       --max-items 1 \\
       --query 'events[0].message' \\
       --output text 2>/dev/null)
@@ -3599,11 +3617,6 @@ while [ \$WAIT -lt 1200 ]; do
   echo "  ${t('d_backfill_in_progress')} (\${WAIT}s)"
 done
 echo ""` : ''}
-# ── S3 cleanup (if template was staged to S3) ─
-if echo "\$TEMPLATE_REF" | grep -q "template-url"; then
-    aws s3 rm "s3://\${BUCKET}/map-auto-tagger-\${MPE}.yaml" > /dev/null 2>&1 || true
-    aws s3 rb "s3://\${BUCKET}" 2>/dev/null || true
-fi
 # ── Step 3: Done ─────────────────────────────
 echo "${t('d_step3')}"
 echo ""
@@ -3812,19 +3825,47 @@ ${accountsTpl}
 ACCOUNTS_TEMPLATE_EOF
 
 aws s3 mb "s3://\${BUCKET}" --region "\${REGION}" 2>/dev/null || true
-aws s3api put-public-access-block --bucket "\${BUCKET}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
-aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
-aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"DenyHTTP\",\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::\${BUCKET}\",\"arn:aws:s3:::\${BUCKET}/*\"],\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}"
+for i in 1 2 3 4 5; do
+    aws s3api put-public-access-block --bucket "\${BUCKET}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" > /dev/null 2>&1 && break
+    sleep 2
+done
+aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' > /dev/null 2>&1 || true
+aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"DenyHTTP\",\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::\${BUCKET}\",\"arn:aws:s3:::\${BUCKET}/*\"],\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}" > /dev/null 2>&1 || true
 aws s3 cp "\$ORG_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-org.yaml" > /dev/null
 aws s3 cp "\$ACCOUNTS_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts.yaml" > /dev/null
 rm -f "\$ORG_TEMPLATE" "\$ACCOUNTS_TEMPLATE"
 
-aws cloudformation create-stack \\
-  --stack-name "\$STACK_NAME" \\
-  --template-url "https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-org.yaml" \\
-  --parameters "ParameterKey=PerAccountTemplateURL,ParameterValue=https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-accounts.yaml" \\
-  --capabilities CAPABILITY_NAMED_IAM \\
-  --region "\$REGION" > /dev/null
+STACK_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+ORG_TEMPLATE_URL="https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-org.yaml"
+ORG_PARAMS="ParameterKey=PerAccountTemplateURL,ParameterValue=https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-accounts.yaml"
+if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ] || [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+    aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger" --region "\$REGION" 2>/dev/null || true
+    aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-backfill" --region "\$REGION" 2>/dev/null || true
+fi
+if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ]; then
+    aws cloudformation create-stack \\
+      --stack-name "\$STACK_NAME" \\
+      --template-url "\$ORG_TEMPLATE_URL" \\
+      --parameters "\$ORG_PARAMS" \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null
+elif [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+    aws cloudformation delete-stack --stack-name "\$STACK_NAME" --region "\$REGION"
+    aws cloudformation wait stack-delete-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+    aws cloudformation create-stack \\
+      --stack-name "\$STACK_NAME" \\
+      --template-url "\$ORG_TEMPLATE_URL" \\
+      --parameters "\$ORG_PARAMS" \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null
+else
+    aws cloudformation update-stack \\
+      --stack-name "\$STACK_NAME" \\
+      --template-url "\$ORG_TEMPLATE_URL" \\
+      --parameters "\$ORG_PARAMS" \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null 2>&1 || true
+fi
 
 echo "  ${t('d_deploying')}"
 echo ""
@@ -3852,16 +3893,16 @@ if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
   echo "  ${t('d_backfill_wait_info')}"
   echo ""
   BACKFILL_RESULT="${t('d_backfill_timeout')}"
+  BACKFILL_WAIT_START_MS=\$(( \$(date +%s) * 1000 ))
   WAIT=0
   while [ \$WAIT -lt 1200 ]; do
     RULE_STATE=\$(aws events describe-rule --name map-auto-tagger-backfill --region "\$REGION" --query 'State' --output text 2>/dev/null)
     if [ "\$RULE_STATE" = "DISABLED" ]; then
       echo "  ${t('d_backfill_starting')}"
-      START_MS=\$(( \$(date +%s) * 1000 - 1800000 ))
       COMPLETE=\$(aws logs filter-log-events \\
         --log-group-name "/aws/lambda/map-auto-tagger-backfill" \\
         --filter-pattern '"Backfill complete"' \\
-        --start-time "\$START_MS" \\
+        --start-time "\$BACKFILL_WAIT_START_MS" \\
         --max-items 1 \\
         --query 'events[0].message' \\
         --output text 2>/dev/null)
