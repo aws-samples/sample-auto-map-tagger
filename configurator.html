@@ -3964,7 +3964,7 @@ if [ -z "\$DEPLOY_STATUS" ]; then
         --region "\$REGION" --query "Summaries[*].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
       CURRENT=\$((TOTAL - OUTDATED))
       echo "  StackSet progress: \${CURRENT}/\${TOTAL} accounts ready... (\${SS_WAIT}s)"
-      if [ "\$OUTDATED" -eq 0 ]; then
+      if [ "\$TOTAL" -gt 0 ] && [ "\$OUTDATED" -eq 0 ]; then
         echo "  ✅ StackSet: all \${TOTAL} accounts ready"
         DEPLOY_STATUS="SUCCESS"
         break
