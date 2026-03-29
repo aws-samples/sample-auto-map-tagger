@@ -228,12 +228,12 @@
 
                 <div class="form-group">
                     <label><span data-i18n="ui_agree_start">Agreement Start Date</span> <span class="hint" data-i18n="ui_agree_start_hint">(Date to start tagging newly created MAP 2.0 resources)</span></label>
-                    <input type="date" id="agreementDate">
+                    <input type="date" id="agreementDate" min="1900-01-01" max="9999-12-31">
                     <div class="error-msg" id="agreementDate-error" data-i18n="err_date_required">Agreement start date is required</div>
                 </div>
                 <div class="form-group">
                     <label><span data-i18n="ui_agree_end">Agreement End Date</span> <span class="hint" data-i18n="ui_agree_end_hint">(Date to stop tagging newly created resources)</span></label>
-                    <input type="date" id="agreementEndDate">
+                    <input type="date" id="agreementEndDate" min="1900-01-01" max="9999-12-31">
                     <div class="error-msg" id="agreementEndDate-error" data-i18n="err_date_end">Agreement end date is required and must be after start date</div>
                 </div>
 
