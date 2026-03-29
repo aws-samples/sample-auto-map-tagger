@@ -1,3 +1,6 @@
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+
 # MAP 2.0 Auto-Tagger — Threat Model
 
 **Version:** v19.25 (updated post full MAP 2.0 service sweep)
