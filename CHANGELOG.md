@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v19.27] - 2026-03-30
+
+### Fixed (configurator.html) — bugs found during final E2E test
+
+- **Missing EN i18n keys for VPC/account preflight messages** — `d_ok_vpc`, `d_fail_vpc`, `d_fix_vpc`, `d_ok_account_scope`, `d_fail_account_scope`, `d_fix_account_scope` were added to all 6 non-English languages but never added to the English dictionary. `t()` was returning the raw key string instead of translated text.
+
+- **`set -e` exit on non-existent VPC/account** — `aws ec2 describe-vpcs` and `aws organizations describe-account` return non-zero exit codes when the resource doesn't exist. Under `set -e`, this killed the script silently before the error message was shown. Fixed with `|| VPC_RESULT=""` / `|| ACCT_RESULT=""`.
+
+### Verified (final E2E live test — 2026-03-30)
+
+| Test | Scenario | Result |
+|------|----------|--------|
+| T1 | Single account fresh deploy | ✅ |
+| T2 | Single account multi-region (ap-northeast-2 + us-east-1) | ✅ |
+| T3 | VPC-scoped with real VPC — preflight passes | ✅ |
+| T4 | VPC-scoped with fake VPC — preflight error shown | ✅ |
+| T5 | Backfill (206 events, 0 errors) | ✅ |
+| T6 | Multi-account all org (7/7 CURRENT) | ✅ |
+| T7 | Multi-account with fake account — preflight error shown | ✅ |
+| T8 | Multi-account scoped: linked1+2 tagged, linked3 NOT tagged | ✅ |
+
+---
+
 ## [v19.26] - 2026-03-29
 
 ### Fixed (configurator.html) — Holmes PCSR remediation
