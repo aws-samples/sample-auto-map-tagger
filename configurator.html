@@ -2232,6 +2232,11 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
                 const key = el.getAttribute('data-i18n');
                 el.textContent = t(key);
             });
+            // Regenerate review table if on Step 2 (dynamically generated, no data-i18n)
+            const step2 = document.getElementById('step2');
+            if (step2 && !step2.classList.contains('hidden')) {
+                reviewConfig();
+            }
             document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
                 const key = el.getAttribute('data-i18n-placeholder');
                 el.placeholder = t(key);
