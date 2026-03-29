@@ -511,6 +511,19 @@
 
     <script>
         // --- UI State ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const firstVpc = document.querySelector('.vpc-input');
+            if (firstVpc) {
+                firstVpc.addEventListener('blur', () => validateVpcInput(firstVpc));
+                firstVpc.addEventListener('input', () => validateVpcInput(firstVpc));
+            }
+            const firstAcct = document.querySelector('.stackset-account-id');
+            if (firstAcct) {
+                firstAcct.addEventListener('blur', () => validateAccountInput(firstAcct));
+                firstAcct.addEventListener('input', () => validateAccountInput(firstAcct));
+            }
+        });
+
         function selectDeployMode(mode) {
             document.querySelector(`input[name="deployMode"][value="${mode}"]`).checked = true;
             document.getElementById('opt-single').classList.toggle('selected', mode === 'single');
@@ -546,11 +559,45 @@
         }
 
         // --- Dynamic lists ---
+        function validateVpcInput(input) {
+            const v = input.value.trim();
+            if (v && !/^vpc-[0-9a-f]{8,17}$/.test(v)) {
+                input.style.borderColor = '#d13212';
+                input.title = t('err_vpc_format');
+            } else {
+                input.style.borderColor = '';
+                input.title = '';
+            }
+        }
+
+        function validateAccountInput(input) {
+            const v = input.value.trim();
+            if (v && !/^\d{12}$/.test(v)) {
+                input.style.borderColor = '#d13212';
+                input.title = t('err_account_format');
+            } else {
+                input.style.borderColor = '';
+                input.title = '';
+            }
+        }
+
         function addStacksetAccount() {
             const list = document.getElementById('stacksetAccountList');
             const row = document.createElement('div');
             row.className = 'entry-row';
-            row.innerHTML = '<input type="text" class="stackset-account-id" placeholder="123456789012" maxlength="12"><input type="text" class="stackset-account-label account-label" placeholder="e.g., Prod Account"><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>';
+            const idInput = document.createElement('input');
+            idInput.type = 'text'; idInput.className = 'stackset-account-id';
+            idInput.placeholder = '123456789012'; idInput.maxLength = 12;
+            idInput.addEventListener('blur', () => validateAccountInput(idInput));
+            idInput.addEventListener('input', () => validateAccountInput(idInput));
+            const labelInput = document.createElement('input');
+            labelInput.type = 'text'; labelInput.className = 'account-label';
+            labelInput.placeholder = 'e.g., Prod Account';
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove'; btn.title = 'Remove';
+            btn.onclick = function(){ removeEntry(this); };
+            btn.textContent = '×';
+            row.appendChild(idInput); row.appendChild(labelInput); row.appendChild(btn);
             list.appendChild(row);
         }
 
@@ -558,7 +605,16 @@
             const list = document.getElementById('vpcList');
             const row = document.createElement('div');
             row.className = 'entry-row';
-            row.innerHTML = '<input type="text" class="vpc-input" placeholder="vpc-0abc1234def56789"><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>';
+            const input = document.createElement('input');
+            input.type = 'text'; input.className = 'vpc-input';
+            input.placeholder = 'vpc-0abc1234def56789';
+            input.addEventListener('blur', () => validateVpcInput(input));
+            input.addEventListener('input', () => validateVpcInput(input));
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove'; btn.title = 'Remove';
+            btn.onclick = function(){ removeEntry(this); };
+            btn.textContent = '×';
+            row.appendChild(input); row.appendChild(btn);
             list.appendChild(row);
         }
 
@@ -661,7 +717,9 @@
                 const acctVals = getValues('.stackset-account-id').filter(v => v.trim());
                 const acctErr = document.getElementById('account-scope-error');
                 const dupeAcct = acctVals.length !== new Set(acctVals).size;
-                const acctKey = acctVals.length === 0 ? 'err_account_scope_required' : (dupeAcct ? 'err_duplicate_account' : null);
+                const invalidAcct = acctVals.some(v => v && !/^\d{12}$/.test(v));
+                document.querySelectorAll('.stackset-account-id').forEach(el => validateAccountInput(el));
+                const acctKey = acctVals.length === 0 ? 'err_account_scope_required' : (invalidAcct ? 'err_account_format' : (dupeAcct ? 'err_duplicate_account' : null));
                 if (acctKey) {
                     acctErr.setAttribute('data-i18n', acctKey);
                     acctErr.textContent = t(acctKey);
@@ -678,7 +736,9 @@
                 const vpcVals = getValues('.vpc-input').filter(v => v.trim());
                 const vpcErr = document.getElementById('vpc-error');
                 const dupeVpc = vpcVals.length !== new Set(vpcVals).size;
-                const vpcKey = vpcVals.length === 0 ? 'err_vpc_required' : (dupeVpc ? 'err_duplicate_vpc' : null);
+                const invalidVpc = vpcVals.some(v => v && !/^vpc-[0-9a-f]{8,17}$/.test(v));
+                document.querySelectorAll('.vpc-input').forEach(el => validateVpcInput(el));
+                const vpcKey = vpcVals.length === 0 ? 'err_vpc_required' : (invalidVpc ? 'err_vpc_format' : (dupeVpc ? 'err_duplicate_vpc' : null));
                 if (vpcKey) {
                     vpcErr.setAttribute('data-i18n', vpcKey);
                     vpcErr.textContent = t(vpcKey);
