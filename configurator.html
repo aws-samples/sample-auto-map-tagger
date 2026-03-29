@@ -260,28 +260,35 @@
                 <div id="single-account-options" class="hidden">
                     <div class="section-divider"></div>
                     <div class="form-group">
-                        <label><span data-i18n="ui_deployment_region_single">Deployment Region</span></label>
-                        <select id="singleRegion">
-                            <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
-                            <option value="us-east-2">US East (Ohio) — us-east-2</option>
-                            <option value="us-west-1">US West (N. California) — us-west-1</option>
-                            <option value="us-west-2">US West (Oregon) — us-west-2</option>
-                            <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
-                            <option value="ap-northeast-2" selected>Asia Pacific (Seoul) — ap-northeast-2</option>
-                            <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
-                            <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
-                            <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
-                            <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
-                            <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
-                            <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
-                            <option value="eu-west-2">Europe (London) — eu-west-2</option>
-                            <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
-                            <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
-                            <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
-                            <option value="ca-central-1">Canada (Central) — ca-central-1</option>
-                            <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
-                            <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
-                        </select>
+                        <label><span data-i18n="ui_deployment_regions">Deployment Regions</span> <span class="hint" data-i18n="ui_deployment_regions_hint">(regions where the customer creates resources)</span></label>
+                        <div id="singleRegionList">
+                            <div class="entry-row">
+                                <select class="region-select">
+                                    <option value="">Select a region...</option>
+                                    <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                                    <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                                    <option value="us-west-1">US West (N. California) — us-west-1</option>
+                                    <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                                    <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                                    <option value="ap-northeast-2" selected>Asia Pacific (Seoul) — ap-northeast-2</option>
+                                    <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                                    <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                                    <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                                    <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                                    <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                                    <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                                    <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                                    <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                                    <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                                    <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                                    <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                                    <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                                    <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                                </select>
+                                <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                            </div>
+                        </div>
+                        <button class="btn-add" onclick="addSingleRegion()" data-i18n="ui_add_region">+ Add another region</button>
                     </div>
                     <div class="section-divider"></div>
                     <div class="form-group">
@@ -564,6 +571,15 @@
             list.appendChild(row);
         }
 
+        function addSingleRegion() {
+            const list = document.getElementById('singleRegionList');
+            const firstSelect = list.querySelector('.region-select');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = `<select class="region-select">${firstSelect.innerHTML}</select><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>`;
+            list.appendChild(row);
+        }
+
         function removeEntry(btn) {
             const list = btn.parentElement.parentElement;
             if (list.children.length > 1) btn.parentElement.remove();
@@ -666,8 +682,8 @@
             };
 
             if (deployMode === 'single') {
-                const singleRegionEl = document.getElementById('singleRegion');
-                config.regions = [singleRegionEl ? singleRegionEl.value || 'ap-northeast-2' : 'ap-northeast-2'];
+                const singleRegions = getValues('#singleRegionList .region-select');
+                config.regions = singleRegions.length > 0 ? singleRegions : ['ap-northeast-2'];
             } else if (deployMode === 'multi') {
                 config.regions = getValues('.region-select');
                 config.useAccountScope = document.getElementById('useAccountScope').checked;
@@ -3578,6 +3594,7 @@ Outputs:
 set -e
 
 STACK_NAME="map-auto-tagger"
+REGIONS="${regions.join(' ')}"
 REGION="${region}"
 MPE="${mpe}"
 CUSTOMER="${customerDisplay}"
@@ -3594,7 +3611,7 @@ echo ""
 echo "  ┌─────────────────────────────────────────┐"
 echo "  │   ${t('d_title')}              │"
 echo "  │   ${t('d_tag_label')}: \$MPE"
-echo "  │   ${t('d_region_label')}: \$REGION"
+echo "  │   ${t('d_region_label')}: \$REGIONS"
 echo "  └─────────────────────────────────────────┘"
 echo ""
 
@@ -3613,17 +3630,19 @@ else
     PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_creds')}\\n"
 fi
 
-TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$REGION" --no-include-shadow-trails --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
-if [ "\$TRAIL_COUNT" -eq 0 ]; then
-    echo "  ❌ ${t('d_fail_trail')} \$REGION"
-    echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
-    echo "            ${t('d_fix_trail2')} \$REGION"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_trail')} \$REGION\\n"
-    ERRORS=\$((ERRORS + 1))
-else
-    echo "  ✅ ${t('d_ok_trail')} \$REGION"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_trail')} \$REGION\\n"
-fi
+for CHECK_REGION in \$REGIONS; do
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --no-include-shadow-trails --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    if [ "\$TRAIL_COUNT" -eq 0 ]; then
+        echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
+        echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
+        echo "            ${t('d_fix_trail2')} \$CHECK_REGION"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_trail')} \$CHECK_REGION\\n"
+        ERRORS=\$((ERRORS + 1))
+    else
+        echo "  ✅ ${t('d_ok_trail')} \$CHECK_REGION"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_trail')} \$CHECK_REGION\\n"
+    fi
+done
 
 if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
     echo "  ❌ ${t('d_fail_perms')}"
@@ -3694,6 +3713,12 @@ ${tpl}
 MAP_TEMPLATE_EOF
 
 ACCT=\$(aws sts get-caller-identity --query Account --output text)
+DEPLOY_STATUS="SUCCESS"
+
+for REGION in \$REGIONS; do
+echo ""
+echo "  ── \$REGION ──────────────────────────────────"
+
 TEMPLATE_SIZE=\$(wc -c < "\$TEMPLATE")
 if [ "\$TEMPLATE_SIZE" -gt 51200 ]; then
     BUCKET="auto-map-tagger-\${ACCT}"
@@ -3712,7 +3737,6 @@ fi
 
 STACK_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
 if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ] || [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
-    # Pre-delete Lambda log groups to avoid "already exists" on fresh create
     aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger" --region "\$REGION" 2>/dev/null || true
     aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-backfill" --region "\$REGION" 2>/dev/null || true
 fi
@@ -3743,10 +3767,13 @@ else
     fi
 fi
 
-rm -f "\$TEMPLATE"
-DEPLOY_STATUS="SUCCESS"
+echo "  ✅ \$REGION"
 aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger" --retention-in-days 90 --region "\$REGION" 2>/dev/null || true
 ${config.includeBackfill ? 'aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger-backfill" --retention-in-days 90 --region "\\$REGION" 2>/dev/null || true' : ''}
+done
+
+rm -f "\$TEMPLATE"
+REGION="${region}"
 ${config.includeBackfill ? `
 # ── Backfill wait ────────────────────────────
 echo ""
