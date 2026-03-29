@@ -3844,7 +3844,7 @@ fi
 
 ${config.scopeMode === 'vpc' && config.scopedVpcIds && config.scopedVpcIds[0] !== 'NONE' ? `
 for CHECK_VPC in ${config.scopedVpcIds.map(v => '"' + v + '"').join(' ')}; do
-    VPC_RESULT=\$(aws ec2 describe-vpcs --vpc-ids "\$CHECK_VPC" --region "\$REGION" --query 'Vpcs[0].VpcId' --output text 2>/dev/null)
+    VPC_RESULT=\$(aws ec2 describe-vpcs --vpc-ids "\$CHECK_VPC" --region "\$REGION" --query 'Vpcs[0].VpcId' --output text 2>/dev/null) || VPC_RESULT=""
     if [ "\$VPC_RESULT" = "\$CHECK_VPC" ]; then
         echo "  ✅ ${t('d_ok_vpc')} \$CHECK_VPC"
         PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_vpc')} \$CHECK_VPC\\n"
@@ -4164,7 +4164,7 @@ fi
 
 ${config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0 ? `
 for CHECK_ACCT in ${config.stacksetAccounts.map(a => '"' + a.id + '"').join(' ')}; do
-    ACCT_RESULT=\$(aws organizations describe-account --account-id "\$CHECK_ACCT" --query 'Account.Id' --output text 2>/dev/null)
+    ACCT_RESULT=\$(aws organizations describe-account --account-id "\$CHECK_ACCT" --query 'Account.Id' --output text 2>/dev/null) || ACCT_RESULT=""
     if [ "\$ACCT_RESULT" = "\$CHECK_ACCT" ]; then
         echo "  ✅ ${t('d_ok_account_scope')} \$CHECK_ACCT"
         PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_account_scope')} \$CHECK_ACCT\\n"
