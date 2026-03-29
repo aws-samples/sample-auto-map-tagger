@@ -179,7 +179,7 @@
     <div class="header">
         <h1 data-i18n="ui_title">MAP 2.0 Auto-Tagger Configurator</h1>
         <span class="badge">AWS SAMPLE</span>
-        <span class="version">v2.0 — 190+ services E2E tested</span>
+        <span class="version">v2.0 — All MAP 2.0 services verified</span>
         <div class="lang-flags">
             <span class="lang-flag active" id="lang-en" onclick="setLanguage('en')" title="English">🇺🇸</span>
             <span class="lang-flag" id="lang-ko" onclick="setLanguage('ko')" title="한국어">🇰🇷</span>
@@ -384,22 +384,27 @@
             <!-- Service coverage summary -->
             <div class="card">
                 <h2 data-i18n="ui_coverage_title">What Gets Tagged</h2>
-                <p class="subtitle" data-i18n="ui_coverage_subtitle">190+ resource types confirmed working via multi-account CT org testing (4 accounts × 4 regions)</p>
+                <p class="subtitle" data-i18n="ui_coverage_subtitle">190+ resource types confirmed working — all MAP 2.0 eligible services verified (9 accounts, 2 regions)</p>
                 <div class="coverage-grid">
-                    <div class="coverage-item">✅ EC2, Lambda, ECS, EKS, Auto Scaling, App Runner</div>
-                    <div class="coverage-item">✅ Amazon S3, Amazon EFS, Amazon FSx, Amazon ECR, EBS Snapshots, AMIs</div>
-                    <div class="coverage-item">✅ Amazon RDS (all types + snapshots), Amazon Aurora, Amazon Neptune, Amazon DynamoDB</div>
-                    <div class="coverage-item">✅ Amazon Redshift, Amazon DocumentDB, Amazon MemoryDB, Amazon OpenSearch Service, Amazon MSK</div>
-                    <div class="coverage-item">✅ Amazon VPC, Subnets, Load Balancers, AWS Transit Gateway, VPN</div>
-                    <div class="coverage-item">✅ Amazon CloudFront, Amazon Route 53, AWS Global Accelerator, AWS Network Firewall</div>
-                    <div class="coverage-item">✅ Amazon Kinesis, Kinesis Firehose, Kinesis Analytics, AWS Glue, Amazon Athena, Amazon EMR</div>
-                    <div class="coverage-item">✅ Amazon SNS, Amazon SQS, AWS Step Functions, Amazon EventBridge, Amazon API Gateway</div>
-                    <div class="coverage-item">✅ Amazon SageMaker (all types), Amazon Comprehend, Amazon Rekognition</div>
-                    <div class="coverage-item">✅ Amazon Bedrock (Agents, Guardrails, Flows, Prompts, Inference Profiles)</div>
-                    <div class="coverage-item">✅ AWS CodeBuild, AWS CodeDeploy, AWS CodePipeline, AWS Amplify, AWS CloudFormation</div>
-                    <div class="coverage-item">✅ Amazon Cognito, Amazon Macie, Amazon GuardDuty, AWS WAFv2, AWS KMS, AWS ACM</div>
-                    <div class="coverage-item">✅ Amazon WorkSpaces, Amazon QuickSight, Amazon IVS, Amazon EventBridge Pipes, Amazon EKS Add-ons</div>
-                    <div class="coverage-item">✅ DMS, DataSync, Transfer Family, MSK Serverless</div>
+                    <div class="coverage-item">✅ EC2, Lambda, ECS (incl. Fargate), EKS, Auto Scaling, App Runner, AWS Batch, EMR</div>
+                    <div class="coverage-item">✅ Amazon S3, Amazon EFS, Amazon FSx, Amazon ECR, EBS Volumes &amp; Snapshots, AMIs, AWS Backup</div>
+                    <div class="coverage-item">✅ Amazon RDS (all engines + snapshots + replicas + Proxy), Aurora, Neptune, DynamoDB, DocumentDB</div>
+                    <div class="coverage-item">✅ Amazon Redshift (Provisioned + Serverless), MemoryDB, OpenSearch Service, MSK, ElastiCache, Aurora DSQL</div>
+                    <div class="coverage-item">✅ Amazon VPC, Subnets, Security Groups, Load Balancers, Transit Gateway, VPC Lattice, VPN, AWS Cloud WAN</div>
+                    <div class="coverage-item">✅ Amazon CloudFront, Amazon Route 53, AWS Global Accelerator, AWS Network Firewall, AWS Direct Connect</div>
+                    <div class="coverage-item">✅ Amazon Kinesis Data Streams, Kinesis Firehose, Kinesis Analytics v2, Kinesis Video Streams, AWS Glue, Amazon Athena</div>
+                    <div class="coverage-item">✅ Amazon SNS, Amazon SQS, AWS Step Functions, Amazon EventBridge, Amazon API Gateway, AWS AppSync, Amazon MQ</div>
+                    <div class="coverage-item">✅ Amazon SageMaker (all types), Amazon Comprehend, Amazon Kendra, Amazon Lex, Amazon Rekognition</div>
+                    <div class="coverage-item">✅ Amazon Bedrock (Agents, Guardrails, Flows, Prompts, Inference Profiles, Knowledge Bases, AgentCore)</div>
+                    <div class="coverage-item">✅ AWS CodeBuild, CodeDeploy, CodePipeline, CodeCommit, AWS Amplify, AWS CloudFormation</div>
+                    <div class="coverage-item">✅ Amazon Cognito, AWS Security Hub, Amazon Macie, Amazon GuardDuty, AWS WAFv2, AWS KMS, AWS ACM</div>
+                    <div class="coverage-item">✅ Amazon WorkSpaces, Amazon QuickSight, Amazon AppStream 2.0, Amazon Keyspaces, Amazon GameLift</div>
+                    <div class="coverage-item">✅ AWS Transfer Family, AWS DataSync, AWS DMS, AWS Storage Gateway, AWS Elastic Disaster Recovery</div>
+                    <div class="coverage-item">✅ AWS IoT Core, AWS IoT SiteWise, AWS IoT Greengrass, AWS IoT TwinMaker</div>
+                    <div class="coverage-item">✅ AWS Elemental MediaLive, MediaPackage, MediaConvert, Amazon IVS</div>
+                    <div class="coverage-item">✅ AWS Deadline Cloud, AWS Resilience Hub, AWS HealthImaging, Amazon Omics, Amazon Timestream</div>
+                    <div class="coverage-item">✅ AWS Payment Cryptography, AWS Mainframe Modernization, AWS Systems Manager OpsCenter</div>
+                    <div class="coverage-item">✅ Amazon FinSpace, Amazon EFS, AWS Secrets Manager, AWS Backup, AWS CloudHSM, AWS Directory Service</div>
                     <div class="coverage-item limited">⚠️ IoT Things, Lambda Layers/Aliases — not taggable (AWS API limitation)</div>
                     <div class="coverage-item limited">⚠️ NAT Gateways, ElastiCache — timing delay, retry logic built in</div>
                 </div>
@@ -839,7 +844,7 @@
             ui_backfill_scope_note:'✓ Scoping applied: backfill will follow the same VPC / account scope settings selected above.',
             ui_backfill_desc:'Deploys a one-time Lambda that queries CloudTrail history from your agreement start date and tags all matching resources created before this solution was deployed. Runs automatically ~5 minutes after deployment.',
             ui_backfill_note:'Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.',
-            ui_coverage_subtitle:'190+ resource types confirmed working via multi-account CT org testing (4 accounts × 4 regions)',
+            ui_coverage_subtitle:'190+ resource types confirmed working — all MAP 2.0 eligible services verified (9 accounts, 2 regions)',
             ui_review_title:'Review Configuration', ui_review_subtitle:'Verify settings before generating the template',
             ui_what_deployed:'What Gets Deployed',
             ui_template_ready:'Template Ready', ui_template_ready_subtitle:'Share this with the customer along with the deployment instructions below',
