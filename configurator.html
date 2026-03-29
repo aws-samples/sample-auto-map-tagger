@@ -661,15 +661,14 @@
                 const acctVals = getValues('.stackset-account-id').filter(v => v.trim());
                 const acctErr = document.getElementById('account-scope-error');
                 const dupeAcct = acctVals.length !== new Set(acctVals).size;
-                if (acctVals.length === 0) {
-                    acctErr.textContent = t('err_account_scope_required');
-                    acctErr.style.display = 'block';
-                    valid = false;
-                } else if (dupeAcct) {
-                    acctErr.textContent = t('err_duplicate_account');
+                const acctKey = acctVals.length === 0 ? 'err_account_scope_required' : (dupeAcct ? 'err_duplicate_account' : null);
+                if (acctKey) {
+                    acctErr.setAttribute('data-i18n', acctKey);
+                    acctErr.textContent = t(acctKey);
                     acctErr.style.display = 'block';
                     valid = false;
                 } else {
+                    acctErr.setAttribute('data-i18n', 'err_account_scope_required');
                     acctErr.style.display = 'none';
                 }
             }
@@ -679,15 +678,14 @@
                 const vpcVals = getValues('.vpc-input').filter(v => v.trim());
                 const vpcErr = document.getElementById('vpc-error');
                 const dupeVpc = vpcVals.length !== new Set(vpcVals).size;
-                if (vpcVals.length === 0) {
-                    vpcErr.textContent = t('err_vpc_required');
-                    vpcErr.style.display = 'block';
-                    valid = false;
-                } else if (dupeVpc) {
-                    vpcErr.textContent = t('err_duplicate_vpc');
+                const vpcKey = vpcVals.length === 0 ? 'err_vpc_required' : (dupeVpc ? 'err_duplicate_vpc' : null);
+                if (vpcKey) {
+                    vpcErr.setAttribute('data-i18n', vpcKey);
+                    vpcErr.textContent = t(vpcKey);
                     vpcErr.style.display = 'block';
                     valid = false;
                 } else {
+                    vpcErr.setAttribute('data-i18n', 'err_vpc_required');
                     vpcErr.style.display = 'none';
                 }
             }
