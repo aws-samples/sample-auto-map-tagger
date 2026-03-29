@@ -426,15 +426,15 @@
                     <div class="coverage-item">✅ Amazon CloudFront, Amazon Route 53, AWS Global Accelerator, AWS Network Firewall, AWS Direct Connect</div>
                     <div class="coverage-item">✅ Amazon Kinesis Data Streams, Kinesis Firehose, Kinesis Analytics v2, Kinesis Video Streams, AWS Glue, Amazon Athena</div>
                     <div class="coverage-item">✅ Amazon SNS, Amazon SQS, AWS Step Functions, Amazon EventBridge, Amazon API Gateway, AWS AppSync, Amazon MQ</div>
-                    <div class="coverage-item">✅ Amazon SageMaker (all types), Amazon Comprehend, Amazon Kendra, Amazon Lex, Amazon Rekognition</div>
+                    <div class="coverage-item">✅ Amazon SageMaker AI (all types), Amazon Comprehend, Amazon Kendra, Amazon Lex, Amazon Rekognition</div>
                     <div class="coverage-item">✅ Amazon Bedrock (Agents, Guardrails, Flows, Prompts, Inference Profiles, Knowledge Bases, AgentCore)</div>
                     <div class="coverage-item">✅ AWS CodeBuild, CodeDeploy, CodePipeline, CodeCommit, AWS Amplify, AWS CloudFormation</div>
-                    <div class="coverage-item">✅ Amazon Cognito, AWS Security Hub, Amazon Macie, Amazon GuardDuty, AWS WAFv2, AWS KMS, AWS ACM</div>
+                    <div class="coverage-item">✅ Amazon Cognito, AWS Security Hub, Amazon Macie, Amazon GuardDuty, AWS WAF, AWS KMS, AWS Certificate Manager</div>
                     <div class="coverage-item">✅ Amazon WorkSpaces, Amazon QuickSight, Amazon AppStream 2.0, Amazon Keyspaces, Amazon GameLift</div>
                     <div class="coverage-item">✅ AWS Transfer Family, AWS DataSync, AWS DMS, AWS Storage Gateway, AWS Elastic Disaster Recovery</div>
                     <div class="coverage-item">✅ AWS IoT Core, AWS IoT SiteWise, AWS IoT Greengrass, AWS IoT TwinMaker</div>
                     <div class="coverage-item">✅ AWS Elemental MediaLive, MediaPackage, MediaConvert, Amazon IVS</div>
-                    <div class="coverage-item">✅ AWS Deadline Cloud, AWS Resilience Hub, AWS HealthImaging, Amazon Omics, Amazon Timestream</div>
+                    <div class="coverage-item">✅ AWS Deadline Cloud, AWS Resilience Hub, AWS HealthImaging, AWS HealthOmics, Amazon Timestream</div>
                     <div class="coverage-item">✅ AWS Payment Cryptography, AWS Mainframe Modernization, AWS Systems Manager OpsCenter</div>
                     <div class="coverage-item">✅ Amazon FinSpace, Amazon EFS, AWS Secrets Manager, AWS Backup, AWS CloudHSM, AWS Directory Service</div>
                     <div class="coverage-item limited">❌ IoT Things, Lambda Layers/Aliases — not taggable (AWS platform limitation)</div>
@@ -802,8 +802,8 @@
             ui_btn_download:'Download',
             ui_instr_opt1_title:'Option 1: AWS CloudShell (Recommended)',
             ui_instr_opt2_title:'Option 2: Local AWS CLI',
-            ui_instr_cli_prereq_single:'Ensure AWS CLI v2 is installed and configured with your migration account credentials.',
-            ui_instr_cli_prereq_multi:'Ensure AWS CLI v2 is installed and configured with your management account credentials.',
+            ui_instr_cli_prereq_single:'Verify AWS CLI v2 is installed and configured with your migration account credentials.',
+            ui_instr_cli_prereq_multi:'Verify AWS CLI v2 is installed and configured with your management account credentials.',
             ui_instr_cli_download:'Download deploy.sh to your computer.',
             ui_instr_cli_download_all:'Download all 3 files to your computer.',
             ui_instr_cli_terminal:'Open a terminal (Linux/macOS) or WSL/Git Bash (Windows).',
@@ -834,7 +834,7 @@
             ui_instr_all_org:'all accounts in org',
             ui_instr_cloudtrail_note:'NOTE: CloudTrail must be enabled in each account and target region.',
             ui_sample_notice_title:'Sample Code Notice:',
-            ui_sample_notice_body:"This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SNS, SQS, and SSM. See the",
+            ui_sample_notice_body:"This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, and AWS Systems Manager. See the",
             ui_shared_responsibility:'AWS Shared Responsibility Model',
             ui_btn_copy:'Copy Instructions',
             ui_one_file_step:'One file. One step.',
@@ -895,7 +895,7 @@
             ui_template_ready:'Template Ready', ui_template_ready_subtitle:'Share this with the customer along with the deployment instructions below',
             ui_prereq_title:'Customer Prerequisites', ui_prereq_subtitle:'the generated deploy.sh will verify these automatically before deploying:',
             ui_prereq_cloudtrail:'CloudTrail must be enabled in the target region(s)',
-            ui_prereq_perms:'Deployer must have CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch)',
+            ui_prereq_perms:'Deployer must have AWS CloudFormation permissions (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
             ui_prereq_org:'Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access',
             ui_scp_title:'⚠️ Service Control Policy (SCP) Advisory',
             ui_scp_intro:'If the customer\'s organization uses SCPs, verify the following before deployment:',
@@ -903,7 +903,7 @@
             ui_template_preview:'Template Preview',
             ui_start_over:'Start Over',
             ui_cost_note:'Estimated monthly cost: ', ui_cost_note2:' per account (Lambda invocations + CloudWatch). No AWS Config required.',
-            ui_scp_tagging:"Tagging SCPs — ensure SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh will run a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
+            ui_scp_tagging:"Tagging SCPs — verify SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh runs a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
             ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution will not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
             rv_not_specified:'(not specified)', rv_none:'(none)', rv_none_specified:'(none specified)',
             rv_yes:'Yes', rv_no:'No', rv_disabled:'Disabled',
@@ -948,7 +948,7 @@
             d_fix_trail2:'Make sure to include region',
             d_ok_perms:'Deployment permissions are in place.',
             d_fail_perms:'Your account does not have the required deployment permissions.',
-            d_fix_perms:'Ask your AWS administrator to grant you CloudFormation, IAM, Lambda, EventBridge, SSM, SNS, SQS, and CloudWatch permissions.',
+            d_fix_perms:'Ask your AWS administrator to grant you AWS CloudFormation, IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, and Amazon CloudWatch permissions.',
             d_ok_org:'Running from the correct account (management or delegated administrator).',
             d_ok_org_delegated:'Running as delegated administrator for CloudFormation StackSets.',
             d_fail_org:"This script must be run from your organization's management account or a delegated administrator account for CloudFormation StackSets.",
