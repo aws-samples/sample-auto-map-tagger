@@ -565,18 +565,40 @@
         function addRegion() {
             const list = document.getElementById('regionList');
             const firstSelect = list.querySelector('.region-select');
+            const selected = new Set([...list.querySelectorAll('.region-select')].map(s => s.value).filter(v => v));
+            const select = document.createElement('select');
+            select.className = 'region-select';
+            [...firstSelect.options].forEach(opt => {
+                if (!selected.has(opt.value)) {
+                    select.appendChild(opt.cloneNode(true));
+                }
+            });
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove'; btn.title = 'Remove'; btn.onclick = function(){ removeEntry(this); };
+            btn.textContent = '×';
             const row = document.createElement('div');
             row.className = 'entry-row';
-            row.innerHTML = `<select class="region-select">${firstSelect.innerHTML}</select><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>`;
+            row.appendChild(select); row.appendChild(btn);
             list.appendChild(row);
         }
 
         function addSingleRegion() {
             const list = document.getElementById('singleRegionList');
             const firstSelect = list.querySelector('.region-select');
+            const selected = new Set([...list.querySelectorAll('.region-select')].map(s => s.value).filter(v => v));
+            const select = document.createElement('select');
+            select.className = 'region-select';
+            [...firstSelect.options].forEach(opt => {
+                if (!selected.has(opt.value)) {
+                    select.appendChild(opt.cloneNode(true));
+                }
+            });
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove'; btn.title = 'Remove'; btn.onclick = function(){ removeEntry(this); };
+            btn.textContent = '×';
             const row = document.createElement('div');
             row.className = 'entry-row';
-            row.innerHTML = `<select class="region-select">${firstSelect.innerHTML}</select><button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>`;
+            row.appendChild(select); row.appendChild(btn);
             list.appendChild(row);
         }
 
@@ -683,9 +705,9 @@
 
             if (deployMode === 'single') {
                 const singleRegions = getValues('#singleRegionList .region-select');
-                config.regions = singleRegions.length > 0 ? singleRegions : ['ap-northeast-2'];
+                config.regions = [...new Set(singleRegions.length > 0 ? singleRegions : ['ap-northeast-2'])];
             } else if (deployMode === 'multi') {
-                config.regions = getValues('.region-select');
+                config.regions = [...new Set(getValues('.region-select'))];
                 config.useAccountScope = document.getElementById('useAccountScope').checked;
                 const ssIds = document.querySelectorAll('.stackset-account-id');
                 const ssLabels = document.querySelectorAll('.stackset-account-label');
@@ -728,15 +750,16 @@
                 [t('ui_deploy_mode'), config.deployMode === 'single' ? t('ui_single_title') : t('ui_multi_title')],
             ];
 
+            if (config.regions && config.regions.length > 0) {
+                rows.push([t('ui_deployment_regions'), config.regions.join(', ')]);
+            }
+
             if (config.deployMode === 'multi') {
                 if (config.useAccountScope) {
                     const acctDisplay = (config.stacksetAccounts || []).map(a => `${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('<br>');
                     rows.push([t('rv_target_accounts'), acctDisplay || t('rv_none_specified')]);
                 } else {
                     rows.push([t('rv_target_accounts'), t('rv_targets_all')]);
-                }
-                if (config.regions && config.regions.length > 0) {
-                    rows.push([t('ui_deployment_regions'), config.regions.join(', ')]);
                 }
             }
 
