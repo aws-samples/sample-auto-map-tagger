@@ -257,9 +257,11 @@ Resources:
                   - qbusiness:TagResource
                   - frauddetector:TagResource
                 Resource: '*'
-              # NOTE: sts:AssumeRole for cross-account architecture has been removed from the
-              # default template. The recommended deployment (StackSets) gives each account its
-              # own Lambda — no cross-account role assumption is needed or exercised.
+              # NOTE: This template deploys a single-account Lambda. No sts:AssumeRole or
+              # cross-account permissions are present or required. For multi-account deployments,
+              # a separate CloudFormation StackSet deploys this same template to each account
+              # independently via CloudFormation SERVICE_MANAGED permissions (AWS service-linked
+              # roles), not direct cross-account role assumption by the Lambda function itself.
               - Sid: MinimalReads
                 Effect: Allow
                 Action:

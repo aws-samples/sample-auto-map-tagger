@@ -246,7 +246,7 @@
 
             <div class="card">
                 <h2 data-i18n="ui_deploy_mode">Deployment Mode</h2>
-                <p class="subtitle" data-i18n="ui_deploy_mode_subtitle">How many AWS accounts will be used for migration?</p>
+                <p class="subtitle" data-i18n="ui_deploy_mode_subtitle">How many AWS accounts are used for migration?</p>
 
                 <div class="option-card" id="opt-single" onclick="selectDeployMode('single')">
                     <h3>
@@ -311,7 +311,7 @@
                                 These services have no VPC association. Check to tag them all regardless of VPC scope (recommended for MAP eligibility).
                             </div>
                         </div>
-                        <label><span data-i18n="ui_vpc_ids">VPC IDs</span> <span class="hint" data-i18n="ui_vpc_ids_hint">(only VPC-bound resources in these VPCs will be tagged)</span></label>
+                        <label><span data-i18n="ui_vpc_ids">VPC IDs</span> <span class="hint" data-i18n="ui_vpc_ids_hint">(only VPC-bound resources in these VPCs are tagged)</span></label>
                         <div id="vpcList">
                             <div class="entry-row">
                                 <input type="text" class="vpc-input" placeholder="vpc-0abc1234def56789">
@@ -479,7 +479,7 @@
                 <div id="downloadButtons" style="margin: 16px 0; display: flex; gap: 12px; flex-wrap: wrap;"></div>
 
                 <div class="info-box" style="border-left: 4px solid #d13212; background: #fdf3f1; margin: 16px 0;">
-                    <strong data-i18n="ui_prereq_title">Customer Prerequisites</strong> — <span data-i18n="ui_prereq_subtitle">the generated deploy.sh will verify these automatically before deploying:</span>
+                    <strong data-i18n="ui_prereq_title">Customer Prerequisites</strong> — <span data-i18n="ui_prereq_subtitle">the generated deploy.sh verifies these automatically before deploying:</span>
                     <ul style="margin: 8px 0 0 0; padding-left: 20px;">
                         <li data-i18n="ui_prereq_cloudtrail">CloudTrail must be enabled in the target region(s)</li>
                         <li data-i18n="ui_prereq_perms">Deployer must have CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch)</li>
@@ -865,7 +865,7 @@
             ui_agree_end:'Agreement End Date', ui_agree_end_hint:'(Date to stop tagging newly created resources)',
             ui_alert_email:'Alert Email', ui_alert_email_hint:'(optional — email to receive tagging failure alerts)',
             ui_email_confirm_hint:'Customer must confirm the AWS subscription email after deployment.',
-            ui_deploy_mode:'Deployment Mode', ui_deploy_mode_subtitle:'How many AWS accounts will be used for migration?',
+            ui_deploy_mode:'Deployment Mode', ui_deploy_mode_subtitle:'How many AWS accounts are used for migration?',
             ui_single_title:'Single Account', ui_single_desc:'Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.',
             ui_multi_title:'Multiple Accounts (AWS Organizations)', ui_multi_desc:'Customer has multiple linked accounts under an AWS Organization. One StackSet command deploys to all accounts simultaneously.',
             ui_backfill_title:'One-Time Backfill', ui_optional:'(optional)',
@@ -875,7 +875,7 @@
             ui_vpc_limit:'Limit tagging to specific VPCs only',
             ui_tag_non_vpc:'Also tag non-VPC resources (S3, DynamoDB, Lambda, SNS, SQS, etc.)',
             ui_tag_non_vpc_hint:'These services have no VPC association. Check to tag them all regardless of VPC scope (recommended for MAP eligibility).',
-            ui_vpc_ids:'VPC IDs', ui_vpc_ids_hint:'(only VPC-bound resources in these VPCs will be tagged)',
+            ui_vpc_ids:'VPC IDs', ui_vpc_ids_hint:'(only VPC-bound resources in these VPCs are tagged)',
             ui_add_vpc:'+ Add another VPC', ui_add_account:'+ Add another account', ui_add_region:'+ Add another region',
             ui_migration_account_ids:'Migration Account IDs', ui_migration_account_ids_hint:'(for reference — the stack deploys to the entire org automatically)',
             ui_stackset_note:'The Lambda is deployed to every account in your org via the root OU. By default, all accounts\' resources are tagged. You can optionally limit tagging to specific accounts below.',
@@ -886,14 +886,14 @@
             ui_deployment_region_single:'Deployment Region',
             ui_deployment_regions:'Deployment Regions', ui_deployment_regions_hint:'(regions where the customer creates resources)',
             ui_backfill_strong:'Tag existing resources created since agreement start date',
-            ui_backfill_scope_note:'✓ Scoping applied: backfill will follow the same VPC / account scope settings selected above.',
+            ui_backfill_scope_note:'✓ Scoping applied: backfill follows the same VPC / account scope settings selected above.',
             ui_backfill_desc:'Deploys a one-time Lambda that queries CloudTrail history from your agreement start date and tags all matching resources created before this solution was deployed. Runs automatically ~5 minutes after deployment.',
             ui_backfill_note:'Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.',
             ui_coverage_subtitle:'190+ resource types confirmed working — all MAP 2.0 eligible services verified (9 accounts, 2 regions)',
             ui_review_title:'Review Configuration', ui_review_subtitle:'Verify settings before generating the template',
             ui_what_deployed:'What Gets Deployed',
             ui_template_ready:'Template Ready', ui_template_ready_subtitle:'Share this with the customer along with the deployment instructions below',
-            ui_prereq_title:'Customer Prerequisites', ui_prereq_subtitle:'the generated deploy.sh will verify these automatically before deploying:',
+            ui_prereq_title:'Customer Prerequisites', ui_prereq_subtitle:'the generated deploy.sh verifies these automatically before deploying:',
             ui_prereq_cloudtrail:'CloudTrail must be enabled in the target region(s)',
             ui_prereq_perms:'Deployer must have AWS CloudFormation permissions (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
             ui_prereq_org:'Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access',
@@ -904,7 +904,7 @@
             ui_start_over:'Start Over',
             ui_cost_note:'Estimated monthly cost: ', ui_cost_note2:' per account (Lambda invocations + CloudWatch). No AWS Config required.',
             ui_scp_tagging:"Tagging SCPs — verify SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh runs a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
-            ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution will not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
+            ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution does not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
             rv_not_specified:'(not specified)', rv_none:'(none)', rv_none_specified:'(none specified)',
             rv_yes:'Yes', rv_no:'No', rv_disabled:'Disabled',
             rv_multi_method:'Multi-Account Method', rv_stackset:'StackSet (per-account Lambda)', rv_central:'Central Lambda (cross-account)',
@@ -953,7 +953,7 @@
             d_ok_org_delegated:'Running as delegated administrator for CloudFormation StackSets.',
             d_fail_org:"This script must be run from your organization's management account or a delegated administrator account for CloudFormation StackSets.",
             d_fix_org:'Switch to your management account (or delegated admin account) in AWS CloudShell and run this script again. If you are unsure which account that is, contact your AWS account team.',
-            d_warn_stacksets:'Multi-account deployment integration not yet enabled — will be set up automatically.',
+            d_warn_stacksets:'Multi-account deployment integration not yet enabled — is set up automatically during deployment.',
             d_ok_stacksets:'Multi-account deployment integration is enabled.',
             d_ok_scp:'No security policies are blocking the tagging service.',
             d_fail_scp:'A security policy in your organization is blocking the tagging service.',
@@ -962,17 +962,17 @@
             d_all_passed:'All checks passed.',
             d_checks_failed:'check(s) failed. Please follow the steps above, then run this script again.',
             d_fix_label:'→ Fix:',
-            d_deploying:'Deployment is running. You can safely press Ctrl+C — it will continue in the background.',
+            d_deploying:'Deployment is running. You can safely press Ctrl+C — it continues in the background.',
             d_still_deploying:'Still setting up...',
             d_elapsed:'elapsed',
             d_deploy_failed:'Setup failed. Please share the report below with your AWS account team.',
             d_complete_title:'Setup Complete!',
-            d_complete_single:'New resources will be automatically tagged within 1–2 minutes of creation (up to 15 min at peak).',
+            d_complete_single:'New resources are automatically tagged within 1–2 minutes of creation (up to 15 min at peak).',
             d_complete_multi:'Auto-tagging is now active across all accounts in your organization.',
             d_backfill_msg:'Backfill is scheduled to run shortly.',
-            d_backfill_since:'It will tag existing resources created since',
+            d_backfill_since:'Tags existing resources created since',
             d_backfill_waiting:'Waiting for backfill to complete...',
-            d_backfill_wait_info:'(Backfill will start shortly, may take up to 15 minutes)',
+            d_backfill_wait_info:'(Backfill starts shortly, may take up to 15 minutes)',
             d_backfill_starting:'Backfill is running...',
             d_backfill_in_progress:'Backfill in progress...',
             d_backfill_timeout:'Backfill is still running. Report saved — check CloudWatch for final results:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
