@@ -1,7 +1,7 @@
 # MAP 2.0 Auto-Tagger — Threat Model
 
-**Version:** v19.1 (updated post E2E testing)
-**Date:** 2026-03-25
+**Version:** v19.25 (updated post full MAP 2.0 service sweep)
+**Date:** 2026-03-29
 **Status:** For AppSec / PCSR review
 
 ---
@@ -19,6 +19,26 @@ It runs entirely within the customer's AWS account(s) with:
 ---
 
 ## 2. Architecture
+
+```mermaid
+graph TD
+    CT["AWS CloudTrail\n(all regions)"] --> EB["Amazon EventBridge Rule\n(Create* / Run* / Put* / Enable* events)"]
+    EB --> LF["AWS Lambda\nmap-auto-tagger"]
+    LF --> SSM["AWS Systems Manager\nParameter Store\n(read config)"]
+    LF --> TAG["tag:TagResources\n+ 30+ service-specific\ntagging APIs"]
+    LF -->|on failure| SQS["Amazon SQS\nRetry Queue"]
+    SQS -->|retry 1-3x| LF
+    SQS -->|exhausted| DLQ["Amazon SQS\nDead Letter Queue"]
+    DLQ --> CW["Amazon CloudWatch\nAlarm"]
+    CW --> SNS["Amazon SNS Topic\n→ customer email"]
+    CF["AWS CloudFormation\n(deploy)"] -.->|creates| LF
+    CF -.->|creates| EB
+    CF -.->|creates| SSM
+```
+
+**Single-account deployment** — one CloudFormation stack per region. Lambda runs in the same account and region as the resources being tagged. No cross-account calls.
+
+**Multi-account deployment** — SERVICE_MANAGED CloudFormation StackSet deploys this same single-account template to each member account independently via CloudFormation service-linked roles. Each account's Lambda runs locally within that account. No direct cross-account Lambda invocations.
 
 ```
 CloudTrail (all regions)
