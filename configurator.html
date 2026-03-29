@@ -2919,6 +2919,8 @@ ${crossAccountCode}
                           'CreateVpnGateway':'vpnGateway.vpnGatewayId'}
                       path = obj_map.get(event_name,'')
                       val = resp
+                      wrapper = event_name + 'Response'
+                      if wrapper in (val or {}): val = val[wrapper]
                       for k in path.split('.'):
                           val = (val or {}).get(k) if isinstance(val, dict) else None
                       if val:
