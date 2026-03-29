@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v19.25] - 2026-03-29
+
+### Fixed (configurator.html)
+- **NAT Gateway ARN construction** — `CreateNatGateway` response wraps the object in `CreateNatGatewayResponse` (same pattern as Transit Gateway). The path traversal `natGateway.natGatewayId` was failing because it started from `resp` rather than `resp.CreateNatGatewayResponse`. Fixed by unwrapping `{EventName}Response` before traversing the obj_map path — this future-proofs all EC2 APIs that use this wrapper pattern.
+
+### Changed (configurator.html)
+- **What Gets Tagged UI** — updated service list to include all new MAP 2.0 services added in v19.21–v19.24. Coverage grid now has 20 categories. Not-taggable items now show ❌ (genuinely impossible). NAT Gateways/ElastiCache show ✅ with timing note (tagged within 5–15 min via retry), no longer showing misleading ⚠️.
+- **Version badge** — updated to "All MAP 2.0 services verified"
+
+---
+
 ## [v19.20] - 2026-03-29
 
 ### Added (configurator.html)

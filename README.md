@@ -7,7 +7,7 @@
 [![E2E Tested](https://img.shields.io/badge/E2E%20Tested-190%2B%20Resource%20Types-brightgreen)]()
 [![Success Rate](https://img.shields.io/badge/Success%20Rate-100%25%20Taggable-brightgreen)]()
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-success)]()
-[![Bugs Fixed](https://img.shields.io/badge/Bugs%20Fixed-84%2B-blue)]()
+[![Bugs Fixed](https://img.shields.io/badge/Bugs%20Fixed-100%2B-blue)]()
 [![Multi--Account](https://img.shields.io/badge/Multi--Account-9%20Accounts%20Validated-brightgreen)]()
 [![Lambda Errors](https://img.shields.io/badge/Lambda%20Errors-0%20across%20all%20tests-brightgreen)]()
 
@@ -213,12 +213,12 @@ AWS Resource Created
 
 **Phase 2:** 2+ days across CT org (4 accounts × 4 regions = 16 StackSet instances), all services validated
 
-**Phase 3 (v19.15–v19.19):** Full E2E test against 9 real AWS accounts — 1 single account + CT org with 5 linked accounts + 2 security OU accounts (ap-northeast-2). First ever test of configurator-generated deploy.sh end-to-end.
+**Phase 3 (v19.15–v19.25):** Full MAP 2.0 service sweep against 9 real AWS accounts (1 single + CT org with 5 linked + 2 security OU). First ever test of configurator-generated deploy.sh end-to-end. Full sweep of all 88 MAP 2.0 eligible services from the Mar 20, 2026 PDF.
 
 | Metric | Phase 1 | Phase 2 | Phase 3 | Total |
 |--------|---------|---------|---------|-------|
-| Resource types tested | 170+ | 200+ | 21 (deep) | **190+ unique** |
-| Bugs found & fixed | 55+ | 24 | 5 | **84+ total** |
+| Resource types tested | 170+ | 200+ | 60+ | **190+ unique** |
+| Bugs found & fixed | 55+ | 24 | 21 | **100+ total** |
 | False positives | 0 | 0 | 0 | **0** |
 | Lambda errors | 0 | 0 | **0** | **0** |
 | Accounts tested | 1 | 4 | 9 | **9** |
@@ -226,12 +226,21 @@ AWS Resource Created
 **Phase 3 scenarios covered:**
 - Single account: 21 resource types, VPC scoping (in/out), backfill, Korean language, update path
 - Multi-account: 7/7 org accounts, account scoping (in/out of scope verified), backfill in all 5 linked accounts
-- Edge cases: agreement start/end date filtering, 40-resource simultaneous burst (throttling), already-tagged resource handling
+- Edge cases: date filtering, 40-resource throttle burst, already-tagged resources
+- Full MAP 2.0 service sweep: all 88 services from official list verified — 16 bugs fixed, 11 services confirmed with environment-restricted testing
 
-**Hardest bugs fixed (Phase 3 — configurator-specific):**
+**Notable bugs fixed (Phase 3 — deployment pipeline):**
 - **SSO/Identity Center users** — `iam:SimulatePrincipalPolicy` fails for assumed-role ARNs; `set -e` caused silent script exit for all Identity Center users
 - **StackSet Lambda timeout** — Lambda waited for 15-min operation inside a 15-min timeout; now responds SUCCESS immediately, deploy.sh polls StackSet instances directly
 - **StackSet polling race condition** — polling loop exited immediately when `TOTAL=0` before any instances appeared
+
+**Notable bugs fixed (Phase 3 — MAP service sweep):**
+- **NAT Gateway** — `CreateNatGatewayResponse` wrapper not being unwrapped before path traversal; ARN construction silently failed
+- **Kinesis Video Streams** — `CreateStream` event shared with Kinesis Data Streams; wrong service ARN constructed; `TagStream` requires `StreamARN=` not `StreamName=`
+- **Aurora DSQL, Keyspaces** — `tag:TagResources` not supported; need `dsql:TagResource` and `cassandra:Alter` + `keyspaces:TagResource` direct calls
+- **Bedrock AgentCore** — Lambda runtime boto3 too old; SigV4 urllib call with correct `bedrock-agentcore:TagResource` IAM action
+- **Security Hub** — `EnableSecurityHub` doesn't match `Create*` prefix; added `Enable` prefix to EventBridge rule
+- **ACM, OpsCenter, HealthImaging** — response ARN fields (`certificateArn`, `opsItemArn`, `datastoreId`) not in ARN_FIELDS scan
 
 **Hardest bugs fixed (Phase 2):**
 - **IVS Channel** — universal scan grabbed `stream-key.arn` before `channel.arn` → moved handler to early-exit before scan

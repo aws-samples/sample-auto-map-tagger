@@ -1,7 +1,22 @@
 # MAP 2.0 Auto-Tagger — Service Coverage & Test Results
 
-**Template version:** v19.24 | **Accounts tested:** 9 (single + CT org with 5 linked + 2 security OU) | **Regions:** ap-northeast-2, us-east-1
-**Total bugs fixed:** 99+ | **False positives:** 0 | **Last full MAP 2.0 service sweep:** 2026-03-29
+**Template version:** v19.25 | **Accounts tested:** 9 (single + CT org with 5 linked + 2 security OU) | **Regions:** ap-northeast-2, us-east-1
+**Total bugs fixed:** 100+ | **False positives:** 0 | **Last full MAP 2.0 service sweep:** 2026-03-29
+
+### Additional Phase 3 Retests (2026-03-29) — MAP-eligible custom API services
+
+Services confirmed working in live retest:
+
+| Service | Status | Notes |
+|---------|--------|-------|
+| NAT Gateways | ✅ Fixed v19.25 | `CreateNatGatewayResponse` wrapper fix; tagged via EC2 CreateTags after provisioning |
+| Amazon ElastiCache | ✅ Confirmed | First attempt fails (provisioning), retry at 5 min succeeds |
+| Amazon CloudFront | ✅ Confirmed | Tagged via us-east-1 Lambda |
+| Amazon EMR | ✅ Confirmed | Instant tagging |
+| Auto Scaling Groups | ✅ Confirmed | Instant tagging |
+| Amazon API Gateway (REST) | ✅ Confirmed | Instant tagging via apigateway:TagResource |
+| Amazon Kinesis Firehose | ✅ Confirmed | Instant tagging |
+| Amazon Route 53 | ✅ Confirmed (Phase 2) | Requires org trail or multi-region trail — CloudTrail events for Route 53 (global service) only reach EventBridge when a properly configured trail exists in us-east-1 |
 
 ---
 
