@@ -199,7 +199,7 @@
         </div>
 
         <div class="info-box" style="background:#fff8e1;border-left:4px solid #f9a825;font-size:13px;">
-            <strong data-i18n="ui_sample_notice_title">Sample Code Notice:</strong> <span data-i18n="ui_sample_notice_body">This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for Lambda, EventBridge, CloudWatch, SNS, SQS, and SSM. See the</span> <a href="https://aws.amazon.com/security/shared-responsibility/" target="_blank" rel="noopener" data-i18n="ui_shared_responsibility">AWS Shared Responsibility Model</a>.
+            <strong data-i18n="ui_sample_notice_title">Sample Code Notice:</strong> <span data-i18n="ui_sample_notice_body">This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, and AWS Systems Manager. See the</span> <a href="https://aws.amazon.com/security/shared-responsibility/" target="_blank" rel="noopener" data-i18n="ui_shared_responsibility">AWS Shared Responsibility Model</a>.
         </div>
 
         <div class="info-box">
@@ -482,7 +482,7 @@
                     <strong data-i18n="ui_prereq_title">Customer Prerequisites</strong> — <span data-i18n="ui_prereq_subtitle">the generated deploy.sh verifies these automatically before deploying:</span>
                     <ul style="margin: 8px 0 0 0; padding-left: 20px;">
                         <li data-i18n="ui_prereq_cloudtrail">CloudTrail must be enabled in the target region(s)</li>
-                        <li data-i18n="ui_prereq_perms">Deployer must have CloudFormation permissions (IAM, Lambda, EventBridge, SSM, SNS, SQS, CloudWatch)</li>
+                        <li data-i18n="ui_prereq_perms">Deployer must have AWS CloudFormation permissions (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)</li>
                         <li id="prereq-multi" style="display:none;" data-i18n="ui_prereq_org">Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access</li>
                     </ul>
                 </div>
@@ -873,12 +873,12 @@
             ui_btn_next:'Review Configuration →', ui_btn_back:'← Back', ui_btn_generate:'Generate & Download →',
             ui_tagging_scope:'Tagging Scope', ui_vpc_scope_hint:'By default all new resources in the account are tagged. Use VPC scoping if migration and non-migration workloads share the same account.',
             ui_vpc_limit:'Limit tagging to specific VPCs only',
-            ui_tag_non_vpc:'Also tag non-VPC resources (S3, DynamoDB, Lambda, SNS, SQS, etc.)',
+            ui_tag_non_vpc:'Also tag non-VPC resources (Amazon S3, Amazon DynamoDB, AWS Lambda, Amazon SNS, Amazon SQS, etc.)',
             ui_tag_non_vpc_hint:'These services have no VPC association. Check to tag them all regardless of VPC scope (recommended for MAP eligibility).',
             ui_vpc_ids:'VPC IDs', ui_vpc_ids_hint:'(only VPC-bound resources in these VPCs are tagged)',
             ui_add_vpc:'+ Add another VPC', ui_add_account:'+ Add another account', ui_add_region:'+ Add another region',
             ui_migration_account_ids:'Migration Account IDs', ui_migration_account_ids_hint:'(for reference — the stack deploys to the entire org automatically)',
-            ui_stackset_note:'The Lambda is deployed to every account in your org via the root OU. By default, all accounts\' resources are tagged. You can optionally limit tagging to specific accounts below.',
+            ui_stackset_note:'The AWS Lambda function is deployed to every account in your org via the root OU. By default, all accounts\' resources are tagged. You can optionally limit tagging to specific accounts below.',
             ui_stackset_bucket_note:'ⓘ This deployment creates a temporary S3 bucket (auto-map-tagger-{account-id}) to stage CloudFormation templates for the StackSet. The bucket is retained after deployment as the StackSet requires it to deploy to new accounts that join your organization in the future.',
             ui_account_limit:'Limit tagging to specific accounts only',
             ui_central_account_id:'Central Account ID', ui_central_account_id_hint:'(where the Lambda will be deployed)',
@@ -887,7 +887,7 @@
             ui_deployment_regions:'Deployment Regions', ui_deployment_regions_hint:'(regions where the customer creates resources)',
             ui_backfill_strong:'Tag existing resources created since agreement start date',
             ui_backfill_scope_note:'✓ Scoping applied: backfill follows the same VPC / account scope settings selected above.',
-            ui_backfill_desc:'Deploys a one-time Lambda that queries CloudTrail history from your agreement start date and tags all matching resources created before this solution was deployed. Runs automatically ~5 minutes after deployment.',
+            ui_backfill_desc:'Deploys a one-time AWS Lambda function that queries CloudTrail history from your agreement start date and tags all matching resources created before this solution was deployed. Runs automatically ~5 minutes after deployment.',
             ui_backfill_note:'Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.',
             ui_coverage_subtitle:'190+ resource types confirmed working — all MAP 2.0 eligible services verified (9 accounts, 2 regions)',
             ui_review_title:'Review Configuration', ui_review_subtitle:'Verify settings before generating the template',
@@ -902,7 +902,7 @@
             ui_deploy_instructions:'Customer Deployment Instructions',
             ui_template_preview:'Template Preview',
             ui_start_over:'Start Over',
-            ui_cost_note:'Estimated monthly cost: ', ui_cost_note2:' per account (Lambda invocations + CloudWatch). No AWS Config required.',
+            ui_cost_note:'Estimated monthly cost: ', ui_cost_note2:' per account (AWS Lambda invocations + Amazon CloudWatch). No AWS Config required.',
             ui_scp_tagging:"Tagging SCPs — verify SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh runs a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
             ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution does not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
             rv_not_specified:'(not specified)', rv_none:'(none)', rv_none_specified:'(none specified)',
