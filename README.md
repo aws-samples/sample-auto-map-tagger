@@ -7,7 +7,7 @@
 [![E2E Tested](https://img.shields.io/badge/E2E%20Tested-190%2B%20Resource%20Types-brightgreen)]()
 [![Success Rate](https://img.shields.io/badge/Success%20Rate-100%25%20Taggable-brightgreen)]()
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-success)]()
-[![Bugs Fixed](https://img.shields.io/badge/Bugs%20Fixed-100%2B-blue)]()
+[![Bugs Fixed](https://img.shields.io/badge/Bugs%20Fixed-102%2B-blue)]()
 [![Multi--Account](https://img.shields.io/badge/Multi--Account-9%20Accounts%20Validated-brightgreen)]()
 [![Lambda Errors](https://img.shields.io/badge/Lambda%20Errors-0%20across%20all%20tests-brightgreen)]()
 
