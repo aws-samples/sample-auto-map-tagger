@@ -6,6 +6,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [v19.26] - 2026-03-29
+
+### Fixed (configurator.html) — Holmes PCSR remediation
+
+- **Service name prefixes** — Added AWS/Amazon prefixes throughout: coverage grid (20 categories), all 7 language translations of sample notice, prereqs, resource labels in review section, and HTML fallback text
+- **Superlative language** — Replaced all "will/ensure" with present tense in English i18n strings; "will" → "starts/are tagged/runs/etc." across 10 instances
+- **Technical accuracy** — Updated YAML cross-account comment to accurately describe SERVICE_MANAGED StackSet mechanism
+- **Copyright** — Added copyright header to THREAT-MODEL.md
+
+### Added (configurator.html) — UI improvements
+
+- **Single account region picker** — Added Deployment Region selector (with "Add another region" for multi-region deployments); deploy.sh loops over all regions
+- **Date input restriction** — `min`/`max` attributes prevent year values beyond 4 digits
+- **Duplicate prevention** — VPC IDs and account IDs deduplicated via Set; error messages shown in all 7 languages with dynamic `data-i18n` so language switches show correct message
+- **Format validation** — VPC IDs validated against `vpc-[0-9a-f]{8,17}`; account IDs validated as exactly 12 digits; red border + tooltip on invalid input; error messages in all 7 languages
+- **Review section i18n** — Review table now regenerates when language changes (was hardcoded English); "MAP Engagement ID" → `t('ui_mpe_tag')` (was hardcoded, not translated); region shown for both single and multi-account mode
+- **Preflight: VPC existence** — deploy.sh checks each scoped VPC ID exists in the account/region via `aws ec2 describe-vpcs`; fails preflight with clear message if not found
+- **Preflight: Account existence** — deploy.sh checks each scoped account ID exists in the org via `aws organizations describe-account`; fails preflight with clear message if not found
+
+### Added (THREAT-MODEL.md)
+
+- Mermaid architecture diagram showing full data flow (CloudTrail → EventBridge → Lambda → tagging APIs + retry path)
+- Version updated to v19.25, date 2026-03-29
+
+### Added (docs)
+
+- `HOLMES-JUSTIFICATIONS.md` — justifications for all 12 Holmes scan findings for PCSR ticket V2153641992
+
+---
+
 ## [v19.25] - 2026-03-29
 
 ### Fixed (configurator.html)
