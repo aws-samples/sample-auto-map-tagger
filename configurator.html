@@ -1,5 +1,5 @@
 <!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. -->
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: MIT-0 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2762,7 +2762,7 @@ ${backfillEventNamesList}
               return parts[4] if len(parts) > 4 else None`;
 
             return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT-0
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
@@ -3588,7 +3588,7 @@ ${t('ui_instr_cloudtrail_note')}`;
                 : `      # Lambda deployed to all org accounts. Tagging applies to all accounts.`;
 
             return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT-0
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
@@ -3789,7 +3789,7 @@ Outputs:
                 const tpl = escapeHeredoc(mainTemplate);
                 return `#!/bin/bash
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT-0
 #
 # MAP 2.0 Auto-Tagger — Deployment Script
 # Customer: ${config.customerName || 'Customer'} | MPE: ${mpe}
@@ -4081,7 +4081,7 @@ echo ""
 
             return `#!/bin/bash
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: MIT-0
 #
 # MAP 2.0 Auto-Tagger — Deployment Script
 # Customer: ${config.customerName || 'Customer'} | MPE: ${mpe}

@@ -321,7 +321,7 @@ aws logs filter-log-events \
 - ✅ Threat model documented (`THREAT-MODEL.md`) — STRIDE analysis, trust boundaries, residual risks
 - ✅ Non-production disclaimer added to README
 - ✅ Required open source files present — `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, `CHANGELOG.md`
-- ✅ Apache 2.0 license headers added to all source files
+- ✅ MIT-0 license headers added to all source files
 - ✅ Repolinter — 0 failures (1 warning: false positive, no standalone `.js` files in project)
 - ✅ CI workflow added (`.github/workflows/lint.yml` — cfn-lint on CloudFormation template)
 - ✅ GitHub issue and PR templates added
