@@ -2,7 +2,7 @@
 
 ---
 
-# FOR THE AWS ACCOUNT TEAM
+## Step 1 — Generate deploy.sh
 
 **1. Open `configurator.html` in any browser**
 
@@ -19,15 +19,9 @@
 
 **3. Click "Generate & Download" → downloads `deploy.sh`**
 
-**4. Send `deploy.sh` to the customer with:**
-
-> *"Log into the AWS Console, open CloudShell from the top menu bar, upload this file, and run: `bash deploy.sh`"*
-
 ---
 
----
-
-# FOR THE CUSTOMER
+## Step 2 — Deploy
 
 ## Single Account
 

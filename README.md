@@ -43,7 +43,7 @@ EventBridge catches resource creation events and triggers a Lambda that applies 
 |----------|-------------|
 | **[TEST-RESULTS.md](TEST-RESULTS.md)** | ✅ **Complete test results** — every service tested, every bug documented |
 | **[OVERVIEW.md](OVERVIEW.md)** | Non-technical stakeholder overview |
-| **[INSTRUCTIONS.md](INSTRUCTIONS.md)** | Deployment steps for the AWS team and customer |
+| **[INSTRUCTIONS.md](INSTRUCTIONS.md)** | Deployment steps — generating deploy.sh and running it |
 | **[MAP_TAGGING_GAP_ANALYSIS.md](MAP_TAGGING_GAP_ANALYSIS.md)** | Gap analysis: what can't be tagged and why |
 | **[THREAT-MODEL.md](THREAT-MODEL.md)** | AppSec artifact — STRIDE threat model, trust boundaries, residual risks |
 
