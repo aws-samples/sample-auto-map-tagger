@@ -3941,7 +3941,8 @@ if [ "\$TEMPLATE_SIZE" -gt 51200 ]; then
         sleep 2
     done
     aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' > /dev/null 2>&1 || true
-    aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"DenyHTTP\",\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::\${BUCKET}\",\"arn:aws:s3:::\${BUCKET}/*\"],\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}" > /dev/null 2>&1 || true
+    BUCKET_POLICY=\$(printf '{"Version":"2012-10-17","Statement":[{"Sid":"DenyHTTP","Effect":"Deny","Principal":"*","Action":"s3:*","Resource":["arn:aws:s3:::%s","arn:aws:s3:::%s/*"],"Condition":{"Bool":{"aws:SecureTransport":"false"}}}]}' "\${BUCKET}" "\${BUCKET}")
+    aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "\${BUCKET_POLICY}" > /dev/null 2>&1 || true
     aws s3 cp "\$TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-\${MPE}.yaml" > /dev/null
     TEMPLATE_REF="--template-url https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-\${MPE}.yaml"
 else
@@ -4261,7 +4262,8 @@ for i in 1 2 3 4 5; do
     sleep 2
 done
 aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' > /dev/null 2>&1 || true
-aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Sid\":\"DenyHTTP\",\"Effect\":\"Deny\",\"Principal\":\"*\",\"Action\":\"s3:*\",\"Resource\":[\"arn:aws:s3:::\${BUCKET}\",\"arn:aws:s3:::\${BUCKET}/*\"],\"Condition\":{\"Bool\":{\"aws:SecureTransport\":\"false\"}}}]}" > /dev/null 2>&1 || true
+BUCKET_POLICY=\$(printf '{"Version":"2012-10-17","Statement":[{"Sid":"DenyHTTP","Effect":"Deny","Principal":"*","Action":"s3:*","Resource":["arn:aws:s3:::%s","arn:aws:s3:::%s/*"],"Condition":{"Bool":{"aws:SecureTransport":"false"}}}]}' "\${BUCKET}" "\${BUCKET}")
+aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "\${BUCKET_POLICY}" > /dev/null 2>&1 || true
 aws s3 cp "\$ORG_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-org.yaml" > /dev/null
 aws s3 cp "\$ACCOUNTS_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts.yaml" > /dev/null
 rm -f "\$ORG_TEMPLATE" "\$ACCOUNTS_TEMPLATE"
