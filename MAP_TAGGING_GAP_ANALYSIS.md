@@ -1,6 +1,8 @@
 # MAP 2.0 Auto-Tagger: Comprehensive Gap Analysis
 
-**Date:** 2026-03-19
+> **Note:** This document was written during the early design phase of the auto-tagger. Many of the gaps described below (ElastiCache, NAT Gateways, EFS, Kinesis, Step Functions, API Gateway, Redshift, multi-account, retry/DLQ, and more) have since been addressed in the current version. This document remains useful for understanding architectural limitations that are inherent to AWS's tagging platform (Bedrock inference profiles, ECS propagateTags, EKS Auto Mode, GovCloud, etc.) and scenarios that are outside the scope of any auto-tagging solution.
+
+**Date:** 2026-03-19 (early design phase)
 **Sources:** MAP 2.0 Included Services List, customer field observations, and auto-tagger source code review.
 
 ---

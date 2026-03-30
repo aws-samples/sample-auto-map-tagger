@@ -216,5 +216,4 @@ The configurator takes ~2 minutes and produces a fully self-contained script wit
 | **Deployment** | 1 command in CloudShell (single or org-wide) |
 | **Cost** | < $2/month per account |
 | **Customer effort** | Run one script, zero ongoing maintenance |
-| **Testing** | 2-day CT org validation, 76+ bugs fixed, zero false positives |
-| **Status** | Production ready ✅ |
+| **Testing** | Multi-account org validation, 100+ bugs fixed, zero false positives |

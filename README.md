@@ -6,7 +6,6 @@
 
 [![E2E Tested](https://img.shields.io/badge/E2E%20Tested-190%2B%20Resource%20Types-brightgreen)]()
 [![Success Rate](https://img.shields.io/badge/Success%20Rate-100%25%20Taggable-brightgreen)]()
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-success)]()
 [![Bugs Fixed](https://img.shields.io/badge/Bugs%20Fixed-102%2B-blue)]()
 [![Multi--Account](https://img.shields.io/badge/Multi--Account-9%20Accounts%20Validated-brightgreen)]()
 [![Lambda Errors](https://img.shields.io/badge/Lambda%20Errors-0%20across%20all%20tests-brightgreen)]()
@@ -41,18 +40,16 @@ EventBridge catches resource creation events and triggers a Lambda that applies 
 
 | Document | Description |
 |----------|-------------|
-| **[TEST-RESULTS.md](TEST-RESULTS.md)** | ✅ **Complete test results** — every service tested, every bug documented |
-| **[OVERVIEW.md](OVERVIEW.md)** | Non-technical stakeholder overview |
+| **[OVERVIEW.md](OVERVIEW.md)** | Non-technical overview — how it works, what gets tagged, cost |
 | **[INSTRUCTIONS.md](INSTRUCTIONS.md)** | Deployment steps — generating deploy.sh and running it |
 | **[MAP_TAGGING_GAP_ANALYSIS.md](MAP_TAGGING_GAP_ANALYSIS.md)** | Gap analysis: what can't be tagged and why |
-| **[THREAT-MODEL.md](THREAT-MODEL.md)** | AppSec artifact — STRIDE threat model, trust boundaries, residual risks |
 
 ---
 
 ## Components
 
-- **`map2-auto-tagger-optimized.yaml`** — Production CloudFormation template (v18, 190+ services, 84+ bugs fixed, AppSec hardened)
-- **`configurator.html`** — Customer-facing self-service UI. Generates a customized `deploy.sh` for CloudShell or local AWS CLI deployment.
+- **`map2-auto-tagger-optimized.yaml`** — CloudFormation template (190+ services, IAM hardened)
+- **`configurator.html`** — Self-service UI. Generates a customized `deploy.sh` for CloudShell or local AWS CLI deployment.
 
 ---
 
@@ -209,47 +206,17 @@ AWS Resource Created
 
 ## 🔧 Testing Summary
 
-**Phase 1:** 12+ hours of continuous E2E testing, [test account], ap-northeast-2
+Validated across **9 real AWS accounts** (single account + multi-account org with 5 linked + 2 security OU accounts), covering all 88 MAP 2.0 eligible services from the official Included Services List.
 
-**Phase 2:** 2+ days across CT org (4 accounts × 4 regions = 16 StackSet instances), all services validated
+| Metric | Result |
+|--------|--------|
+| Resource types tested | **190+ unique** |
+| Bugs found & fixed | **100+** |
+| False positives | **0** |
+| Lambda errors | **0** |
+| Accounts tested | **9** |
 
-**Phase 3 (v19.15–v19.25):** Full MAP 2.0 service sweep against 9 real AWS accounts (1 single + CT org with 5 linked + 2 security OU). First ever test of configurator-generated deploy.sh end-to-end. Full sweep of all 88 MAP 2.0 eligible services from the Mar 20, 2026 PDF.
-
-| Metric | Phase 1 | Phase 2 | Phase 3 | Total |
-|--------|---------|---------|---------|-------|
-| Resource types tested | 170+ | 200+ | 60+ | **190+ unique** |
-| Bugs found & fixed | 55+ | 24 | 21 | **100+ total** |
-| False positives | 0 | 0 | 0 | **0** |
-| Lambda errors | 0 | 0 | **0** | **0** |
-| Accounts tested | 1 | 4 | 9 | **9** |
-
-**Phase 3 scenarios covered:**
-- Single account: 21 resource types, VPC scoping (in/out), backfill, Korean language, update path
-- Multi-account: 7/7 org accounts, account scoping (in/out of scope verified), backfill in all 5 linked accounts
-- Edge cases: date filtering, 40-resource throttle burst, already-tagged resources
-- Full MAP 2.0 service sweep: all 88 services from official list verified — 16 bugs fixed, 11 services confirmed with environment-restricted testing
-
-**Notable bugs fixed (Phase 3 — deployment pipeline):**
-- **SSO/Identity Center users** — `iam:SimulatePrincipalPolicy` fails for assumed-role ARNs; `set -e` caused silent script exit for all Identity Center users
-- **StackSet Lambda timeout** — Lambda waited for 15-min operation inside a 15-min timeout; now responds SUCCESS immediately, deploy.sh polls StackSet instances directly
-- **StackSet polling race condition** — polling loop exited immediately when `TOTAL=0` before any instances appeared
-
-**Notable bugs fixed (Phase 3 — MAP service sweep):**
-- **NAT Gateway** — `CreateNatGatewayResponse` wrapper not being unwrapped before path traversal; ARN construction silently failed
-- **Kinesis Video Streams** — `CreateStream` event shared with Kinesis Data Streams; wrong service ARN constructed; `TagStream` requires `StreamARN=` not `StreamName=`
-- **Aurora DSQL, Keyspaces** — `tag:TagResources` not supported; need `dsql:TagResource` and `cassandra:Alter` + `keyspaces:TagResource` direct calls
-- **Bedrock AgentCore** — Lambda runtime boto3 too old; SigV4 urllib call with correct `bedrock-agentcore:TagResource` IAM action
-- **Security Hub** — `EnableSecurityHub` doesn't match `Create*` prefix; added `Enable` prefix to EventBridge rule
-- **ACM, OpsCenter, HealthImaging** — response ARN fields (`certificateArn`, `opsItemArn`, `datastoreId`) not in ARN_FIELDS scan
-
-**Hardest bugs fixed (Phase 2):**
-- **IVS Channel** — universal scan grabbed `stream-key.arn` before `channel.arn` → moved handler to early-exit before scan
-- **Lightsail Container** — CloudTrail ARN uses UUID but `lightsail.tag_resource()` needs name → extract `containerServiceName` from request
-- **Transcribe** — `tag:TagResources` silently unsupported → added `transcribe:TagResource` specific handler
-- **Service Catalog** — `tag:TagResources` internally calls `servicecatalog:UpdateProduct` (not obvious) → added permission
-- **Lex v2** — wrong `eventSource` (`models.lex.amazonaws.com` vs actual `lex.amazonaws.com`) → fixed
-- **Supply Chain** — `tag:TagResources` not supported → `scn:TagResource` specific handler
-- **SageMaker Feature Store** — `FeatureGroupArn` (PascalCase) vs actual `featureGroupArn` (camelCase) → fixed
+**Scenarios covered:** Single account, multi-account org, VPC scoping, account scoping, backfill, multi-region, IAM Identity Center (SSO) users, delegated administrator accounts, date filtering, throttle burst handling.
 
 ---
 
@@ -311,50 +278,8 @@ aws logs filter-log-events \
 
 ---
 
-## Security Review Status
-
-### Completed
-- ✅ IAM hardened — ReadOnlyAccess removed, cross-account AssumeRole removed, 42+ invalid/discontinued/redundant permissions removed
-- ✅ S3 feedback loop fixed — Lambda no longer re-triggers on `PutBucketTagging`
-- ✅ CloudWatch Log Group added with 90-day retention
-- ✅ IAM Access Analyzer run — 0 findings after remediating 7 invalid action names
-- ✅ Threat model documented (`THREAT-MODEL.md`) — STRIDE analysis, trust boundaries, residual risks
-- ✅ Non-production disclaimer added to README
-- ✅ Required open source files present — `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `SUPPORT.md`, `CHANGELOG.md`
-- ✅ MIT-0 license headers added to all source files
-- ✅ Repolinter — 0 failures (1 warning: false positive, no standalone `.js` files in project)
-- ✅ CI workflow added (`.github/workflows/lint.yml` — cfn-lint on CloudFormation template)
-- ✅ GitHub issue and PR templates added
-
-### Pending (required before AppSec submission)
-- ⬜ Push to GitFarm or AWS GitLab
-- ⬜ Run security scanners (Probe / CRUX / ACAT) and remediate all high/critical findings
-- ⬜ 2+ peer code reviews
-- ⬜ Submit via RIVER workflow
-- ⬜ File OSPO SIM ticket for `aws-samples` repo creation
-
----
-
-## 🎯 Production Readiness
-
-**PRODUCTION READY** ✅
-
-- ✅ 190+ resource types proven end-to-end in real CT org
-- ✅ 500+ real AWS resources tagged during Phase 2 testing
-- ✅ All 76+ bugs discovered are fixed
-- ✅ 100% success rate on all taggable services
-- ✅ Zero false positives across all testing
-- ✅ Multi-account (StackSets) and multi-region validated
-- ✅ All known limitations documented
-
 **Recommended deployment:**
-1. Generate `deploy.sh` via `configurator.html`
-2. Run `bash deploy.sh` in CloudShell or local CLI (from the target account)
-3. Monitor via CloudWatch for 1 week
-4. Expand regions as needed (us-east-1 for CloudFront/Route53; us-west-2 for GA)
-
----
-
-*MAP 2.0 Auto-Tagger — v19 (configurator improvements)*
-*190+ Resource Types | 79+ Bugs Fixed | CT Org Validated (4 accounts × 4 regions)*
-*Status: PRODUCTION READY ✅*
+1. Open `configurator.html` in a browser and generate `deploy.sh`
+2. Run `bash deploy.sh` in AWS CloudShell or local AWS CLI (from the target account)
+3. Monitor via Amazon CloudWatch for the first week
+4. Expand regions as needed (us-east-1 for CloudFront/Route53; us-west-2 for Global Accelerator)
