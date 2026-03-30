@@ -2799,6 +2799,10 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Name: /auto-map-tagger/config
+      # SECURITY NOTE: Type: String is intentional. The stored values (MPE ID, agreement
+      # dates, account/VPC scope lists) are non-sensitive operational configuration — not
+      # credentials, secrets, or PII. SecureString would require KMS decrypt permissions
+      # on every Lambda invocation with no security benefit for this data classification.
       Type: String
       Value: |
           {
@@ -3777,6 +3781,9 @@ Outputs:
             if (config.deployMode === 'single') {
                 const tpl = escapeHeredoc(mainTemplate);
                 return `#!/bin/bash
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
 # MAP 2.0 Auto-Tagger — Deployment Script
 # Customer: ${config.customerName || 'Customer'} | MPE: ${mpe}
 # Run this file in AWS CloudShell: bash deploy.sh
@@ -4065,6 +4072,9 @@ echo ""
             const accountsTpl = escapeHeredoc(perAccountTemplate || '');
 
             return `#!/bin/bash
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
 # MAP 2.0 Auto-Tagger — Deployment Script
 # Customer: ${config.customerName || 'Customer'} | MPE: ${mpe}
 # Run this file in AWS CloudShell (management account): bash deploy.sh
