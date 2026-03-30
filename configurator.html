@@ -922,8 +922,8 @@
             ui_cli_alt_short:'Configure AWS CLI for the account and run:',
             ui_instr_single_title:'DEPLOYMENT INSTRUCTIONS — Single Account',
             ui_instr_multi_title:'DEPLOYMENT INSTRUCTIONS — Multi-Account',
-            ui_instr_login_single:'Log into the AWS Console for your migration account.',
-            ui_instr_login_multi:'Log into the AWS Console for your MANAGEMENT account.',
+            ui_instr_login_single:'Log into the AWS Management Console for your migration account.',
+            ui_instr_login_multi:'Log into the AWS Management Console for your MANAGEMENT account.',
             ui_instr_open_cloudshell:'Open CloudShell (click the terminal icon in the top menu bar).',
             ui_instr_upload_files:'Upload the files (CloudShell → Actions → Upload file):',
             ui_instr_upload_all:'Upload all 3 files (CloudShell → Actions → Upload file):',
@@ -1062,7 +1062,7 @@
             d_fix_creds:'Your session may have expired. Close and reopen AWS CloudShell, then run this script again.',
             d_ok_trail:'Activity logging is enabled in',
             d_fail_trail:'Activity logging is not enabled in region',
-            d_fix_trail1:'Go to AWS Console → CloudTrail → Create trail.',
+            d_fix_trail1:'Go to AWS Management Console → CloudTrail → Create trail.',
             d_fix_trail2:'Make sure to include region',
             d_ok_perms:'Deployment permissions are in place.',
             d_fail_perms:'Your account does not have the required deployment permissions.',
@@ -2758,7 +2758,9 @@ ${backfillEventNamesList}
               parts = arn.split(':')
               return parts[4] if len(parts) > 4 else None`;
 
-            return `AWSTemplateFormatVersion: '2010-09-09'
+            return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
   Auto-tags 190+ AWS resource types within typically 60-90 seconds (up to 15 minutes during high-volume activity) of creation.
@@ -3582,7 +3584,9 @@ ${t('ui_instr_cloudtrail_note')}`;
                 ? `      # Lambda deployed to all org accounts. Tagging scoped to: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ')}`
                 : `      # Lambda deployed to all org accounts. Tagging applies to all accounts.`;
 
-            return `AWSTemplateFormatVersion: '2010-09-09'
+            return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
   Automatically discovers org structure and deploys Lambda to all accounts.
