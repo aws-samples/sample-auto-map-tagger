@@ -3971,7 +3971,7 @@ fi
 
 echo "  ✅ \$REGION"
 aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger" --retention-in-days 90 --region "\$REGION" 2>/dev/null || true
-${config.includeBackfill ? 'aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger-backfill" --retention-in-days 90 --region "\\$REGION" 2>/dev/null || true' : ''}
+${config.includeBackfill ? 'aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger-backfill" --retention-in-days 90 --region "$REGION" 2>/dev/null || true' : ''}
 done
 
 rm -f "\$TEMPLATE"
