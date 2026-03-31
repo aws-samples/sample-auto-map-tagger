@@ -19,7 +19,7 @@ Customer-deployable CloudFormation solution that automatically tags newly create
 - ✅ **190+ resource types proven working** — validated against 9 real AWS accounts including CT org
 - ✅ **100% success rate** on all taggable MAP-eligible resources
 - ✅ **Typically 60–90 seconds** automatic tagging latency (CloudTrail → EventBridge → Lambda → Tag)
-- ✅ **84+ bugs found and fixed** across all phases of testing
+- ✅ **100+ bugs found and fixed** across all phases of testing
 - ✅ **Multi-account + multi-region** — StackSet deploys to entire org automatically
 - ✅ **< $2/month** customer cost per account
 - ✅ **Zero Lambda errors** across full E2E test suite (single + multi-account + edge cases)

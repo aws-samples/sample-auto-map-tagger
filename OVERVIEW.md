@@ -71,7 +71,7 @@ It works by listening to AWS's own audit log (CloudTrail) and reacting automatic
 
 ## What Gets Tagged
 
-The auto-tagger covers **190+ AWS resource types** across every major service category — all confirmed through real-world testing across a live CT org (4 accounts, 4 regions).
+The auto-tagger covers **190+ AWS resource types** across every major service category — all confirmed through real-world testing across 9 AWS accounts.
 
 | Category | Examples |
 |----------|---------|
@@ -169,14 +169,14 @@ The tool has been validated through **extensive multi-phase end-to-end testing**
 - **384 unique AWS resources** tagged
 - **55+ bugs** discovered and fixed
 
-**Phase 2** — Multi-account CT org validation (4 accounts × 4 regions = 16 deployments):
+**Phase 2 & 3** — Multi-account org validation across 9 AWS accounts (single account + org with 5 linked + 2 security OU accounts):
 - **190+ resource types** confirmed working
 - **500+ resources** tagged across all accounts
-- **21 additional bugs** found and fixed
-- All MAP 2.0 eligible services tested (including new services: Bedrock KBs, EMR Serverless, IoT, Media, Emerging)
+- All 88 MAP 2.0 eligible services verified against the official Included Services List
+- All MAP 2.0 eligible services tested (including Bedrock KBs, EMR Serverless, IoT, Media, Emerging)
 - Discontinued/new-account-gated services documented
 
-**Total: 76+ bugs fixed | Zero false positives**
+**Total: 100+ bugs fixed | Zero false positives**
 
 ---
 
