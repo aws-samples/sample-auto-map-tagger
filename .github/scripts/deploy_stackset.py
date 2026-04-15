@@ -116,7 +116,10 @@ def main() -> None:
             "StackSetName": args.stack_set_name,
             "DeploymentTargets": {
                 "OrganizationalUnitIds": ou_ids,
-                "Accounts": account_ids,  # filter to specific accounts within the OU
+                # Note: SERVICE_MANAGED StackSets cannot mix Accounts + OUs
+                # Use Accounts as AccountFilterType to limit within the OU
+                "AccountFilterType": "INTERSECTION",
+                "Accounts": account_ids,
             },
             "Regions": [args.region],
             "OperationPreferences": {
