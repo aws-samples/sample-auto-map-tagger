@@ -876,20 +876,42 @@ def _delete_location(arn: str, name: str, region: str, account: str) -> None:
 
 
 def _delete_cloudfront(arn: str, dist_id: str, account: str) -> None:
+    """Disable then delete a CloudFront distribution.
+
+    CloudFront requires: disable → wait for Deployed status → delete.
+    Skipping the wait leaves a dangling distribution pointing at a
+    deleted S3 bucket — a Palisade security finding (EpoxyMitigationsRisk).
+    """
     cf = _client("cloudfront", "us-east-1", account)
     try:
         resp = cf.get_distribution(Id=dist_id)
         etag = resp["ETag"]
         config = resp["Distribution"]["DistributionConfig"]
+        status = resp["Distribution"].get("Status", "")
+
         if config.get("Enabled"):
             config["Enabled"] = False
-            cf.update_distribution(
+            update_resp = cf.update_distribution(
                 DistributionConfig=config, Id=dist_id, IfMatch=etag
             )
-            log.info("Disabled CloudFront %s — will need to wait before deletion", dist_id)
-            # Don't wait — just record. Teardown can run again or use tag sweep.
-        else:
+            etag = update_resp["ETag"]
+            log.info("Disabled CloudFront %s — waiting for Deployed status...", dist_id)
+            status = "InProgress"
+
+        # Wait up to 10 minutes for the distribution to reach Deployed state
+        deadline = time.time() + 600
+        while status != "Deployed" and time.time() < deadline:
+            time.sleep(30)
+            resp = cf.get_distribution(Id=dist_id)
+            status = resp["Distribution"].get("Status", "")
+            etag = resp["ETag"]
+            log.info("  CloudFront %s status: %s", dist_id, status)
+
+        if status == "Deployed":
             safe_delete(cf.delete_distribution, Id=dist_id, IfMatch=etag, resource_desc=arn)
+            log.info("Deleted CloudFront %s", dist_id)
+        else:
+            log.warning("CloudFront %s did not reach Deployed within timeout — leaving disabled", dist_id)
     except Exception as exc:
         log.warning("CloudFront delete %s: %s", arn, exc)
 
