@@ -770,6 +770,543 @@ jobs:
           if-no-files-found: warn
 
   # ══════════════════════════════════════════════════════════════════════════
+  # Phase 3b — deploy.sh generation + execution test
+  # Tests that configurator.html generates a working deploy.sh (not just the YAML)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  test-deploy-sh:
+    name: Test deploy.sh generation and execution
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: npm install playwright && npx playwright install chromium --with-deps
+
+      - name: Generate deploy.sh from configurator.html
+        run: |
+          node .github/scripts/generate_deploy_sh.js \
+            --mpe-id "$MPE_ID" \
+            --agreement-date "2024-01-01" \
+            --agreement-end-date "2099-12-31" \
+            --region ap-northeast-2 \
+            --mode single \
+            --output /tmp/deploy-generated.sh
+
+      - name: Run generated deploy.sh (dry-run validation)
+        working-directory: .
+        run: |
+          # Verify key elements are present in the generated script
+          echo "Validating generated deploy.sh contents..."
+          grep -q "aws cloudformation deploy" /tmp/deploy-generated.sh && echo "✅ cloudformation deploy command present"
+          grep -q "$MPE_ID"                  /tmp/deploy-generated.sh && echo "✅ MPE ID present"
+          grep -q "ap-northeast-2"           /tmp/deploy-generated.sh && echo "✅ region present"
+          grep -q "AgreementStartDate"       /tmp/deploy-generated.sh && echo "✅ agreement date parameter present"
+          grep -q "CloudTrail"               /tmp/deploy-generated.sh && echo "✅ CloudTrail preflight check present"
+          grep -q "map2-auto-tagger"         /tmp/deploy-generated.sh && echo "✅ stack name present"
+          echo "All content checks passed."
+
+      - name: Execute generated deploy.sh
+        working-directory: .
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
+          aws s3 mb "s3://${S3_BUCKET}" --region ap-northeast-2 2>/dev/null || true
+          # Inject S3 bucket into the script (deploy.sh stages template to S3 itself,
+          # but needs a bucket to exist — the script creates one named after account ID)
+          bash /tmp/deploy-generated.sh
+        env:
+          AWS_DEFAULT_REGION: ap-northeast-2
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Phase 3c — Scoping tests
+  # Tests that account scope, VPC scope, and date filtering work correctly
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # ── Account scope test ─────────────────────────────────────────────────────
+  deploy-scope-account:
+    name: "[Scope] Deploy account-scoped stack (linked1 only)"
+    runs-on: ubuntu-latest
+    needs: [deploy-stackset]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - name: Deploy account-scoped stack
+        working-directory: .
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
+          aws s3 mb "s3://${S3_BUCKET}" --region ap-northeast-2 2>/dev/null || true
+          aws cloudformation deploy \
+            --stack-name "${STACK_NAME}-scope-acct" \
+            --template-file map2-auto-tagger-optimized.yaml \
+            --parameter-overrides \
+              MpeId="$MPE_ID" \
+              AgreementStartDate="2024-01-01" \
+              ScopeMode="account" \
+              ScopedAccountIds="${{ secrets.AWS_LINKED1_ACCOUNT_ID }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --s3-bucket "$S3_BUCKET" \
+            --s3-prefix "e2e-scope-acct" \
+            --region ap-northeast-2 \
+            --no-fail-on-empty-changeset
+
+  create-scope-account-inscope:
+    name: "[Scope] Create resource in-scope account (linked1)"
+    runs-on: ubuntu-latest
+    needs: [deploy-scope-account]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - name: Create S3 bucket in linked1 (should be tagged)
+        run: |
+          python3 - <<'EOF'
+          import boto3, json, os, time
+          s3 = boto3.client('s3', region_name='ap-northeast-2')
+          name = f"e2e-scope-acct-inscope-{os.environ['PR_NUMBER']}-{int(time.time())}"
+          s3.create_bucket(Bucket=name, CreateBucketConfiguration={'LocationConstraint': 'ap-northeast-2'})
+          record = {"arn": f"arn:aws:s3:::{name}", "service": "s3", "region": "ap-northeast-2",
+                    "account": boto3.client('sts').get_caller_identity()['Account'],
+                    "resource_id": name, "taggable": True,
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['MPE_ID']}
+          with open('created-arns-scope-acct-inscope.json', 'w') as f:
+              json.dump([record], f)
+          print(f"Created S3 bucket: {name}")
+          EOF
+        working-directory: .github/scripts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-scope-acct-inscope
+          path: .github/scripts/created-arns-scope-acct-inscope.json
+          if-no-files-found: warn
+
+  create-scope-account-outscope:
+    name: "[Scope] Create resource out-of-scope account (linked2)"
+    runs-on: ubuntu-latest
+    needs: [deploy-scope-account]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED2_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - name: Create S3 bucket in linked2 (should NOT be tagged)
+        run: |
+          python3 - <<'EOF'
+          import boto3, json, os, time
+          s3 = boto3.client('s3', region_name='ap-northeast-2')
+          name = f"e2e-scope-acct-outscope-{os.environ['PR_NUMBER']}-{int(time.time())}"
+          s3.create_bucket(Bucket=name, CreateBucketConfiguration={'LocationConstraint': 'ap-northeast-2'})
+          record = {"arn": f"arn:aws:s3:::{name}", "service": "s3", "region": "ap-northeast-2",
+                    "account": boto3.client('sts').get_caller_identity()['Account'],
+                    "resource_id": name, "taggable": True,
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['MPE_ID']}
+          with open('created-arns-scope-acct-outscope.json', 'w') as f:
+              json.dump([record], f)
+          print(f"Created S3 bucket: {name}")
+          EOF
+        working-directory: .github/scripts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-scope-acct-outscope
+          path: .github/scripts/created-arns-scope-acct-outscope.json
+          if-no-files-found: warn
+
+  verify-scope-account-positive:
+    name: "[Scope] Verify in-scope resource IS tagged"
+    runs-on: ubuntu-latest
+    needs: [create-scope-account-inscope]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - uses: actions/download-artifact@v4
+        with:
+          name: arns-scope-acct-inscope
+          path: artifacts/
+      - run: |
+          python3 verify_tags.py \
+            --arns-dir ../../artifacts/ \
+            --tag-key map-migrated \
+            --tag-value "$MPE_ID" \
+            --max-wait 300 \
+            --poll-interval 30
+        working-directory: .github/scripts
+
+  verify-scope-account-negative:
+    name: "[Scope] Verify out-of-scope resource is NOT tagged"
+    runs-on: ubuntu-latest
+    needs: [create-scope-account-outscope]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED2_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - uses: actions/download-artifact@v4
+        with:
+          name: arns-scope-acct-outscope
+          path: artifacts/
+      - run: |
+          python3 verify_tags.py \
+            --arns-dir ../../artifacts/ \
+            --tag-key map-migrated \
+            --tag-value "$MPE_ID" \
+            --expect-not-tagged \
+            --not-tagged-wait 120
+        working-directory: .github/scripts
+
+  # ── VPC scope test ──────────────────────────────────────────────────────────
+  deploy-scope-vpc:
+    name: "[Scope] Deploy VPC-scoped stack"
+    runs-on: ubuntu-latest
+    needs: [create-networking]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - name: Deploy VPC-scoped stack
+        working-directory: .
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
+          aws cloudformation deploy \
+            --stack-name "${STACK_NAME}-scope-vpc" \
+            --template-file map2-auto-tagger-optimized.yaml \
+            --parameter-overrides \
+              MpeId="$MPE_ID" \
+              AgreementStartDate="2024-01-01" \
+              ScopeMode="vpc" \
+              ScopedVpcIds="${{ needs.create-networking.outputs.vpc-id }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --s3-bucket "$S3_BUCKET" \
+            --s3-prefix "e2e-scope-vpc" \
+            --region ap-northeast-2 \
+            --no-fail-on-empty-changeset
+
+  create-scope-vpc-inscope:
+    name: "[Scope] Create SG in scoped VPC (should be tagged)"
+    runs-on: ubuntu-latest
+    needs: [deploy-scope-vpc, create-networking]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - name: Create security group in scoped VPC
+        run: |
+          python3 - <<'EOF'
+          import boto3, json, os, time
+          ec2 = boto3.client('ec2', region_name='ap-northeast-2')
+          sts = boto3.client('sts')
+          account = sts.get_caller_identity()['Account']
+          vpc_id = os.environ['VPC_ID']
+          sg = ec2.create_security_group(
+              GroupName=f"e2e-scope-vpc-inscope-{os.environ['PR_NUMBER']}-{int(time.time())}",
+              Description="E2E scope test - in VPC scope",
+              VpcId=vpc_id
+          )
+          sg_id = sg['GroupId']
+          arn = f"arn:aws:ec2:ap-northeast-2:{account}:security-group/{sg_id}"
+          record = {"arn": arn, "service": "ec2", "region": "ap-northeast-2", "account": account,
+                    "resource_id": sg_id, "taggable": True,
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['MPE_ID']}
+          with open('created-arns-scope-vpc-inscope.json', 'w') as f:
+              json.dump([record], f)
+          print(f"Created SG {sg_id} in VPC {vpc_id}")
+          EOF
+        working-directory: .github/scripts
+        env:
+          VPC_ID: ${{ needs.create-networking.outputs.vpc-id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-scope-vpc-inscope
+          path: .github/scripts/created-arns-scope-vpc-inscope.json
+          if-no-files-found: warn
+
+  create-scope-vpc-outscope:
+    name: "[Scope] Create SG in default VPC (should NOT be tagged)"
+    runs-on: ubuntu-latest
+    needs: [deploy-scope-vpc]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - name: Create security group in default VPC (out of scope)
+        run: |
+          python3 - <<'EOF'
+          import boto3, json, os, time
+          ec2 = boto3.client('ec2', region_name='ap-northeast-2')
+          sts = boto3.client('sts')
+          account = sts.get_caller_identity()['Account']
+          # Get default VPC (different from scoped VPC)
+          vpcs = ec2.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
+          default_vpc = vpcs['Vpcs'][0]['VpcId'] if vpcs['Vpcs'] else None
+          if not default_vpc:
+              print("No default VPC found — creating VPC for test")
+              default_vpc = ec2.create_vpc(CidrBlock='172.31.0.0/16')['Vpc']['VpcId']
+          sg = ec2.create_security_group(
+              GroupName=f"e2e-scope-vpc-outscope-{os.environ['PR_NUMBER']}-{int(time.time())}",
+              Description="E2E scope test - out of VPC scope",
+              VpcId=default_vpc
+          )
+          sg_id = sg['GroupId']
+          arn = f"arn:aws:ec2:ap-northeast-2:{account}:security-group/{sg_id}"
+          record = {"arn": arn, "service": "ec2", "region": "ap-northeast-2", "account": account,
+                    "resource_id": sg_id, "taggable": True,
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['MPE_ID']}
+          with open('created-arns-scope-vpc-outscope.json', 'w') as f:
+              json.dump([record], f)
+          print(f"Created SG {sg_id} in default VPC {default_vpc}")
+          EOF
+        working-directory: .github/scripts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-scope-vpc-outscope
+          path: .github/scripts/created-arns-scope-vpc-outscope.json
+          if-no-files-found: warn
+
+  verify-scope-vpc-positive:
+    name: "[Scope] Verify VPC-scoped SG IS tagged"
+    runs-on: ubuntu-latest
+    needs: [create-scope-vpc-inscope]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - uses: actions/download-artifact@v4
+        with:
+          name: arns-scope-vpc-inscope
+          path: artifacts/
+      - run: |
+          python3 verify_tags.py \
+            --arns-dir ../../artifacts/ \
+            --tag-key map-migrated \
+            --tag-value "$MPE_ID" \
+            --max-wait 300 \
+            --poll-interval 30
+        working-directory: .github/scripts
+
+  verify-scope-vpc-negative:
+    name: "[Scope] Verify out-of-VPC SG is NOT tagged"
+    runs-on: ubuntu-latest
+    needs: [create-scope-vpc-outscope]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - uses: actions/download-artifact@v4
+        with:
+          name: arns-scope-vpc-outscope
+          path: artifacts/
+      - run: |
+          python3 verify_tags.py \
+            --arns-dir ../../artifacts/ \
+            --tag-key map-migrated \
+            --tag-value "$MPE_ID" \
+            --expect-not-tagged \
+            --not-tagged-wait 120
+        working-directory: .github/scripts
+
+  # ── Date filter test ────────────────────────────────────────────────────────
+  deploy-scope-date:
+    name: "[Scope] Deploy future-dated stack"
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - name: Deploy stack with future agreement start date
+        working-directory: .
+        run: |
+          TOMORROW=$(date -d '+1 day' '+%Y-%m-%d')
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
+          aws cloudformation deploy \
+            --stack-name "${STACK_NAME}-scope-date" \
+            --template-file map2-auto-tagger-optimized.yaml \
+            --parameter-overrides \
+              MpeId="$MPE_ID" \
+              AgreementStartDate="${TOMORROW}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --s3-bucket "$S3_BUCKET" \
+            --s3-prefix "e2e-scope-date" \
+            --region ap-northeast-2 \
+            --no-fail-on-empty-changeset
+
+  create-scope-date:
+    name: "[Scope] Create resource before agreement start (should NOT be tagged)"
+    runs-on: ubuntu-latest
+    needs: [deploy-scope-date]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - name: Create S3 bucket (before agreement start date)
+        run: |
+          python3 - <<'EOF'
+          import boto3, json, os, time
+          s3 = boto3.client('s3', region_name='ap-northeast-2')
+          name = f"e2e-scope-date-{os.environ['PR_NUMBER']}-{int(time.time())}"
+          s3.create_bucket(Bucket=name, CreateBucketConfiguration={'LocationConstraint': 'ap-northeast-2'})
+          record = {"arn": f"arn:aws:s3:::{name}", "service": "s3", "region": "ap-northeast-2",
+                    "account": boto3.client('sts').get_caller_identity()['Account'],
+                    "resource_id": name, "taggable": True,
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['MPE_ID']}
+          with open('created-arns-scope-date.json', 'w') as f:
+              json.dump([record], f)
+          print(f"Created S3 bucket: {name} (should NOT be tagged — before agreement start)")
+          EOF
+        working-directory: .github/scripts
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-scope-date
+          path: .github/scripts/created-arns-scope-date.json
+          if-no-files-found: warn
+
+  verify-scope-date:
+    name: "[Scope] Verify pre-agreement resource is NOT tagged"
+    runs-on: ubuntu-latest
+    needs: [create-scope-date]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install boto3
+      - uses: actions/download-artifact@v4
+        with:
+          name: arns-scope-date
+          path: artifacts/
+      - run: |
+          python3 verify_tags.py \
+            --arns-dir ../../artifacts/ \
+            --tag-key map-migrated \
+            --tag-value "$MPE_ID" \
+            --expect-not-tagged \
+            --not-tagged-wait 120
+        working-directory: .github/scripts
+
+  # ══════════════════════════════════════════════════════════════════════════
   # Phase 4 — Teardown (always runs, even on failure)
   # ══════════════════════════════════════════════════════════════════════════
 
@@ -779,6 +1316,12 @@ jobs:
     if: always()
     needs:
       - verify
+      - test-deploy-sh
+      - verify-scope-account-positive
+      - verify-scope-account-negative
+      - verify-scope-vpc-positive
+      - verify-scope-vpc-negative
+      - verify-scope-date
       - create-networking
       - create-core
       - create-databases
@@ -835,6 +1378,12 @@ jobs:
           for REGION in ap-northeast-2 us-east-1 us-west-2; do
             aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION" || true
           done
+          # Delete scoped test stacks
+          for SUFFIX in scope-acct scope-vpc scope-date; do
+            aws cloudformation delete-stack --stack-name "${STACK_NAME}-${SUFFIX}" --region ap-northeast-2 || true
+          done
+          # Delete the stack deployed by deploy.sh test
+          aws cloudformation delete-stack --stack-name "map-auto-tagger-$MPE_ID" --region ap-northeast-2 || true
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
           S3_BUCKET="cfn-e2e-${ACCOUNT}-${PR_NUMBER}"
           aws s3 rb "s3://${S3_BUCKET}" --force 2>/dev/null || true

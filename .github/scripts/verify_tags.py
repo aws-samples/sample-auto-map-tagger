@@ -315,12 +315,64 @@ def main() -> None:
     parser.add_argument("--tag-value", required=True)
     parser.add_argument("--max-wait", type=int, default=900, help="Max seconds to wait")
     parser.add_argument("--poll-interval", type=int, default=30, help="Poll interval in seconds")
+    parser.add_argument("--expect-not-tagged", action="store_true",
+                        help="Invert: verify resources are NOT tagged (scoping/date tests)")
+    parser.add_argument("--not-tagged-wait", type=int, default=120,
+                        help="Seconds to wait before checking for absence of tag (default: 120)")
     args = parser.parse_args()
 
     records = load_records(args.arns_dir)
-    # Filter: only check taggable resources
     taggable = [r for r in records if r.get("taggable", True)]
-    skipped = [r for r in records if not r.get("taggable", True)]
+    skipped  = [r for r in records if not r.get("taggable", True)]
+
+    # ── Inverted mode: verify resources are NOT tagged ─────────────────────
+    if args.expect_not_tagged:
+        log.info("Mode: expect-not-tagged — verifying resources are NOT tagged")
+        log.info("Waiting %ds before checking (allow Lambda time to run if it's going to)...",
+                 args.not_tagged_wait)
+        time.sleep(args.not_tagged_wait)
+
+        wrongly_tagged: list[dict] = []
+        correctly_untagged: list[dict] = []
+        for record in taggable:
+            try:
+                tagged = check_tag(record, args.tag_key, args.tag_value)
+            except Exception as exc:
+                log.debug("Tag check error for %s: %s", record["arn"], exc)
+                tagged = False
+            if tagged:
+                wrongly_tagged.append(record)
+                log.error("  WRONGLY TAGGED: %s", record["arn"])
+            else:
+                correctly_untagged.append(record)
+                log.info("  CORRECTLY UNTAGGED: %s", record["arn"])
+
+        log.info("")
+        log.info("═══════ NOT-TAGGED VERIFICATION SUMMARY ═══════")
+        log.info("  CORRECTLY UNTAGGED : %d", len(correctly_untagged))
+        log.info("  WRONGLY TAGGED     : %d", len(wrongly_tagged))
+        log.info("  SKIPPED            : %d", len(skipped))
+        log.info("═══════════════════════════════════════════════")
+
+        report = {
+            "mode": "expect-not-tagged",
+            "tag_key": args.tag_key,
+            "tag_value": args.tag_value,
+            "total_correctly_untagged": len(correctly_untagged),
+            "total_wrongly_tagged": len(wrongly_tagged),
+            "correctly_untagged": [r["arn"] for r in correctly_untagged],
+            "wrongly_tagged": [r["arn"] for r in wrongly_tagged],
+        }
+        with open("verification-report.json", "w") as f:
+            json.dump(report, f, indent=2)
+
+        if wrongly_tagged:
+            log.error("FAILED: %d resource(s) were tagged but should NOT have been "
+                      "(scoping/date filter not working)", len(wrongly_tagged))
+            sys.exit(1)
+        log.info("All resources correctly untagged — scoping/date filter working.")
+        return
+    # ── End inverted mode ──────────────────────────────────────────────────
 
     log.info("Loaded %d total records: %d taggable, %d skipped",
              len(records), len(taggable), len(skipped))
