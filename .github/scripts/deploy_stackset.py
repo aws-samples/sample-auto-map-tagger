@@ -53,7 +53,7 @@ def main() -> None:
     # Common parameters
     parameters = [
         {"ParameterKey": "MpeId", "ParameterValue": args.mpe_id},
-        {"ParameterKey": "MigrationAgreementDate", "ParameterValue": args.agreement_date},
+        {"ParameterKey": "AgreementStartDate", "ParameterValue": args.agreement_date},
     ]
 
     # ── Create or update StackSet ─────────────────────────────────────────────

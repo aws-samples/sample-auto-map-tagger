@@ -803,9 +803,11 @@ jobs:
           node-version: '20'
 
       - name: Install Playwright
+        working-directory: .
         run: npm install playwright && npx playwright install chromium --with-deps
 
       - name: Generate deploy.sh from configurator.html
+        working-directory: .
         run: |
           node .github/scripts/generate_deploy_sh.js \
             --mpe-id "$MPE_ID" \
@@ -832,7 +834,7 @@ jobs:
         working-directory: .
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
-          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
           aws s3api create-bucket --bucket "$S3_BUCKET" --region ap-northeast-2 --create-bucket-configuration LocationConstraint=ap-northeast-2 2>/dev/null || true
           # Inject S3 bucket into the script (deploy.sh stages template to S3 itself,
           # but needs a bucket to exist — the script creates one named after account ID)
@@ -863,7 +865,7 @@ jobs:
         working-directory: .
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
-          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
           aws s3api create-bucket --bucket "$S3_BUCKET" --region ap-northeast-2 --create-bucket-configuration LocationConstraint=ap-northeast-2 2>/dev/null || true
           aws cloudformation deploy \
             --stack-name "${STACK_NAME}-scope-acct" \
@@ -1037,7 +1039,7 @@ jobs:
         working-directory: .
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
-          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
           aws cloudformation deploy \
             --stack-name "${STACK_NAME}-scope-vpc" \
             --template-file map2-auto-tagger-optimized.yaml \
@@ -1232,7 +1234,7 @@ jobs:
         run: |
           TOMORROW=$(date -d '+1 day' '+%Y-%m-%d')
           ACCT=$(aws sts get-caller-identity --query Account --output text)
-          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
           aws cloudformation deploy \
             --stack-name "${STACK_NAME}-scope-date" \
             --template-file map2-auto-tagger-optimized.yaml \
