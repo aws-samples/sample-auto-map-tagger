@@ -61,16 +61,21 @@ jobs:
       - name: Deploy auto-tagger CloudFormation stack
         working-directory: .
         run: |
-          # Template is >51KB so must be staged in S3 first
+          # Template is >51KB — stage in S3 per region (buckets must be co-located)
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-          S3_BUCKET="cfn-e2e-${ACCOUNT}-${PR_NUMBER}"
-          aws s3api create-bucket \
-            --bucket "$S3_BUCKET" \
-            --region ap-northeast-2 \
-            --create-bucket-configuration LocationConstraint=ap-northeast-2 \
-            2>/dev/null || true
 
           for REGION in ap-northeast-2 us-east-1 us-west-2; do
+            S3_BUCKET="cfn-e2e-${ACCOUNT}-${PR_NUMBER}-${REGION}"
+            # us-east-1 does not accept LocationConstraint
+            if [ "$REGION" = "us-east-1" ]; then
+              aws s3api create-bucket --bucket "$S3_BUCKET" --region us-east-1 2>/dev/null || true
+            else
+              aws s3api create-bucket \
+                --bucket "$S3_BUCKET" \
+                --region "$REGION" \
+                --create-bucket-configuration LocationConstraint="$REGION" \
+                2>/dev/null || true
+            fi
             aws cloudformation deploy \
               --stack-name "${STACK_NAME}" \
               --template-file map2-auto-tagger-optimized.yaml \
@@ -828,7 +833,7 @@ jobs:
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
           S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
-          aws s3 mb "s3://${S3_BUCKET}" --region ap-northeast-2 2>/dev/null || true
+          aws s3api create-bucket --bucket "$S3_BUCKET" --region ap-northeast-2 --create-bucket-configuration LocationConstraint=ap-northeast-2 2>/dev/null || true
           # Inject S3 bucket into the script (deploy.sh stages template to S3 itself,
           # but needs a bucket to exist — the script creates one named after account ID)
           bash /tmp/deploy-generated.sh
@@ -859,7 +864,7 @@ jobs:
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
           S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}"
-          aws s3 mb "s3://${S3_BUCKET}" --region ap-northeast-2 2>/dev/null || true
+          aws s3api create-bucket --bucket "$S3_BUCKET" --region ap-northeast-2 --create-bucket-configuration LocationConstraint=ap-northeast-2 2>/dev/null || true
           aws cloudformation deploy \
             --stack-name "${STACK_NAME}-scope-acct" \
             --template-file map2-auto-tagger-optimized.yaml \
@@ -1389,9 +1394,13 @@ jobs:
           # Delete the stack deployed by deploy.sh test
           aws cloudformation delete-stack --stack-name "map-auto-tagger-$MPE_ID" --region ap-northeast-2 || true
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-          S3_BUCKET="cfn-e2e-${ACCOUNT}-${PR_NUMBER}"
-          aws s3 rb "s3://${S3_BUCKET}" --force 2>/dev/null || true
-          echo "Stack deletions initiated and S3 staging bucket removed"
+          # Delete per-region staging buckets
+          for REGION in ap-northeast-2 us-east-1 us-west-2; do
+            aws s3 rb "s3://cfn-e2e-${ACCOUNT}-${PR_NUMBER}-${REGION}" --force 2>/dev/null || true
+          done
+          # Delete single ap-northeast-2 bucket used by scoped test deploys
+          aws s3 rb "s3://cfn-e2e-${ACCOUNT}-${PR_NUMBER}" --force 2>/dev/null || true
+          echo "Stack deletions initiated and S3 staging buckets removed"
         continue-on-error: true
 
       - name: Delete multi-account StackSet

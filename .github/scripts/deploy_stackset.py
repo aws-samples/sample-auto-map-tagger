@@ -68,7 +68,7 @@ def main() -> None:
                 Parameters=parameters,
                 PermissionModel="SERVICE_MANAGED",
                 AutoDeployment={
-                    "Enabled": False,
+                    "Enabled": True,
                     "RetainStacksOnAccountRemoval": False,
                 },
                 Capabilities=["CAPABILITY_NAMED_IAM", "CAPABILITY_AUTO_EXPAND"],
