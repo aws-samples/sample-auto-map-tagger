@@ -17,6 +17,7 @@ Customer-deployable CloudFormation solution that automatically tags newly create
 ## 🎯 Quick Facts
 
 - ✅ **190+ resource types proven working** — validated against 9 real AWS accounts including CT org
+- ✅ **All 88 MAP-eligible services covered** — cross-referenced against official MAP Included Services List (6 April 2026)
 - ✅ **100% success rate** on all taggable MAP-eligible resources
 - ✅ **Typically 60–90 seconds** automatic tagging latency (CloudTrail → EventBridge → Lambda → Tag)
 - ✅ **100+ bugs found and fixed** across all phases of testing
@@ -50,6 +51,7 @@ EventBridge catches resource creation events and triggers a Lambda that applies 
 
 - **`map2-auto-tagger-optimized.yaml`** — CloudFormation template (190+ services, IAM hardened)
 - **`configurator.html`** — Self-service UI. Generates a customized `deploy.sh` for CloudShell or local AWS CLI deployment.
+- **`editor.html`** — Day-2 operations UI. Add or remove accounts from an existing deployment without redeploying. Generates an `update.sh` script.
 
 ---
 
@@ -100,20 +102,20 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 |----------|-------------|--------|
 | **Compute** | Lambda, EC2, ECS, EKS, Auto Scaling, App Runner, Batch, Lightsail, EMR, EMR Serverless, Elastic Beanstalk | ✅ |
 | **Storage** | S3, EFS, FSx (Lustre/ONTAP/OpenZFS), ECR, EBS, AMIs, Backup | ✅ |
-| **Database** | RDS (all engines + snapshots + replicas), Aurora, Neptune, DocumentDB, DynamoDB, Redshift, MemoryDB, OpenSearch, ElastiCache, MSK | ✅ |
+| **Database** | RDS (all engines + snapshots + replicas), Aurora, Neptune, DocumentDB, DynamoDB, DynamoDB DAX, Redshift, MemoryDB, OpenSearch, ElastiCache (incl. Serverless), MSK (incl. Serverless) | ✅ |
 | **Messaging** | Amazon MQ (ActiveMQ + RabbitMQ), SNS, SQS | ✅ |
-| **Networking** | VPC, Subnets, Security Groups, Load Balancers, Transit Gateway, VPN, CloudFront, Route53, Global Accelerator, Network Firewall | ✅ |
-| **Analytics** | Kinesis, MSK, Glue (all types + DataBrew), Athena, OpenSearch, EMR, CodeArtifact | ✅ |
+| **Networking** | VPC, Subnets, Security Groups, Load Balancers, Transit Gateway, VPN, CloudFront, Route53, Global Accelerator, Network Firewall, Direct Connect, VPC Lattice | ✅ |
+| **Analytics** | Kinesis (Data Streams + Video Streams), MSK, Glue (all types + DataBrew), Athena, OpenSearch, EMR, CodeArtifact | ✅ |
 | **Integration** | SNS, SQS, Step Functions, EventBridge (Rules + Buses + Pipes + Scheduler Groups), AppSync, API Gateway (REST + HTTP + WebSocket) | ✅ |
-| **ML & AI** | SageMaker (all types incl. Pipeline/FeatureStore/Domain), Bedrock (Agents + Guardrails + Flows + Prompts + Inference Profiles + Knowledge Bases), Comprehend, Rekognition, Kendra, Lex v2 | ✅ |
+| **ML & AI** | SageMaker (all types incl. Pipeline/FeatureStore/Domain), Bedrock (Agents + Guardrails + Flows + Prompts + Inference Profiles + Knowledge Bases + AgentCore), Comprehend, Rekognition, Kendra, Lex v2 | ✅ |
 | **Security** | KMS, ACM, WAFv2, Macie, GuardDuty, Cognito, Verified Permissions, Clean Rooms, Detective | ✅ |
 | **Developer** | CodeCommit, CodeBuild, CodeDeploy, CodePipeline, CloudFormation, Amplify, CodeArtifact, CodeGuru Profiler | ✅ |
 | **Management** | CloudWatch, SSM, Secrets Manager, X-Ray, AppConfig, MWAA, Transcribe | ✅ |
-| **Migration** | Transfer Family, DataSync, DMS (Instances + Endpoints + Tasks) | ✅ |
-| **IoT** | IoT Greengrass, IoT SiteWise, IoT TwinMaker | ✅ |
+| **Migration** | Transfer Family (Servers + Connectors + Users), DataSync, DMS (Instances + Endpoints + Tasks + Serverless), Elastic Disaster Recovery | ✅ |
+| **IoT** | IoT Core (Topic Rules), IoT Greengrass, IoT SiteWise (Assets + Models + Gateways + Portals), IoT TwinMaker | ✅ |
 | **Media** | IVS (Channels + Chat), MediaConvert, MediaPackage | ✅ |
 | **Global** | CloudFront, Route53, Global Accelerator, IVS — via us-east-1/us-west-2 Lambda | ✅ |
-| **Emerging** | AWS Supply Chain, HealthLake, Omics, DataZone, Q Business, Location Service, Pinpoint, AppStream 2.0 | ✅ |
+| **Emerging** | AWS Supply Chain, HealthLake, Omics, DataZone, Q Business, Location Service, Pinpoint, AppStream 2.0, Deadline Cloud, Kinesis Video Streams | ✅ |
 
 ### Not Taggable — Confirmed AWS Platform Limitations
 
@@ -192,7 +194,27 @@ AWS Resource Created
   - Uses `SERVICE_MANAGED` permission model — no direct IAM access to member accounts required; CloudFormation deploys using org-level service-linked roles
   - Lambda Custom Resource auto-discovers org root OU and deploys to all accounts
   - Use **account scoping** in the configurator to limit deployment to specific accounts
-  - New accounts added to the org automatically receive the auto-tagger
+
+### Adding or Removing Accounts
+
+Re-run `deploy.sh` with the updated account list. The StackSet update pushes the new configuration to all existing accounts and deploys to any new org accounts.
+
+- **Adding accounts:** Regenerate `deploy.sh` with all account IDs (existing + new) and re-run. The new accounts will start being tagged.
+- **Removing accounts:** Regenerate `deploy.sh` without the account IDs you want to remove and re-run. Those accounts will stop being tagged (the Lambda remains deployed but skips out-of-scope accounts).
+- **No scoping (default):** If `scoped_account_ids` is left as `ALL`, every account is tagged automatically. No re-runs needed when accounts join the org — just re-run `deploy.sh` once to deploy the Lambda to the new account.
+
+> **Important:** You must include all account IDs you want in scope every time you regenerate `deploy.sh`. The update overwrites the previous configuration — it does not merge.
+
+### Multiple MAP Engagements
+
+All resources are namespaced with the MPE ID (e.g., `map-auto-tagger-mig111`), so multiple MAP engagements can coexist in the same organization:
+
+1. Run `deploy.sh` with MPE ID `mig111` scoped to accounts 1, 2, 3
+2. Run `deploy.sh` with MPE ID `mig222` scoped to accounts 4, 5, 6
+
+Each creates a separate StackSet, Lambda, SSM config, and EventBridge rule. They do not conflict.
+
+> **Important:** Do not scope the same account to two different MPE IDs. The `map-migrated` tag can only hold one value — the last Lambda to run wins.
 
 ---
 
@@ -201,6 +223,10 @@ AWS Resource Created
 - CloudTrail enabled in target region(s)
 - Deployer needs: `iam:*Role*`, `lambda:CreateFunction`, `events:PutRule`, `ssm:PutParameter`, `sns:CreateTopic`, `sqs:CreateQueue`, `cloudwatch:PutMetricAlarm`
 - Or use a CloudFormation service role
+- **Multi-account only:** Trusted access for CloudFormation StackSets must be enabled in your organization:
+  ```bash
+  aws organizations enable-aws-service-access --service-principal member.org.stacksets.cloudformation.amazonaws.com
+  ```
 
 ---
 
@@ -226,9 +252,9 @@ Validated across **9 real AWS accounts** (single account + multi-account org wit
 - **Existing resources** not automatically tagged — enable the one-time backfill option in the configurator (covers resources created up to 90 days before deployment)
 - **S3 staging bucket (multi-account only)** — the multi-account deployment creates an S3 bucket named `auto-map-tagger-{account-id}` in the management account to stage CloudFormation templates for the StackSet. This bucket is intentionally retained after deployment — CloudFormation StackSets require a persistent template URL to automatically deploy to new accounts that join your organization in the future. The bucket contains only the per-account CloudFormation template (~40KB) and has Block Public Access, AES-256 encryption, and HTTPS-only enforcement applied. Single-account deployments do not create a persistent S3 bucket.
 - **Delegated administrator accounts supported** — in large enterprises the management account is often locked down and a "shared services" account is designated as the [delegated administrator](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-orgs-delegated-admin.html) for CloudFormation StackSets. Running `deploy.sh` from a delegated admin account is fully supported. The preflight check verifies the caller is either the management account or a registered delegated admin for `stacksets.cloudformation.amazonaws.com`.
-- **One active deployment per account** — all Lambda, EventBridge, IAM, and SSM resources use fixed names (`map-auto-tagger`, `/auto-map-tagger/config`). A second deployment to the same account will conflict with an existing one. To switch MPE IDs, delete the existing stack first and redeploy.
+- **One active deployment per account per MPE ID** — all resources are namespaced with the MPE ID (e.g., `map-auto-tagger-mig111`). Multiple MAP engagements can coexist. However, do not scope the same account to two different MPE IDs — the `map-migrated` tag can only hold one value.
 - **Management account not covered in multi-account mode** — `SERVICE_MANAGED` StackSets cannot deploy to the management account (AWS hard constraint). In multi-account StackSet deployments, the management account runs the deployment but does not receive the auto-tagger Lambda. Resources created in the management account will not be tagged. AWS best practice is to not run workloads in the management account. If tagging is required there, additionally run a single-account deployment targeting the management account after the StackSet deployment completes.
-- **New AWS accounts added post-deployment** — if a new account joins the organization after the StackSet has been deployed, it will not automatically receive the Lambda. Resources created in that account will not be tagged. Re-run `deploy.sh` to extend the StackSet to cover new accounts.
+- **New AWS accounts added post-deployment** — new accounts that join the organization after the StackSet has been deployed will not automatically receive the auto-tagger. Re-run `deploy.sh` to extend the StackSet to new accounts. Auto-deployment is intentionally disabled because customers may have multiple MAP engagements with different MPE IDs scoped to different accounts.
 - **Service Control Policies (SCPs)** — two scenarios require manual verification before deployment:
   - *Tagging SCPs*: if your organization's SCPs deny `tag:TagResources` or service-specific tagging actions for Lambda execution roles, the auto-tagger will silently fail and events will accumulate in the DLQ. The `deploy.sh` preflight check runs an IAM simulation (`iam:SimulatePrincipalPolicy`) to detect explicit denies, but SCPs are not evaluated by IAM simulation and require manual review in the AWS Organizations console.
   - *Mandatory tagging SCPs*: if SCPs require the `map-migrated` tag to be present at resource creation time, this solution will not satisfy that requirement — tags are applied typically 60–90 seconds (up to 15 minutes during high-volume activity) after creation. Either exempt `map-migrated` from creation-time enforcement or configure a grace period in the SCP.

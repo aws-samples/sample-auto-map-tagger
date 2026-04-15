@@ -50,7 +50,7 @@ Resources:
   MapConfig:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /auto-map-tagger/config
+      Name: !Sub '/auto-map-tagger/${MpeId}/config'
       Type: String
       Description: MAP 2.0 Auto-Tagger configuration
       Value: !Sub
@@ -75,7 +75,7 @@ Resources:
   AutoTaggerRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'map-auto-tagger-role-${AWS::Region}'
+      RoleName: !Sub 'map-auto-tagger-role-${MpeId}-${AWS::Region}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -256,6 +256,10 @@ Resources:
                   - datazone:TagResource
                   - qbusiness:TagResource
                   - frauddetector:TagResource
+                  - dax:TagResource
+                  - drs:TagResource
+                  - deadline:TagResource
+                  - kinesisvideo:TagStream
                 Resource: '*'
               # NOTE: This template deploys a single-account Lambda. No sts:AssumeRole or
               # cross-account permissions are present or required. For multi-account deployments,
@@ -277,7 +281,7 @@ Resources:
                 Effect: Allow
                 Action:
                   - ssm:GetParameter
-                Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/auto-map-tagger/config
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/auto-map-tagger/${MpeId}/config'
               - Sid: Logging
                 Effect: Allow
                 Action:
@@ -291,7 +295,7 @@ Resources:
   AutoTaggerLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: /aws/lambda/map-auto-tagger
+      LogGroupName: !Sub '/aws/lambda/map-auto-tagger-${MpeId}'
       RetentionInDays: 90
 
   # Lambda function
@@ -299,7 +303,7 @@ Resources:
     Type: AWS::Lambda::Function
     DependsOn: AutoTaggerLogGroup
     Properties:
-      FunctionName: map-auto-tagger
+      FunctionName: !Sub 'map-auto-tagger-${MpeId}'
       Runtime: python3.12
       Handler: index.handler
       Role: !GetAtt AutoTaggerRole.Arn
@@ -310,7 +314,7 @@ Resources:
       ReservedConcurrentExecutions: 10
       Environment:
         Variables:
-          CONFIG_PARAM: /auto-map-tagger/config
+          CONFIG_PARAM: !Sub '/auto-map-tagger/${MpeId}/config'
       Code:
         ZipFile: |
           import json, os, boto3, re, time, random
@@ -472,6 +476,9 @@ Resources:
                   pg_id = pg.get('groupId')
                   if pg_id:
                       return f"arn:aws:ec2:{region}:{account_id}:placement-group/{pg_id}"
+                  pg_arn = pg.get('groupArn')
+                  if pg_arn:
+                      return pg_arn
 
               # IVS Channel — must be before universal scan; response has both channel and streamKey
               # Universal scan finds streamKey.arn first; we need channel.arn
@@ -610,9 +617,6 @@ Resources:
               elif event_name == 'CreateDeliveryStream':
                   name = req.get('deliveryStreamName')
                   return f"arn:aws:firehose:{region}:{account_id}:deliverystream/{name}" if name else None
-              elif event_name == 'CreateNatGateway':
-                  nat_id = resp.get('natGateway', {}).get('natGatewayId')
-                  return f"arn:aws:ec2:{region}:{account_id}:natgateway/{nat_id}" if nat_id else None
               elif event_name == 'CreateAutoScalingGroup':
                   name = req.get('autoScalingGroupName')
                   return f"arn:aws:autoscaling:{region}:{account_id}:autoScalingGroup:*:autoScalingGroupName/{name}" if name else None
@@ -825,33 +829,6 @@ Resources:
                       if resource_name:
                           return f"arn:aws:lightsail:{region}:{account_id}:Instance/{resource_name}"
 
-              # Lightsail Container Service (ARN has UUID - use serviceName from request)
-              elif event_name == 'CreateContainerService' and event_source == 'lightsail.amazonaws.com':
-                  service_name = req.get('serviceName')
-                  if not service_name:
-                      cs = resp.get('containerService', {})
-                      service_name = cs.get('containerServiceName')
-                  if service_name:
-                      return f"arn:aws:lightsail:{region}:{account_id}:ContainerService/{service_name}"
-
-              # Lightsail Load Balancer (response has operations list)
-              elif event_name == 'CreateLoadBalancer' and event_source == 'lightsail.amazonaws.com':
-                  lb_name = req.get('loadBalancerName')
-                  if not lb_name:
-                      ops = resp.get('operations', [])
-                      lb_name = ops[0].get('resourceName') if ops else None
-                  if lb_name:
-                      return f"arn:aws:lightsail:{region}:{account_id}:LoadBalancer/{lb_name}"
-
-              # Lightsail Relational Database
-              elif event_name == 'CreateRelationalDatabase' and event_source == 'lightsail.amazonaws.com':
-                  ops = resp.get('operations', [])
-                  db_name = req.get('relationalDatabaseName')
-                  if not db_name and ops:
-                      db_name = ops[0].get('resourceName')
-                  if db_name:
-                      return f"arn:aws:lightsail:{region}:{account_id}:RelationalDatabase/{db_name}"
-
               # Transfer Family Server
               elif event_name == 'CreateServer' and event_source == 'transfer.amazonaws.com':
                   server_id = resp.get('serverId')
@@ -1017,19 +994,6 @@ Resources:
                   dhcp_id = dhcp.get('dhcpOptionsId')
                   if dhcp_id:
                       return f"arn:aws:ec2:{region}:{account_id}:dhcp-options/{dhcp_id}"
-
-              # Placement Group - use groupId not groupName for ARN
-              elif event_name == 'CreatePlacementGroup':
-                  pg = resp.get('placementGroup', {})
-                  if not pg and 'CreatePlacementGroupResponse' in resp:
-                      pg = resp['CreatePlacementGroupResponse'].get('placementGroup', {})
-                  # Use groupId (pg-xxx) not groupName for EC2 tagging compatibility
-                  pg_id = pg.get('groupId')
-                  if pg_id:
-                      return f"arn:aws:ec2:{region}:{account_id}:placement-group/{pg_id}"
-                  pg_arn = pg.get('groupArn')
-                  if pg_arn:
-                      return pg_arn
 
               # AMI (CreateImage)
               elif event_name == 'CreateImage':
@@ -1248,13 +1212,6 @@ Resources:
                   if conn_arn:
                       return conn_arn
 
-              # ECS Service
-              elif event_name == 'CreateService' and event_source == 'ecs.amazonaws.com':
-                  svc = resp.get('service', {})
-                  svc_arn = svc.get('serviceArn')
-                  if svc_arn:
-                      return svc_arn
-
               # RDS Snapshots (flat response — ARN is at top level)
               elif event_name == 'CreateDBSnapshot':
                   arn = resp.get('dBSnapshotArn')
@@ -1429,13 +1386,6 @@ Resources:
                   if pool_id:
                       return f"arn:aws:cognito-identity:{region}:{account_id}:identitypool/{pool_id}"
 
-              # CodePipeline Pipeline
-              elif event_name == 'CreatePipeline' and event_source == 'codepipeline.amazonaws.com':
-                  pipeline = resp.get('pipeline', {})
-                  pipeline_name = pipeline.get('name')
-                  if pipeline_name:
-                      return f"arn:aws:codepipeline:{region}:{account_id}:{pipeline_name}"
-
               # Network Firewall Policy
               elif event_name == 'CreateFirewallPolicy':
                   nfw_resp = resp.get('firewallPolicyResponse', {})
@@ -1491,21 +1441,6 @@ Resources:
                   if svc_arn:
                       return svc_arn
 
-              # VPC Flow Logs (EC2 response wrapper: CreateFlowLogsResponse.flowLogIdSet.item)
-              elif event_name == 'CreateFlowLogs':
-                  fl_id = None
-                  if 'CreateFlowLogsResponse' in resp:
-                      nested = resp['CreateFlowLogsResponse']
-                      fl_id_set = nested.get('flowLogIdSet', {})
-                      fl_id = fl_id_set.get('item') if isinstance(fl_id_set, dict) else None
-                      if isinstance(fl_id, list):
-                          fl_id = fl_id[0]
-                  if not fl_id:
-                      flow_ids = resp.get('flowLogIds', [])
-                      fl_id = flow_ids[0] if flow_ids else None
-                  if fl_id:
-                      return f"arn:aws:ec2:{region}:{account_id}:vpc-flow-log/{fl_id}"
-
               # Glue Table
               elif event_name == 'CreateTable' and event_source == 'glue.amazonaws.com':
                   db_name = req.get('databaseName')
@@ -1544,6 +1479,166 @@ Resources:
                   key_pair_id = resp.get('keyPairId')
                   if key_pair_id:
                       return f"arn:aws:ec2:{region}:{account_id}:key-pair/{key_pair_id}"
+
+              # DAX Cluster
+              elif event_name == 'CreateCluster' and event_source == 'dax.amazonaws.com':
+                  cluster = resp.get('cluster', {})
+                  cluster_arn = cluster.get('clusterArn')
+                  if cluster_arn:
+                      return cluster_arn
+
+              # DynamoDB RestoreTableFromBackup / RestoreTableToPointInTime
+              elif event_name in ('RestoreTableFromBackup', 'RestoreTableToPointInTime') and event_source == 'dynamodb.amazonaws.com':
+                  desc = resp.get('tableDescription', {})
+                  table_arn = desc.get('tableArn')
+                  if table_arn:
+                      return table_arn
+
+              # ElastiCache Serverless
+              elif event_name == 'CreateServerlessCache' and event_source == 'elasticache.amazonaws.com':
+                  sc = resp.get('serverlessCache', {})
+                  sc_arn = sc.get('aRN') or sc.get('arn') or sc.get('ARN')
+                  if sc_arn:
+                      return sc_arn
+
+              # MSK CreateClusterV2 (MSK Serverless / Provisioned v2)
+              elif event_name == 'CreateClusterV2' and event_source == 'kafka.amazonaws.com':
+                  cluster_arn = resp.get('clusterArn')
+                  if cluster_arn:
+                      return cluster_arn
+
+              # SageMaker Domain (Studio)
+              elif event_name == 'CreateDomain' and event_source == 'sagemaker.amazonaws.com':
+                  domain_arn = resp.get('domainArn') or resp.get('DomainArn')
+                  if domain_arn:
+                      return domain_arn
+
+              # SageMaker Pipeline
+              elif event_name == 'CreatePipeline' and event_source == 'sagemaker.amazonaws.com':
+                  pipeline_arn = resp.get('pipelineArn') or resp.get('PipelineArn')
+                  if pipeline_arn:
+                      return pipeline_arn
+
+              # SageMaker Feature Group
+              elif event_name == 'CreateFeatureGroup' and event_source == 'sagemaker.amazonaws.com':
+                  fg_arn = resp.get('featureGroupArn') or resp.get('FeatureGroupArn')
+                  if fg_arn:
+                      return fg_arn
+
+              # FSx Backup
+              elif event_name == 'CreateBackup' and event_source == 'fsx.amazonaws.com':
+                  backup = resp.get('backup', {})
+                  backup_arn = backup.get('resourceARN')
+                  if backup_arn:
+                      return backup_arn
+
+              # FSx CreateFileSystemFromBackup
+              elif event_name == 'CreateFileSystemFromBackup' and event_source == 'fsx.amazonaws.com':
+                  fs = resp.get('fileSystem', {})
+                  fs_arn = fs.get('resourceARN')
+                  if fs_arn:
+                      return fs_arn
+
+              # DMS Serverless (CreateReplicationConfig)
+              elif event_name == 'CreateReplicationConfig' and event_source == 'dms.amazonaws.com':
+                  rc = resp.get('replicationConfig', {})
+                  rc_arn = rc.get('replicationConfigArn')
+                  if rc_arn:
+                      return rc_arn
+
+              # Neptune (uses same event names as RDS but different source)
+              elif event_name in ('CreateDBCluster', 'CreateDBInstance') and event_source == 'rds.amazonaws.com':
+                  # Already handled by existing RDS handlers — this catches Neptune/DocDB
+                  # which share the rds.amazonaws.com event source
+                  pass
+
+              # Transfer Family Connector
+              elif event_name == 'CreateConnector' and event_source == 'transfer.amazonaws.com':
+                  connector_id = resp.get('connectorId')
+                  if connector_id:
+                      return f"arn:aws:transfer:{region}:{account_id}:connector/{connector_id}"
+
+              # Transfer Family User
+              elif event_name == 'CreateUser' and event_source == 'transfer.amazonaws.com':
+                  server_id = req.get('serverId')
+                  user_name = resp.get('userName') or req.get('userName')
+                  if server_id and user_name:
+                      return f"arn:aws:transfer:{region}:{account_id}:user/{server_id}/{user_name}"
+
+              # Direct Connect LAG
+              elif event_name == 'CreateLag' and event_source == 'directconnect.amazonaws.com':
+                  lag_id = resp.get('lagId')
+                  if lag_id:
+                      return f"arn:aws:directconnect:{region}:{account_id}:dxlag/{lag_id}"
+
+              # Direct Connect Gateway
+              elif event_name == 'CreateDirectConnectGateway' and event_source == 'directconnect.amazonaws.com':
+                  gw = resp.get('directConnectGateway', {})
+                  gw_id = gw.get('directConnectGatewayId')
+                  if gw_id:
+                      return f"arn:aws:directconnect::{account_id}:dx-gateway/{gw_id}"
+
+              # Kinesis Video Streams (disambiguate from Kinesis Data Streams)
+              elif event_name == 'CreateStream' and event_source == 'kinesisvideo.amazonaws.com':
+                  stream_arn = resp.get('streamARN') or resp.get('streamArn')
+                  if stream_arn:
+                      return stream_arn
+
+              # Elastic Disaster Recovery (DRS) Source Server
+              elif event_name == 'CreateSourceServer' and event_source == 'drs.amazonaws.com':
+                  source_arn = resp.get('arn') or resp.get('sourceServerArn')
+                  if source_arn:
+                      return source_arn
+
+              # Deadline Cloud Farm
+              elif event_name == 'CreateFarm' and event_source == 'deadline.amazonaws.com':
+                  farm_id = resp.get('farmId')
+                  if farm_id:
+                      return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}"
+
+              # Deadline Cloud Queue
+              elif event_name == 'CreateQueue' and event_source == 'deadline.amazonaws.com':
+                  farm_id = req.get('farmId')
+                  queue_id = resp.get('queueId')
+                  if farm_id and queue_id:
+                      return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}/queue/{queue_id}"
+
+              # Deadline Cloud Fleet
+              elif event_name == 'CreateFleet' and event_source == 'deadline.amazonaws.com':
+                  farm_id = req.get('farmId')
+                  fleet_id = resp.get('fleetId')
+                  if farm_id and fleet_id:
+                      return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}/fleet/{fleet_id}"
+
+              # IoT Core Topic Rule
+              elif event_name == 'CreateTopicRule' and event_source == 'iot.amazonaws.com':
+                  rule_name = req.get('ruleName')
+                  if rule_name:
+                      return f"arn:aws:iot:{region}:{account_id}:rule/{rule_name}"
+
+              # IoT SiteWise Asset
+              elif event_name == 'CreateAsset' and event_source == 'iotsitewise.amazonaws.com':
+                  asset_id = resp.get('assetId')
+                  if asset_id:
+                      return f"arn:aws:iotsitewise:{region}:{account_id}:asset/{asset_id}"
+
+              # IoT SiteWise Asset Model
+              elif event_name == 'CreateAssetModel' and event_source == 'iotsitewise.amazonaws.com':
+                  model_id = resp.get('assetModelId')
+                  if model_id:
+                      return f"arn:aws:iotsitewise:{region}:{account_id}:asset-model/{model_id}"
+
+              # IoT SiteWise Gateway
+              elif event_name == 'CreateGateway' and event_source == 'iotsitewise.amazonaws.com':
+                  gw_id = resp.get('gatewayId')
+                  if gw_id:
+                      return f"arn:aws:iotsitewise:{region}:{account_id}:gateway/{gw_id}"
+
+              # IoT SiteWise Portal
+              elif event_name == 'CreatePortal' and event_source == 'iotsitewise.amazonaws.com':
+                  portal_id = resp.get('portalId')
+                  if portal_id:
+                      return f"arn:aws:iotsitewise:{region}:{account_id}:portal/{portal_id}"
 
               return None
 
@@ -1629,6 +1724,10 @@ Resources:
                   kinesis = get_service_client('kinesis')
                   stream_name = arn.split('/')[-1]
                   kinesis.add_tags_to_stream(StreamName=stream_name, Tags={tag_key: tag_value})
+                  return True
+              elif ':kinesisvideo:' in arn:
+                  kv = get_service_client('kinesisvideo')
+                  kv.tag_stream(StreamARN=arn, Tags={tag_key: tag_value})
                   return True
               elif ':firehose:' in arn:
                   firehose = get_service_client('firehose')
@@ -1773,7 +1872,7 @@ Resources:
   AutoTagEventRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: map-auto-tagger-rule
+      Name: !Sub 'map-auto-tagger-rule-${MpeId}'
       Description: Triggers MAP auto-tagger on resource creation events
       State: ENABLED
       EventPattern:
@@ -1793,6 +1892,9 @@ Resources:
             - prefix: "Launch"     # EMR clusters, SageMaker jobs
             - prefix: "Import"     # EC2 AMIs, snapshots
             - prefix: "Publish"    # Lambda layers (PublishLayerVersion)
+            - prefix: "Copy"       # RDS/EBS snapshots, AMIs
+            - prefix: "Restore"    # RDS/Aurora/Redshift from snapshots
+            - prefix: "Enable"     # SecurityHub
       Targets:
         - Arn: !GetAtt AutoTaggerFunction.Arn
           Id: MapAutoTagger
@@ -1810,7 +1912,7 @@ Resources:
   AlertTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: auto-map-tagger-alerts
+      TopicName: !Sub 'auto-map-tagger-alerts-${MpeId}'
       DisplayName: MAP 2.0 Auto-Tagger Alerts
       KmsMasterKeyId: alias/aws/sns
 
@@ -1818,7 +1920,7 @@ Resources:
   TaggerErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: map-auto-tagger-errors
+      AlarmName: !Sub 'map-auto-tagger-errors-${MpeId}'
       AlarmDescription: MAP auto-tagger Lambda is failing
       Namespace: AWS/Lambda
       MetricName: Errors

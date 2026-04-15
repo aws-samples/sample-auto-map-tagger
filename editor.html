@@ -1,0 +1,394 @@
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. -->
+<!-- SPDX-License-Identifier: MIT-0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAP 2.0 Auto-Tagger — Edit Deployment</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, 'Amazon Ember', 'Helvetica Neue', sans-serif;
+            background: #f2f3f3;
+            color: #16191f;
+            line-height: 1.6;
+        }
+        .header {
+            background: #232f3e;
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .header h1 { font-size: 18px; font-weight: 600; }
+        .header .badge {
+            background: #ff9900;
+            color: #16191f;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        .container { max-width: 800px; margin: 32px auto; padding: 0 24px; }
+        .card {
+            background: white;
+            border: 1px solid #d5dbdb;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card h2 { font-size: 18px; margin-bottom: 4px; color: #16191f; }
+        .card .subtitle { font-size: 13px; color: #687078; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+        label .hint { font-weight: 400; color: #687078; font-size: 12px; }
+        input[type="text"], select {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: 1px solid #aab7b8;
+            border-radius: 4px;
+            background: white;
+        }
+        input:focus, select:focus { outline: none; border-color: #0073bb; box-shadow: 0 0 0 1px #0073bb; }
+        .entry-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+        .entry-row input { flex: 1; }
+        .btn-remove {
+            background: none; border: 1px solid #d5dbdb; border-radius: 4px;
+            padding: 6px 10px; cursor: pointer; color: #d13212; font-size: 18px; line-height: 1;
+        }
+        .btn-remove:hover { background: #fdf3f1; }
+        .btn-add {
+            background: none; border: 1px dashed #aab7b8; border-radius: 4px;
+            padding: 8px 16px; cursor: pointer; color: #0073bb; font-size: 13px; width: 100%;
+        }
+        .btn-add:hover { background: #f2f8fd; border-color: #0073bb; }
+        .btn-primary {
+            background: #ff9900; color: #16191f; border: none; border-radius: 4px;
+            padding: 10px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+        }
+        .btn-primary:hover { background: #ec7211; }
+        .btn-secondary {
+            background: white; color: #16191f; border: 1px solid #aab7b8;
+            border-radius: 4px; padding: 10px 24px; font-size: 14px; cursor: pointer;
+        }
+        .btn-secondary:hover { background: #fafafa; }
+        .option-card {
+            border: 2px solid #d5dbdb; border-radius: 8px; padding: 16px; margin-bottom: 12px; cursor: pointer;
+        }
+        .option-card.selected { border-color: #0073bb; background: #f2f8fd; }
+        .option-card h3 { font-size: 14px; margin-bottom: 4px; }
+        .option-card p { font-size: 13px; color: #687078; margin: 0; }
+        .info-box {
+            background: #f2f8fd; border-left: 4px solid #0073bb;
+            padding: 12px 16px; font-size: 13px; margin-bottom: 20px; border-radius: 0 4px 4px 0;
+        }
+        .warn-box {
+            background: #fef8f0; border-left: 4px solid #ff9900;
+            padding: 12px 16px; font-size: 13px; margin-bottom: 12px; border-radius: 0 4px 4px 0;
+        }
+        .preview-box {
+            background: #1b2631; color: #89d185; font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px; padding: 16px; border-radius: 4px; overflow-x: auto;
+            white-space: pre; max-height: 400px; overflow-y: auto; margin-top: 16px;
+        }
+        .hidden { display: none; }
+        .section-divider { border-top: 1px solid #eaeded; margin: 16px 0; }
+        .actions { display: flex; gap: 12px; margin-top: 24px; }
+        code {
+            background: #f2f3f3; padding: 1px 5px; border-radius: 3px;
+            font-family: 'SF Mono', monospace; font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>MAP 2.0 Auto-Tagger</h1>
+    <span class="badge">EDIT</span>
+</div>
+
+<div class="container">
+
+    <div class="warn-box" style="margin-bottom:20px; font-size:12px;">
+        <strong>Sample Code Notice:</strong> This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, and AWS Systems Manager. See the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/" style="color:#0073bb;">AWS Shared Responsibility Model</a>.
+    </div>
+
+    <div class="card">
+        <h2>Edit Existing Deployment</h2>
+        <p class="subtitle">Add or remove accounts from an existing MAP auto-tagger deployment</p>
+
+        <div class="info-box">
+            This tool modifies an existing deployment created by the MAP Auto-Tagger Configurator.
+            It generates an <code>update.sh</code> script that updates the account scope without redeploying.
+        </div>
+
+        <div class="form-group">
+            <label>MAP Engagement ID (MPE ID) <span class="hint">— must match the original deployment</span></label>
+            <input type="text" id="mpeId" placeholder="e.g., migA1B2C3D4E5">
+        </div>
+
+        <div class="form-group">
+            <label>Deployment Region <span class="hint">— region where the management stack was deployed</span></label>
+            <select id="region">
+                <option value="">Select a region...</option>
+                <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                <option value="us-west-1">US West (N. California) — us-west-1</option>
+                <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Action</h2>
+        <p class="subtitle">Choose whether to add or remove accounts from the MAP scope</p>
+
+        <div class="option-card selected" id="opt-add" onclick="selectAction('add')">
+            <h3><input type="radio" name="action" value="add" checked> Add accounts to MAP scope</h3>
+            <p>New accounts will start being tagged with the MAP tag. Backfill runs automatically for historical resources.</p>
+        </div>
+
+        <div class="option-card" id="opt-remove" onclick="selectAction('remove')">
+            <h3><input type="radio" name="action" value="remove"> Remove accounts from MAP scope</h3>
+            <p>Accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive.</p>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="form-group">
+            <label>Account IDs <span class="hint">— only the accounts to add or remove (not the full list)</span></label>
+            <div id="accountList">
+                <div class="entry-row">
+                    <input type="text" class="account-input" placeholder="123456789012" maxlength="12">
+                    <button class="btn-remove" onclick="removeRow(this)" title="Remove">&times;</button>
+                </div>
+            </div>
+            <button class="btn-add" onclick="addAccount()">+ Add another account</button>
+        </div>
+    </div>
+
+    <div class="card" id="backfill-card">
+        <div class="form-group" style="margin-bottom:0;">
+            <label>
+                <input type="checkbox" id="includeBackfill" checked>
+                Re-run backfill for newly added accounts
+            </label>
+            <p class="hint" style="margin-top:4px;">Tags existing resources created since the agreement start date. Runs automatically during the StackSet update. Only applies when adding accounts.</p>
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="btn-primary" onclick="generate()">Generate update.sh</button>
+    </div>
+
+    <div id="output" class="hidden" style="margin-top: 20px;">
+        <div class="card">
+            <h2>Generated Script</h2>
+            <p class="subtitle">Run this in AWS CloudShell from the management account</p>
+            <div class="preview-box" id="scriptContent"></div>
+            <div class="actions">
+                <button class="btn-primary" onclick="download()">Download update.sh</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+function selectAction(action) {
+    document.querySelector(`input[name="action"][value="${action}"]`).checked = true;
+    document.getElementById('opt-add').classList.toggle('selected', action === 'add');
+    document.getElementById('opt-remove').classList.toggle('selected', action === 'remove');
+    document.getElementById('backfill-card').classList.toggle('hidden', action === 'remove');
+}
+
+function addAccount() {
+    const list = document.getElementById('accountList');
+    const row = document.createElement('div');
+    row.className = 'entry-row';
+    row.innerHTML = '<input type="text" class="account-input" placeholder="123456789012" maxlength="12"><button class="btn-remove" onclick="removeRow(this)" title="Remove">&times;</button>';
+    list.appendChild(row);
+}
+
+function removeRow(btn) {
+    const list = btn.parentElement.parentElement;
+    if (list.children.length > 1) btn.parentElement.remove();
+}
+
+function generate() {
+    const mpe = document.getElementById('mpeId').value.trim();
+    const region = document.getElementById('region').value;
+    const action = document.querySelector('input[name="action"]:checked').value;
+    const backfill = document.getElementById('includeBackfill').checked && action === 'add';
+    const accounts = [...document.querySelectorAll('.account-input')]
+        .map(el => el.value.trim())
+        .filter(v => /^\d{12}$/.test(v));
+
+    if (!mpe) { alert('Please enter the MPE ID'); return; }
+    if (!region) { alert('Please select a region'); return; }
+    if (accounts.length === 0) { alert('Please enter at least one valid 12-digit account ID'); return; }
+
+    const stacksetName = `map-auto-tagger-${mpe}`;
+    const accountsJson = JSON.stringify(accounts);
+
+    const script = `#!/bin/bash
+# MAP 2.0 Auto-Tagger — Update Script
+# Action: ${action} accounts | MPE: ${mpe}
+# Accounts: ${accounts.join(', ')}
+set -e
+
+STACKSET_NAME="${stacksetName}"
+REGION="${region}"
+MPE="${mpe}"
+ACTION="${action}"
+ACCOUNTS_TO_MODIFY='${accountsJson}'
+
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   MAP 2.0 Auto-Tagger — Update          │"
+echo "  │   StackSet: \$STACKSET_NAME"
+echo "  │   Action: \$ACTION"
+echo "  │   Accounts: \$ACCOUNTS_TO_MODIFY"
+echo "  └─────────────────────────────────────────┘"
+echo ""
+
+# ── Step 1: Verify StackSet exists ────────────
+echo "Step 1: Checking existing deployment..."
+if ! aws cloudformation describe-stack-set --stack-set-name "\$STACKSET_NAME" > /dev/null 2>&1; then
+    echo "  ❌ StackSet '\$STACKSET_NAME' not found."
+    echo "     Run the initial deploy.sh from the configurator first."
+    exit 1
+fi
+echo "  ✅ StackSet found"
+
+ACCOUNT=\$(aws sts get-caller-identity --query Account --output text)
+BUCKET="auto-map-tagger-\${ACCOUNT}"
+
+# ── Step 2: Download and update template ──────
+echo ""
+echo "Step 2: Updating account scope..."
+
+TEMPLATE=\$(mktemp /tmp/map-update-XXXX.yaml)
+aws s3 cp "s3://\${BUCKET}/map-auto-tagger-accounts-\${MPE}.yaml" "\$TEMPLATE" > /dev/null
+
+echo "  Current scope:"
+grep "scoped_account_ids" "\$TEMPLATE" | head -1 | sed 's/.*scoped_account_ids/  scoped_account_ids/'
+
+# Update scoped_account_ids in template
+${action === 'add' ? accounts.map(id =>
+'if ! grep -q \'"' + id + '"\' "$TEMPLATE"; then\n' +
+'  sed -i.bak \'s|"scoped_account_ids": \\[|"scoped_account_ids": ["' + id + '",|\'  "$TEMPLATE"\nfi'
+).join('\n') : accounts.map(id =>
+'sed -i.bak \'s|"' + id + '"||g\' "$TEMPLATE"\n' +
+'sed -i.bak \'s|,,|,|g; s|\\[,|[|g; s|,\\]|]|g\' "$TEMPLATE"'
+).join('\n')}
+rm -f "\$TEMPLATE.bak"
+
+# Update BackfillTrigger ScopedAccounts to match (triggers backfill re-run)
+NEW_SCOPE=\$(grep -o '"scoped_account_ids": \\[[^]]*\\]' "\$TEMPLATE" | head -1 | sed 's/"scoped_account_ids": //')
+sed -i.bak "s|ScopedAccounts: .*|ScopedAccounts: '\$NEW_SCOPE'|" "\$TEMPLATE"
+rm -f "\$TEMPLATE.bak"
+
+echo "  Updated scope:"
+grep "scoped_account_ids" "\$TEMPLATE" | head -1 | sed 's/.*scoped_account_ids/  scoped_account_ids/'
+
+# ── Step 3: Push update ──────────────────────
+echo ""
+echo "Step 3: Pushing update to all accounts..."
+
+aws s3 cp "\$TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts-\${MPE}.yaml" > /dev/null
+
+UPDATE_OUT=\$(aws cloudformation update-stack-set \\
+    --stack-set-name "\$STACKSET_NAME" \\
+    --template-body "file://\$TEMPLATE" \\
+    --capabilities CAPABILITY_NAMED_IAM 2>&1) || true
+
+if echo "\$UPDATE_OUT" | grep -q "No updates"; then
+    echo "  StackSet already up to date"
+elif echo "\$UPDATE_OUT" | grep -q "OperationId"; then
+    echo "  StackSet update initiated"
+    WAIT=0
+    while [ \$WAIT -lt 600 ]; do
+        STATUS=\$(aws cloudformation list-stack-set-operations \\
+            --stack-set-name "\$STACKSET_NAME" \\
+            --query "Summaries[0].Status" --output text 2>/dev/null)
+        if [ "\$STATUS" = "SUCCEEDED" ]; then
+            echo "  ✅ Update complete — all accounts updated"
+            break
+        elif [ "\$STATUS" = "FAILED" ]; then
+            echo "  ❌ Update failed. Check:"
+            echo "     aws cloudformation list-stack-instances --stack-set-name \$STACKSET_NAME"
+            break
+        fi
+        sleep 15
+        WAIT=\$((WAIT + 15))
+        echo "  Still updating... (\${WAIT}s)"
+    done
+elif echo "\$UPDATE_OUT" | grep -q "OperationInProgress"; then
+    echo "  ⚠️  Another operation is in progress. Try again in a few minutes."
+else
+    echo "  \$UPDATE_OUT"
+fi
+${backfill ? `
+echo ""
+echo "  ⏳ Backfill runs automatically as part of the StackSet update."
+echo "     Check logs: aws logs tail /aws/lambda/map-auto-tagger-backfill-\$MPE --region \$REGION"` : ''}
+
+rm -f "\$TEMPLATE"
+
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ✅ Update complete                     │"
+echo "  └─────────────────────────────────────────┘"
+`;
+
+    document.getElementById('scriptContent').textContent = script;
+    document.getElementById('output').classList.remove('hidden');
+    document.getElementById('output').scrollIntoView({ behavior: 'smooth' });
+    window._script = script;
+    window._mpe = mpe;
+}
+
+function download() {
+    const blob = new Blob([window._script], { type: 'text/x-sh' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `update-${window._mpe}.sh`;
+    a.click();
+}
+</script>
+</body>
+</html>
