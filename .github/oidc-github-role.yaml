@@ -1,0 +1,73 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# One-time setup template — deploy to each test account before running E2E CI.
+# Creates a GitHub Actions OIDC provider and IAM role that GitHub Actions
+# can assume via short-lived tokens (no long-lived AWS keys needed).
+#
+# Deploy command:
+#   aws cloudformation deploy \
+#     --stack-name github-oidc-e2e \
+#     --template-file .github/oidc-github-role.yaml \
+#     --capabilities CAPABILITY_NAMED_IAM \
+#     --profile <account-profile> \
+#     --region ap-northeast-2
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  GitHub Actions OIDC provider and IAM role for auto-map-tagger E2E tests.
+  Allows GitHub Actions workflows in aws-samples/sample-auto-map-tagger to
+  assume this role using short-lived OIDC tokens — no long-lived keys required.
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Default: aws-samples
+  GitHubRepo:
+    Type: String
+    Default: sample-auto-map-tagger
+
+Resources:
+
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        # GitHub Actions OIDC thumbprints (stable, maintained by GitHub)
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fcd
+
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: GitHubActionsE2ERole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !GetAtt GitHubOidcProvider.Arn
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                # Restricts to this specific repo only
+                token.actions.githubusercontent.com:sub:
+                  !Sub 'repo:${GitHubOrg}/${GitHubRepo}:*'
+      # AdministratorAccess is intentional for these dedicated test accounts.
+      # The role is restricted to GitHub Actions OIDC tokens from this repo only.
+      # No long-lived credentials exist. Accounts contain no production resources.
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+Outputs:
+  RoleArn:
+    Value: !GetAtt GitHubActionsRole.Arn
+    Description: IAM role ARN to use in GitHub Actions workflow
+  OidcProviderArn:
+    Value: !GetAtt GitHubOidcProvider.Arn
+    Description: OIDC provider ARN
