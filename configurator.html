@@ -223,23 +223,23 @@
             </div>
 
             <div class="card">
-                <h2 style="margin-bottom:6px;">What would you like to do?</h2>
-                <p class="subtitle" style="margin-bottom:24px;">Select an option to get started</p>
+                <h2 style="margin-bottom:6px;" data-i18n="ui_landing_title">What would you like to do?</h2>
+                <p class="subtitle" style="margin-bottom:24px;" data-i18n="ui_landing_subtitle">Select an option to get started</p>
 
                 <div class="mode-card" onclick="selectMode('deploy')">
                     <div class="mode-icon">🚀</div>
                     <div class="mode-body">
-                        <h3>Deploy new auto-tagger</h3>
-                        <p>Generate a deployment script for a new MAP 2.0 engagement. Works for single-account and multi-account (AWS Organizations) deployments.</p>
+                        <h3 data-i18n="ui_mode_deploy_title">Deploy new MAP Auto-Tagger</h3>
+                        <p data-i18n="ui_mode_deploy_desc">Generate a deployment script for a new MAP 2.0 engagement. Works for single-account and multi-account (AWS Organizations) deployments.</p>
                     </div>
                 </div>
 
                 <div class="mode-card" onclick="selectMode('edit')">
                     <div class="mode-icon">✏️</div>
                     <div class="mode-body">
-                        <h3>Edit existing deployment</h3>
-                        <p>Add or remove AWS accounts from scope on an already-deployed auto-tagger. Generates an update script — no full redeployment needed.</p>
-                        <span class="mode-note">Multi-account (AWS Organizations) deployments only</span>
+                        <h3 data-i18n="ui_mode_edit_title">Edit existing deployment</h3>
+                        <p data-i18n="ui_mode_edit_desc">Add or remove AWS accounts from scope on an already-deployed MAP Auto-Tagger. Generates an update script — no full redeployment needed.</p>
+                        <span class="mode-note" data-i18n="ui_mode_edit_note">Multi-account (AWS Organizations) deployments only</span>
                     </div>
                 </div>
             </div>
@@ -279,9 +279,9 @@
                     <label><span data-i18n="ui_mpe_tag">MAP Engagement ID</span> <span class="hint" data-i18n="ui_mpe_hint">(10-character alphanumeric code from AWS Investments — e.g., A1B2C3D4E5)</span></label>
                     <div style="display:flex;align-items:center;gap:0;">
                         <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
-                        <input type="text" id="mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;">
+                        <input type="text" id="mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
                     </div>
-                    <div class="error-msg" id="mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be exactly 10 alphanumeric characters</div>
+                    <div class="error-msg" id="mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
                 </div>
 
                 <div class="form-group">
@@ -617,123 +617,188 @@
         <!-- Editor flow — hidden until mode selected -->
         <div id="edit-flow" class="hidden">
 
-            <div class="warn-box" style="font-size:12px;margin-top:8px;">
+            <!-- Step indicator -->
+            <div class="step-indicator" style="margin-top:8px;">
+                <div class="step active" id="estep1-indicator" data-i18n="ui_estep1">1. Configure</div>
+                <div class="step" id="estep2-indicator" data-i18n="ui_estep2">2. Review</div>
+                <div class="step" id="estep3-indicator" data-i18n="ui_estep3">3. Download</div>
+            </div>
+
+            <div class="warn-box" style="font-size:12px;">
                 <strong>Sample Code Notice:</strong> This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. See the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/" style="color:#0073bb;">AWS Shared Responsibility Model</a>.
             </div>
 
-            <div class="card">
-                <h2>Edit Existing Deployment</h2>
-                <p class="subtitle">Add or remove accounts from an existing MAP auto-tagger deployment</p>
-
-                <div class="info-box">
-                    This tool modifies an existing deployment created by the MAP Auto-Tagger Configurator.
-                    It generates an <code>update.sh</code> script that updates the account scope without redeploying.
-                </div>
-
-                <div class="form-group">
-                    <label>MAP Engagement ID <span class="hint">— 10-character alphanumeric code, must match the original deployment</span></label>
-                    <div style="display:flex;align-items:center;gap:0;">
-                        <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
-                        <input type="text" id="editor-mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;">
-                    </div>
-                    <div class="error-msg" id="editor-mpeId-error">MAP Engagement ID must be exactly 10 alphanumeric characters</div>
-                </div>
-
-                <div class="form-group">
-                    <label>Deployment Region <span class="hint">— region where the management stack was deployed</span></label>
-                    <select id="editor-region">
-                        <option value="" disabled selected>Select a region...</option>
-                        <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
-                        <option value="us-east-2">US East (Ohio) — us-east-2</option>
-                        <option value="us-west-1">US West (N. California) — us-west-1</option>
-                        <option value="us-west-2">US West (Oregon) — us-west-2</option>
-                        <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
-                        <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
-                        <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
-                        <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
-                        <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
-                        <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
-                        <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
-                        <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
-                        <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
-                        <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
-                        <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
-                        <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
-                        <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
-                        <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
-                        <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
-                        <option value="ca-central-1">Canada (Central) — ca-central-1</option>
-                        <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
-                        <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
-                        <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
-                        <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
-                        <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
-                        <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
-                        <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
-                        <option value="eu-west-2">Europe (London) — eu-west-2</option>
-                        <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
-                        <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
-                        <option value="me-central-1">Middle East (UAE) — me-central-1</option>
-                        <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
-                        <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
-                        <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
-                    </select>
-                    <div class="error-msg" id="editor-region-error">Please select a deployment region</div>
-                </div>
+            <div class="info-box">
+                <span data-i18n="ui_editor_info">This tool modifies an existing deployment created by the MAP Auto-Tagger Configurator. It generates an <code>update.sh</code> script that updates the account scope without redeploying.</span>
             </div>
 
-            <div class="card">
-                <h2>Action</h2>
-                <p class="subtitle">Choose whether to add or remove accounts from the MAP scope</p>
-
-                <div class="option-card selected" id="editor-opt-add" onclick="editorSelectAction('add')">
-                    <h3><input type="radio" name="editor-action" value="add" checked> Add accounts to MAP scope</h3>
-                    <p>New accounts will start being tagged with the MAP tag. Backfill runs automatically for historical resources.</p>
-                </div>
-
-                <div class="option-card" id="editor-opt-remove" onclick="editorSelectAction('remove')">
-                    <h3><input type="radio" name="editor-action" value="remove"> Remove accounts from MAP scope</h3>
-                    <p>Accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive for these accounts.</p>
-                </div>
-
-                <div class="section-divider"></div>
-
-                <div class="form-group">
-                    <label>Account IDs <span class="hint">— only the accounts to add or remove (not the full list)</span></label>
-                    <div id="editor-accountList">
-                        <div class="entry-row">
-                            <input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12">
-                            <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
-                        </div>
-                    </div>
-                    <button class="btn-add" onclick="editorAddAccount()">+ Add another account</button>
-                    <div class="error-msg" id="editor-account-error">Please enter at least one valid 12-digit account ID</div>
-                </div>
-            </div>
-
-            <div class="card" id="editor-backfill-card">
-                <div class="form-group" style="margin-bottom:0;">
-                    <label>
-                        <input type="checkbox" id="editor-includeBackfill" checked>
-                        Re-run backfill for newly added accounts
-                    </label>
-                    <p class="hint" style="margin-top:4px;">Tags existing resources created since the agreement start date. Runs automatically during the StackSet update. Only applies when adding accounts.</p>
-                </div>
-            </div>
-
-            <div class="actions">
-                <button class="btn-secondary" onclick="selectMode(null)">← Back</button>
-                <button class="btn-primary" onclick="editorGenerate()" style="margin-left:auto;">Generate update.sh →</button>
-            </div>
-
-            <div id="editor-output" class="hidden" style="margin-top:20px;">
+            <!-- Editor Step 1: Configure -->
+            <div id="estep1">
                 <div class="card">
-                    <h2>Generated Script</h2>
-                    <p class="subtitle">Run this in AWS CloudShell from the management account</p>
+                    <h2 data-i18n="ui_editor_step1_title">Deployment Details</h2>
+                    <p class="subtitle" data-i18n="ui_editor_step1_subtitle">Enter the details of your existing MAP Auto-Tagger deployment</p>
+
+                    <div class="form-group">
+                        <label><span data-i18n="ui_mpe_tag">MAP Engagement ID</span> <span class="hint" data-i18n="ui_editor_mpe_hint">— 10-character alphanumeric code, must match the original deployment</span></label>
+                        <div style="display:flex;align-items:center;gap:0;">
+                            <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                            <input type="text" id="editor-mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                        </div>
+                        <div class="error-msg" id="editor-mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label><span data-i18n="ui_editor_region">Deployment Region</span> <span class="hint" data-i18n="ui_editor_region_hint">— region where the management stack was deployed</span></label>
+                        <select id="editor-region">
+                            <option value="" disabled selected data-i18n="ui_editor_region_placeholder">Select a region...</option>
+                            <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                            <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                            <option value="us-west-1">US West (N. California) — us-west-1</option>
+                            <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                            <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                            <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                            <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                            <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                            <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                            <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                            <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                            <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                            <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                            <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                            <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                            <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                            <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                            <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                            <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                            <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                            <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                            <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                            <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                            <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                            <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                            <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                            <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                            <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                            <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                            <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                            <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                            <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                            <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                            <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                        </select>
+                        <div class="error-msg" id="editor-region-error" data-i18n="err_editor_region">Please select a deployment region</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 data-i18n="ui_editor_action_title">Action</h2>
+                    <p class="subtitle" data-i18n="ui_editor_action_subtitle">Choose whether to add or remove accounts from the MAP scope</p>
+
+                    <div class="option-card" id="editor-opt-add" onclick="editorSelectAction('add')">
+                        <h3><input type="radio" name="editor-action" value="add"> <span data-i18n="ui_editor_add_title">Add accounts to MAP scope</span></h3>
+                        <p data-i18n="ui_editor_add_desc">Selected accounts will start being tagged with the MAP tag.</p>
+                    </div>
+
+                    <div id="editor-add-accounts-section" class="hidden">
+                        <div class="section-divider"></div>
+                        <div class="form-group">
+                            <label><span data-i18n="ui_editor_add_accounts_label">Account IDs to add</span> <span class="hint" data-i18n="ui_editor_add_accounts_hint">— only accounts not currently in scope</span></label>
+                            <div id="editor-add-accountList">
+                                <div class="entry-row">
+                                    <input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12">
+                                    <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="editorAddAccount('add')" data-i18n="ui_add_account">+ Add another account</button>
+                            <div class="error-msg" id="editor-account-error" data-i18n="err_editor_account">Please enter at least one valid 12-digit account ID</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:4px;">
+                            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="editor-includeBackfill" checked style="margin-top:3px;flex-shrink:0;">
+                                <div>
+                                    <strong data-i18n="ui_editor_backfill_title">Re-run backfill for newly added accounts</strong>
+                                    <p class="hint" style="margin-top:4px;" data-i18n="ui_editor_backfill_desc">Queries CloudTrail history from the agreement start date and tags existing resources in the newly added accounts. Runs automatically during the StackSet update. Results appear in CloudWatch Logs (<code>map-auto-tagger-backfill</code>).</p>
+                                    <p class="hint" style="margin-top:4px;color:#d13212;" data-i18n="ui_editor_backfill_note">Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.</p>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="section-divider"></div>
+                    </div>
+
+                    <div class="option-card" id="editor-opt-remove" onclick="editorSelectAction('remove')">
+                        <h3><input type="radio" name="editor-action" value="remove"> <span data-i18n="ui_editor_remove_title">Remove accounts from MAP scope</span></h3>
+                        <p data-i18n="ui_editor_remove_desc">Selected accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive for these accounts.</p>
+                    </div>
+
+                    <div id="editor-remove-accounts-section" class="hidden">
+                        <div class="section-divider"></div>
+                        <div class="form-group" style="margin-bottom:4px;">
+                            <label><span data-i18n="ui_editor_remove_accounts_label">Account IDs to remove</span> <span class="hint" data-i18n="ui_editor_remove_accounts_hint">— only accounts currently in scope</span></label>
+                            <div id="editor-remove-accountList">
+                                <div class="entry-row">
+                                    <input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12">
+                                    <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="editorAddAccount('remove')" data-i18n="ui_add_account">+ Add another account</button>
+                            <div class="error-msg" id="editor-remove-account-error" data-i18n="err_editor_account">Please enter at least one valid 12-digit account ID</div>
+                        </div>
+                        <div class="section-divider"></div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="selectMode(null)" data-i18n="ui_editor_back">← Back</button>
+                    <button class="btn-primary" onclick="editorReview()" style="margin-left:auto;" data-i18n="ui_editor_review">Review →</button>
+                </div>
+            </div>
+
+            <!-- Editor Step 2: Review -->
+            <div id="estep2" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_review_title">Review Configuration</h2>
+                    <p class="subtitle" data-i18n="ui_editor_review_subtitle">Verify your settings before generating the update script</p>
+                    <table style="width:100%;font-size:14px;border-collapse:collapse;" id="editor-reviewTable"></table>
+                </div>
+
+                <div class="card" style="border-left:4px solid #d13212;background:#fdf3f1;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="editor-confirm" style="margin-top:3px;flex-shrink:0;">
+                            <span>
+                                <span data-i18n="ui_editor_confirm_text">I confirm that a MAP Auto-Tagger has already been deployed in the selected region using the specified MPE ID, and that both values are correct.</span>
+                                <strong data-i18n="ui_editor_confirm_risk">Generating and running this script with incorrect information may update the wrong StackSet, corrupt the account scope, or cause resources to be tagged with the wrong MAP engagement ID — resulting in lost MAP credits that cannot be recovered retroactively.</strong>
+                            </span>
+                        </label>
+                        <div class="error-msg" id="editor-confirm-error" style="margin-top:8px;" data-i18n="err_editor_confirm">You must confirm before generating the update script</div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="editorSetStep(1)" data-i18n="ui_btn_back">← Back</button>
+                    <button class="btn-primary" onclick="editorGenerate()" style="margin-left:auto;" data-i18n="ui_editor_generate">Generate update.sh →</button>
+                </div>
+            </div>
+
+            <!-- Editor Step 3: Download -->
+            <div id="estep3" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_step3_title">Script Ready</h2>
+                    <p class="subtitle" data-i18n="ui_editor_step3_subtitle">Run this in AWS CloudShell from the management account</p>
+
+                    <div style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;">
+                        <button class="btn-primary" onclick="editorDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_editor_download">⬇ Download update.sh</button>
+                        <button class="btn-secondary" onclick="editorCopyInstructions()" data-i18n="ui_btn_copy">📋 Copy Instructions</button>
+                    </div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Deployment Instructions</h3>
+                    <div class="preview-box" id="editor-instructions" style="color:#d4d4d4;"></div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_editor_script_preview">Script Preview</h3>
                     <div class="preview-box" id="editor-scriptContent"></div>
-                    <div class="actions">
-                        <button class="btn-secondary" onclick="selectMode(null)">← Back to start</button>
-                        <button class="btn-primary" onclick="editorDownload()" style="margin-left:auto;">Download update.sh</button>
+
+                    <div class="actions" style="margin-top:20px;">
+                        <button class="btn-secondary" onclick="editorSetStep(1)" data-i18n="ui_start_over">Start Over</button>
                     </div>
                 </div>
             </div>
@@ -748,6 +813,104 @@
             document.getElementById('landing').classList.toggle('hidden', mode !== null);
             document.getElementById('deploy-flow').classList.toggle('hidden', mode !== 'deploy');
             document.getElementById('edit-flow').classList.toggle('hidden', mode !== 'edit');
+            if (mode === 'edit') editorSetStep(1);
+            window.scrollTo(0, 0);
+        }
+
+        // --- Editor step navigation ---
+        function editorSetStep(num) {
+            ['estep1', 'estep2', 'estep3'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
+                const ind = document.getElementById(id + '-indicator');
+                ind.classList.remove('active', 'done');
+                if (i + 1 < num) ind.classList.add('done');
+                if (i + 1 === num) ind.classList.add('active');
+            });
+            window.scrollTo(0, 0);
+        }
+
+        function editorReview() {
+            // Validate step 1 first
+            const mpeRaw = document.getElementById('editor-mpeId').value.trim();
+            const region = document.getElementById('editor-region').value;
+            const actionEl = document.querySelector('input[name="editor-action"]:checked');
+            const actionVal = actionEl ? actionEl.value : null;
+            const listId = actionVal === 'remove' ? 'editor-remove-accountList' : 'editor-add-accountList';
+            const errorId = actionVal === 'remove' ? 'editor-remove-account-error' : 'editor-account-error';
+            const allInputs = [...document.getElementById(listId).querySelectorAll('.editor-account-input')];
+            const accounts = allInputs.map(el => el.value.trim()).filter(v => /^\d{12}$/.test(v));
+            const hasInvalid = allInputs.some(el => el.value.trim() && !/^\d{12}$/.test(el.value.trim()));
+
+            let valid = true;
+
+            if (!/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/.test(mpeRaw)) {
+                document.getElementById('editor-mpeId').classList.add('error');
+                document.getElementById('editor-mpeId-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('editor-mpeId').classList.remove('error');
+                document.getElementById('editor-mpeId-error').style.display = 'none';
+            }
+
+            if (!region) {
+                document.getElementById('editor-region').classList.add('error');
+                document.getElementById('editor-region-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('editor-region').classList.remove('error');
+                document.getElementById('editor-region-error').style.display = 'none';
+            }
+
+            if (!document.querySelector('input[name="editor-action"]:checked')) {
+                document.getElementById('editor-opt-add').style.outline = '2px solid #d13212';
+                document.getElementById('editor-opt-remove').style.outline = '2px solid #d13212';
+                valid = false;
+            } else {
+                document.getElementById('editor-opt-add').style.outline = '';
+                document.getElementById('editor-opt-remove').style.outline = '';
+            }
+
+            allInputs.forEach(el => {
+                const bad = el.value.trim() && !/^\d{12}$/.test(el.value.trim());
+                el.classList.toggle('error', bad);
+                el.title = bad ? t('err_account_format') : '';
+            });
+            if (accounts.length === 0 || hasInvalid) {
+                document.getElementById(errorId).style.display = 'block';
+                const errKey = hasInvalid ? 'err_account_format' : 'err_editor_account';
+                document.getElementById(errorId).setAttribute('data-i18n', errKey);
+                document.getElementById(errorId).textContent = t(errKey);
+                valid = false;
+            } else {
+                document.getElementById(errorId).style.display = 'none';
+            }
+
+            if (!valid) return;
+
+            // Build review table
+            const mpe = 'mig' + mpeRaw;
+            const action = actionVal || '';
+            const backfill = document.getElementById('editor-includeBackfill').checked && action === 'add';
+            const table = document.getElementById('editor-reviewTable');
+            const rows = [
+                [t('ui_mpe_tag'), mpe],
+                [t('ui_editor_region'), region],
+                [t('ui_editor_action_title'), action === 'add' ? t('ui_editor_add_title') : t('ui_editor_remove_title')],
+                [t('ui_editor_review_accounts'), accounts.join(', ')],
+            ];
+            if (action === 'add') rows.push([t('ui_backfill_title'), backfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
+            table.innerHTML = rows.map(([k, v], i) =>
+                `<tr style="border-bottom:1px solid #eaeded;${i%2===0?'background:#fafafa;':''}">
+                    <td style="padding:8px;font-weight:600;width:40%;color:#687078;">${k}</td>
+                    <td style="padding:8px;">${v}</td>
+                </tr>`
+            ).join('');
+
+            // Reset confirm checkbox
+            document.getElementById('editor-confirm').checked = false;
+            document.getElementById('editor-confirm-error').style.display = 'none';
+
+            editorSetStep(2);
         }
 
         // --- Editor functions ---
@@ -755,11 +918,15 @@
             document.querySelector(`input[name="editor-action"][value="${action}"]`).checked = true;
             document.getElementById('editor-opt-add').classList.toggle('selected', action === 'add');
             document.getElementById('editor-opt-remove').classList.toggle('selected', action === 'remove');
-            document.getElementById('editor-backfill-card').classList.toggle('hidden', action === 'remove');
+            document.getElementById('editor-opt-add').style.outline = '';
+            document.getElementById('editor-opt-remove').style.outline = '';
+            document.getElementById('editor-add-accounts-section').classList.toggle('hidden', action !== 'add');
+            document.getElementById('editor-remove-accounts-section').classList.toggle('hidden', action !== 'remove');
         }
 
-        function editorAddAccount() {
-            const list = document.getElementById('editor-accountList');
+        function editorAddAccount(type) {
+            const listId = type === 'remove' ? 'editor-remove-accountList' : 'editor-add-accountList';
+            const list = document.getElementById(listId);
             const row = document.createElement('div');
             row.className = 'entry-row';
             row.innerHTML = '<input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12"><button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
@@ -782,53 +949,22 @@
         }
 
         function editorGenerate() {
+            // Only confirmation needs checking here — all other fields validated in editorReview()
+            if (!document.getElementById('editor-confirm').checked) {
+                document.getElementById('editor-confirm-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('editor-confirm-error').style.display = 'none';
+
             const mpeRaw = document.getElementById('editor-mpeId').value.trim();
             const mpe = 'mig' + mpeRaw;
             const region = document.getElementById('editor-region').value;
             const action = document.querySelector('input[name="editor-action"]:checked').value;
             const backfill = document.getElementById('editor-includeBackfill').checked && action === 'add';
-            const accounts = [...document.querySelectorAll('.editor-account-input')]
+            const listId = action === 'remove' ? 'editor-remove-accountList' : 'editor-add-accountList';
+            const accounts = [...document.getElementById(listId).querySelectorAll('.editor-account-input')]
                 .map(el => el.value.trim())
                 .filter(v => /^\d{12}$/.test(v));
-
-            let valid = true;
-
-            if (!/^[a-zA-Z0-9]{10}$/.test(mpeRaw)) {
-                document.getElementById('editor-mpeId').classList.add('error');
-                document.getElementById('editor-mpeId-error').style.display = 'block';
-                valid = false;
-            } else {
-                document.getElementById('editor-mpeId').classList.remove('error');
-                document.getElementById('editor-mpeId-error').style.display = 'none';
-            }
-
-            if (!region) {
-                document.getElementById('editor-region').classList.add('error');
-                document.getElementById('editor-region-error').style.display = 'block';
-                valid = false;
-            } else {
-                document.getElementById('editor-region').classList.remove('error');
-                document.getElementById('editor-region-error').style.display = 'none';
-            }
-
-            const allInputs = [...document.querySelectorAll('.editor-account-input')];
-            const hasInvalid = allInputs.some(el => el.value.trim() && !/^\d{12}$/.test(el.value.trim()));
-            allInputs.forEach(el => {
-                const bad = el.value.trim() && !/^\d{12}$/.test(el.value.trim());
-                el.classList.toggle('error', bad);
-                el.title = bad ? 'Account ID must be exactly 12 digits' : '';
-            });
-            if (accounts.length === 0 || hasInvalid) {
-                document.getElementById('editor-account-error').style.display = 'block';
-                document.getElementById('editor-account-error').textContent = hasInvalid
-                    ? 'Account IDs must be exactly 12 digits'
-                    : 'Please enter at least one valid 12-digit account ID';
-                valid = false;
-            } else {
-                document.getElementById('editor-account-error').style.display = 'none';
-            }
-
-            if (!valid) return;
 
             const stacksetName = `map-auto-tagger-${mpe}`;
             const accountsJson = JSON.stringify(accounts);
@@ -945,10 +1081,46 @@ echo "  └───────────────────────
 `;
 
             document.getElementById('editor-scriptContent').textContent = script;
-            document.getElementById('editor-output').classList.remove('hidden');
-            document.getElementById('editor-output').scrollIntoView({ behavior: 'smooth' });
             window._editorScript = script;
             window._editorMpe = mpe;
+
+            const instructions = `UPDATE INSTRUCTIONS — MAP Auto-Tagger Account Scope
+=========================================
+
+── Option 1: AWS CloudShell (Recommended) ──────────────────
+1. Log into the AWS Console for your management account.
+2. Open CloudShell (click the terminal icon in the top menu bar).
+3. Upload the file (CloudShell → Actions → Upload file):
+     update.sh
+4. Run:
+   bash update.sh
+
+── Option 2: Local AWS CLI ──────────────────────────────────
+1. Ensure AWS CLI v2 is installed and configured with credentials
+   for the management account.
+2. Download update.sh to your local machine.
+3. Open a terminal in the folder containing update.sh.
+4. Run:
+   bash update.sh
+
+─────────────────────────────────────────────────
+The script handles everything automatically:
+  - Verifies the existing StackSet deployment
+  - Updates the account scope parameter
+  - Pushes the update to all accounts in the org
+${action === 'add' && backfill ? `  - Re-runs backfill for newly added accounts (CloudTrail, last 90 days)\n` : ''}
+Check update status:
+   aws cloudformation list-stack-instances \\
+     --stack-set-name map-auto-tagger-${mpe} \\
+     --query "Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]" \\
+     --output table
+   # Expected: SUCCEEDED for all accounts
+
+Note: Only resources created AFTER this update will be tagged in newly added accounts
+(unless backfill is enabled). Existing tags on removed accounts are not affected.`;
+
+            document.getElementById('editor-instructions').textContent = instructions;
+            editorSetStep(3);
         }
 
         function editorDownload() {
@@ -957,6 +1129,15 @@ echo "  └───────────────────────
             a.href = URL.createObjectURL(blob);
             a.download = `update-${window._editorMpe}.sh`;
             a.click();
+        }
+
+        function editorCopyInstructions() {
+            navigator.clipboard.writeText(document.getElementById('editor-instructions').textContent).then(() => {
+                const btn = document.querySelector('[onclick="editorCopyInstructions()"]');
+                const orig = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => { btn.textContent = orig; }, 2000);
+            });
         }
 
         // --- UI State ---
@@ -972,16 +1153,15 @@ echo "  └───────────────────────
                 firstAcct.addEventListener('input', () => validateAccountInput(firstAcct));
             }
             // Editor: wire up first account input and MPE field
-            const editorAcct = document.querySelector('.editor-account-input');
-            if (editorAcct) {
-                editorAcct.addEventListener('blur',  () => editorValidateAccount(editorAcct));
-                editorAcct.addEventListener('input', () => editorValidateAccount(editorAcct));
-            }
+            document.querySelectorAll('.editor-account-input').forEach(input => {
+                input.addEventListener('blur',  () => editorValidateAccount(input));
+                input.addEventListener('input', () => editorValidateAccount(input));
+            });
             const editorMpe = document.getElementById('editor-mpeId');
             if (editorMpe) {
                 editorMpe.addEventListener('blur', () => {
                     const val = editorMpe.value.trim();
-                    const bad = val && !/^[a-zA-Z0-9]{10}$/.test(val);
+                    const bad = val && !/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/.test(val);
                     editorMpe.classList.toggle('error', bad);
                     document.getElementById('editor-mpeId-error').style.display = bad ? 'block' : 'none';
                 });
@@ -1138,7 +1318,7 @@ echo "  └───────────────────────
             const mpeId = document.getElementById('mpeId').value.trim();
             const date = document.getElementById('agreementDate').value;
 
-            if (!/^[a-zA-Z0-9]{10}$/.test(mpeId)) {
+            if (!/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/.test(mpeId)) {
                 document.getElementById('mpeId').classList.add('error');
                 document.getElementById('mpeId-error').style.display = 'block';
                 valid = false;
@@ -1492,7 +1672,50 @@ echo "  └───────────────────────
             rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'Auto-discovers root OU ID at deploy time — customer does nothing',
             rv_res_xaccount:'Cross-Account Role', rv_res_xaccount_desc:'MapAutoTaggerCrossAccount role in each member account (trusts central Lambda)',
             rv_res_eb_fwd:'EventBridge Forwarding', rv_res_eb_fwd_desc:'Member accounts forward events to central event bus',
-            err_mpe_invalid:"MAP Engagement ID must be exactly 10 alphanumeric characters",
+            err_mpe_invalid:"MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number",
+            ui_landing_title:'What would you like to do?',
+            ui_landing_subtitle:'Select an option to get started',
+            ui_mode_deploy_title:'Deploy new MAP Auto-Tagger',
+            ui_mode_deploy_desc:'Generate a deployment script for a new MAP 2.0 engagement. Works for single-account and multi-account (AWS Organizations) deployments.',
+            ui_mode_edit_title:'Edit existing deployment',
+            ui_mode_edit_desc:'Add or remove AWS accounts from scope on an already-deployed MAP Auto-Tagger. Generates an update script — no full redeployment needed.',
+            ui_mode_edit_note:'Multi-account (AWS Organizations) deployments only',
+            ui_estep1:'1. Configure', ui_estep2:'2. Review', ui_estep3:'3. Download',
+            ui_editor_info:'This tool modifies an existing deployment created by the MAP Auto-Tagger Configurator. It generates an update.sh script that updates the account scope without redeploying.',
+            ui_editor_step1_title:'Deployment Details',
+            ui_editor_step1_subtitle:'Enter the details of your existing MAP Auto-Tagger deployment',
+            ui_editor_mpe_hint:'— 10-character alphanumeric code, must match the original deployment',
+            ui_editor_region:'Deployment Region',
+            ui_editor_region_hint:'— region where the management stack was deployed',
+            ui_editor_region_placeholder:'Select a region...',
+            err_editor_region:'Please select a deployment region',
+            ui_editor_action_title:'Action',
+            ui_editor_action_subtitle:'Choose whether to add or remove accounts from the MAP scope',
+            ui_editor_add_title:'Add accounts to MAP scope',
+            ui_editor_add_desc:'Selected accounts will start being tagged with the MAP tag.',
+            ui_editor_add_accounts_label:'Account IDs to add',
+            ui_editor_add_accounts_hint:'— only accounts not currently in scope',
+            err_editor_account:'Please enter at least one valid 12-digit account ID',
+            ui_editor_backfill_title:'Re-run backfill for newly added accounts',
+            ui_editor_backfill_desc:'Queries CloudTrail history from the agreement start date and tags existing resources in the newly added accounts. Runs automatically during the StackSet update. Results appear in CloudWatch Logs (map-auto-tagger-backfill).',
+            ui_editor_backfill_note:'Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.',
+            ui_editor_remove_title:'Remove accounts from MAP scope',
+            ui_editor_remove_desc:'Selected accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive for these accounts.',
+            ui_editor_remove_accounts_label:'Account IDs to remove',
+            ui_editor_remove_accounts_hint:'— only accounts currently in scope',
+            ui_editor_back:'← Back',
+            ui_editor_review:'Review →',
+            ui_editor_review_title:'Review Configuration',
+            ui_editor_review_subtitle:'Verify your settings before generating the update script',
+            ui_editor_review_accounts:'Accounts',
+            ui_editor_confirm_text:'I confirm that a MAP Auto-Tagger has already been deployed in the selected region using the specified MPE ID, and that both values are correct.',
+            ui_editor_confirm_risk:'Generating and running this script with incorrect information may update the wrong StackSet, corrupt the account scope, or cause resources to be tagged with the wrong MAP engagement ID — resulting in lost MAP credits that cannot be recovered retroactively.',
+            err_editor_confirm:'You must confirm before generating the update script',
+            ui_editor_generate:'Generate update.sh →',
+            ui_editor_step3_title:'Script Ready',
+            ui_editor_step3_subtitle:'Run this in AWS CloudShell from the management account',
+            ui_editor_download:'⬇ Download update.sh',
+            ui_editor_script_preview:'Script Preview',
             err_date_required:'Agreement start date is required',
             err_date_end:'Agreement end date is required and must be after start date',
             err_vpc_required:'Please enter at least one VPC ID.',
@@ -1706,7 +1929,50 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             rv_res_custom:'사용자 지정 리소스 (Lambda)', rv_res_custom_desc:'배포 시 루트 OU ID 자동 감지 — 고객 조치 불필요',
             rv_res_xaccount:'교차 계정 역할', rv_res_xaccount_desc:'각 멤버 계정의 MapAutoTaggerCrossAccount 역할 (중앙 Lambda 신뢰)',
             rv_res_eb_fwd:'EventBridge 전달', rv_res_eb_fwd_desc:'멤버 계정이 중앙 이벤트 버스로 이벤트 전달',
-            err_mpe_invalid:"MAP 참여 ID는 정확히 10자리 영숫자여야 합니다",
+            err_mpe_invalid:"MAP 참여 ID는 정확히 10자리이며 영문 대문자(A–Z)와 숫자(0–9)만 사용 가능하고, 문자와 숫자가 각각 최소 1개 포함되어야 합니다",
+            ui_landing_title:'무엇을 하시겠습니까?',
+            ui_landing_subtitle:'옵션을 선택하여 시작하세요',
+            ui_mode_deploy_title:'새 MAP Auto-Tagger 배포',
+            ui_mode_deploy_desc:'새 MAP 2.0 참여를 위한 배포 스크립트를 생성합니다. 단일 계정 및 다중 계정(AWS Organizations) 배포를 지원합니다.',
+            ui_mode_edit_title:'기존 배포 편집',
+            ui_mode_edit_desc:'이미 배포된 MAP Auto-Tagger의 범위에서 AWS 계정을 추가하거나 제거합니다. 전체 재배포 없이 업데이트 스크립트를 생성합니다.',
+            ui_mode_edit_note:'다중 계정(AWS Organizations) 배포 전용',
+            ui_estep1:'1. 구성', ui_estep2:'2. 검토', ui_estep3:'3. 다운로드',
+            ui_editor_info:'이 도구는 MAP Auto-Tagger Configurator로 생성된 기존 배포를 수정합니다. 재배포 없이 계정 범위를 업데이트하는 update.sh 스크립트를 생성합니다.',
+            ui_editor_step1_title:'배포 세부 정보',
+            ui_editor_step1_subtitle:'기존 MAP Auto-Tagger 배포의 세부 정보를 입력하세요',
+            ui_editor_mpe_hint:'— 원래 배포와 일치해야 하는 10자리 영숫자 코드',
+            ui_editor_region:'배포 리전',
+            ui_editor_region_hint:'— 관리 스택이 배포된 리전',
+            ui_editor_region_placeholder:'리전 선택...',
+            err_editor_region:'배포 리전을 선택하세요',
+            ui_editor_action_title:'작업',
+            ui_editor_action_subtitle:'MAP 범위에서 계정을 추가할지 제거할지 선택하세요',
+            ui_editor_add_title:'MAP 범위에 계정 추가',
+            ui_editor_add_desc:'선택한 계정이 MAP 태그로 태깅되기 시작합니다.',
+            ui_editor_add_accounts_label:'추가할 계정 ID',
+            ui_editor_add_accounts_hint:'— 현재 범위에 없는 계정만',
+            err_editor_account:'유효한 12자리 계정 ID를 하나 이상 입력하세요',
+            ui_editor_backfill_title:'새로 추가된 계정에 대해 백필 재실행',
+            ui_editor_backfill_desc:'협약 시작일부터 CloudTrail 기록을 조회하여 새로 추가된 계정의 기존 리소스에 태그를 적용합니다. StackSet 업데이트 중 자동으로 실행됩니다. 결과는 CloudWatch Logs(map-auto-tagger-backfill)에서 확인할 수 있습니다.',
+            ui_editor_backfill_note:'참고: CloudTrail 기록은 최근 90일로 제한됩니다. 그 이전에 생성된 리소스는 수동으로 태그해야 합니다.',
+            ui_editor_remove_title:'MAP 범위에서 계정 제거',
+            ui_editor_remove_desc:'선택한 계정은 더 이상 태깅되지 않습니다. 기존 태그는 제거되지 않습니다. Lambda는 해당 계정에서 비활성 상태로 유지됩니다.',
+            ui_editor_remove_accounts_label:'제거할 계정 ID',
+            ui_editor_remove_accounts_hint:'— 현재 범위에 있는 계정만',
+            ui_editor_back:'← 뒤로',
+            ui_editor_review:'검토 →',
+            ui_editor_review_title:'구성 검토',
+            ui_editor_review_subtitle:'업데이트 스크립트를 생성하기 전에 설정을 확인하세요',
+            ui_editor_review_accounts:'계정',
+            ui_editor_confirm_text:'지정된 MPE ID와 선택한 리전에 MAP Auto-Tagger가 이미 배포되어 있으며, 두 값이 모두 정확하다는 것을 확인합니다.',
+            ui_editor_confirm_risk:'잘못된 정보로 이 스크립트를 생성하고 실행하면 잘못된 StackSet이 업데이트되거나, 계정 범위가 손상되거나, 리소스에 잘못된 MAP 참여 ID가 태깅될 수 있습니다 — 이로 인한 MAP 크레딧 손실은 소급하여 복구할 수 없습니다.',
+            err_editor_confirm:'업데이트 스크립트를 생성하기 전에 확인해야 합니다',
+            ui_editor_generate:'update.sh 생성 →',
+            ui_editor_step3_title:'스크립트 준비 완료',
+            ui_editor_step3_subtitle:'관리 계정의 AWS CloudShell에서 실행하세요',
+            ui_editor_download:'⬇ update.sh 다운로드',
+            ui_editor_script_preview:'스크립트 미리보기',
             err_date_required:'협약 시작일을 입력해 주세요',
             err_date_end:'협약 종료일은 시작일 이후여야 합니다',
             err_vpc_required:'VPC ID를 하나 이상 입력해 주세요.',
@@ -1915,7 +2181,50 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             rv_res_custom:'カスタムリソース（Lambda）', rv_res_custom_desc:'デプロイ時にルートOU IDを自動検出 — お客様の操作不要',
             rv_res_xaccount:'クロスアカウントロール', rv_res_xaccount_desc:'各メンバーアカウントのMapAutoTaggerCrossAccountロール（中央Lambdaを信頼）',
             rv_res_eb_fwd:'EventBridgeフォワーディング', rv_res_eb_fwd_desc:'メンバーアカウントが中央イベントバスにイベントを転送',
-            err_mpe_invalid:"MAP IDは正確に10文字の英数字である必要があります",
+            err_mpe_invalid:"MAP IDは正確に10文字で、英大文字(A–Z)と数字(0–9)のみ使用可能、かつ文字と数字をそれぞれ1文字以上含む必要があります",
+            ui_landing_title:'何をしますか？',
+            ui_landing_subtitle:'オプションを選択して開始してください',
+            ui_mode_deploy_title:'新しいMAP Auto-Taggerをデプロイ',
+            ui_mode_deploy_desc:'新しいMAP 2.0エンゲージメント向けのデプロイスクリプトを生成します。単一アカウントおよびマルチアカウント（AWS Organizations）のデプロイに対応しています。',
+            ui_mode_edit_title:'既存のデプロイを編集',
+            ui_mode_edit_desc:'デプロイ済みのMAP Auto-Taggerのスコープに対してAWSアカウントを追加または削除します。完全な再デプロイなしで更新スクリプトを生成します。',
+            ui_mode_edit_note:'マルチアカウント（AWS Organizations）デプロイ専用',
+            ui_estep1:'1. 設定', ui_estep2:'2. 確認', ui_estep3:'3. ダウンロード',
+            ui_editor_info:'このツールはMAP Auto-Tagger Configuratorで作成された既存のデプロイを変更します。再デプロイなしでアカウントスコープを更新するupdate.shスクリプトを生成します。',
+            ui_editor_step1_title:'デプロイ詳細',
+            ui_editor_step1_subtitle:'既存のMAP Auto-Taggerデプロイの詳細を入力してください',
+            ui_editor_mpe_hint:'— 元のデプロイと一致する必要がある10文字の英数字コード',
+            ui_editor_region:'デプロイリージョン',
+            ui_editor_region_hint:'— 管理スタックがデプロイされたリージョン',
+            ui_editor_region_placeholder:'リージョンを選択...',
+            err_editor_region:'デプロイリージョンを選択してください',
+            ui_editor_action_title:'アクション',
+            ui_editor_action_subtitle:'MAPスコープに対してアカウントを追加するか削除するかを選択してください',
+            ui_editor_add_title:'MAPスコープにアカウントを追加',
+            ui_editor_add_desc:'選択したアカウントのリソースがMAPタグでタグ付けされるようになります。',
+            ui_editor_add_accounts_label:'追加するアカウントID',
+            ui_editor_add_accounts_hint:'— 現在スコープ外のアカウントのみ',
+            err_editor_account:'有効な12桁のアカウントIDを1つ以上入力してください',
+            ui_editor_backfill_title:'新しく追加されたアカウントのバックフィルを再実行',
+            ui_editor_backfill_desc:'契約開始日からCloudTrail履歴を照会し、新しく追加されたアカウントの既存リソースにタグを適用します。StackSet更新中に自動的に実行されます。結果はCloudWatch Logs（map-auto-tagger-backfill）で確認できます。',
+            ui_editor_backfill_note:'注意：CloudTrail履歴は過去90日間に限られます。それ以前に作成されたリソースは手動でタグ付けが必要です。',
+            ui_editor_remove_title:'MAPスコープからアカウントを削除',
+            ui_editor_remove_desc:'選択したアカウントはタグ付けされなくなります。既存のタグは削除されません。Lambdaはそのアカウントでは非アクティブのまま残ります。',
+            ui_editor_remove_accounts_label:'削除するアカウントID',
+            ui_editor_remove_accounts_hint:'— 現在スコープ内のアカウントのみ',
+            ui_editor_back:'← 戻る',
+            ui_editor_review:'確認 →',
+            ui_editor_review_title:'設定の確認',
+            ui_editor_review_subtitle:'更新スクリプトを生成する前に設定を確認してください',
+            ui_editor_review_accounts:'アカウント',
+            ui_editor_confirm_text:'指定されたMPE IDと選択したリージョンにMAP Auto-Taggerがすでにデプロイされており、両方の値が正しいことを確認します。',
+            ui_editor_confirm_risk:'誤った情報でこのスクリプトを生成・実行すると、誤ったStackSetが更新されたり、アカウントスコープが破損したり、リソースに誤ったMAP参与IDがタグ付けされる可能性があります — これによるMAPクレジットの損失は遡って回復できません。',
+            err_editor_confirm:'更新スクリプトを生成する前に確認が必要です',
+            ui_editor_generate:'update.shを生成 →',
+            ui_editor_step3_title:'スクリプト準備完了',
+            ui_editor_step3_subtitle:'管理アカウントのAWS CloudShellで実行してください',
+            ui_editor_download:'⬇ update.shをダウンロード',
+            ui_editor_script_preview:'スクリプトプレビュー',
             err_date_required:'契約開始日を入力してください',
             err_date_end:'契約終了日は開始日より後である必要があります',
             err_vpc_required:'VPC IDを1つ以上入力してください。',
@@ -2124,7 +2433,50 @@ ui_instr_single_title:'部署说明 — 单账户',
             rv_res_custom:'自定义资源（Lambda）', rv_res_custom_desc:'部署时自动发现根OU ID — 客户无需操作',
             rv_res_xaccount:'跨账户角色', rv_res_xaccount_desc:'每个成员账户中的MapAutoTaggerCrossAccount角色（信任中央Lambda）',
             rv_res_eb_fwd:'EventBridge转发', rv_res_eb_fwd_desc:'成员账户将事件转发到中央事件总线',
-            err_mpe_invalid:"MAP参与ID必须恰好为10位字母数字字符",
+            err_mpe_invalid:"MAP参与ID必须恰好为10个字符，仅限英文大写字母(A–Z)和数字(0–9)，且至少包含一个字母和一个数字",
+            ui_landing_title:'您想做什么？',
+            ui_landing_subtitle:'选择一个选项开始',
+            ui_mode_deploy_title:'部署新的MAP Auto-Tagger',
+            ui_mode_deploy_desc:'为新的MAP 2.0项目生成部署脚本。支持单账户和多账户（AWS Organizations）部署。',
+            ui_mode_edit_title:'编辑现有部署',
+            ui_mode_edit_desc:'在已部署的MAP Auto-Tagger范围内添加或删除AWS账户。无需完全重新部署，生成更新脚本。',
+            ui_mode_edit_note:'仅限多账户（AWS Organizations）部署',
+            ui_estep1:'1. 配置', ui_estep2:'2. 审核', ui_estep3:'3. 下载',
+            ui_editor_info:'此工具修改由MAP Auto-Tagger Configurator创建的现有部署。它生成一个update.sh脚本，无需重新部署即可更新账户范围。',
+            ui_editor_step1_title:'部署详情',
+            ui_editor_step1_subtitle:'输入您现有MAP Auto-Tagger部署的详细信息',
+            ui_editor_mpe_hint:'— 必须与原始部署匹配的10位字母数字代码',
+            ui_editor_region:'部署区域',
+            ui_editor_region_hint:'— 管理堆栈部署所在的区域',
+            ui_editor_region_placeholder:'选择区域...',
+            err_editor_region:'请选择部署区域',
+            ui_editor_action_title:'操作',
+            ui_editor_action_subtitle:'选择是添加还是从MAP范围中删除账户',
+            ui_editor_add_title:'将账户添加到MAP范围',
+            ui_editor_add_desc:'选定的账户将开始使用MAP标签进行标记。',
+            ui_editor_add_accounts_label:'要添加的账户ID',
+            ui_editor_add_accounts_hint:'— 仅限当前不在范围内的账户',
+            err_editor_account:'请输入至少一个有效的12位账户ID',
+            ui_editor_backfill_title:'为新添加的账户重新运行回填',
+            ui_editor_backfill_desc:'从协议开始日期查询CloudTrail历史记录，并为新添加账户中的现有资源打标签。在StackSet更新期间自动运行。结果显示在CloudWatch Logs（map-auto-tagger-backfill）中。',
+            ui_editor_backfill_note:'注意：CloudTrail历史记录限于最近90天。之前创建的资源需要手动打标签。',
+            ui_editor_remove_title:'从MAP范围中删除账户',
+            ui_editor_remove_desc:'选定的账户将停止被标记。现有标签不会被删除。Lambda在这些账户中保持部署但处于非活动状态。',
+            ui_editor_remove_accounts_label:'要删除的账户ID',
+            ui_editor_remove_accounts_hint:'— 仅限当前在范围内的账户',
+            ui_editor_back:'← 返回',
+            ui_editor_review:'审核 →',
+            ui_editor_review_title:'审核配置',
+            ui_editor_review_subtitle:'在生成更新脚本之前验证您的设置',
+            ui_editor_review_accounts:'账户',
+            ui_editor_confirm_text:'我确认MAP Auto-Tagger已在选定区域使用指定的MPE ID进行部署，且两个值均正确。',
+            ui_editor_confirm_risk:'使用错误信息生成并运行此脚本可能会更新错误的StackSet、损坏账户范围，或导致资源被标记错误的MAP参与ID — 由此导致的MAP积分损失无法追溯恢复。',
+            err_editor_confirm:'生成更新脚本前必须确认',
+            ui_editor_generate:'生成update.sh →',
+            ui_editor_step3_title:'脚本已就绪',
+            ui_editor_step3_subtitle:'在管理账户的AWS CloudShell中运行',
+            ui_editor_download:'⬇ 下载update.sh',
+            ui_editor_script_preview:'脚本预览',
             err_date_required:'请填写协议开始日期',
             err_date_end:'协议结束日期必须晚于开始日期',
             err_vpc_required:'请至少输入一个VPC ID。',
@@ -2333,7 +2685,50 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             rv_res_custom:'Resource Kustom (Lambda)', rv_res_custom_desc:'Otomatis menemukan ID OU root saat deployment — pelanggan tidak perlu melakukan apa pun',
             rv_res_xaccount:'Peran Lintas Akun', rv_res_xaccount_desc:'Peran MapAutoTaggerCrossAccount di setiap akun anggota (mempercayai Lambda pusat)',
             rv_res_eb_fwd:'Penerusan EventBridge', rv_res_eb_fwd_desc:'Akun anggota meneruskan event ke event bus pusat',
-            err_mpe_invalid:"MAP ID harus tepat 10 karakter alfanumerik",
+            err_mpe_invalid:"MAP ID harus tepat 10 karakter, hanya huruf besar Inggris (A–Z) dan angka (0–9), serta minimal satu huruf dan satu angka",
+            ui_landing_title:'Apa yang ingin Anda lakukan?',
+            ui_landing_subtitle:'Pilih opsi untuk memulai',
+            ui_mode_deploy_title:'Deploy MAP Auto-Tagger Baru',
+            ui_mode_deploy_desc:'Buat skrip deployment untuk engagement MAP 2.0 baru. Mendukung deployment satu akun dan multi-akun (AWS Organizations).',
+            ui_mode_edit_title:'Edit deployment yang ada',
+            ui_mode_edit_desc:'Tambah atau hapus akun AWS dari cakupan MAP Auto-Tagger yang sudah di-deploy. Membuat skrip pembaruan — tanpa perlu deploy ulang.',
+            ui_mode_edit_note:'Hanya untuk deployment multi-akun (AWS Organizations)',
+            ui_estep1:'1. Konfigurasi', ui_estep2:'2. Tinjau', ui_estep3:'3. Unduh',
+            ui_editor_info:'Alat ini memodifikasi deployment yang ada yang dibuat oleh MAP Auto-Tagger Configurator. Ini menghasilkan skrip update.sh yang memperbarui cakupan akun tanpa perlu deploy ulang.',
+            ui_editor_step1_title:'Detail Deployment',
+            ui_editor_step1_subtitle:'Masukkan detail deployment MAP Auto-Tagger Anda yang sudah ada',
+            ui_editor_mpe_hint:'— kode alfanumerik 10 karakter, harus sesuai dengan deployment asli',
+            ui_editor_region:'Wilayah Deployment',
+            ui_editor_region_hint:'— wilayah tempat management stack di-deploy',
+            ui_editor_region_placeholder:'Pilih wilayah...',
+            err_editor_region:'Silakan pilih wilayah deployment',
+            ui_editor_action_title:'Tindakan',
+            ui_editor_action_subtitle:'Pilih apakah akan menambah atau menghapus akun dari cakupan MAP',
+            ui_editor_add_title:'Tambahkan akun ke cakupan MAP',
+            ui_editor_add_desc:'Akun yang dipilih akan mulai diberi tag MAP.',
+            ui_editor_add_accounts_label:'ID Akun yang akan ditambahkan',
+            ui_editor_add_accounts_hint:'— hanya akun yang belum ada di cakupan',
+            err_editor_account:'Masukkan setidaknya satu ID akun 12 digit yang valid',
+            ui_editor_backfill_title:'Jalankan ulang backfill untuk akun yang baru ditambahkan',
+            ui_editor_backfill_desc:'Mengkueri riwayat CloudTrail dari tanggal mulai perjanjian dan memberi tag pada sumber daya yang ada di akun baru. Berjalan otomatis selama pembaruan StackSet. Hasilnya muncul di CloudWatch Logs (map-auto-tagger-backfill).',
+            ui_editor_backfill_note:'Catatan: Riwayat CloudTrail dibatasi hingga 90 hari terakhir. Sumber daya yang dibuat sebelum periode tersebut harus diberi tag secara manual.',
+            ui_editor_remove_title:'Hapus akun dari cakupan MAP',
+            ui_editor_remove_desc:'Akun yang dipilih tidak akan lagi diberi tag. Tag yang ada tidak dihapus. Lambda tetap di-deploy tetapi tidak aktif untuk akun-akun ini.',
+            ui_editor_remove_accounts_label:'ID Akun yang akan dihapus',
+            ui_editor_remove_accounts_hint:'— hanya akun yang saat ini ada di cakupan',
+            ui_editor_back:'← Kembali',
+            ui_editor_review:'Tinjau →',
+            ui_editor_review_title:'Tinjau Konfigurasi',
+            ui_editor_review_subtitle:'Verifikasi pengaturan Anda sebelum membuat skrip pembaruan',
+            ui_editor_review_accounts:'Akun',
+            ui_editor_confirm_text:'Saya mengonfirmasi bahwa MAP Auto-Tagger sudah di-deploy di wilayah yang dipilih menggunakan MPE ID yang ditentukan, dan kedua nilai tersebut sudah benar.',
+            ui_editor_confirm_risk:'Menghasilkan dan menjalankan skrip ini dengan informasi yang salah dapat memperbarui StackSet yang salah, merusak cakupan akun, atau menyebabkan sumber daya diberi tag dengan MAP engagement ID yang salah — yang mengakibatkan kredit MAP yang hilang tidak dapat dipulihkan secara retroaktif.',
+            err_editor_confirm:'Anda harus mengonfirmasi sebelum membuat skrip pembaruan',
+            ui_editor_generate:'Buat update.sh →',
+            ui_editor_step3_title:'Skrip Siap',
+            ui_editor_step3_subtitle:'Jalankan ini di AWS CloudShell dari akun manajemen',
+            ui_editor_download:'⬇ Unduh update.sh',
+            ui_editor_script_preview:'Pratinjau Skrip',
             err_date_required:'Tanggal mulai perjanjian wajib diisi',
             err_date_end:'Tanggal berakhir harus setelah tanggal mulai',
             err_vpc_required:'Harap masukkan setidaknya satu VPC ID.',
@@ -2542,7 +2937,50 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'ค้นหา ID root OU โดยอัตโนมัติระหว่างติดตั้ง ลูกค้าไม่ต้องทำอะไร',
             rv_res_xaccount:'Cross-Account Role', rv_res_xaccount_desc:'MapAutoTaggerCrossAccount role ในแต่ละบัญชีสมาชิก (เชื่อถือ Lambda กลาง)',
             rv_res_eb_fwd:'EventBridge Forwarding', rv_res_eb_fwd_desc:'บัญชีสมาชิกส่งต่อ event ไปยัง event bus กลาง',
-            err_mpe_invalid:"MAP ID ต้องมีตัวอักษรและตัวเลขรวมกันพอดี 10 ตัว",
+            err_mpe_invalid:"MAP ID ต้องมีพอดี 10 ตัวอักษร ใช้ได้เฉพาะตัวอักษรภาษาอังกฤษพิมพ์ใหญ่ (A–Z) และตัวเลข (0–9) โดยต้องมีตัวอักษรและตัวเลขอย่างน้อยอย่างละ 1 ตัว",
+            ui_landing_title:'คุณต้องการทำอะไร?',
+            ui_landing_subtitle:'เลือกตัวเลือกเพื่อเริ่มต้น',
+            ui_mode_deploy_title:'ติดตั้ง MAP Auto-Tagger ใหม่',
+            ui_mode_deploy_desc:'สร้างสคริปต์ deployment สำหรับ engagement MAP 2.0 ใหม่ รองรับการ deploy แบบบัญชีเดียวและหลายบัญชี (AWS Organizations)',
+            ui_mode_edit_title:'แก้ไข deployment ที่มีอยู่',
+            ui_mode_edit_desc:'เพิ่มหรือลบบัญชี AWS ออกจากขอบเขตของ MAP Auto-Tagger ที่ติดตั้งแล้ว สร้างสคริปต์อัปเดต — ไม่จำเป็นต้อง deploy ใหม่ทั้งหมด',
+            ui_mode_edit_note:'สำหรับการ deploy หลายบัญชี (AWS Organizations) เท่านั้น',
+            ui_estep1:'1. ตั้งค่า', ui_estep2:'2. ตรวจสอบ', ui_estep3:'3. ดาวน์โหลด',
+            ui_editor_info:'เครื่องมือนี้แก้ไข deployment ที่มีอยู่ซึ่งสร้างโดย MAP Auto-Tagger Configurator โดยสร้างสคริปต์ update.sh ที่อัปเดตขอบเขตบัญชีโดยไม่ต้อง deploy ใหม่',
+            ui_editor_step1_title:'รายละเอียด Deployment',
+            ui_editor_step1_subtitle:'ป้อนรายละเอียดของ MAP Auto-Tagger deployment ที่มีอยู่ของคุณ',
+            ui_editor_mpe_hint:'— รหัสตัวอักษรและตัวเลข 10 หลักที่ต้องตรงกับ deployment เดิม',
+            ui_editor_region:'ภูมิภาค Deployment',
+            ui_editor_region_hint:'— ภูมิภาคที่ management stack ถูก deploy',
+            ui_editor_region_placeholder:'เลือกภูมิภาค...',
+            err_editor_region:'กรุณาเลือกภูมิภาค deployment',
+            ui_editor_action_title:'การดำเนินการ',
+            ui_editor_action_subtitle:'เลือกว่าจะเพิ่มหรือลบบัญชีออกจากขอบเขต MAP',
+            ui_editor_add_title:'เพิ่มบัญชีในขอบเขต MAP',
+            ui_editor_add_desc:'บัญชีที่เลือกจะเริ่มได้รับการติด tag MAP',
+            ui_editor_add_accounts_label:'ID บัญชีที่จะเพิ่ม',
+            ui_editor_add_accounts_hint:'— เฉพาะบัญชีที่ยังไม่อยู่ในขอบเขตปัจจุบัน',
+            err_editor_account:'กรุณาป้อน ID บัญชี 12 หลักที่ถูกต้องอย่างน้อยหนึ่งรายการ',
+            ui_editor_backfill_title:'รันการ backfill ใหม่สำหรับบัญชีที่เพิ่งเพิ่ม',
+            ui_editor_backfill_desc:'ค้นหาประวัติ CloudTrail ตั้งแต่วันที่เริ่มต้นข้อตกลงและติด tag ทรัพยากรที่มีอยู่ในบัญชีที่เพิ่งเพิ่ม รันโดยอัตโนมัติระหว่างการอัปเดต StackSet ผลลัพธ์ปรากฏใน CloudWatch Logs (map-auto-tagger-backfill)',
+            ui_editor_backfill_note:'หมายเหตุ: ประวัติ CloudTrail จำกัดอยู่ที่ 90 วันที่ผ่านมา ทรัพยากรที่สร้างก่อนหน้านั้นต้องติด tag ด้วยตนเอง',
+            ui_editor_remove_title:'ลบบัญชีออกจากขอบเขต MAP',
+            ui_editor_remove_desc:'บัญชีที่เลือกจะหยุดถูกติด tag tag ที่มีอยู่จะไม่ถูกลบ Lambda ยังคง deploy อยู่แต่ไม่ active สำหรับบัญชีเหล่านี้',
+            ui_editor_remove_accounts_label:'ID บัญชีที่จะลบ',
+            ui_editor_remove_accounts_hint:'— เฉพาะบัญชีที่อยู่ในขอบเขตปัจจุบัน',
+            ui_editor_back:'← กลับ',
+            ui_editor_review:'ตรวจสอบ →',
+            ui_editor_review_title:'ตรวจสอบการตั้งค่า',
+            ui_editor_review_subtitle:'ตรวจสอบการตั้งค่าของคุณก่อนสร้างสคริปต์อัปเดต',
+            ui_editor_review_accounts:'บัญชี',
+            ui_editor_confirm_text:'ฉันยืนยันว่า MAP Auto-Tagger ถูก deploy แล้วในภูมิภาคที่เลือกโดยใช้ MPE ID ที่ระบุ และทั้งสองค่าถูกต้อง',
+            ui_editor_confirm_risk:'การสร้างและรันสคริปต์นี้ด้วยข้อมูลที่ไม่ถูกต้องอาจอัปเดต StackSet ที่ผิด ทำให้ขอบเขตบัญชีเสียหาย หรือทำให้ทรัพยากรถูกติด tag ด้วย MAP engagement ID ที่ผิด — เครดิต MAP ที่สูญหายไม่สามารถกู้คืนได้',
+            err_editor_confirm:'คุณต้องยืนยันก่อนสร้างสคริปต์อัปเดต',
+            ui_editor_generate:'สร้าง update.sh →',
+            ui_editor_step3_title:'สคริปต์พร้อมแล้ว',
+            ui_editor_step3_subtitle:'รันในAWS CloudShell จาก management account',
+            ui_editor_download:'⬇ ดาวน์โหลด update.sh',
+            ui_editor_script_preview:'ตัวอย่างสคริปต์',
             err_date_required:'กรุณากรอกวันที่เริ่มต้นข้อตกลง',
             err_date_end:'วันที่สิ้นสุดต้องอยู่หลังวันที่เริ่มต้น',
             err_vpc_required:'กรุณากรอก VPC ID อย่างน้อยหนึ่งรายการ',
@@ -2751,7 +3189,50 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'Tự động tìm ID root OU khi triển khai — khách hàng không cần làm gì',
             rv_res_xaccount:'Cross-Account Role', rv_res_xaccount_desc:'Vai trò MapAutoTaggerCrossAccount trong mỗi tài khoản thành viên (tin tưởng Lambda trung tâm)',
             rv_res_eb_fwd:'Chuyển tiếp EventBridge', rv_res_eb_fwd_desc:'Tài khoản thành viên chuyển tiếp sự kiện đến event bus trung tâm',
-            err_mpe_invalid:"MAP ID phải có đúng 10 ký tự chữ và số",
+            err_mpe_invalid:"MAP ID phải có đúng 10 ký tự, chỉ dùng chữ hoa tiếng Anh (A–Z) và chữ số (0–9), và phải có ít nhất một chữ cái và một chữ số",
+            ui_landing_title:'Bạn muốn làm gì?',
+            ui_landing_subtitle:'Chọn một tùy chọn để bắt đầu',
+            ui_mode_deploy_title:'Triển khai MAP Auto-Tagger mới',
+            ui_mode_deploy_desc:'Tạo script triển khai cho engagement MAP 2.0 mới. Hỗ trợ triển khai một tài khoản và nhiều tài khoản (AWS Organizations).',
+            ui_mode_edit_title:'Chỉnh sửa triển khai hiện có',
+            ui_mode_edit_desc:'Thêm hoặc xóa tài khoản AWS khỏi phạm vi MAP Auto-Tagger đã được triển khai. Tạo script cập nhật — không cần triển khai lại.',
+            ui_mode_edit_note:'Chỉ dành cho triển khai nhiều tài khoản (AWS Organizations)',
+            ui_estep1:'1. Cấu hình', ui_estep2:'2. Xem lại', ui_estep3:'3. Tải xuống',
+            ui_editor_info:'Công cụ này chỉnh sửa triển khai hiện có được tạo bởi MAP Auto-Tagger Configurator. Nó tạo script update.sh để cập nhật phạm vi tài khoản mà không cần triển khai lại.',
+            ui_editor_step1_title:'Chi tiết Triển khai',
+            ui_editor_step1_subtitle:'Nhập chi tiết của triển khai MAP Auto-Tagger hiện có của bạn',
+            ui_editor_mpe_hint:'— mã chữ và số 10 ký tự, phải khớp với triển khai gốc',
+            ui_editor_region:'Vùng Triển khai',
+            ui_editor_region_hint:'— vùng nơi management stack được triển khai',
+            ui_editor_region_placeholder:'Chọn vùng...',
+            err_editor_region:'Vui lòng chọn vùng triển khai',
+            ui_editor_action_title:'Hành động',
+            ui_editor_action_subtitle:'Chọn thêm hoặc xóa tài khoản khỏi phạm vi MAP',
+            ui_editor_add_title:'Thêm tài khoản vào phạm vi MAP',
+            ui_editor_add_desc:'Các tài khoản được chọn sẽ bắt đầu được gắn tag MAP.',
+            ui_editor_add_accounts_label:'ID tài khoản cần thêm',
+            ui_editor_add_accounts_hint:'— chỉ các tài khoản chưa có trong phạm vi',
+            err_editor_account:'Vui lòng nhập ít nhất một ID tài khoản 12 chữ số hợp lệ',
+            ui_editor_backfill_title:'Chạy lại backfill cho các tài khoản mới thêm',
+            ui_editor_backfill_desc:'Truy vấn lịch sử CloudTrail từ ngày bắt đầu thỏa thuận và gắn tag tài nguyên hiện có trong các tài khoản mới thêm. Tự động chạy trong quá trình cập nhật StackSet. Kết quả xuất hiện trong CloudWatch Logs (map-auto-tagger-backfill).',
+            ui_editor_backfill_note:'Lưu ý: Lịch sử CloudTrail giới hạn trong 90 ngày gần nhất. Tài nguyên được tạo trước khoảng thời gian đó phải được gắn tag thủ công.',
+            ui_editor_remove_title:'Xóa tài khoản khỏi phạm vi MAP',
+            ui_editor_remove_desc:'Các tài khoản được chọn sẽ ngừng được gắn tag. Tag hiện có không bị xóa. Lambda vẫn được triển khai nhưng không hoạt động cho các tài khoản này.',
+            ui_editor_remove_accounts_label:'ID tài khoản cần xóa',
+            ui_editor_remove_accounts_hint:'— chỉ các tài khoản đang có trong phạm vi',
+            ui_editor_back:'← Quay lại',
+            ui_editor_review:'Xem lại →',
+            ui_editor_review_title:'Xem lại Cấu hình',
+            ui_editor_review_subtitle:'Xác minh cài đặt của bạn trước khi tạo script cập nhật',
+            ui_editor_review_accounts:'Tài khoản',
+            ui_editor_confirm_text:'Tôi xác nhận rằng MAP Auto-Tagger đã được triển khai ở vùng đã chọn với MPE ID được chỉ định, và cả hai giá trị đều chính xác.',
+            ui_editor_confirm_risk:'Tạo và chạy script này với thông tin không chính xác có thể cập nhật sai StackSet, làm hỏng phạm vi tài khoản, hoặc khiến tài nguyên được gắn tag với MAP engagement ID sai — dẫn đến mất tín dụng MAP không thể phục hồi.',
+            err_editor_confirm:'Bạn phải xác nhận trước khi tạo script cập nhật',
+            ui_editor_generate:'Tạo update.sh →',
+            ui_editor_step3_title:'Script Đã Sẵn Sàng',
+            ui_editor_step3_subtitle:'Chạy trong AWS CloudShell từ tài khoản quản lý',
+            ui_editor_download:'⬇ Tải xuống update.sh',
+            ui_editor_script_preview:'Xem trước Script',
             err_date_required:'Vui lòng nhập ngày bắt đầu thỏa thuận',
             err_date_end:'Ngày kết thúc phải sau ngày bắt đầu',
             err_vpc_required:'Vui lòng nhập ít nhất một VPC ID.',
