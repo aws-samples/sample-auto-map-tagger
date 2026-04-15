@@ -1,0 +1,835 @@
+name: E2E Integration Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'map2-auto-tagger-optimized.yaml'
+      - 'configurator.html'
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+# Default settings inherited by all jobs
+defaults:
+  run:
+    working-directory: .github/scripts
+
+env:
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  # MPE_ID drives the expected tag value.  Stored as a secret so the real
+  # test MPE is not hard-coded here; falls back to migTEST0000001 for forks.
+  MPE_ID: ${{ secrets.TEST_MPE_ID || 'migTEST0000001' }}
+  STACK_NAME: map-auto-tagger-e2e-pr${{ github.event.pull_request.number }}
+
+# ---------------------------------------------------------------------------
+# Reusable step fragments — referenced by name in jobs below
+# ---------------------------------------------------------------------------
+
+# ── AWS credentials helper ─────────────────────────────────────────────────
+# Every job includes these three steps at the top.
+# Multi-account jobs override role-to-assume.
+
+jobs:
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Phase 1 — Deploy the auto-tagger itself (runs in parallel)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  deploy-single:
+    name: Deploy single-account stack
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Deploy auto-tagger CloudFormation stack
+        working-directory: .
+        run: |
+          aws cloudformation deploy \
+            --stack-name "$STACK_NAME" \
+            --template-file map2-auto-tagger-optimized.yaml \
+            --parameter-overrides \
+              MpeId="$MPE_ID" \
+              AgreementStartDate="2024-01-01" \
+            --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --no-fail-on-empty-changeset
+
+      - name: Verify stack is deployed
+        working-directory: .
+        run: |
+          STATUS=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query 'Stacks[0].StackStatus' --output text)
+          echo "Stack status: $STATUS"
+          if [[ "$STATUS" != *"COMPLETE"* ]]; then
+            echo "Stack not in a successful state: $STATUS"
+            exit 1
+          fi
+
+  deploy-stackset:
+    name: Deploy multi-account StackSet
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Deploy StackSet to linked accounts
+        run: |
+          python3 deploy_stackset.py \
+            --stack-set-name "$STACK_NAME-stackset" \
+            --template ../../map2-auto-tagger-optimized.yaml \
+            --mpe-id "$MPE_ID" \
+            --agreement-date "2024-01-01" \
+            --accounts "${{ secrets.E2E_LINKED_ACCOUNT_IDS }}" \
+            --region ap-northeast-2
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Phase 2 — Create test resources (all parallel, each group independent)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  create-networking:
+    name: Create networking resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      vpc-id: ${{ steps.create.outputs.vpc-id }}
+      subnet-ids: ${{ steps.create.outputs.subnet-ids }}
+      sg-id: ${{ steps.create.outputs.sg-id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create networking resources
+        id: create
+        run: |
+          python3 create_resources.py \
+            --group networking \
+            --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-networking
+          path: .github/scripts/created-arns-networking.json
+          if-no-files-found: warn
+
+  create-core:
+    name: Create core compute resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create core resources
+        run: |
+          python3 create_resources.py --group core --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-core
+          path: .github/scripts/created-arns-core.json
+          if-no-files-found: warn
+
+  create-databases:
+    name: Create database resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single, create-networking]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create database resources
+        run: |
+          python3 create_resources.py \
+            --group databases \
+            --region ap-northeast-2 \
+            --vpc-id "${{ needs.create-networking.outputs.vpc-id }}" \
+            --subnet-ids "${{ needs.create-networking.outputs.subnet-ids }}" \
+            --sg-id "${{ needs.create-networking.outputs.sg-id }}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-databases
+          path: .github/scripts/created-arns-databases.json
+          if-no-files-found: warn
+
+  create-analytics:
+    name: Create analytics resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create analytics resources
+        run: |
+          python3 create_resources.py --group analytics --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-analytics
+          path: .github/scripts/created-arns-analytics.json
+          if-no-files-found: warn
+
+  create-integration:
+    name: Create integration resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create integration resources
+        run: |
+          python3 create_resources.py --group integration --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-integration
+          path: .github/scripts/created-arns-integration.json
+          if-no-files-found: warn
+
+  create-security:
+    name: Create security resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create security resources
+        run: |
+          python3 create_resources.py --group security --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-security
+          path: .github/scripts/created-arns-security.json
+          if-no-files-found: warn
+
+  create-devtools:
+    name: Create devtools resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create devtools resources
+        run: |
+          python3 create_resources.py --group devtools --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-devtools
+          path: .github/scripts/created-arns-devtools.json
+          if-no-files-found: warn
+
+  create-ml:
+    name: Create ML/AI resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create ML resources
+        run: |
+          python3 create_resources.py --group ml --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-ml
+          path: .github/scripts/created-arns-ml.json
+          if-no-files-found: warn
+
+  create-media-iot:
+    name: Create media and IoT resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create media and IoT resources
+        run: |
+          python3 create_resources.py --group media-iot --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-media-iot
+          path: .github/scripts/created-arns-media-iot.json
+          if-no-files-found: warn
+
+  create-misc:
+    name: Create miscellaneous resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create miscellaneous resources
+        run: |
+          python3 create_resources.py --group misc --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-misc
+          path: .github/scripts/created-arns-misc.json
+          if-no-files-found: warn
+
+  create-global-us-east-1:
+    name: Create global us-east-1 resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: us-east-1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create global us-east-1 resources
+        run: |
+          python3 create_resources.py --group global-us-east-1 --region us-east-1
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-global-us-east-1
+          path: .github/scripts/created-arns-global-us-east-1.json
+          if-no-files-found: warn
+
+  create-global-us-west-2:
+    name: Create global us-west-2 resources
+    runs-on: ubuntu-latest
+    needs: [deploy-single]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: us-west-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create global us-west-2 resources
+        run: |
+          python3 create_resources.py --group global-us-west-2 --region us-west-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-global-us-west-2
+          path: .github/scripts/created-arns-global-us-west-2.json
+          if-no-files-found: warn
+
+  # ── Multi-account linked account resource creation ────────────────────────
+  # Each linked account job assumes a separate role specific to that account.
+
+  create-multiaccount-linked1:
+    name: Create resources in linked account 1
+    runs-on: ubuntu-latest
+    needs: [deploy-stackset]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create resources in linked account 1
+        run: |
+          python3 create_resources.py \
+            --group multiaccount-linked1 \
+            --account-index 1 \
+            --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-multiaccount-linked1
+          path: .github/scripts/created-arns-multiaccount-linked1.json
+          if-no-files-found: warn
+
+  create-multiaccount-linked2:
+    name: Create resources in linked account 2
+    runs-on: ubuntu-latest
+    needs: [deploy-stackset]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED2_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create resources in linked account 2
+        run: |
+          python3 create_resources.py \
+            --group multiaccount-linked2 \
+            --account-index 2 \
+            --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-multiaccount-linked2
+          path: .github/scripts/created-arns-multiaccount-linked2.json
+          if-no-files-found: warn
+
+  create-multiaccount-linked3:
+    name: Create resources in linked account 3
+    runs-on: ubuntu-latest
+    needs: [deploy-stackset]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED3_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create resources in linked account 3
+        run: |
+          python3 create_resources.py \
+            --group multiaccount-linked3 \
+            --account-index 3 \
+            --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-multiaccount-linked3
+          path: .github/scripts/created-arns-multiaccount-linked3.json
+          if-no-files-found: warn
+
+  create-multiaccount-linked4:
+    name: Create resources in linked account 4
+    runs-on: ubuntu-latest
+    needs: [deploy-stackset]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED4_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create resources in linked account 4
+        run: |
+          python3 create_resources.py \
+            --group multiaccount-linked4 \
+            --account-index 4 \
+            --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-multiaccount-linked4
+          path: .github/scripts/created-arns-multiaccount-linked4.json
+          if-no-files-found: warn
+
+  create-multiaccount-linked5:
+    name: Create resources in linked account 5
+    runs-on: ubuntu-latest
+    needs: [deploy-stackset]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED5_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      - name: Create resources in linked account 5
+        run: |
+          python3 create_resources.py \
+            --group multiaccount-linked5 \
+            --account-index 5 \
+            --region ap-northeast-2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arns-multiaccount-linked5
+          path: .github/scripts/created-arns-multiaccount-linked5.json
+          if-no-files-found: warn
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Phase 3 — Verify tags (runs after all create jobs)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  verify:
+    name: Verify map-migrated tags
+    runs-on: ubuntu-latest
+    needs:
+      - create-networking
+      - create-core
+      - create-databases
+      - create-analytics
+      - create-integration
+      - create-security
+      - create-devtools
+      - create-ml
+      - create-media-iot
+      - create-misc
+      - create-global-us-east-1
+      - create-global-us-west-2
+      - create-multiaccount-linked1
+      - create-multiaccount-linked2
+      - create-multiaccount-linked3
+      - create-multiaccount-linked4
+      - create-multiaccount-linked5
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      # Download all ARN artifact files into a single directory
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-*
+          path: artifacts/
+          merge-multiple: true
+
+      - name: List downloaded ARN files
+        run: ls -la artifacts/ || echo "No artifacts directory"
+        working-directory: .
+
+      - name: Verify tags on all resources
+        run: |
+          python3 verify_tags.py \
+            --arns-dir ../../artifacts/ \
+            --tag-key map-migrated \
+            --tag-value "$MPE_ID" \
+            --max-wait 900 \
+            --poll-interval 30
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-report
+          path: .github/scripts/verification-report.json
+          if-no-files-found: warn
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # Phase 4 — Teardown (always runs, even on failure)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  teardown:
+    name: Teardown all E2E resources
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - verify
+      - create-networking
+      - create-core
+      - create-databases
+      - create-analytics
+      - create-integration
+      - create-security
+      - create-devtools
+      - create-ml
+      - create-media-iot
+      - create-misc
+      - create-global-us-east-1
+      - create-global-us-west-2
+      - create-multiaccount-linked1
+      - create-multiaccount-linked2
+      - create-multiaccount-linked3
+      - create-multiaccount-linked4
+      - create-multiaccount-linked5
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install boto3
+
+      # Download all ARN records so teardown knows what to delete
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-*
+          path: artifacts/
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Delete test resources
+        run: |
+          python3 teardown.py \
+            --arns-dir ../../artifacts/ \
+            --pr "$PR_NUMBER" \
+            --tag-value "$MPE_ID"
+        continue-on-error: true
+
+      - name: Delete single-account CloudFormation stack
+        working-directory: .
+        run: |
+          aws cloudformation delete-stack --stack-name "$STACK_NAME" || true
+          echo "Stack deletion initiated (not waiting for completion)"
+        continue-on-error: true
+
+      - name: Delete multi-account StackSet
+        run: |
+          python3 delete_stackset.py \
+            --name "$STACK_NAME-stackset" \
+            --accounts "${{ secrets.E2E_LINKED_ACCOUNT_IDS }}" \
+            --region ap-northeast-2
+        continue-on-error: true
