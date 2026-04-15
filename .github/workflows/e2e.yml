@@ -61,14 +61,24 @@ jobs:
       - name: Deploy auto-tagger CloudFormation stack
         working-directory: .
         run: |
-          aws cloudformation deploy \
-            --stack-name "$STACK_NAME" \
-            --template-file map2-auto-tagger-optimized.yaml \
-            --parameter-overrides \
-              MpeId="$MPE_ID" \
-              AgreementStartDate="2024-01-01" \
-            --capabilities CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
-            --no-fail-on-empty-changeset
+          # Template is >51KB so must be staged in S3 first
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          S3_BUCKET="cfn-e2e-${ACCOUNT}-${PR_NUMBER}"
+          aws s3 mb "s3://${S3_BUCKET}" --region ap-northeast-2 2>/dev/null || true
+
+          for REGION in ap-northeast-2 us-east-1 us-west-2; do
+            aws cloudformation deploy \
+              --stack-name "${STACK_NAME}" \
+              --template-file map2-auto-tagger-optimized.yaml \
+              --parameter-overrides \
+                MpeId="$MPE_ID" \
+                AgreementStartDate="2024-01-01" \
+              --capabilities CAPABILITY_NAMED_IAM \
+              --s3-bucket "$S3_BUCKET" \
+              --s3-prefix "e2e" \
+              --region "$REGION" \
+              --no-fail-on-empty-changeset
+          done
 
       - name: Verify stack is deployed
         working-directory: .
@@ -819,11 +829,16 @@ jobs:
             --tag-value "$MPE_ID"
         continue-on-error: true
 
-      - name: Delete single-account CloudFormation stack
+      - name: Delete single-account CloudFormation stacks and S3 staging bucket
         working-directory: .
         run: |
-          aws cloudformation delete-stack --stack-name "$STACK_NAME" || true
-          echo "Stack deletion initiated (not waiting for completion)"
+          for REGION in ap-northeast-2 us-east-1 us-west-2; do
+            aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION" || true
+          done
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          S3_BUCKET="cfn-e2e-${ACCOUNT}-${PR_NUMBER}"
+          aws s3 rb "s3://${S3_BUCKET}" --force 2>/dev/null || true
+          echo "Stack deletions initiated and S3 staging bucket removed"
         continue-on-error: true
 
       - name: Delete multi-account StackSet
