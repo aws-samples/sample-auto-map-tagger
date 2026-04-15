@@ -129,6 +129,7 @@ jobs:
             --mpe-id "$MPE_ID" \
             --agreement-date "2024-01-01" \
             --accounts "${{ secrets.E2E_LINKED_ACCOUNT_IDS }}" \
+            --org-unit-ids "${{ secrets.AWS_SANDBOX_OU_ID }}" \
             --region ap-northeast-2
 
   # ══════════════════════════════════════════════════════════════════════════

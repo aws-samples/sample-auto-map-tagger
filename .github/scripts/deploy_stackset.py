@@ -104,10 +104,20 @@ def main() -> None:
     # ── Create stack instances ────────────────────────────────────────────────
     log.info("Creating stack instances in accounts: %s", account_ids)
     try:
-        # SERVICE_MANAGED StackSets use DeploymentTargets with AccountIds
+        # SERVICE_MANAGED StackSets require OrganizationalUnitIds in DeploymentTargets.
+        # Individual Accounts are not accepted — must use OU IDs.
+        ou_ids = [ou.strip() for ou in args.org_unit_ids.split(",") if ou.strip()] if args.org_unit_ids else []
+        if not ou_ids:
+            log.error("SERVICE_MANAGED StackSets require --org-unit-ids. "
+                      "Provide the OU ID(s) containing the target accounts.")
+            sys.exit(1)
+
         create_kwargs: dict = {
             "StackSetName": args.stack_set_name,
-            "DeploymentTargets": {"Accounts": account_ids},
+            "DeploymentTargets": {
+                "OrganizationalUnitIds": ou_ids,
+                "Accounts": account_ids,  # filter to specific accounts within the OU
+            },
             "Regions": [args.region],
             "OperationPreferences": {
                 "MaxConcurrentPercentage": 100,
@@ -116,10 +126,6 @@ def main() -> None:
             },
             "ParameterOverrides": parameters,
         }
-        if args.org_unit_ids:
-            create_kwargs["DeploymentTargets"]["OrganizationalUnitIds"] = [
-                ou.strip() for ou in args.org_unit_ids.split(",") if ou.strip()
-            ]
 
         resp = cfn.create_stack_instances(**create_kwargs)
         op_id = resp["OperationId"]
