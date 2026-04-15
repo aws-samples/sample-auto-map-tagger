@@ -64,7 +64,11 @@ jobs:
           # Template is >51KB so must be staged in S3 first
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
           S3_BUCKET="cfn-e2e-${ACCOUNT}-${PR_NUMBER}"
-          aws s3 mb "s3://${S3_BUCKET}" --region ap-northeast-2 2>/dev/null || true
+          aws s3api create-bucket \
+            --bucket "$S3_BUCKET" \
+            --region ap-northeast-2 \
+            --create-bucket-configuration LocationConstraint=ap-northeast-2 \
+            2>/dev/null || true
 
           for REGION in ap-northeast-2 us-east-1 us-west-2; do
             aws cloudformation deploy \
@@ -103,7 +107,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_MGMT_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
 
       - uses: actions/setup-python@v5
