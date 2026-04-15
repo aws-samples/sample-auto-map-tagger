@@ -3312,6 +3312,22 @@ ${crossAccountCode}
                   elif event_name == 'CreateDatabase' and detail.get('eventSource') == 'glue.amazonaws.com':
                       db_name = req.get('databaseInput', {}).get('name')
                       arn = f"arn:{p}:glue:{region}:{account_id}:database/{db_name}" if db_name else None
+                  elif event_name == 'CreateFlowLogs':
+                      fl_id = None
+                      if 'CreateFlowLogsResponse' in resp:
+                          nested = resp['CreateFlowLogsResponse']
+                          fl_id_set = nested.get('flowLogIdSet', {})
+                          fl_id = fl_id_set.get('item') if isinstance(fl_id_set, dict) else None
+                          if isinstance(fl_id, list): fl_id = fl_id[0]
+                      if not fl_id:
+                          flow_ids = resp.get('flowLogIds', [])
+                          fl_id = flow_ids[0] if flow_ids else None
+                      if fl_id:
+                          arn = f"arn:{p}:ec2:{region}:{account_id}:vpc-flow-log/{fl_id}"
+                  elif event_name == 'CreatePipeline' and detail.get('eventSource') == 'codepipeline.amazonaws.com':
+                      pipeline_name = resp.get('pipeline', {}).get('name')
+                      if pipeline_name:
+                          arn = f"arn:{p}:codepipeline:{region}:{account_id}:{pipeline_name}"
 
               if not arn:
                   print(f'No ARN found for {event_name}')
