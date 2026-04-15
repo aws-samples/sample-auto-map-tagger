@@ -150,7 +150,7 @@ jobs:
           node - <<'EOF'
           const fs = require('fs');
 
-          ['configurator.html', 'editor.html'].forEach(file => {
+          ['configurator.html'].forEach(file => {
             if (!fs.existsSync(file)) {
               console.log(`  ⚠️  ${file} not found — skipping`);
               return;

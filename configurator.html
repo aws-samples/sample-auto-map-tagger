@@ -212,7 +212,17 @@
 
         <!-- Landing: mode selection -->
         <div id="landing">
-            <div class="card" style="margin-top:8px;">
+            <div class="info-box" style="background:#fff8e1;border-left:4px solid #f9a825;font-size:13px;margin-top:8px;">
+                <strong data-i18n="ui_sample_notice_title">Sample Code Notice:</strong> <span data-i18n="ui_sample_notice_body">This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, and AWS Systems Manager. See the</span> <a href="https://aws.amazon.com/security/shared-responsibility/" target="_blank" rel="noopener" data-i18n="ui_shared_responsibility">AWS Shared Responsibility Model</a>.
+            </div>
+
+            <div class="info-box">
+                <span data-i18n="ui_main_desc1">Generates a CloudFormation template that auto-tags new AWS resources with</span> <code>map-migrated</code> <span data-i18n="ui_main_desc2">within</span> <strong data-i18n="ui_main_desc3">typically 60-90 seconds (up to 15 minutes during high-volume activity)</strong> <span data-i18n="ui_main_desc4">of creation.</span>
+                <span data-i18n="ui_main_desc5">Covers</span> <strong>190+ <span data-i18n="ui_main_desc6">resource types across all major AWS services (CT org E2E tested).</span></strong>
+                <span data-i18n="ui_main_desc7">Customer cost:</span> <strong>&lt; $2/month</strong>.
+            </div>
+
+            <div class="card">
                 <h2 style="margin-bottom:6px;">What would you like to do?</h2>
                 <p class="subtitle" style="margin-bottom:24px;">Select an option to get started</p>
 
@@ -602,16 +612,124 @@
 
         <!-- Editor flow — hidden until mode selected -->
         <div id="edit-flow" class="hidden">
-            <div class="card" style="margin-top:8px;">
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
-                    <button class="btn-secondary" onclick="selectMode(null)" style="padding:6px 14px;font-size:13px;">← Back</button>
-                    <div>
-                        <h2 style="margin:0;">Edit Existing Deployment</h2>
-                        <p style="font-size:13px;color:#687078;margin:2px 0 0;">Add or remove accounts from scope on an existing multi-account deployment</p>
+
+            <div style="margin:8px 0 16px;">
+                <button class="btn-secondary" onclick="selectMode(null)" style="padding:6px 14px;font-size:13px;">← Back</button>
+            </div>
+
+            <div class="warn-box" style="font-size:12px;">
+                <strong>Sample Code Notice:</strong> This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. See the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/" style="color:#0073bb;">AWS Shared Responsibility Model</a>.
+            </div>
+
+            <div class="card">
+                <h2>Edit Existing Deployment</h2>
+                <p class="subtitle">Add or remove accounts from an existing MAP auto-tagger deployment</p>
+
+                <div class="info-box">
+                    This tool modifies an existing deployment created by the MAP Auto-Tagger Configurator.
+                    It generates an <code>update.sh</code> script that updates the account scope without redeploying.
+                </div>
+
+                <div class="form-group">
+                    <label>MAP Engagement ID (MPE ID) <span class="hint">— must match the original deployment</span></label>
+                    <input type="text" id="editor-mpeId" placeholder="e.g., migA1B2C3D4E5">
+                </div>
+
+                <div class="form-group">
+                    <label>Deployment Region <span class="hint">— region where the management stack was deployed</span></label>
+                    <select id="editor-region">
+                        <option value="">Select a region...</option>
+                        <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                        <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                        <option value="us-west-1">US West (N. California) — us-west-1</option>
+                        <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                        <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                        <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                        <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                        <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                        <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                        <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                        <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                        <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                        <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                        <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                        <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                        <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                        <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                        <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                        <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                        <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                        <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                        <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                        <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                        <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                        <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                        <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                        <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                        <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                        <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                        <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                        <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                        <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                        <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                        <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Action</h2>
+                <p class="subtitle">Choose whether to add or remove accounts from the MAP scope</p>
+
+                <div class="option-card selected" id="editor-opt-add" onclick="editorSelectAction('add')">
+                    <h3><input type="radio" name="editor-action" value="add" checked> Add accounts to MAP scope</h3>
+                    <p>New accounts will start being tagged with the MAP tag. Backfill runs automatically for historical resources.</p>
+                </div>
+
+                <div class="option-card" id="editor-opt-remove" onclick="editorSelectAction('remove')">
+                    <h3><input type="radio" name="editor-action" value="remove"> Remove accounts from MAP scope</h3>
+                    <p>Accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive for these accounts.</p>
+                </div>
+
+                <div class="section-divider"></div>
+
+                <div class="form-group">
+                    <label>Account IDs <span class="hint">— only the accounts to add or remove (not the full list)</span></label>
+                    <div id="editor-accountList">
+                        <div class="entry-row">
+                            <input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12">
+                            <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                        </div>
+                    </div>
+                    <button class="btn-add" onclick="editorAddAccount()">+ Add another account</button>
+                </div>
+            </div>
+
+            <div class="card" id="editor-backfill-card">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>
+                        <input type="checkbox" id="editor-includeBackfill" checked>
+                        Re-run backfill for newly added accounts
+                    </label>
+                    <p class="hint" style="margin-top:4px;">Tags existing resources created since the agreement start date. Runs automatically during the StackSet update. Only applies when adding accounts.</p>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-primary" onclick="editorGenerate()">Generate update.sh</button>
+            </div>
+
+            <div id="editor-output" class="hidden" style="margin-top:20px;">
+                <div class="card">
+                    <h2>Generated Script</h2>
+                    <p class="subtitle">Run this in AWS CloudShell from the management account</p>
+                    <div class="preview-box" id="editor-scriptContent"></div>
+                    <div class="actions">
+                        <button class="btn-primary" onclick="editorDownload()">Download update.sh</button>
                     </div>
                 </div>
-                <div id="editor-content"></div>
             </div>
+
         </div>
 
     </div>
@@ -622,34 +740,169 @@
             document.getElementById('landing').classList.toggle('hidden', mode !== null);
             document.getElementById('deploy-flow').classList.toggle('hidden', mode !== 'deploy');
             document.getElementById('edit-flow').classList.toggle('hidden', mode !== 'edit');
+        }
 
-            if (mode === 'edit') {
-                // Embed editor.html content inline via fetch
-                const container = document.getElementById('editor-content');
-                if (!container.dataset.loaded) {
-                    fetch('editor.html')
-                        .then(r => r.text())
-                        .then(html => {
-                            // Extract just the body content from editor.html
-                            const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-                            if (match) {
-                                container.innerHTML = match[1];
-                                // Re-run any inline scripts from editor.html
-                                container.querySelectorAll('script').forEach(s => {
-                                    const ns = document.createElement('script');
-                                    ns.textContent = s.textContent;
-                                    document.body.appendChild(ns);
-                                });
-                            } else {
-                                container.innerHTML = '<p style="color:#d13212;">Could not load editor.html. Make sure both files are in the same folder.</p>';
-                            }
-                            container.dataset.loaded = '1';
-                        })
-                        .catch(() => {
-                            container.innerHTML = '<p style="color:#d13212;">Could not load editor.html — make sure both files are in the same folder and opened via a local server or file:// URL.</p>';
-                        });
-                }
-            }
+        // --- Editor functions ---
+        function editorSelectAction(action) {
+            document.querySelector(`input[name="editor-action"][value="${action}"]`).checked = true;
+            document.getElementById('editor-opt-add').classList.toggle('selected', action === 'add');
+            document.getElementById('editor-opt-remove').classList.toggle('selected', action === 'remove');
+            document.getElementById('editor-backfill-card').classList.toggle('hidden', action === 'remove');
+        }
+
+        function editorAddAccount() {
+            const list = document.getElementById('editor-accountList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = '<input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12"><button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+        }
+
+        function editorRemoveRow(btn) {
+            const list = btn.parentElement.parentElement;
+            if (list.children.length > 1) btn.parentElement.remove();
+        }
+
+        function editorGenerate() {
+            const mpe = document.getElementById('editor-mpeId').value.trim();
+            const region = document.getElementById('editor-region').value;
+            const action = document.querySelector('input[name="editor-action"]:checked').value;
+            const backfill = document.getElementById('editor-includeBackfill').checked && action === 'add';
+            const accounts = [...document.querySelectorAll('.editor-account-input')]
+                .map(el => el.value.trim())
+                .filter(v => /^\d{12}$/.test(v));
+
+            if (!mpe) { alert('Please enter the MPE ID'); return; }
+            if (!region) { alert('Please select a region'); return; }
+            if (accounts.length === 0) { alert('Please enter at least one valid 12-digit account ID'); return; }
+
+            const stacksetName = `map-auto-tagger-${mpe}`;
+            const accountsJson = JSON.stringify(accounts);
+
+            const addCmds = accounts.map(id =>
+                `if ! grep -q '"${id}"' "$TEMPLATE"; then\n  sed -i.bak 's|"scoped_account_ids": \\[|"scoped_account_ids": ["${id}",|' "$TEMPLATE"\nfi`
+            ).join('\n');
+
+            const removeCmds = accounts.map(id =>
+                `sed -i.bak 's|"${id}"||g' "$TEMPLATE"\nsed -i.bak 's|,,|,|g; s|\\[,|[|g; s|,\\]|]|g' "$TEMPLATE"`
+            ).join('\n');
+
+            const script = `#!/bin/bash
+# MAP 2.0 Auto-Tagger — Update Script
+# Action: ${action} accounts | MPE: ${mpe}
+# Accounts: ${accounts.join(', ')}
+set -e
+
+STACKSET_NAME="${stacksetName}"
+REGION="${region}"
+MPE="${mpe}"
+ACTION="${action}"
+ACCOUNTS_TO_MODIFY='${accountsJson}'
+
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   MAP 2.0 Auto-Tagger — Update          │"
+echo "  │   StackSet: $STACKSET_NAME"
+echo "  │   Action: $ACTION"
+echo "  │   Accounts: $ACCOUNTS_TO_MODIFY"
+echo "  └─────────────────────────────────────────┘"
+echo ""
+
+# ── Step 1: Verify StackSet exists ────────────
+echo "Step 1: Checking existing deployment..."
+if ! aws cloudformation describe-stack-set --stack-set-name "$STACKSET_NAME" > /dev/null 2>&1; then
+    echo "  ❌ StackSet '$STACKSET_NAME' not found."
+    echo "     Run the initial deploy.sh from the configurator first."
+    exit 1
+fi
+echo "  ✅ StackSet found"
+
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+BUCKET="auto-map-tagger-\${ACCOUNT}"
+
+# ── Step 2: Download and update template ──────
+echo ""
+echo "Step 2: Updating account scope..."
+
+TEMPLATE=$(mktemp /tmp/map-update-XXXX.yaml)
+aws s3 cp "s3://\${BUCKET}/map-auto-tagger-accounts-\${MPE}.yaml" "$TEMPLATE" > /dev/null
+
+echo "  Current scope:"
+grep "scoped_account_ids" "$TEMPLATE" | head -1 | sed 's/.*scoped_account_ids/  scoped_account_ids/'
+
+${action === 'add' ? addCmds : removeCmds}
+rm -f "$TEMPLATE.bak"
+
+NEW_SCOPE=$(grep -o '"scoped_account_ids": \\[[^]]*\\]' "$TEMPLATE" | head -1 | sed 's/"scoped_account_ids": //')
+sed -i.bak "s|ScopedAccounts: .*|ScopedAccounts: '$NEW_SCOPE'|" "$TEMPLATE"
+rm -f "$TEMPLATE.bak"
+
+echo "  Updated scope:"
+grep "scoped_account_ids" "$TEMPLATE" | head -1 | sed 's/.*scoped_account_ids/  scoped_account_ids/'
+
+# ── Step 3: Push update ──────────────────────
+echo ""
+echo "Step 3: Pushing update to all accounts..."
+
+aws s3 cp "$TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts-\${MPE}.yaml" > /dev/null
+
+UPDATE_OUT=$(aws cloudformation update-stack-set \\
+    --stack-set-name "$STACKSET_NAME" \\
+    --template-body "file://$TEMPLATE" \\
+    --capabilities CAPABILITY_NAMED_IAM 2>&1) || true
+
+if echo "$UPDATE_OUT" | grep -q "No updates"; then
+    echo "  StackSet already up to date"
+elif echo "$UPDATE_OUT" | grep -q "OperationId"; then
+    echo "  StackSet update initiated"
+    WAIT=0
+    while [ $WAIT -lt 600 ]; do
+        STATUS=$(aws cloudformation list-stack-set-operations \\
+            --stack-set-name "$STACKSET_NAME" \\
+            --query "Summaries[0].Status" --output text 2>/dev/null)
+        if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "  ✅ Update complete — all accounts updated"
+            break
+        elif [ "$STATUS" = "FAILED" ]; then
+            echo "  ❌ Update failed. Check:"
+            echo "     aws cloudformation list-stack-instances --stack-set-name $STACKSET_NAME"
+            break
+        fi
+        sleep 15
+        WAIT=$((WAIT + 15))
+        echo "  Still updating... (\${WAIT}s)"
+    done
+elif echo "$UPDATE_OUT" | grep -q "OperationInProgress"; then
+    echo "  ⚠️  Another operation is in progress. Try again in a few minutes."
+else
+    echo "  $UPDATE_OUT"
+fi
+${backfill ? `
+echo ""
+echo "  ⏳ Backfill runs automatically as part of the StackSet update."
+echo "     Check logs: aws logs tail /aws/lambda/map-auto-tagger-backfill-${mpe} --region ${region}"` : ''}
+
+rm -f "$TEMPLATE"
+
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ✅ Update complete                     │"
+echo "  └─────────────────────────────────────────┘"
+`;
+
+            document.getElementById('editor-scriptContent').textContent = script;
+            document.getElementById('editor-output').classList.remove('hidden');
+            document.getElementById('editor-output').scrollIntoView({ behavior: 'smooth' });
+            window._editorScript = script;
+            window._editorMpe = mpe;
+        }
+
+        function editorDownload() {
+            const blob = new Blob([window._editorScript], { type: 'text/x-sh' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `update-${window._editorMpe}.sh`;
+            a.click();
         }
 
         // --- UI State ---
