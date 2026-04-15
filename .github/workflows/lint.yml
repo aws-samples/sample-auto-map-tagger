@@ -297,3 +297,14 @@ jobs:
 
           sys.exit(0)
           EOF
+
+
+  # ── 6. YAML ↔ Configurator sync check ────────────────────────────────────
+  sync-drift-check:
+    name: YAML ↔ Configurator Sync Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check IAM permissions and critical handler sync
+        run: python3 .github/scripts/sync-check.py
