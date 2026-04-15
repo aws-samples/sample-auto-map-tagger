@@ -145,6 +145,14 @@ def check_tag(record: dict, tag_key: str, tag_value: str) -> bool:
         if ":log-group:" in arn:
             return _check_logs(arn, tag_key, tag_value, region, account)
 
+        # ── Auto Scaling Group (ARN has wildcard UUID — use name-based lookup) ──
+        if ":autoscaling:" in arn and ":autoScalingGroup:" in arn:
+            return _check_asg(arn, tag_key, tag_value, region, account)
+
+        # ── CloudFormation Stack ──────────────────────────────────────────────
+        if ":cloudformation:" in arn and ":stack/" in arn:
+            return _check_cloudformation_stack(arn, tag_key, tag_value, region, account)
+
         # ── Default: Resource Groups Tagging API ──────────────────────────────
         return _check_tagging_api(arn, tag_key, tag_value, region, account)
 
@@ -275,6 +283,44 @@ def _check_logs(arn: str, key: str, value: str, region: str, account: str) -> bo
                        for t in resp.get("tags", []))
         except ClientError:
             return False
+
+
+def _check_asg(arn: str, key: str, value: str, region: str, account: str) -> bool:
+    """Check ASG tags by name — ARN has wildcard UUID so RGTA lookup fails."""
+    # ARN format: arn:aws:autoscaling:region:account:autoScalingGroup:*:autoScalingGroupName/{name}
+    name = arn.split("autoScalingGroupName/")[-1] if "autoScalingGroupName/" in arn else None
+    if not name:
+        return False
+    asg = _client("autoscaling", region, account)
+    try:
+        resp = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[name])
+        for group in resp.get("AutoScalingGroups", []):
+            for tag in group.get("Tags", []):
+                if tag["Key"] == key and tag["Value"] == value:
+                    return True
+    except Exception as exc:
+        log.debug("ASG tag check error for %s: %s", name, exc)
+    return False
+
+
+def _check_cloudformation_stack(arn: str, key: str, value: str, region: str, account: str) -> bool:
+    """Check CloudFormation stack tags — stack ARN may not work with RGTA directly."""
+    # ARN format: arn:aws:cloudformation:region:account:stack/name/uuid
+    parts = arn.split(":")
+    stack_name_part = parts[-1] if len(parts) > 0 else ""
+    stack_name = stack_name_part.split("/")[1] if "/" in stack_name_part else stack_name_part
+    if not stack_name:
+        return False
+    cfn = _client("cloudformation", region, account)
+    try:
+        resp = cfn.describe_stacks(StackName=stack_name)
+        for stack in resp.get("Stacks", []):
+            for tag in stack.get("Tags", []):
+                if tag["Key"] == key and tag["Value"] == value:
+                    return True
+    except Exception as exc:
+        log.debug("CFn stack tag check error for %s: %s", stack_name, exc)
+    return False
 
 
 def _check_tagging_api(arn: str, key: str, value: str, region: str, account: str) -> bool:

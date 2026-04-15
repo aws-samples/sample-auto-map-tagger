@@ -766,10 +766,66 @@ jobs:
 
       - run: pip install boto3
 
-      # Download all ARN artifact files into a single directory
+      # Download single-account and multi-account ARN artifacts only
+      # Scope test artifacts (arns-scope-*) are verified by their own jobs
       - uses: actions/download-artifact@v4
         with:
-          pattern: arns-*
+          pattern: arns-networking
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-core
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-databases
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-analytics
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-integration
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-security
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-devtools
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-ml
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-media-iot
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-misc
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-global-us-east-1
+          path: artifacts/
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: arns-global-us-west-2
           path: artifacts/
           merge-multiple: true
 
@@ -1007,7 +1063,7 @@ jobs:
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
             --tag-value "migTEST0000002" \
-            --max-wait 300 \
+            --max-wait 600 \
             --poll-interval 30
         working-directory: .github/scripts
 
@@ -1202,7 +1258,7 @@ jobs:
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
             --tag-value "migTEST0000003" \
-            --max-wait 300 \
+            --max-wait 600 \
             --poll-interval 30
         working-directory: .github/scripts
 
