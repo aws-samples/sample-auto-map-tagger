@@ -276,9 +276,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label><span data-i18n="ui_mpe_tag">MAP 2.0 Tag Value</span> <span class="hint">(ex. migA1B2C3D4E5)</span></label>
-                    <input type="text" id="mpeId" placeholder="migA1B2C3D4E5">
-                    <div class="error-msg" id="mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must start with 'mig' followed by alphanumeric characters</div>
+                    <label><span data-i18n="ui_mpe_tag">MAP Engagement ID</span> <span class="hint" data-i18n="ui_mpe_hint">(10-character alphanumeric code from AWS Investments — e.g., A1B2C3D4E5)</span></label>
+                    <div style="display:flex;align-items:center;gap:0;">
+                        <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                        <input type="text" id="mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;">
+                    </div>
+                    <div class="error-msg" id="mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be exactly 10 alphanumeric characters</div>
                 </div>
 
                 <div class="form-group">
@@ -528,6 +531,7 @@
             </div>
 
             <div class="actions">
+                <button class="btn-secondary" onclick="selectMode(null)" style="margin-right:auto;">← Back</button>
                 <button class="btn-primary" onclick="reviewConfig()" data-i18n="ui_btn_next">Review Configuration →</button>
             </div>
         </div>
@@ -613,11 +617,7 @@
         <!-- Editor flow — hidden until mode selected -->
         <div id="edit-flow" class="hidden">
 
-            <div style="margin:8px 0 16px;">
-                <button class="btn-secondary" onclick="selectMode(null)" style="padding:6px 14px;font-size:13px;">← Back</button>
-            </div>
-
-            <div class="warn-box" style="font-size:12px;">
+            <div class="warn-box" style="font-size:12px;margin-top:8px;">
                 <strong>Sample Code Notice:</strong> This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. See the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/" style="color:#0073bb;">AWS Shared Responsibility Model</a>.
             </div>
 
@@ -631,14 +631,18 @@
                 </div>
 
                 <div class="form-group">
-                    <label>MAP Engagement ID (MPE ID) <span class="hint">— must match the original deployment</span></label>
-                    <input type="text" id="editor-mpeId" placeholder="e.g., migA1B2C3D4E5">
+                    <label>MAP Engagement ID <span class="hint">— 10-character alphanumeric code, must match the original deployment</span></label>
+                    <div style="display:flex;align-items:center;gap:0;">
+                        <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                        <input type="text" id="editor-mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;">
+                    </div>
+                    <div class="error-msg" id="editor-mpeId-error">MAP Engagement ID must be exactly 10 alphanumeric characters</div>
                 </div>
 
                 <div class="form-group">
                     <label>Deployment Region <span class="hint">— region where the management stack was deployed</span></label>
                     <select id="editor-region">
-                        <option value="">Select a region...</option>
+                        <option value="" disabled selected>Select a region...</option>
                         <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
                         <option value="us-east-2">US East (Ohio) — us-east-2</option>
                         <option value="us-west-1">US West (N. California) — us-west-1</option>
@@ -674,6 +678,7 @@
                         <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
                         <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
                     </select>
+                    <div class="error-msg" id="editor-region-error">Please select a deployment region</div>
                 </div>
             </div>
 
@@ -702,6 +707,7 @@
                         </div>
                     </div>
                     <button class="btn-add" onclick="editorAddAccount()">+ Add another account</button>
+                    <div class="error-msg" id="editor-account-error">Please enter at least one valid 12-digit account ID</div>
                 </div>
             </div>
 
@@ -716,7 +722,8 @@
             </div>
 
             <div class="actions">
-                <button class="btn-primary" onclick="editorGenerate()">Generate update.sh</button>
+                <button class="btn-secondary" onclick="selectMode(null)">← Back</button>
+                <button class="btn-primary" onclick="editorGenerate()" style="margin-left:auto;">Generate update.sh →</button>
             </div>
 
             <div id="editor-output" class="hidden" style="margin-top:20px;">
@@ -725,7 +732,8 @@
                     <p class="subtitle">Run this in AWS CloudShell from the management account</p>
                     <div class="preview-box" id="editor-scriptContent"></div>
                     <div class="actions">
-                        <button class="btn-primary" onclick="editorDownload()">Download update.sh</button>
+                        <button class="btn-secondary" onclick="selectMode(null)">← Back to start</button>
+                        <button class="btn-primary" onclick="editorDownload()" style="margin-left:auto;">Download update.sh</button>
                     </div>
                 </div>
             </div>
@@ -756,6 +764,16 @@
             row.className = 'entry-row';
             row.innerHTML = '<input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12"><button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
             list.appendChild(row);
+            const input = row.querySelector('input');
+            input.addEventListener('blur',  () => editorValidateAccount(input));
+            input.addEventListener('input', () => editorValidateAccount(input));
+        }
+
+        function editorValidateAccount(input) {
+            const val = input.value.trim();
+            const bad = val && !/^\d{12}$/.test(val);
+            input.classList.toggle('error', bad);
+            input.title = bad ? 'Account ID must be exactly 12 digits' : '';
         }
 
         function editorRemoveRow(btn) {
@@ -764,7 +782,8 @@
         }
 
         function editorGenerate() {
-            const mpe = document.getElementById('editor-mpeId').value.trim();
+            const mpeRaw = document.getElementById('editor-mpeId').value.trim();
+            const mpe = 'mig' + mpeRaw;
             const region = document.getElementById('editor-region').value;
             const action = document.querySelector('input[name="editor-action"]:checked').value;
             const backfill = document.getElementById('editor-includeBackfill').checked && action === 'add';
@@ -772,9 +791,44 @@
                 .map(el => el.value.trim())
                 .filter(v => /^\d{12}$/.test(v));
 
-            if (!mpe) { alert('Please enter the MPE ID'); return; }
-            if (!region) { alert('Please select a region'); return; }
-            if (accounts.length === 0) { alert('Please enter at least one valid 12-digit account ID'); return; }
+            let valid = true;
+
+            if (!/^[a-zA-Z0-9]{10}$/.test(mpeRaw)) {
+                document.getElementById('editor-mpeId').classList.add('error');
+                document.getElementById('editor-mpeId-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('editor-mpeId').classList.remove('error');
+                document.getElementById('editor-mpeId-error').style.display = 'none';
+            }
+
+            if (!region) {
+                document.getElementById('editor-region').classList.add('error');
+                document.getElementById('editor-region-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('editor-region').classList.remove('error');
+                document.getElementById('editor-region-error').style.display = 'none';
+            }
+
+            const allInputs = [...document.querySelectorAll('.editor-account-input')];
+            const hasInvalid = allInputs.some(el => el.value.trim() && !/^\d{12}$/.test(el.value.trim()));
+            allInputs.forEach(el => {
+                const bad = el.value.trim() && !/^\d{12}$/.test(el.value.trim());
+                el.classList.toggle('error', bad);
+                el.title = bad ? 'Account ID must be exactly 12 digits' : '';
+            });
+            if (accounts.length === 0 || hasInvalid) {
+                document.getElementById('editor-account-error').style.display = 'block';
+                document.getElementById('editor-account-error').textContent = hasInvalid
+                    ? 'Account IDs must be exactly 12 digits'
+                    : 'Please enter at least one valid 12-digit account ID';
+                valid = false;
+            } else {
+                document.getElementById('editor-account-error').style.display = 'none';
+            }
+
+            if (!valid) return;
 
             const stacksetName = `map-auto-tagger-${mpe}`;
             const accountsJson = JSON.stringify(accounts);
@@ -916,6 +970,21 @@ echo "  └───────────────────────
             if (firstAcct) {
                 firstAcct.addEventListener('blur', () => validateAccountInput(firstAcct));
                 firstAcct.addEventListener('input', () => validateAccountInput(firstAcct));
+            }
+            // Editor: wire up first account input and MPE field
+            const editorAcct = document.querySelector('.editor-account-input');
+            if (editorAcct) {
+                editorAcct.addEventListener('blur',  () => editorValidateAccount(editorAcct));
+                editorAcct.addEventListener('input', () => editorValidateAccount(editorAcct));
+            }
+            const editorMpe = document.getElementById('editor-mpeId');
+            if (editorMpe) {
+                editorMpe.addEventListener('blur', () => {
+                    const val = editorMpe.value.trim();
+                    const bad = val && !/^[a-zA-Z0-9]{10}$/.test(val);
+                    editorMpe.classList.toggle('error', bad);
+                    document.getElementById('editor-mpeId-error').style.display = bad ? 'block' : 'none';
+                });
             }
         });
 
@@ -1069,7 +1138,7 @@ echo "  └───────────────────────
             const mpeId = document.getElementById('mpeId').value.trim();
             const date = document.getElementById('agreementDate').value;
 
-            if (!/^mig[a-zA-Z0-9]+$/.test(mpeId)) {
+            if (!/^[a-zA-Z0-9]{10}$/.test(mpeId)) {
                 document.getElementById('mpeId').classList.add('error');
                 document.getElementById('mpeId-error').style.display = 'block';
                 valid = false;
@@ -1159,7 +1228,7 @@ echo "  └───────────────────────
             const tagNonVpcServices = document.getElementById('tagNonVpcServices').checked;
 
             const config = {
-                mpeId: document.getElementById('mpeId').value.trim(),
+                mpeId: 'mig' + document.getElementById('mpeId').value.trim(),
                 agreementDate: document.getElementById('agreementDate').value,
                 agreementEndDate: document.getElementById('agreementEndDate').value,
                 alertEmail: document.getElementById('alertEmail').value.trim(),
@@ -1355,7 +1424,8 @@ echo "  └───────────────────────
             ui_card_deal_subtitle:'Enter the MAP agreement details from AWS Investments',
             ui_customer_name:'Customer Name', ui_customer_name_hint:'(used for filename generation only)',
             ui_customer_name_placeholder:'e.g., Acme Corp',
-            ui_mpe_tag:'MAP 2.0 Tag Value',
+            ui_mpe_tag:'MAP Engagement ID',
+            ui_mpe_hint:'(10-character alphanumeric code from AWS Investments — e.g., A1B2C3D4E5)',
             ui_agree_start:'Agreement Start Date', ui_agree_start_hint:'(Date to start tagging newly created MAP 2.0 resources)',
             ui_agree_end:'Agreement End Date', ui_agree_end_hint:'(Date to stop tagging newly created resources)',
             ui_alert_email:'Alert Email', ui_alert_email_hint:'(optional — email to receive tagging failure alerts)',
@@ -1422,7 +1492,7 @@ echo "  └───────────────────────
             rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'Auto-discovers root OU ID at deploy time — customer does nothing',
             rv_res_xaccount:'Cross-Account Role', rv_res_xaccount_desc:'MapAutoTaggerCrossAccount role in each member account (trusts central Lambda)',
             rv_res_eb_fwd:'EventBridge Forwarding', rv_res_eb_fwd_desc:'Member accounts forward events to central event bus',
-            err_mpe_invalid:"MAP Engagement ID must start with 'mig' followed by alphanumeric characters",
+            err_mpe_invalid:"MAP Engagement ID must be exactly 10 alphanumeric characters",
             err_date_required:'Agreement start date is required',
             err_date_end:'Agreement end date is required and must be after start date',
             err_vpc_required:'Please enter at least one VPC ID.',
@@ -1569,7 +1639,8 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             ui_card_deal_subtitle:'AWS Investments의 MAP 계약 정보를 입력하세요',
             ui_customer_name:'고객명', ui_customer_name_hint:'(파일 이름 생성에만 사용됨)',
             ui_customer_name_placeholder:'예: 홍길동 기업',
-            ui_mpe_tag:'MAP 2.0 태그 값',
+            ui_mpe_tag:'MAP 참여 ID',
+            ui_mpe_hint:'(AWS Investments의 10자리 영숫자 코드 — 예: A1B2C3D4E5)',
             ui_agree_start:'협약 시작일', ui_agree_start_hint:'(MAP 2.0 리소스 태그 적용 시작일)',
             ui_agree_end:'협약 종료일', ui_agree_end_hint:'(신규 리소스 태그 적용 종료일)',
             ui_alert_email:'알림 이메일', ui_alert_email_hint:'(선택 — 태그 오류 알림 수신 이메일)',
@@ -1635,7 +1706,7 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             rv_res_custom:'사용자 지정 리소스 (Lambda)', rv_res_custom_desc:'배포 시 루트 OU ID 자동 감지 — 고객 조치 불필요',
             rv_res_xaccount:'교차 계정 역할', rv_res_xaccount_desc:'각 멤버 계정의 MapAutoTaggerCrossAccount 역할 (중앙 Lambda 신뢰)',
             rv_res_eb_fwd:'EventBridge 전달', rv_res_eb_fwd_desc:'멤버 계정이 중앙 이벤트 버스로 이벤트 전달',
-            err_mpe_invalid:"MAP 참여 ID는 'mig'로 시작하고 영숫자만 포함해야 합니다",
+            err_mpe_invalid:"MAP 참여 ID는 정확히 10자리 영숫자여야 합니다",
             err_date_required:'협약 시작일을 입력해 주세요',
             err_date_end:'협약 종료일은 시작일 이후여야 합니다',
             err_vpc_required:'VPC ID를 하나 이상 입력해 주세요.',
@@ -1777,7 +1848,8 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             ui_card_deal_subtitle:'AWS InvestmentsのMAP契約情報を入力してください',
             ui_customer_name:'顧客名', ui_customer_name_hint:'（ファイル名生成にのみ使用）',
             ui_customer_name_placeholder:'例：株式会社ABC',
-            ui_mpe_tag:'MAP 2.0 タグ値',
+            ui_mpe_tag:'MAP エンゲージメントID',
+            ui_mpe_hint:'(AWS Investmentsの10文字の英数字コード — 例: A1B2C3D4E5)',
             ui_agree_start:'契約開始日', ui_agree_start_hint:'（MAPリソースへのタグ付け開始日）',
             ui_agree_end:'契約終了日', ui_agree_end_hint:'（タグ付け停止日）',
             ui_alert_email:'アラートメール', ui_alert_email_hint:'（任意 — タグエラー通知を受信するメールアドレス）',
@@ -1843,7 +1915,7 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             rv_res_custom:'カスタムリソース（Lambda）', rv_res_custom_desc:'デプロイ時にルートOU IDを自動検出 — お客様の操作不要',
             rv_res_xaccount:'クロスアカウントロール', rv_res_xaccount_desc:'各メンバーアカウントのMapAutoTaggerCrossAccountロール（中央Lambdaを信頼）',
             rv_res_eb_fwd:'EventBridgeフォワーディング', rv_res_eb_fwd_desc:'メンバーアカウントが中央イベントバスにイベントを転送',
-            err_mpe_invalid:"MAP IDは'mig'で始まり英数字のみを含む必要があります",
+            err_mpe_invalid:"MAP IDは正確に10文字の英数字である必要があります",
             err_date_required:'契約開始日を入力してください',
             err_date_end:'契約終了日は開始日より後である必要があります',
             err_vpc_required:'VPC IDを1つ以上入力してください。',
@@ -1985,7 +2057,8 @@ ui_instr_single_title:'部署说明 — 单账户',
             ui_card_deal_subtitle:'请输入AWS Investments提供的MAP协议信息',
             ui_customer_name:'客户名称', ui_customer_name_hint:'（仅用于生成文件名）',
             ui_customer_name_placeholder:'例如：ABC公司',
-            ui_mpe_tag:'MAP 2.0 标签值',
+            ui_mpe_tag:'MAP 参与ID',
+            ui_mpe_hint:'(来自AWS Investments的10位字母数字代码 — 例如: A1B2C3D4E5)',
             ui_agree_start:'协议开始日期', ui_agree_start_hint:'（开始对MAP 2.0资源打标签的日期）',
             ui_agree_end:'协议结束日期', ui_agree_end_hint:'（停止对新建资源打标签的日期）',
             ui_alert_email:'告警邮件', ui_alert_email_hint:'（可选 — 接收标签错误通知的邮箱）',
@@ -2051,7 +2124,7 @@ ui_instr_single_title:'部署说明 — 单账户',
             rv_res_custom:'自定义资源（Lambda）', rv_res_custom_desc:'部署时自动发现根OU ID — 客户无需操作',
             rv_res_xaccount:'跨账户角色', rv_res_xaccount_desc:'每个成员账户中的MapAutoTaggerCrossAccount角色（信任中央Lambda）',
             rv_res_eb_fwd:'EventBridge转发', rv_res_eb_fwd_desc:'成员账户将事件转发到中央事件总线',
-            err_mpe_invalid:"MAP参与ID必须以'mig'开头，后跟字母数字字符",
+            err_mpe_invalid:"MAP参与ID必须恰好为10位字母数字字符",
             err_date_required:'请填写协议开始日期',
             err_date_end:'协议结束日期必须晚于开始日期',
             err_vpc_required:'请至少输入一个VPC ID。',
@@ -2193,7 +2266,8 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             ui_card_deal_subtitle:'Masukkan detail perjanjian MAP dari AWS Investments',
             ui_customer_name:'Nama Pelanggan', ui_customer_name_hint:'(hanya digunakan untuk pembuatan nama file)',
             ui_customer_name_placeholder:'cth. PT ABC Indonesia',
-            ui_mpe_tag:'Nilai Tag MAP 2.0',
+            ui_mpe_tag:'MAP Engagement ID',
+            ui_mpe_hint:'(Kode 10 karakter alfanumerik dari AWS Investments — contoh: A1B2C3D4E5)',
             ui_agree_start:'Tanggal Mulai Perjanjian', ui_agree_start_hint:'(Tanggal mulai pemberian tag pada resource MAP 2.0)',
             ui_agree_end:'Tanggal Berakhir Perjanjian', ui_agree_end_hint:'(Tanggal penghentian pemberian tag pada resource baru)',
             ui_alert_email:'Email Peringatan', ui_alert_email_hint:'(opsional — email untuk menerima peringatan kesalahan tag)',
@@ -2259,7 +2333,7 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             rv_res_custom:'Resource Kustom (Lambda)', rv_res_custom_desc:'Otomatis menemukan ID OU root saat deployment — pelanggan tidak perlu melakukan apa pun',
             rv_res_xaccount:'Peran Lintas Akun', rv_res_xaccount_desc:'Peran MapAutoTaggerCrossAccount di setiap akun anggota (mempercayai Lambda pusat)',
             rv_res_eb_fwd:'Penerusan EventBridge', rv_res_eb_fwd_desc:'Akun anggota meneruskan event ke event bus pusat',
-            err_mpe_invalid:"MAP ID harus diawali dengan 'mig' diikuti karakter alfanumerik",
+            err_mpe_invalid:"MAP ID harus tepat 10 karakter alfanumerik",
             err_date_required:'Tanggal mulai perjanjian wajib diisi',
             err_date_end:'Tanggal berakhir harus setelah tanggal mulai',
             err_vpc_required:'Harap masukkan setidaknya satu VPC ID.',
@@ -2401,7 +2475,8 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             ui_card_deal_subtitle:'กรอกรายละเอียดข้อตกลง MAP จาก AWS Investments',
             ui_customer_name:'ชื่อลูกค้า', ui_customer_name_hint:'(ใช้สำหรับสร้างชื่อไฟล์เท่านั้น)',
             ui_customer_name_placeholder:'เช่น บริษัท ABC จำกัด',
-            ui_mpe_tag:'ค่า Tag MAP 2.0',
+            ui_mpe_tag:'MAP Engagement ID',
+            ui_mpe_hint:'(รหัสตัวอักษรและตัวเลข 10 หลักจาก AWS Investments — เช่น: A1B2C3D4E5)',
             ui_agree_start:'วันที่เริ่มต้นข้อตกลง', ui_agree_start_hint:'(วันที่เริ่มติด Tag ให้ทรัพยากร MAP 2.0)',
             ui_agree_end:'วันที่สิ้นสุดข้อตกลง', ui_agree_end_hint:'(วันที่หยุดติด Tag ให้ทรัพยากรใหม่)',
             ui_alert_email:'อีเมลแจ้งเตือน', ui_alert_email_hint:'(ไม่บังคับ — อีเมลสำหรับรับการแจ้งเตือนข้อผิดพลาด)',
@@ -2467,7 +2542,7 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'ค้นหา ID root OU โดยอัตโนมัติระหว่างติดตั้ง ลูกค้าไม่ต้องทำอะไร',
             rv_res_xaccount:'Cross-Account Role', rv_res_xaccount_desc:'MapAutoTaggerCrossAccount role ในแต่ละบัญชีสมาชิก (เชื่อถือ Lambda กลาง)',
             rv_res_eb_fwd:'EventBridge Forwarding', rv_res_eb_fwd_desc:'บัญชีสมาชิกส่งต่อ event ไปยัง event bus กลาง',
-            err_mpe_invalid:"MAP ID ต้องเริ่มต้นด้วย 'mig' ตามด้วยตัวอักษรและตัวเลข",
+            err_mpe_invalid:"MAP ID ต้องมีตัวอักษรและตัวเลขรวมกันพอดี 10 ตัว",
             err_date_required:'กรุณากรอกวันที่เริ่มต้นข้อตกลง',
             err_date_end:'วันที่สิ้นสุดต้องอยู่หลังวันที่เริ่มต้น',
             err_vpc_required:'กรุณากรอก VPC ID อย่างน้อยหนึ่งรายการ',
@@ -2609,7 +2684,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             ui_card_deal_subtitle:'Nhập thông tin thỏa thuận MAP từ AWS Investments',
             ui_customer_name:'Tên khách hàng', ui_customer_name_hint:'(chỉ dùng để tạo tên file)',
             ui_customer_name_placeholder:'Ví dụ: Công ty ABC',
-            ui_mpe_tag:'Giá trị Tag MAP 2.0',
+            ui_mpe_tag:'MAP Engagement ID',
+            ui_mpe_hint:'(Mã 10 ký tự chữ và số từ AWS Investments — ví dụ: A1B2C3D4E5)',
             ui_agree_start:'Ngày bắt đầu thỏa thuận', ui_agree_start_hint:'(Ngày bắt đầu gắn tag cho resource MAP 2.0)',
             ui_agree_end:'Ngày kết thúc thỏa thuận', ui_agree_end_hint:'(Ngày dừng gắn tag cho resource mới)',
             ui_alert_email:'Email cảnh báo', ui_alert_email_hint:'(tùy chọn — email nhận thông báo lỗi tag)',
@@ -2675,7 +2751,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'Tự động tìm ID root OU khi triển khai — khách hàng không cần làm gì',
             rv_res_xaccount:'Cross-Account Role', rv_res_xaccount_desc:'Vai trò MapAutoTaggerCrossAccount trong mỗi tài khoản thành viên (tin tưởng Lambda trung tâm)',
             rv_res_eb_fwd:'Chuyển tiếp EventBridge', rv_res_eb_fwd_desc:'Tài khoản thành viên chuyển tiếp sự kiện đến event bus trung tâm',
-            err_mpe_invalid:"MAP ID phải bắt đầu bằng 'mig' theo sau là ký tự chữ và số",
+            err_mpe_invalid:"MAP ID phải có đúng 10 ký tự chữ và số",
             err_date_required:'Vui lòng nhập ngày bắt đầu thỏa thuận',
             err_date_end:'Ngày kết thúc phải sau ngày bắt đầu',
             err_vpc_required:'Vui lòng nhập ít nhất một VPC ID.',
