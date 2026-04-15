@@ -1170,15 +1170,84 @@ def _service_from_arn(arn: str) -> str:
 # Main
 # ---------------------------------------------------------------------------
 
+def tag_sweep_all(tag_value: str, regions: list[str]) -> None:
+    """--all mode: sweep all resources tagged with tag_value using resourcegroupstaggingapi.
+
+    Skips ARN file loading entirely — useful for nightly cleanup where there are
+    no ARN artifact files, only orphaned resources identified by the test MPE tag.
+    """
+    log.info(
+        "Running --all tag sweep for map-migrated=%s across regions: %s",
+        tag_value,
+        ", ".join(regions),
+    )
+    current_account = _get_current_account()
+    for region in regions:
+        try:
+            tagging = _client("resourcegroupstaggingapi", region, current_account)
+            paginator = tagging.get_paginator("get_resources")
+            found = 0
+            for page in paginator.paginate(
+                TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
+            ):
+                for rm in page.get("ResourceTagMappingList", []):
+                    arn = rm["ResourceARN"]
+                    log.info("  Tag sweep (%s): %s", region, arn)
+                    rec = {
+                        "arn": arn,
+                        "service": _service_from_arn(arn),
+                        "region": region,
+                        "account": current_account,
+                        "resource_id": arn.split("/")[-1],
+                    }
+                    try:
+                        delete_record(rec)
+                    except Exception as exc:
+                        log.warning("  Error deleting %s: %s", arn, exc)
+                    found += 1
+            log.info("  Region %s: swept %d resource(s)", region, found)
+        except Exception as exc:
+            log.warning("Tag sweep failed for region %s: %s", region, exc)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Tear down E2E test resources")
-    parser.add_argument("--arns-dir", required=True, help="Directory with ARN JSON files")
-    parser.add_argument("--pr", required=True, help="PR number (used for sweep)")
+    parser.add_argument("--arns-dir", default=None, help="Directory with ARN JSON files")
+    parser.add_argument("--pr", default=None, help="PR number (used for sweep)")
     parser.add_argument("--tag-value", default=None,
                         help="Tag value for orphan sweep (defaults to migTEST from records)")
     parser.add_argument("--no-sweep", action="store_true",
                         help="Skip the tag-based orphan sweep")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="sweep_all",
+        help=(
+            "Skip ARN file loading; instead sweep all resources tagged with "
+            "--tag-value using resourcegroupstaggingapi. Requires --tag-value."
+        ),
+    )
+    parser.add_argument(
+        "--regions",
+        default="ap-northeast-2,us-east-1,us-west-2",
+        help="Comma-separated regions for --all sweep (default: ap-northeast-2,us-east-1,us-west-2)",
+    )
     args = parser.parse_args()
+
+    # ── --all mode: pure tag-based sweep, no ARN file needed ─────────────────
+    if args.sweep_all:
+        if not args.tag_value:
+            log.error("--all requires --tag-value")
+            sys.exit(1)
+        regions = [r.strip() for r in args.regions.split(",") if r.strip()]
+        tag_sweep_all(args.tag_value, regions)
+        log.info("Teardown complete (--all mode).")
+        return
+
+    # ── Normal mode: ARN-file-based deletion + optional orphan sweep ──────────
+    if not args.arns_dir:
+        log.error("--arns-dir is required when not using --all")
+        sys.exit(1)
 
     # Load all records
     p = Path(args.arns_dir)

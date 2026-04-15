@@ -173,6 +173,23 @@
         }
         .lang-flag:hover { opacity: 1; background: rgba(255,255,255,0.15); }
         .lang-flag.active { opacity: 1; background: rgba(255,255,255,0.2); outline: 2px solid rgba(255,255,255,0.6); }
+        .mode-card {
+            border: 2px solid #d5dbdb; border-radius: 8px; padding: 24px 28px;
+            margin-bottom: 16px; cursor: pointer; display: flex; align-items: flex-start; gap: 20px;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .mode-card:hover { border-color: #0073bb; background: #f2f8fd; }
+        .mode-card .mode-icon {
+            font-size: 32px; line-height: 1; flex-shrink: 0; margin-top: 2px;
+        }
+        .mode-card .mode-body h3 { font-size: 16px; font-weight: 600; margin-bottom: 6px; color: #16191f; }
+        .mode-card .mode-body p { font-size: 13px; color: #687078; margin: 0; line-height: 1.5; }
+        .mode-card .mode-body .mode-note {
+            display: inline-block; font-size: 11px; color: #687078;
+            background: #f2f3f3; border: 1px solid #d5dbdb;
+            border-radius: 3px; padding: 2px 6px; margin-top: 8px;
+        }
+        .mode-card:hover .mode-body h3 { color: #0073bb; }
     </style>
 </head>
 <body>
@@ -192,6 +209,35 @@
     </div>
 
     <div class="container">
+
+        <!-- Landing: mode selection -->
+        <div id="landing">
+            <div class="card" style="margin-top:8px;">
+                <h2 style="margin-bottom:6px;">What would you like to do?</h2>
+                <p class="subtitle" style="margin-bottom:24px;">Select an option to get started</p>
+
+                <div class="mode-card" onclick="selectMode('deploy')">
+                    <div class="mode-icon">🚀</div>
+                    <div class="mode-body">
+                        <h3>Deploy new auto-tagger</h3>
+                        <p>Generate a deployment script for a new MAP 2.0 engagement. Works for single-account and multi-account (AWS Organizations) deployments.</p>
+                    </div>
+                </div>
+
+                <div class="mode-card" onclick="selectMode('edit')">
+                    <div class="mode-icon">✏️</div>
+                    <div class="mode-body">
+                        <h3>Edit existing deployment</h3>
+                        <p>Add or remove AWS accounts from scope on an already-deployed auto-tagger. Generates an update script — no full redeployment needed.</p>
+                        <span class="mode-note">Multi-account (AWS Organizations) deployments only</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configurator (deploy flow) — hidden until mode selected -->
+        <div id="deploy-flow" class="hidden">
+
         <div class="step-indicator">
             <div class="step active" id="step1-indicator" data-i18n="ui_step1">1. Configure</div>
             <div class="step" id="step2-indicator" data-i18n="ui_step2">2. Review</div>
@@ -207,7 +253,6 @@
             <span data-i18n="ui_main_desc5">Covers</span> <strong>190+ <span data-i18n="ui_main_desc6">resource types across all major AWS services (CT org E2E tested).</span></strong>
             <span data-i18n="ui_main_desc7">Customer cost:</span> <strong>&lt; $2/month</strong>.
         </div>
-
 
         <!-- Step 1: Configure -->
         <div id="step1">
@@ -552,9 +597,61 @@
                 <button class="btn-secondary" onclick="backToConfig()" data-i18n="ui_start_over">Start Over</button>
             </div>
         </div>
+
+        </div> <!-- end deploy-flow -->
+
+        <!-- Editor flow — hidden until mode selected -->
+        <div id="edit-flow" class="hidden">
+            <div class="card" style="margin-top:8px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+                    <button class="btn-secondary" onclick="selectMode(null)" style="padding:6px 14px;font-size:13px;">← Back</button>
+                    <div>
+                        <h2 style="margin:0;">Edit Existing Deployment</h2>
+                        <p style="font-size:13px;color:#687078;margin:2px 0 0;">Add or remove accounts from scope on an existing multi-account deployment</p>
+                    </div>
+                </div>
+                <div id="editor-content"></div>
+            </div>
+        </div>
+
     </div>
 
     <script>
+        // --- Landing mode selection ---
+        function selectMode(mode) {
+            document.getElementById('landing').classList.toggle('hidden', mode !== null);
+            document.getElementById('deploy-flow').classList.toggle('hidden', mode !== 'deploy');
+            document.getElementById('edit-flow').classList.toggle('hidden', mode !== 'edit');
+
+            if (mode === 'edit') {
+                // Embed editor.html content inline via fetch
+                const container = document.getElementById('editor-content');
+                if (!container.dataset.loaded) {
+                    fetch('editor.html')
+                        .then(r => r.text())
+                        .then(html => {
+                            // Extract just the body content from editor.html
+                            const match = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+                            if (match) {
+                                container.innerHTML = match[1];
+                                // Re-run any inline scripts from editor.html
+                                container.querySelectorAll('script').forEach(s => {
+                                    const ns = document.createElement('script');
+                                    ns.textContent = s.textContent;
+                                    document.body.appendChild(ns);
+                                });
+                            } else {
+                                container.innerHTML = '<p style="color:#d13212;">Could not load editor.html. Make sure both files are in the same folder.</p>';
+                            }
+                            container.dataset.loaded = '1';
+                        })
+                        .catch(() => {
+                            container.innerHTML = '<p style="color:#d13212;">Could not load editor.html — make sure both files are in the same folder and opened via a local server or file:// URL.</p>';
+                        });
+                }
+            }
+        }
+
         // --- UI State ---
         document.addEventListener('DOMContentLoaded', () => {
             const firstVpc = document.querySelector('.vpc-input');
