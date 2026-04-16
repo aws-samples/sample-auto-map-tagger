@@ -4790,7 +4790,7 @@ else
 fi
 
 for CHECK_REGION in \$REGIONS; do
-    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --no-include-shadow-trails --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
     if [ "\$TRAIL_COUNT" -eq 0 ]; then
         echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
         echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
@@ -5124,7 +5124,7 @@ else
 fi
 
 for CHECK_REGION in ${regionArgs}; do
-    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --no-include-shadow-trails --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
     if [ "\$TRAIL_COUNT" -eq 0 ]; then
         echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
         echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
