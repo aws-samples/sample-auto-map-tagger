@@ -3,12 +3,12 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v18 - Automatically tags newly created AWS resources with the
+  MAP 2.0 Auto-Tagger v19 - Automatically tags newly created AWS resources with the
   map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
   across all major AWS services. Deploy once; tagging happens automatically within
-  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v18: AppSec hardening - removed cross-account
-  AssumeRole, removed discontinued service permissions, added security justification
-  comments, added threat model.
+  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v19: MAP eligibility alignment - removed AppConfig and OpenSearch Serverless
+  (not MAP-eligible); added EKS and OpenSearch managed service handlers; fixed event_source
+  guards for SQS, AppSync, and Cognito to prevent cross-service event collisions.
 
 Parameters:
   MpeId:
@@ -161,7 +161,6 @@ Resources:
                   - cloudwatch:TagResource
                   - ssm:AddTagsToResource
                   - secretsmanager:TagResource
-                  - appconfig:TagResource
                   - servicediscovery:TagResource
                   # --- Security & Identity ---
                   - kms:TagResource
@@ -199,7 +198,6 @@ Resources:
                   - comprehend:TagResource
                   - kendra:TagResource
                   - bedrock:TagResource
-                  - aoss:TagResource
                   - braket:TagResource
                   # --- IoT ---
                   - iot:TagResource
@@ -550,7 +548,7 @@ Resources:
                   api_id = resp.get('id') or resp.get('apiId')
                   api_type = 'restapis' if event_name == 'CreateRestApi' else 'apis'
                   return f"arn:aws:apigateway:{region}::/{api_type}/{api_id}" if api_id else None
-              elif event_name == 'CreateQueue':
+              elif event_name == 'CreateQueue' and event_source == 'sqs.amazonaws.com':
                   # SQS returns URL, need to construct ARN
                   queue_url = resp.get('queueUrl')
                   if queue_url:
@@ -731,7 +729,7 @@ Resources:
                   return resp.get('documentClassifierArn')
 
               # AppSync
-              elif event_name == 'CreateGraphqlApi':
+              elif event_name == 'CreateGraphqlApi' and event_source == 'appsync.amazonaws.com':
                   api = resp.get('graphqlApi', {})
                   return api.get('arn')
 
@@ -814,6 +812,13 @@ Resources:
                   if cluster_id:
                       return f"arn:aws:elasticmapreduce:{region}:{account_id}:cluster/{cluster_id}"
 
+              # EKS Cluster
+              elif event_name == 'CreateCluster' and event_source == 'eks.amazonaws.com':
+                  cluster = resp.get('cluster', {})
+                  cluster_arn = cluster.get('arn')
+                  if cluster_arn:
+                      return cluster_arn
+
               # EKS Nodegroup
               elif event_name == 'CreateNodegroup':
                   nodegroup = resp.get('nodegroup', {})
@@ -823,11 +828,6 @@ Resources:
               elif event_name == 'CreateCacheCluster':
                   cache = resp.get('cacheCluster', {})
                   return cache.get('aRN')
-
-              # OpenSearch Serverless Collection
-              elif event_name == 'CreateCollection' and event_source == 'aoss.amazonaws.com':
-                  detail = resp.get('createCollectionDetail', {})
-                  return detail.get('arn')
 
               # Route53 Hosted Zone
               elif event_name == 'CreateHostedZone':
@@ -904,20 +904,6 @@ Resources:
                   task_arn = resp.get('taskArn')
                   if task_arn:
                       return task_arn
-
-              # AppConfig Configuration Profile
-              elif event_name == 'CreateConfigurationProfile':
-                  app_id = req.get('applicationId') or resp.get('applicationId')
-                  profile_id = resp.get('id')
-                  if app_id and profile_id:
-                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}/configurationprofile/{profile_id}"
-
-              # AppConfig Environment
-              elif event_name == 'CreateEnvironment' and event_source == 'appconfig.amazonaws.com':
-                  app_id = req.get('applicationId')
-                  env_id = resp.get('id')
-                  if app_id and env_id:
-                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}/environment/{env_id}"
 
               # Glue DataBrew Dataset
               elif event_name == 'CreateDataset' and event_source == 'databrew.amazonaws.com':
@@ -1116,12 +1102,6 @@ Resources:
                   # For now, skip - would need async operation tracking
                   return None
 
-              # AppConfig Application
-              elif event_name == 'CreateApplication' and event_source == 'appconfig.amazonaws.com':
-                  app_id = resp.get('id')
-                  if app_id:
-                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}"
-
               # ELB Classic (different from ALB/NLB)
               elif event_name == 'CreateLoadBalancer' and event_source == 'elasticloadbalancing.amazonaws.com':
                   # Classic ELB (v1) vs ALB/NLB (v2)
@@ -1156,7 +1136,7 @@ Resources:
                       return pool_arn
 
               # Cognito User Pool
-              elif event_name == 'CreateUserPool':
+              elif event_name == 'CreateUserPool' and event_source == 'cognito-idp.amazonaws.com':
                   pool = resp.get('userPool', {})
                   pool_id = pool.get('id')
                   if pool_id:
@@ -1275,6 +1255,13 @@ Resources:
                   cluster_arn = resp.get('clusterArn')
                   if cluster_arn:
                       return cluster_arn
+
+              # Amazon OpenSearch Service (managed — NOT Serverless)
+              elif event_name == 'CreateDomain' and event_source == 'es.amazonaws.com':
+                  domain_status = resp.get('domainStatus', {})
+                  domain_arn = domain_status.get('ARN') or domain_status.get('arn')
+                  if domain_arn:
+                      return domain_arn
 
               # SageMaker Domain (Studio)
               elif event_name == 'CreateDomain' and event_source == 'sagemaker.amazonaws.com':
