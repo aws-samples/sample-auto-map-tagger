@@ -1,7 +1,5 @@
 acm:AddTagsToCertificate
-aoss:TagResource
 apigateway:PUT
-appconfig:TagResource
 appmesh:TagResource
 appstream:TagResource
 appsync:TagResource
