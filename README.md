@@ -115,7 +115,7 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 | **IoT** | IoT Core (Topic Rules), IoT Greengrass, IoT SiteWise (Assets + Models + Gateways + Portals), IoT TwinMaker | ✅ |
 | **Media** | IVS (Channels + Chat), MediaConvert, MediaPackage | ✅ |
 | **Global** | CloudFront, Route53, Global Accelerator, IVS — via us-east-1/us-west-2 Lambda | ✅ |
-| **Emerging** | AWS Supply Chain, HealthLake, Omics, DataZone, Q Business, Location Service, Pinpoint, AppStream 2.0, Deadline Cloud, Kinesis Video Streams | ✅ |
+| **Emerging** | AWS Supply Chain, HealthLake, Omics, DataZone, Q Business, Location Service, AppStream 2.0, Deadline Cloud, Kinesis Video Streams | ✅ |
 
 ### Not Taggable — Confirmed AWS Platform Limitations
 

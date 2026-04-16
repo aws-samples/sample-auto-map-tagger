@@ -245,7 +245,6 @@ Resources:
                   - workspaces-web:TagResource
                   - quicksight:TagResource
                   - connect:TagResource
-                  - mobiletargeting:TagResource
                   - managedblockchain:TagResource
                   - gamelift:TagResource
                   - geo:TagResource

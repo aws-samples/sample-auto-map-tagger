@@ -673,11 +673,6 @@ def delete_record(record: dict) -> None:
         safe_delete(_client("appstream", region, account).delete_fleet,
                     Name=resource_id, resource_desc=arn)
 
-    # ── Pinpoint ──────────────────────────────────────────────────────────────
-    elif service == "mobiletargeting":
-        safe_delete(_client("pinpoint", region, account).delete_app,
-                    ApplicationId=resource_id, resource_desc=arn)
-
     # ── Supply Chain ──────────────────────────────────────────────────────────
     elif service == "scn":
         safe_delete(_client("supplychain", region, account).delete_instance,
@@ -1101,7 +1096,6 @@ DELETION_PRIORITY: dict[str, int] = {
     "datasync": 5,
     "geo": 5,
     "appstream": 5,
-    "mobiletargeting": 5,
     "scn": 5,
     "bedrock": 5,
     "rekognition": 5,

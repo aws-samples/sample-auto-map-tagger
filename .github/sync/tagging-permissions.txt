@@ -86,7 +86,6 @@ mediaconvert:TagResource
 medialive:CreateTags
 mediapackage:TagResource
 memorydb:TagResource
-mobiletargeting:TagResource
 mq:CreateTags
 omics:TagResource
 pipes:TagResource
