@@ -53,7 +53,7 @@ def main() -> None:
     # Common parameters
     parameters = [
         {"ParameterKey": "MpeId", "ParameterValue": args.mpe_id},
-        {"ParameterKey": "MigrationAgreementDate", "ParameterValue": args.agreement_date},
+        {"ParameterKey": "AgreementStartDate", "ParameterValue": args.agreement_date},
     ]
 
     # ── Create or update StackSet ─────────────────────────────────────────────
@@ -68,7 +68,7 @@ def main() -> None:
                 Parameters=parameters,
                 PermissionModel="SERVICE_MANAGED",
                 AutoDeployment={
-                    "Enabled": False,
+                    "Enabled": True,
                     "RetainStacksOnAccountRemoval": False,
                 },
                 Capabilities=["CAPABILITY_NAMED_IAM", "CAPABILITY_AUTO_EXPAND"],
@@ -104,10 +104,23 @@ def main() -> None:
     # ── Create stack instances ────────────────────────────────────────────────
     log.info("Creating stack instances in accounts: %s", account_ids)
     try:
-        # SERVICE_MANAGED StackSets use DeploymentTargets with AccountIds
+        # SERVICE_MANAGED StackSets require OrganizationalUnitIds in DeploymentTargets.
+        # Individual Accounts are not accepted — must use OU IDs.
+        ou_ids = [ou.strip() for ou in args.org_unit_ids.split(",") if ou.strip()] if args.org_unit_ids else []
+        if not ou_ids:
+            log.error("SERVICE_MANAGED StackSets require --org-unit-ids. "
+                      "Provide the OU ID(s) containing the target accounts.")
+            sys.exit(1)
+
         create_kwargs: dict = {
             "StackSetName": args.stack_set_name,
-            "DeploymentTargets": {"Accounts": account_ids},
+            "DeploymentTargets": {
+                "OrganizationalUnitIds": ou_ids,
+                # Note: SERVICE_MANAGED StackSets cannot mix Accounts + OUs
+                # Use Accounts as AccountFilterType to limit within the OU
+                "AccountFilterType": "INTERSECTION",
+                "Accounts": account_ids,
+            },
             "Regions": [args.region],
             "OperationPreferences": {
                 "MaxConcurrentPercentage": 100,
@@ -116,10 +129,6 @@ def main() -> None:
             },
             "ParameterOverrides": parameters,
         }
-        if args.org_unit_ids:
-            create_kwargs["DeploymentTargets"]["OrganizationalUnitIds"] = [
-                ou.strip() for ou in args.org_unit_ids.split(",") if ou.strip()
-            ]
 
         resp = cfn.create_stack_instances(**create_kwargs)
         op_id = resp["OperationId"]

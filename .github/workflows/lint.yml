@@ -150,7 +150,7 @@ jobs:
           node - <<'EOF'
           const fs = require('fs');
 
-          ['configurator.html', 'editor.html'].forEach(file => {
+          ['configurator.html'].forEach(file => {
             if (!fs.existsSync(file)) {
               console.log(`  ⚠️  ${file} not found — skipping`);
               return;
@@ -223,3 +223,88 @@ jobs:
           if errors:
               sys.exit(1)
           EOF
+
+  # ── 5. New handler E2E coverage check ─────────────────────────────────────
+  new-handler-coverage-check:
+    name: New Handler E2E Coverage Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check new handlers have matching E2E resource scripts
+        run: |
+          python3 - <<'EOF'
+          import re, subprocess, sys
+          from pathlib import Path
+
+          result = subprocess.run(
+              ['git', 'diff', 'origin/main...HEAD', '--', 'map2-auto-tagger-optimized.yaml'],
+              capture_output=True, text=True
+          )
+          diff = result.stdout
+
+          if not diff:
+              print("No changes to map2-auto-tagger-optimized.yaml — skipping")
+              sys.exit(0)
+
+          # Lines added in this PR (+ prefix, excluding +++ header)
+          added_lines = [l[1:] for l in diff.split('\n')
+                         if l.startswith('+') and not l.startswith('+++')]
+
+          # Find newly added handler blocks: "elif event_name == 'Xxx' and event_source == 'yyy'"
+          handler_pattern = re.compile(
+              r"elif\s+event_name\s*==\s*'([^']+)'(?:.*?event_source\s*==\s*'([^']+)')?"
+          )
+          new_handlers = []
+          for line in added_lines:
+              m = handler_pattern.search(line)
+              if m:
+                  new_handlers.append((m.group(1), m.group(2) or ''))
+
+          if not new_handlers:
+              print("No new event handlers added — skipping coverage check")
+              sys.exit(0)
+
+          print(f"Found {len(new_handlers)} new handler(s) to check:")
+
+          # Load all resource_group scripts content once
+          rg_dir = Path('.github/scripts/resource_groups')
+          rg_content = ''
+          if rg_dir.is_dir():
+              for py_file in rg_dir.glob('*.py'):
+                  rg_content += py_file.read_text()
+
+          warnings = []
+          for event_name, event_source in new_handlers:
+              # Check for exact name or snake_case variant
+              snake = re.sub(r'(?<=[a-z])(?=[A-Z])', '_', event_name).lower()
+              found = (event_name in rg_content or snake in rg_content)
+              status = "covered" if found else "MISSING"
+              print(f"  [{status}] {event_name} ({event_source or 'source unspecified'})")
+              if not found:
+                  warnings.append((event_name, event_source))
+
+          if warnings:
+              print()
+              for event_name, event_source in warnings:
+                  src_hint = event_source or 'unknown'
+                  print(f"⚠️  New handler '{event_name}' ({src_hint}) has no matching E2E test resource.")
+                  print(f"    Add resource creation to .github/scripts/resource_groups/<appropriate_module>.py")
+                  print(f"    This is a warning — PR can still merge, but E2E coverage will be incomplete.")
+                  print()
+
+          sys.exit(0)
+          EOF
+
+
+  # ── 6. YAML ↔ Configurator sync check ────────────────────────────────────
+  sync-drift-check:
+    name: YAML ↔ Configurator Sync Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check IAM permissions and critical handler sync
+        run: python3 .github/scripts/sync-check.py

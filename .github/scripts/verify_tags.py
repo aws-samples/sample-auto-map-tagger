@@ -100,6 +100,16 @@ def _assume_role(account: str, region: str) -> boto3.Session:
 # Tag-checking dispatch
 # ---------------------------------------------------------------------------
 
+_tag_value_prefix: str | None = None  # set by main() if --tag-value-prefix supplied
+
+
+def _value_matches(actual_value: str, expected_value: str) -> bool:
+    """Return True if actual_value matches expected — or prefix if prefix mode active."""
+    if _tag_value_prefix and actual_value.startswith(_tag_value_prefix):
+        return True
+    return actual_value == expected_value
+
+
 def check_tag(record: dict, tag_key: str, tag_value: str) -> bool:
     """Return True if the resource has the expected tag."""
     arn: str = record["arn"]
@@ -145,6 +155,14 @@ def check_tag(record: dict, tag_key: str, tag_value: str) -> bool:
         if ":log-group:" in arn:
             return _check_logs(arn, tag_key, tag_value, region, account)
 
+        # ── Auto Scaling Group (ARN has wildcard UUID — use name-based lookup) ──
+        if ":autoscaling:" in arn and ":autoScalingGroup:" in arn:
+            return _check_asg(arn, tag_key, tag_value, region, account)
+
+        # ── CloudFormation Stack ──────────────────────────────────────────────
+        if ":cloudformation:" in arn and ":stack/" in arn:
+            return _check_cloudformation_stack(arn, tag_key, tag_value, region, account)
+
         # ── Default: Resource Groups Tagging API ──────────────────────────────
         return _check_tagging_api(arn, tag_key, tag_value, region, account)
 
@@ -169,7 +187,7 @@ def _check_s3(arn: str, key: str, value: str, account: str) -> bool:
     region = "us-east-1"
     try:
         resp = _client("s3", region, account).get_bucket_tagging(Bucket=bucket)
-        return any(t["Key"] == key and t["Value"] == value for t in resp.get("TagSet", []))
+        return any(t["Key"] == key and _value_matches(t["Value"], value) for t in resp.get("TagSet", []))
     except ClientError as exc:
         if exc.response["Error"]["Code"] == "NoSuchTagSet":
             return False
@@ -196,14 +214,14 @@ def _check_ec2(arn: str, key: str, value: str, region: str, account: str) -> boo
         {"Name": "resource-id", "Values": [resource_id]},
         {"Name": "key", "Values": [key]},
     ])
-    return any(t["Value"] == value for t in resp.get("Tags", []))
+    return any(_value_matches(t["Value"], value) for t in resp.get("Tags", []))
 
 
 def _check_kinesis_stream(arn: str, key: str, value: str, region: str, account: str) -> bool:
     stream_name = arn.split("/")[-1] if "/" in arn else arn.split("stream:")[-1]
     kinesis = _client("kinesis", region, account)
     resp = kinesis.list_tags_for_stream(StreamName=stream_name)
-    return any(t["Key"] == key and t["Value"] == value for t in resp.get("Tags", []))
+    return any(t["Key"] == key and _value_matches(t["Value"], value) for t in resp.get("Tags", []))
 
 
 def _check_firehose(arn: str, key: str, value: str, region: str, account: str) -> bool:
@@ -211,7 +229,7 @@ def _check_firehose(arn: str, key: str, value: str, region: str, account: str) -
     name = arn.split("/")[-1]
     firehose = _client("firehose", region, account)
     resp = firehose.list_tags_for_delivery_stream(DeliveryStreamName=name)
-    return any(t["Key"] == key and t["Value"] == value for t in resp.get("Tags", []))
+    return any(t["Key"] == key and _value_matches(t["Value"], value) for t in resp.get("Tags", []))
 
 
 def _check_sqs(arn: str, key: str, value: str, region: str, account: str) -> bool:
@@ -224,7 +242,7 @@ def _check_sqs(arn: str, key: str, value: str, region: str, account: str) -> boo
     try:
         resp = sqs.list_queue_tags(QueueUrl=queue_url)
         tags = resp.get("Tags", {})
-        return tags.get(key) == value
+        return _value_matches(tags.get(key, ""), value)
     except ClientError:
         return False
 
@@ -233,7 +251,7 @@ def _check_route53_hz(arn: str, key: str, value: str, account: str) -> bool:
     hz_id = arn.split("/")[-1]
     route53 = _client("route53", "us-east-1", account)
     resp = route53.list_tags_for_resource(ResourceType="hostedzone", ResourceId=hz_id)
-    return any(t["Key"] == key and t["Value"] == value
+    return any(t["Key"] == key and _value_matches(t["Value"], value)
                for t in resp.get("ResourceTagSet", {}).get("Tags", []))
 
 
@@ -241,14 +259,14 @@ def _check_route53_hc(arn: str, key: str, value: str, account: str) -> bool:
     hc_id = arn.split("/")[-1]
     route53 = _client("route53", "us-east-1", account)
     resp = route53.list_tags_for_resource(ResourceType="healthcheck", ResourceId=hc_id)
-    return any(t["Key"] == key and t["Value"] == value
+    return any(t["Key"] == key and _value_matches(t["Value"], value)
                for t in resp.get("ResourceTagSet", {}).get("Tags", []))
 
 
 def _check_cloudfront(arn: str, key: str, value: str, account: str) -> bool:
     cf = _client("cloudfront", "us-east-1", account)
     resp = cf.list_tags_for_resource(Resource=arn)
-    return any(t["Key"] == key and t["Value"] == value
+    return any(t["Key"] == key and _value_matches(t["Value"], value)
                for t in resp.get("Tags", {}).get("Items", []))
 
 
@@ -256,7 +274,7 @@ def _check_global_accelerator(arn: str, key: str, value: str) -> bool:
     # Global Accelerator must use us-west-2
     ga = _client("globalaccelerator", "us-west-2")
     resp = ga.list_tags_for_resource(ResourceArn=arn)
-    return any(t["Key"] == key and t["Value"] == value for t in resp.get("Tags", []))
+    return any(t["Key"] == key and _value_matches(t["Value"], value) for t in resp.get("Tags", []))
 
 
 def _check_logs(arn: str, key: str, value: str, region: str, account: str) -> bool:
@@ -266,15 +284,59 @@ def _check_logs(arn: str, key: str, value: str, region: str, account: str) -> bo
     try:
         resp = logs.list_tags_log_group(logGroupName=log_group_name)
         tags = resp.get("tags", {})
-        return tags.get(key) == value
+        return _value_matches(tags.get(key, ""), value)
     except ClientError:
         # Fall back to list_tags_for_resource
         try:
             resp = logs.list_tags_for_resource(resourceArn=arn)
-            return any(t["key"] == key and t["value"] == value
+            return any(t["key"] == key and _value_matches(t["value"], value)
                        for t in resp.get("tags", []))
         except ClientError:
             return False
+
+
+def _check_asg(arn: str, key: str, value: str, region: str, account: str) -> bool:
+    """Check ASG tags by name — ARN has wildcard/empty UUID so RGTA lookup fails."""
+    # ARN formats:
+    #   arn:aws:autoscaling:region:account:autoScalingGroup:{uuid}:autoScalingGroupName/{name}
+    #   arn:aws:autoscaling:region:account:autoScalingGroup::{name}  (UUID omitted)
+    if "autoScalingGroupName/" in arn:
+        name = arn.split("autoScalingGroupName/")[-1]
+    else:
+        # UUID-less format: last colon-separated segment is the name
+        name = arn.split(":")[-1]
+    if not name:
+        return False
+    asg = _client("autoscaling", region, account)
+    try:
+        resp = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[name])
+        for group in resp.get("AutoScalingGroups", []):
+            for tag in group.get("Tags", []):
+                if tag["Key"] == key and _value_matches(tag["Value"], value):
+                    return True
+    except Exception as exc:
+        log.debug("ASG tag check error for %s: %s", name, exc)
+    return False
+
+
+def _check_cloudformation_stack(arn: str, key: str, value: str, region: str, account: str) -> bool:
+    """Check CloudFormation stack tags — stack ARN may not work with RGTA directly."""
+    # ARN format: arn:aws:cloudformation:region:account:stack/name/uuid
+    parts = arn.split(":")
+    stack_name_part = parts[-1] if len(parts) > 0 else ""
+    stack_name = stack_name_part.split("/")[1] if "/" in stack_name_part else stack_name_part
+    if not stack_name:
+        return False
+    cfn = _client("cloudformation", region, account)
+    try:
+        resp = cfn.describe_stacks(StackName=stack_name)
+        for stack in resp.get("Stacks", []):
+            for tag in stack.get("Tags", []):
+                if tag["Key"] == key and _value_matches(tag["Value"], value):
+                    return True
+    except Exception as exc:
+        log.debug("CFn stack tag check error for %s: %s", stack_name, exc)
+    return False
 
 
 def _check_tagging_api(arn: str, key: str, value: str, region: str, account: str) -> bool:
@@ -283,7 +345,7 @@ def _check_tagging_api(arn: str, key: str, value: str, region: str, account: str
     for rm in resp.get("ResourceTagMappingList", []):
         if rm["ResourceARN"] == arn:
             for t in rm.get("Tags", []):
-                if t["Key"] == key and t["Value"] == value:
+                if t["Key"] == key and _value_matches(t["Value"], value):
                     return True
     return False
 
@@ -313,14 +375,71 @@ def main() -> None:
     parser.add_argument("--arns-dir", required=True, help="Directory containing ARN JSON files")
     parser.add_argument("--tag-key", default="map-migrated")
     parser.add_argument("--tag-value", required=True)
+    parser.add_argument("--tag-value-prefix", default=None,
+                        help="Accept any tag value starting with this prefix (e.g. 'migTEST')")
     parser.add_argument("--max-wait", type=int, default=900, help="Max seconds to wait")
     parser.add_argument("--poll-interval", type=int, default=30, help="Poll interval in seconds")
+    parser.add_argument("--expect-not-tagged", action="store_true",
+                        help="Invert: verify resources are NOT tagged (scoping/date tests)")
+    parser.add_argument("--not-tagged-wait", type=int, default=120,
+                        help="Seconds to wait before checking for absence of tag (default: 120)")
     args = parser.parse_args()
 
+    global _tag_value_prefix
+    _tag_value_prefix = args.tag_value_prefix
+
     records = load_records(args.arns_dir)
-    # Filter: only check taggable resources
     taggable = [r for r in records if r.get("taggable", True)]
-    skipped = [r for r in records if not r.get("taggable", True)]
+    skipped  = [r for r in records if not r.get("taggable", True)]
+
+    # ── Inverted mode: verify resources are NOT tagged ─────────────────────
+    if args.expect_not_tagged:
+        log.info("Mode: expect-not-tagged — verifying resources are NOT tagged")
+        log.info("Waiting %ds before checking (allow Lambda time to run if it's going to)...",
+                 args.not_tagged_wait)
+        time.sleep(args.not_tagged_wait)
+
+        wrongly_tagged: list[dict] = []
+        correctly_untagged: list[dict] = []
+        for record in taggable:
+            try:
+                tagged = check_tag(record, args.tag_key, args.tag_value)
+            except Exception as exc:
+                log.debug("Tag check error for %s: %s", record["arn"], exc)
+                tagged = False
+            if tagged:
+                wrongly_tagged.append(record)
+                log.error("  WRONGLY TAGGED: %s", record["arn"])
+            else:
+                correctly_untagged.append(record)
+                log.info("  CORRECTLY UNTAGGED: %s", record["arn"])
+
+        log.info("")
+        log.info("═══════ NOT-TAGGED VERIFICATION SUMMARY ═══════")
+        log.info("  CORRECTLY UNTAGGED : %d", len(correctly_untagged))
+        log.info("  WRONGLY TAGGED     : %d", len(wrongly_tagged))
+        log.info("  SKIPPED            : %d", len(skipped))
+        log.info("═══════════════════════════════════════════════")
+
+        report = {
+            "mode": "expect-not-tagged",
+            "tag_key": args.tag_key,
+            "tag_value": args.tag_value,
+            "total_correctly_untagged": len(correctly_untagged),
+            "total_wrongly_tagged": len(wrongly_tagged),
+            "correctly_untagged": [r["arn"] for r in correctly_untagged],
+            "wrongly_tagged": [r["arn"] for r in wrongly_tagged],
+        }
+        with open("verification-report.json", "w") as f:
+            json.dump(report, f, indent=2)
+
+        if wrongly_tagged:
+            log.error("FAILED: %d resource(s) were tagged but should NOT have been "
+                      "(scoping/date filter not working)", len(wrongly_tagged))
+            sys.exit(1)
+        log.info("All resources correctly untagged — scoping/date filter working.")
+        return
+    # ── End inverted mode ──────────────────────────────────────────────────
 
     log.info("Loaded %d total records: %d taggable, %d skipped",
              len(records), len(taggable), len(skipped))

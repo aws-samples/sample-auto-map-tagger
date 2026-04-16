@@ -673,11 +673,6 @@ def delete_record(record: dict) -> None:
         safe_delete(_client("appstream", region, account).delete_fleet,
                     Name=resource_id, resource_desc=arn)
 
-    # ── Pinpoint ──────────────────────────────────────────────────────────────
-    elif service == "mobiletargeting":
-        safe_delete(_client("pinpoint", region, account).delete_app,
-                    ApplicationId=resource_id, resource_desc=arn)
-
     # ── Supply Chain ──────────────────────────────────────────────────────────
     elif service == "scn":
         safe_delete(_client("supplychain", region, account).delete_instance,
@@ -876,20 +871,42 @@ def _delete_location(arn: str, name: str, region: str, account: str) -> None:
 
 
 def _delete_cloudfront(arn: str, dist_id: str, account: str) -> None:
+    """Disable then delete a CloudFront distribution.
+
+    CloudFront requires: disable → wait for Deployed status → delete.
+    Skipping the wait leaves a dangling distribution pointing at a
+    deleted S3 bucket — a Palisade security finding (EpoxyMitigationsRisk).
+    """
     cf = _client("cloudfront", "us-east-1", account)
     try:
         resp = cf.get_distribution(Id=dist_id)
         etag = resp["ETag"]
         config = resp["Distribution"]["DistributionConfig"]
+        status = resp["Distribution"].get("Status", "")
+
         if config.get("Enabled"):
             config["Enabled"] = False
-            cf.update_distribution(
+            update_resp = cf.update_distribution(
                 DistributionConfig=config, Id=dist_id, IfMatch=etag
             )
-            log.info("Disabled CloudFront %s — will need to wait before deletion", dist_id)
-            # Don't wait — just record. Teardown can run again or use tag sweep.
-        else:
+            etag = update_resp["ETag"]
+            log.info("Disabled CloudFront %s — waiting for Deployed status...", dist_id)
+            status = "InProgress"
+
+        # Wait up to 10 minutes for the distribution to reach Deployed state
+        deadline = time.time() + 600
+        while status != "Deployed" and time.time() < deadline:
+            time.sleep(30)
+            resp = cf.get_distribution(Id=dist_id)
+            status = resp["Distribution"].get("Status", "")
+            etag = resp["ETag"]
+            log.info("  CloudFront %s status: %s", dist_id, status)
+
+        if status == "Deployed":
             safe_delete(cf.delete_distribution, Id=dist_id, IfMatch=etag, resource_desc=arn)
+            log.info("Deleted CloudFront %s", dist_id)
+        else:
+            log.warning("CloudFront %s did not reach Deployed within timeout — leaving disabled", dist_id)
     except Exception as exc:
         log.warning("CloudFront delete %s: %s", arn, exc)
 
@@ -1079,7 +1096,6 @@ DELETION_PRIORITY: dict[str, int] = {
     "datasync": 5,
     "geo": 5,
     "appstream": 5,
-    "mobiletargeting": 5,
     "scn": 5,
     "bedrock": 5,
     "rekognition": 5,
@@ -1170,15 +1186,84 @@ def _service_from_arn(arn: str) -> str:
 # Main
 # ---------------------------------------------------------------------------
 
+def tag_sweep_all(tag_value: str, regions: list[str]) -> None:
+    """--all mode: sweep all resources tagged with tag_value using resourcegroupstaggingapi.
+
+    Skips ARN file loading entirely — useful for nightly cleanup where there are
+    no ARN artifact files, only orphaned resources identified by the test MPE tag.
+    """
+    log.info(
+        "Running --all tag sweep for map-migrated=%s across regions: %s",
+        tag_value,
+        ", ".join(regions),
+    )
+    current_account = _get_current_account()
+    for region in regions:
+        try:
+            tagging = _client("resourcegroupstaggingapi", region, current_account)
+            paginator = tagging.get_paginator("get_resources")
+            found = 0
+            for page in paginator.paginate(
+                TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
+            ):
+                for rm in page.get("ResourceTagMappingList", []):
+                    arn = rm["ResourceARN"]
+                    log.info("  Tag sweep (%s): %s", region, arn)
+                    rec = {
+                        "arn": arn,
+                        "service": _service_from_arn(arn),
+                        "region": region,
+                        "account": current_account,
+                        "resource_id": arn.split("/")[-1],
+                    }
+                    try:
+                        delete_record(rec)
+                    except Exception as exc:
+                        log.warning("  Error deleting %s: %s", arn, exc)
+                    found += 1
+            log.info("  Region %s: swept %d resource(s)", region, found)
+        except Exception as exc:
+            log.warning("Tag sweep failed for region %s: %s", region, exc)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Tear down E2E test resources")
-    parser.add_argument("--arns-dir", required=True, help="Directory with ARN JSON files")
-    parser.add_argument("--pr", required=True, help="PR number (used for sweep)")
+    parser.add_argument("--arns-dir", default=None, help="Directory with ARN JSON files")
+    parser.add_argument("--pr", default=None, help="PR number (used for sweep)")
     parser.add_argument("--tag-value", default=None,
                         help="Tag value for orphan sweep (defaults to migTEST from records)")
     parser.add_argument("--no-sweep", action="store_true",
                         help="Skip the tag-based orphan sweep")
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        dest="sweep_all",
+        help=(
+            "Skip ARN file loading; instead sweep all resources tagged with "
+            "--tag-value using resourcegroupstaggingapi. Requires --tag-value."
+        ),
+    )
+    parser.add_argument(
+        "--regions",
+        default="ap-northeast-2,us-east-1,us-west-2",
+        help="Comma-separated regions for --all sweep (default: ap-northeast-2,us-east-1,us-west-2)",
+    )
     args = parser.parse_args()
+
+    # ── --all mode: pure tag-based sweep, no ARN file needed ─────────────────
+    if args.sweep_all:
+        if not args.tag_value:
+            log.error("--all requires --tag-value")
+            sys.exit(1)
+        regions = [r.strip() for r in args.regions.split(",") if r.strip()]
+        tag_sweep_all(args.tag_value, regions)
+        log.info("Teardown complete (--all mode).")
+        return
+
+    # ── Normal mode: ARN-file-based deletion + optional orphan sweep ──────────
+    if not args.arns_dir:
+        log.error("--arns-dir is required when not using --all")
+        sys.exit(1)
 
     # Load all records
     p = Path(args.arns_dir)

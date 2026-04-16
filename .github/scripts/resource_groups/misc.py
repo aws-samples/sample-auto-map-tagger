@@ -8,7 +8,6 @@ Creates:
   - Deadline Cloud farm + queue + fleet
   - Amazon Location Service (map, tracker, place index, route calculator)
   - AppStream fleet (no wait)
-  - Pinpoint app
   - AWS Supply Chain instance (no wait)
 """
 
@@ -48,7 +47,6 @@ def create(
     directconnect = boto3.client("directconnect", region_name=region)
     location = boto3.client("location", region_name=region)
     appstream = boto3.client("appstream", region_name=region)
-    pinpoint = boto3.client("pinpoint", region_name=region)
     s3 = boto3.client("s3", region_name=region)
     iam = boto3.client("iam")
 
@@ -331,21 +329,6 @@ def create(
         log.info("AppStream fleet: %s (not waiting)", fleet_arn)
     except Exception as exc:
         log.warning("AppStream fleet creation failed: %s", exc)
-
-    # ── Pinpoint app ──────────────────────────────────────────────────────────
-    try:
-        resp = pinpoint.create_app(
-            CreateApplicationRequest={
-                "Name": prefix("pinpoint"),
-                "tags": tags_dict,
-            }
-        )
-        pp_id = resp["ApplicationResponse"]["Id"]
-        pp_arn = f"arn:aws:mobiletargeting:{region}:{account}:apps/{pp_id}"
-        rec(pp_arn, "mobiletargeting", pp_id)
-        log.info("Pinpoint app: %s", pp_id)
-    except Exception as exc:
-        log.error("Pinpoint app creation failed: %s", exc)
 
     # ── AWS Supply Chain instance ─────────────────────────────────────────────
     try:
