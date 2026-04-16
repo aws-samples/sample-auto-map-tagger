@@ -1029,12 +1029,15 @@ def tag_sweep_all(tag_value: str, regions: list[str]) -> None:
 
     Skips ARN file loading entirely — useful for nightly cleanup where there are
     no ARN artifact files, only orphaned resources identified by the test MPE tag.
+    If tag_value is '*', matches any value for the map-migrated key.
     """
+    match_any = tag_value == "*"
     log.info(
         "Running --all tag sweep for map-migrated=%s across regions: %s",
-        tag_value,
+        "* (any value)" if match_any else tag_value,
         ", ".join(regions),
     )
+    tag_filter = [{"Key": "map-migrated"}] if match_any else [{"Key": "map-migrated", "Values": [tag_value]}]
     current_account = _get_current_account()
     for region in regions:
         try:
@@ -1042,7 +1045,7 @@ def tag_sweep_all(tag_value: str, regions: list[str]) -> None:
             paginator = tagging.get_paginator("get_resources")
             found = 0
             for page in paginator.paginate(
-                TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
+                TagFilters=tag_filter
             ):
                 for rm in page.get("ResourceTagMappingList", []):
                     arn = rm["ResourceARN"]

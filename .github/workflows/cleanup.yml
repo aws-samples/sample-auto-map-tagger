@@ -37,7 +37,7 @@ jobs:
         run: |
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --tag-value '*' \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -97,7 +97,7 @@ jobs:
         run: |
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --tag-value '*' \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -147,7 +147,7 @@ jobs:
         run: |
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --tag-value '*' \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -165,7 +165,7 @@ jobs:
         run: |
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --tag-value '*' \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -183,7 +183,7 @@ jobs:
         run: |
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --tag-value '*' \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -201,7 +201,7 @@ jobs:
         run: |
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --tag-value '*' \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -219,6 +219,6 @@ jobs:
         run: |
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --tag-value '*' \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
