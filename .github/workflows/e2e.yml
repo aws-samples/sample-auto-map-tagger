@@ -154,6 +154,7 @@ jobs:
             python3 delete_stackset.py \
               --name "$ss" \
               --accounts "${{ secrets.E2E_LINKED_ACCOUNT_IDS }}" \
+              --org-unit-ids "${{ secrets.AWS_SANDBOX_OU_ID }}" \
               --region ap-northeast-2 || true
           done
         continue-on-error: true
@@ -1542,5 +1543,6 @@ jobs:
           python3 delete_stackset.py \
             --name "$STACK_NAME-stackset" \
             --accounts "${{ secrets.E2E_LINKED_ACCOUNT_IDS }}" \
+            --org-unit-ids "${{ secrets.AWS_SANDBOX_OU_ID }}" \
             --region ap-northeast-2
         continue-on-error: true
