@@ -83,7 +83,89 @@ jobs:
           done
         continue-on-error: true
 
-      # ── Management account (StackSets live here) ──────────────────────────
+      # ── Linked accounts (clean these BEFORE deleting StackSets) ───────────
+
+      - name: Assume role — linked account 1
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+        continue-on-error: true
+
+      - name: Delete tagged resources — linked account 1
+        working-directory: .github/scripts
+        run: |
+          python3 teardown.py \
+            --all \
+            --tag-value migTEST0000001 \
+            --regions ap-northeast-2,us-east-1,us-west-2
+        continue-on-error: true
+
+      - name: Assume role — linked account 2
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED2_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+        continue-on-error: true
+
+      - name: Delete tagged resources — linked account 2
+        working-directory: .github/scripts
+        run: |
+          python3 teardown.py \
+            --all \
+            --tag-value migTEST0000001 \
+            --regions ap-northeast-2,us-east-1,us-west-2
+        continue-on-error: true
+
+      - name: Assume role — linked account 3
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED3_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+        continue-on-error: true
+
+      - name: Delete tagged resources — linked account 3
+        working-directory: .github/scripts
+        run: |
+          python3 teardown.py \
+            --all \
+            --tag-value migTEST0000001 \
+            --regions ap-northeast-2,us-east-1,us-west-2
+        continue-on-error: true
+
+      - name: Assume role — linked account 4
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED4_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+        continue-on-error: true
+
+      - name: Delete tagged resources — linked account 4
+        working-directory: .github/scripts
+        run: |
+          python3 teardown.py \
+            --all \
+            --tag-value migTEST0000001 \
+            --regions ap-northeast-2,us-east-1,us-west-2
+        continue-on-error: true
+
+      - name: Assume role — linked account 5
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED5_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+        continue-on-error: true
+
+      - name: Delete tagged resources — linked account 5
+        working-directory: .github/scripts
+        run: |
+          python3 teardown.py \
+            --all \
+            --tag-value migTEST0000001 \
+            --regions ap-northeast-2,us-east-1,us-west-2
+        continue-on-error: true
+
+      # ── Management account (StackSets — delete AFTER linked accounts) ─────
 
       - name: Assume role — management account
         uses: aws-actions/configure-aws-credentials@v4
@@ -102,123 +184,17 @@ jobs:
         continue-on-error: true
 
       - name: Delete stale StackSets — management account
+        working-directory: .github/scripts
         run: |
           for ss in $(aws cloudformation list-stack-sets \
               --status ACTIVE \
               --query 'Summaries[?starts_with(StackSetName, `map-auto-tagger-e2e-pr`)].StackSetName' \
               --output text \
               --region ap-northeast-2 2>/dev/null); do
-            echo "Removing all instances from StackSet: $ss"
-            # Delete all stack instances first (required before deleting the StackSet)
-            aws cloudformation delete-stack-instances \
-              --stack-set-name "$ss" \
-              --regions ap-northeast-2 \
-              --no-retain-stacks \
-              --deployment-targets 'OrganizationalUnitIds=[]' \
-              --region ap-northeast-2 2>/dev/null || \
-            aws cloudformation delete-stack-instances \
-              --stack-set-name "$ss" \
-              --accounts \
-                "${{ secrets.AWS_LINKED1_ACCOUNT_ID }}" \
-                "${{ secrets.AWS_LINKED2_ACCOUNT_ID }}" \
-                "${{ secrets.AWS_LINKED3_ACCOUNT_ID }}" \
-                "${{ secrets.AWS_LINKED4_ACCOUNT_ID }}" \
-                "${{ secrets.AWS_LINKED5_ACCOUNT_ID }}" \
-              --regions ap-northeast-2 \
-              --no-retain-stacks \
-              --region ap-northeast-2 2>/dev/null || true
-            sleep 5
             echo "Deleting StackSet: $ss"
-            aws cloudformation delete-stack-set --stack-set-name "$ss" --region ap-northeast-2 || true
+            python3 delete_stackset.py \
+              --name "$ss" \
+              --accounts "${{ secrets.AWS_LINKED1_ACCOUNT_ID }},${{ secrets.AWS_LINKED2_ACCOUNT_ID }},${{ secrets.AWS_LINKED3_ACCOUNT_ID }},${{ secrets.AWS_LINKED4_ACCOUNT_ID }},${{ secrets.AWS_LINKED5_ACCOUNT_ID }}" \
+              --region ap-northeast-2 || true
           done
-        continue-on-error: true
-
-      # ── Linked account 1 ──────────────────────────────────────────────────
-
-      - name: Assume role — linked account 1
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
-          aws-region: ap-northeast-2
-        continue-on-error: true
-
-      - name: Delete tagged resources — linked account 1
-        working-directory: .github/scripts
-        run: |
-          python3 teardown.py \
-            --all \
-            --tag-value migTEST0000001 \
-            --regions ap-northeast-2,us-east-1,us-west-2
-        continue-on-error: true
-
-      # ── Linked account 2 ──────────────────────────────────────────────────
-
-      - name: Assume role — linked account 2
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED2_ACCOUNT_ID }}:role/GitHubActionsE2ERole
-          aws-region: ap-northeast-2
-        continue-on-error: true
-
-      - name: Delete tagged resources — linked account 2
-        working-directory: .github/scripts
-        run: |
-          python3 teardown.py \
-            --all \
-            --tag-value migTEST0000001 \
-            --regions ap-northeast-2,us-east-1,us-west-2
-        continue-on-error: true
-
-      # ── Linked account 3 ──────────────────────────────────────────────────
-
-      - name: Assume role — linked account 3
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED3_ACCOUNT_ID }}:role/GitHubActionsE2ERole
-          aws-region: ap-northeast-2
-        continue-on-error: true
-
-      - name: Delete tagged resources — linked account 3
-        working-directory: .github/scripts
-        run: |
-          python3 teardown.py \
-            --all \
-            --tag-value migTEST0000001 \
-            --regions ap-northeast-2,us-east-1,us-west-2
-        continue-on-error: true
-
-      # ── Linked account 4 ──────────────────────────────────────────────────
-
-      - name: Assume role — linked account 4
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED4_ACCOUNT_ID }}:role/GitHubActionsE2ERole
-          aws-region: ap-northeast-2
-        continue-on-error: true
-
-      - name: Delete tagged resources — linked account 4
-        working-directory: .github/scripts
-        run: |
-          python3 teardown.py \
-            --all \
-            --tag-value migTEST0000001 \
-            --regions ap-northeast-2,us-east-1,us-west-2
-        continue-on-error: true
-
-      # ── Linked account 5 ──────────────────────────────────────────────────
-
-      - name: Assume role — linked account 5
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED5_ACCOUNT_ID }}:role/GitHubActionsE2ERole
-          aws-region: ap-northeast-2
-        continue-on-error: true
-
-      - name: Delete tagged resources — linked account 5
-        working-directory: .github/scripts
-        run: |
-          python3 teardown.py \
-            --all \
-            --tag-value migTEST0000001 \
-            --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
