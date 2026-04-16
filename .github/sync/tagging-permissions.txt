@@ -83,6 +83,7 @@ sns:TagResource
 sqs:DeleteMessage
 sqs:GetQueueAttributes
 sqs:ReceiveMessage
+sqs:SendMessage
 sqs:TagQueue
 ssm:AddTagsToResource
 states:TagResource

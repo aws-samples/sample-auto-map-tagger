@@ -248,6 +248,7 @@ Resources:
                   - sqs:ReceiveMessage
                   - sqs:DeleteMessage
                   - sqs:GetQueueAttributes
+                  - sqs:SendMessage
                 Resource:
                   - !GetAtt EventQueue.Arn
                   - !GetAtt EventDLQ.Arn
