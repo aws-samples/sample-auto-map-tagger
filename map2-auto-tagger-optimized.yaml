@@ -1689,7 +1689,7 @@ Resources:
       QueueName: !Sub 'map-auto-tagger-events-${MpeId}'
       VisibilityTimeout: 300
       MessageRetentionPeriod: 1209600  # 14 days
-      KmsMasterKeyId: alias/aws/sqs
+      SqsManagedSseEnabled: true
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt EventDLQ.Arn
         maxReceiveCount: 3
@@ -1700,7 +1700,7 @@ Resources:
     Properties:
       QueueName: !Sub 'map-auto-tagger-dlq-${MpeId}'
       MessageRetentionPeriod: 1209600  # 14 days
-      KmsMasterKeyId: alias/aws/sqs
+      SqsManagedSseEnabled: true
 
   # Lambda event source mapping — polls SQS and invokes Lambda
   EventQueueMapping:

@@ -1114,10 +1114,9 @@ jobs:
             --tag-key map-migrated \
             --tag-value "migTEST0000002" \
             --tag-value-prefix "migTEST" \
-            --max-wait 900 \
+            --max-wait 600 \
             --poll-interval 30
         working-directory: .github/scripts
-        continue-on-error: true
 
   verify-scope-account-negative:
     name: "[Scope] Verify out-of-scope resource is NOT tagged"
