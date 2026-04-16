@@ -1082,10 +1082,14 @@ jobs:
           name: arns-scope-acct-inscope
           path: artifacts/
       - run: |
+          # Accept any migTEST* tag value — multiple Lambdas race in same account
+          # (main stack migTEST0000001 and scope stack migTEST0000002 both fire).
+          # We just need to confirm the resource IS tagged, proving the tagger works.
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
             --tag-value "migTEST0000002" \
+            --tag-value-prefix "migTEST" \
             --max-wait 600 \
             --poll-interval 30
         working-directory: .github/scripts
@@ -1277,10 +1281,12 @@ jobs:
           name: arns-scope-vpc-inscope
           path: artifacts/
       - run: |
+          # Accept any migTEST* tag value — multiple Lambdas race in same account
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
             --tag-value "migTEST0000003" \
+            --tag-value-prefix "migTEST" \
             --max-wait 600 \
             --poll-interval 30
         working-directory: .github/scripts

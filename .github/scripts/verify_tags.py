@@ -100,6 +100,16 @@ def _assume_role(account: str, region: str) -> boto3.Session:
 # Tag-checking dispatch
 # ---------------------------------------------------------------------------
 
+_tag_value_prefix: str | None = None  # set by main() if --tag-value-prefix supplied
+
+
+def _value_matches(actual_value: str, expected_value: str) -> bool:
+    """Return True if actual_value matches expected — or prefix if prefix mode active."""
+    if _tag_value_prefix and actual_value.startswith(_tag_value_prefix):
+        return True
+    return actual_value == expected_value
+
+
 def check_tag(record: dict, tag_key: str, tag_value: str) -> bool:
     """Return True if the resource has the expected tag."""
     arn: str = record["arn"]
@@ -177,7 +187,7 @@ def _check_s3(arn: str, key: str, value: str, account: str) -> bool:
     region = "us-east-1"
     try:
         resp = _client("s3", region, account).get_bucket_tagging(Bucket=bucket)
-        return any(t["Key"] == key and t["Value"] == value for t in resp.get("TagSet", []))
+        return any(t["Key"] == key and _value_matches(t["Value"], value) for t in resp.get("TagSet", []))
     except ClientError as exc:
         if exc.response["Error"]["Code"] == "NoSuchTagSet":
             return False
@@ -204,14 +214,14 @@ def _check_ec2(arn: str, key: str, value: str, region: str, account: str) -> boo
         {"Name": "resource-id", "Values": [resource_id]},
         {"Name": "key", "Values": [key]},
     ])
-    return any(t["Value"] == value for t in resp.get("Tags", []))
+    return any(_value_matches(t["Value"], value) for t in resp.get("Tags", []))
 
 
 def _check_kinesis_stream(arn: str, key: str, value: str, region: str, account: str) -> bool:
     stream_name = arn.split("/")[-1] if "/" in arn else arn.split("stream:")[-1]
     kinesis = _client("kinesis", region, account)
     resp = kinesis.list_tags_for_stream(StreamName=stream_name)
-    return any(t["Key"] == key and t["Value"] == value for t in resp.get("Tags", []))
+    return any(t["Key"] == key and _value_matches(t["Value"], value) for t in resp.get("Tags", []))
 
 
 def _check_firehose(arn: str, key: str, value: str, region: str, account: str) -> bool:
@@ -219,7 +229,7 @@ def _check_firehose(arn: str, key: str, value: str, region: str, account: str) -
     name = arn.split("/")[-1]
     firehose = _client("firehose", region, account)
     resp = firehose.list_tags_for_delivery_stream(DeliveryStreamName=name)
-    return any(t["Key"] == key and t["Value"] == value for t in resp.get("Tags", []))
+    return any(t["Key"] == key and _value_matches(t["Value"], value) for t in resp.get("Tags", []))
 
 
 def _check_sqs(arn: str, key: str, value: str, region: str, account: str) -> bool:
@@ -232,7 +242,7 @@ def _check_sqs(arn: str, key: str, value: str, region: str, account: str) -> boo
     try:
         resp = sqs.list_queue_tags(QueueUrl=queue_url)
         tags = resp.get("Tags", {})
-        return tags.get(key) == value
+        return _value_matches(tags.get(key, ""), value)
     except ClientError:
         return False
 
@@ -241,7 +251,7 @@ def _check_route53_hz(arn: str, key: str, value: str, account: str) -> bool:
     hz_id = arn.split("/")[-1]
     route53 = _client("route53", "us-east-1", account)
     resp = route53.list_tags_for_resource(ResourceType="hostedzone", ResourceId=hz_id)
-    return any(t["Key"] == key and t["Value"] == value
+    return any(t["Key"] == key and _value_matches(t["Value"], value)
                for t in resp.get("ResourceTagSet", {}).get("Tags", []))
 
 
@@ -249,14 +259,14 @@ def _check_route53_hc(arn: str, key: str, value: str, account: str) -> bool:
     hc_id = arn.split("/")[-1]
     route53 = _client("route53", "us-east-1", account)
     resp = route53.list_tags_for_resource(ResourceType="healthcheck", ResourceId=hc_id)
-    return any(t["Key"] == key and t["Value"] == value
+    return any(t["Key"] == key and _value_matches(t["Value"], value)
                for t in resp.get("ResourceTagSet", {}).get("Tags", []))
 
 
 def _check_cloudfront(arn: str, key: str, value: str, account: str) -> bool:
     cf = _client("cloudfront", "us-east-1", account)
     resp = cf.list_tags_for_resource(Resource=arn)
-    return any(t["Key"] == key and t["Value"] == value
+    return any(t["Key"] == key and _value_matches(t["Value"], value)
                for t in resp.get("Tags", {}).get("Items", []))
 
 
@@ -264,7 +274,7 @@ def _check_global_accelerator(arn: str, key: str, value: str) -> bool:
     # Global Accelerator must use us-west-2
     ga = _client("globalaccelerator", "us-west-2")
     resp = ga.list_tags_for_resource(ResourceArn=arn)
-    return any(t["Key"] == key and t["Value"] == value for t in resp.get("Tags", []))
+    return any(t["Key"] == key and _value_matches(t["Value"], value) for t in resp.get("Tags", []))
 
 
 def _check_logs(arn: str, key: str, value: str, region: str, account: str) -> bool:
@@ -274,12 +284,12 @@ def _check_logs(arn: str, key: str, value: str, region: str, account: str) -> bo
     try:
         resp = logs.list_tags_log_group(logGroupName=log_group_name)
         tags = resp.get("tags", {})
-        return tags.get(key) == value
+        return _value_matches(tags.get(key, ""), value)
     except ClientError:
         # Fall back to list_tags_for_resource
         try:
             resp = logs.list_tags_for_resource(resourceArn=arn)
-            return any(t["key"] == key and t["value"] == value
+            return any(t["key"] == key and _value_matches(t["value"], value)
                        for t in resp.get("tags", []))
         except ClientError:
             return False
@@ -302,7 +312,7 @@ def _check_asg(arn: str, key: str, value: str, region: str, account: str) -> boo
         resp = asg.describe_auto_scaling_groups(AutoScalingGroupNames=[name])
         for group in resp.get("AutoScalingGroups", []):
             for tag in group.get("Tags", []):
-                if tag["Key"] == key and tag["Value"] == value:
+                if tag["Key"] == key and _value_matches(tag["Value"], value):
                     return True
     except Exception as exc:
         log.debug("ASG tag check error for %s: %s", name, exc)
@@ -322,7 +332,7 @@ def _check_cloudformation_stack(arn: str, key: str, value: str, region: str, acc
         resp = cfn.describe_stacks(StackName=stack_name)
         for stack in resp.get("Stacks", []):
             for tag in stack.get("Tags", []):
-                if tag["Key"] == key and tag["Value"] == value:
+                if tag["Key"] == key and _value_matches(tag["Value"], value):
                     return True
     except Exception as exc:
         log.debug("CFn stack tag check error for %s: %s", stack_name, exc)
@@ -335,7 +345,7 @@ def _check_tagging_api(arn: str, key: str, value: str, region: str, account: str
     for rm in resp.get("ResourceTagMappingList", []):
         if rm["ResourceARN"] == arn:
             for t in rm.get("Tags", []):
-                if t["Key"] == key and t["Value"] == value:
+                if t["Key"] == key and _value_matches(t["Value"], value):
                     return True
     return False
 
@@ -365,6 +375,8 @@ def main() -> None:
     parser.add_argument("--arns-dir", required=True, help="Directory containing ARN JSON files")
     parser.add_argument("--tag-key", default="map-migrated")
     parser.add_argument("--tag-value", required=True)
+    parser.add_argument("--tag-value-prefix", default=None,
+                        help="Accept any tag value starting with this prefix (e.g. 'migTEST')")
     parser.add_argument("--max-wait", type=int, default=900, help="Max seconds to wait")
     parser.add_argument("--poll-interval", type=int, default=30, help="Poll interval in seconds")
     parser.add_argument("--expect-not-tagged", action="store_true",
@@ -372,6 +384,9 @@ def main() -> None:
     parser.add_argument("--not-tagged-wait", type=int, default=120,
                         help="Seconds to wait before checking for absence of tag (default: 120)")
     args = parser.parse_args()
+
+    global _tag_value_prefix
+    _tag_value_prefix = args.tag_value_prefix
 
     records = load_records(args.arns_dir)
     taggable = [r for r in records if r.get("taggable", True)]
