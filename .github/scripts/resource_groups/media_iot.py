@@ -7,10 +7,7 @@ Creates:
   - IoT SiteWise asset model
   - IoT SiteWise asset (from model)
   - IoT SiteWise portal (no wait)
-  - IoT TwinMaker workspace
-  - IoT Greengrass component version
 
-Note: IVS is handled in global-us-east-1 (IVS is only available in us-east-1).
 """
 
 from __future__ import annotations
@@ -43,8 +40,6 @@ def create(
     mediaconvert = boto3.client("mediaconvert", region_name=region)
     iot = boto3.client("iot", region_name=region)
     iotsitewise = boto3.client("iotsitewise", region_name=region)
-    iottwinmaker = boto3.client("iottwinmaker", region_name=region)
-    greengrassv2 = boto3.client("greengrassv2", region_name=region)
     iam = boto3.client("iam")
 
     def rec(arn, service, resource_id, taggable=True):
@@ -149,58 +144,6 @@ def create(
     except Exception as exc:
         log.error("SiteWise portal creation failed: %s", exc)
 
-    # ── IoT TwinMaker workspace ───────────────────────────────────────────────
-    twinmaker_ws_id = prefix("tm-ws")
-    try:
-        s3 = boto3.client("s3", region_name=region)
-        tm_bucket = f"e2e-pr{pr_number}-{timestamp}-twinmaker-{account}"[:63].lower()
-        try:
-            if region == "us-east-1":
-                s3.create_bucket(Bucket=tm_bucket)
-            else:
-                s3.create_bucket(
-                    Bucket=tm_bucket,
-                    CreateBucketConfiguration={"LocationConstraint": region},
-                )
-        except Exception:
-            pass  # Bucket may already exist
-
-        tm_role_arn = _ensure_twinmaker_role(iam, account, prefix("tm-role"), tm_bucket)
-        resp = iottwinmaker.create_workspace(
-            workspaceId=twinmaker_ws_id,
-            s3Location=f"arn:aws:s3:::{tm_bucket}",
-            role=tm_role_arn,
-            tags=tags_dict,
-        )
-        tm_arn = resp["arn"]
-        rec(tm_arn, "iottwinmaker", twinmaker_ws_id)
-        log.info("TwinMaker workspace: %s", tm_arn)
-    except Exception as exc:
-        log.error("TwinMaker workspace creation failed: %s", exc)
-
-    # ── IoT Greengrass component version ──────────────────────────────────────
-    try:
-        component_name = f"com.e2e.{prefix('gg-comp').replace('-', '.')}"
-        component_recipe = json.dumps({
-            "RecipeFormatVersion": "2020-01-25",
-            "ComponentName": component_name,
-            "ComponentVersion": "1.0.0",
-            "ComponentDescription": "E2E test Greengrass component",
-            "ComponentPublisher": "E2E Test",
-            "Manifests": [{
-                "Platform": {"os": "linux"},
-                "Lifecycle": {"run": "echo 'hello from greengrass e2e'"},
-            }],
-        })
-        resp = greengrassv2.create_component_version(
-            inlineRecipe=component_recipe.encode(),
-            tags=tags_dict,
-        )
-        gg_arn = resp["arn"]
-        rec(gg_arn, "greengrass", component_name)
-        log.info("Greengrass component: %s", gg_arn)
-    except Exception as exc:
-        log.error("Greengrass component creation failed: %s", exc)
 
     return {"arns": arns, "outputs": {}}
 

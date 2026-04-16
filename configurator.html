@@ -3387,12 +3387,12 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'CreateAgentAlias','CreateDataSource','CreateAgentActionGroup','CreateSnapshots',
             'CreateDashboard','CreateAnalysis','CreateDataSet','RegisterUser',
             'CreateComputeEnvironment','CreateReplicationGroup','CreateCacheCluster',
-            'CreateActivity','CreateStateMachine','CreatePipe','CreateEventBus',
+            'CreateActivity','CreateStateMachine',
             'CreateAccelerator','PublishLayerVersion20181031','CreateAlias20150331',
             'CreateAddon','CreateTransitGatewayVpcAttachment','CreateFlowLogs',
-            'CreateClassificationJob','CreateUserPool','CreateIdentityPool',
-            'CreateDeploymentGroup','CreateBranch','CreateConfigurationProfile',
-            'CreateFirewallPolicy','CreateFirewall','CreateSamplingRule',
+            'CreateUserPool','CreateIdentityPool',
+            'CreateConfigurationProfile',
+            'CreateFirewallPolicy','CreateFirewall',
             'PutParameter','PutRule','PutDashboard','PutQueryDefinition',
             'CreateAutoScalingGroup','CreateSecurityGroup','CreateInternetGateway',
             'CreateRouteTable','CreateNetworkAcl','CreateNetworkInterface',
@@ -3400,15 +3400,12 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'CreateCustomerGateway','CreateCarrierGateway','CreateKeyPair',
             'CreateVpcPeeringConnection','CreateVpcLink','CreateLaunchTemplate',
             'CreateTargetGroup','CreateStack','CreateStackSet',
-            'CreateBot','CreateCollection','CreateVocabulary','CreateLanguageModel',
-            'CreateMedicalVocabulary','CreateWorkGroup','CreateWorkflow','CreateTrigger',
-            'CreateSchedule','CreateScheduleGroup','CreateDataset','CreateRecipe',
-            'CreatePolicyStore','CreateCertificateAuthority','CreateResourceShare',
+            'CreateCollection','CreateWorkGroup','CreateWorkflow','CreateTrigger',
+            'CreateDataset','CreateRecipe',
+            'CreateCertificateAuthority','CreateResourceShare',
             'CreateDBProxy','CreateHealthCheck','CreateDocument',
-            'CreateHttpNamespace','CreateIPSet','CreateRuleGroup',
+            'CreateHttpNamespace',
             'CreateTapePool','CreatePortfolio','CreateMesh',
-            'CreateMap','CreateTracker','CreatePlaceIndex','CreateRouteCalculator',
-            'CreateContainerService','CreateInstances','CreateRelationalDatabase',
             'CreateInstance','CreateBuild','CreateScript','CreateTask',
             'CreateApiKey',
             'CreateClusterV2','CreateServerlessCache',
@@ -3436,10 +3433,10 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'aws.gamelift','aws.kendra','aws.mediaconvert','aws.medialive','aws.mediapackage',
             'aws.m2','aws.resiliencehub','aws.finspace','aws.omics','aws.redshift-serverless',
             'aws.comprehend','aws.directconnect','aws.cloudhsm','aws.glacier','aws.bedrock',
-            'aws.bedrock-agent','aws.quicksight','aws.ivs','aws.apprunner','aws.pipes',
-            'aws.macie2','aws.guardduty','aws.inspector2','aws.securityhub','aws.xray',
-            'aws.athena','aws.batch','aws.codecommit','aws.codedeploy','aws.amplify',
-            'aws.servicecatalog','aws.ram','aws.acm-pca','aws.aoss','aws.events',
+            'aws.bedrock-agent','aws.quicksight',
+            'aws.securityhub',
+            'aws.athena',
+            'aws.servicecatalog','aws.ram','aws.acm-pca','aws.aoss',
             'aws.kinesisvideo','aws.dsql','aws.vpc-lattice','aws.bedrock-agentcore',
             'aws.payment-cryptography','aws.networkmanager','aws.workspaces-instances',
             'aws.dax','aws.drs','aws.deadline','aws.iot'
@@ -3450,7 +3447,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'tag:TagResources','tag:GetResources',
             // Compute
             'ec2:CreateTags','autoscaling:CreateOrUpdateTags','ecs:TagResource','eks:TagResource',
-            'lambda:TagResource','batch:TagResource','apprunner:TagResource','lightsail:TagResource',
+            'lambda:TagResource',
             'elasticbeanstalk:AddTags','elasticmapreduce:AddTags','emr-serverless:TagResource',
             // Storage
             's3:PutBucketTagging','s3:GetBucketTagging','elasticfilesystem:TagResource','fsx:TagResource',
@@ -3469,8 +3466,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'glue:TagResource','glue:GetDatabase','databrew:TagResource',
             'athena:TagResource',
             // Integration
-            'sns:TagResource','sqs:TagQueue','states:TagResource','events:TagResource',
-            'pipes:TagResource','scheduler:TagResource','appsync:TagResource','apigateway:TagResource',
+            'sns:TagResource','sqs:TagQueue','states:TagResource',
+            'appsync:TagResource','apigateway:TagResource',
             // SECURITY NOTE: API Gateway v1 REST API tagging requires both PUT and PATCH.
             // AWS maps tag_resource() to apigateway:PATCH internally (confirmed via AccessDenied testing).
             // Precedent: MAP Taggr (AppSec-approved) grants all 5 API GW methods (GET/PUT/PATCH/DELETE/POST).
@@ -3478,18 +3475,16 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'apigateway:PUT','apigateway:PATCH',
             // Management & Monitoring
             'logs:TagResource','cloudwatch:TagResource','ssm:AddTagsToResource',
-            'secretsmanager:TagResource','xray:TagResource','appconfig:TagResource',
+            'secretsmanager:TagResource','appconfig:TagResource',
             'servicediscovery:TagResource',
             // Security
             'kms:TagResource','acm:AddTagsToCertificate',
-            'acm-pca:TagCertificateAuthority','wafv2:TagResource','guardduty:TagResource',
-            'macie2:TagResource','cognito-idp:TagResource','cognito-identity:TagResource',
-            'access-analyzer:TagResource','verifiedpermissions:TagResource','detective:TagResource',
-            'securityhub:TagResource','inspector2:TagResource','cleanrooms:TagResource',
+            'acm-pca:TagCertificateAuthority',
+            'cognito-idp:TagResource','cognito-identity:TagResource',
+            'securityhub:TagResource',
             // Developer Tools
-            'codecommit:TagResource','codedeploy:TagResource','codepipeline:TagResource',
-            'amplify:TagResource','cloud9:TagResource','codeartifact:TagResource',
-            'codeguru-profiler:TagResource',
+            'codepipeline:TagResource',
+            'cloud9:TagResource',
             // CodeBuild: tags applied via UpdateProject; BatchGetProjects needed for tag resolution
             'codebuild:UpdateProject','codebuild:BatchGetProjects',
             // CloudFormation: tagging maps to UpdateStack internally
@@ -3500,28 +3495,26 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             // Migration & Transfer
             'transfer:TagResource','datasync:TagResource','storagegateway:AddTagsToResource',
             // ML / AI
-            'sagemaker:AddTags','comprehend:TagResource','rekognition:TagResource',
-            'kendra:TagResource','lex:TagResource','transcribe:TagResource',
+            'sagemaker:AddTags','comprehend:TagResource',
+            'kendra:TagResource',
             'bedrock:TagResource','aoss:TagResource','braket:TagResource',
             // IoT
             'iot:TagResource','iotanalytics:TagResource','iotevents:TagResource',
-            'iotsitewise:TagResource','iottwinmaker:TagResource','greengrass:TagResource',
+            'iotsitewise:TagResource',
             'kinesisvideo:TagStream','dsql:TagResource','vpc-lattice:TagResource',
             'bedrock-agentcore:TagResource','payment-cryptography:TagResource',
             'networkmanager:TagResource',
             // Media
-            'ivs:TagResource','ivschat:TagResource','mediaconvert:TagResource',
+            'mediaconvert:TagResource',
             'medialive:CreateTags','mediapackage:TagResource',
             // Other
             'ram:TagResource','appstream:TagResource','workspaces:CreateTags',
             'workspaces-web:TagResource','quicksight:TagResource','connect:TagResource',
             'managedblockchain:TagResource',
-            'gamelift:TagResource','geo:TagResource','timestream:TagResource','scn:TagResource',
-            'healthlake:TagResource','omics:TagResource','datazone:TagResource',
+            'gamelift:TagResource','timestream:TagResource',
+            'healthlake:TagResource','omics:TagResource',
             'resiliencehub:TagResource','deadline:TagResource','medical-imaging:TagResource',
             'securityhub:TagResource','cassandra:Alter',
-            'qbusiness:TagResource','frauddetector:TagResource',
-            'airflow:TagResource',
             'dax:TagResource','drs:TagResource',
             'kinesisvideo:TagStream',
             // IAM role tagging (iam:TagRole not covered by tag:TagResources)
@@ -3966,15 +3959,10 @@ ${crossAccountCode}
                       boto3.client('globalaccelerator', region_name='us-west-2').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
                       boto3.client('bedrock-agent', region_name=arn.split(':')[3]).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
-                  elif ':ivs:' in arn or ':apprunner:' in arn:
-                      svc = 'ivs' if ':ivs:' in arn else 'apprunner'
-                      boto3.client(svc, region_name=arn.split(':')[3] or region).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
                   elif ':memorydb:' in arn:
                       get_svc('memorydb').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':iot:' in arn and ':policy/' in arn:
                       get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
-                  elif ':lightsail:' in arn:
-                      get_svc('lightsail').tag_resource(resourceName=arn.split('/')[-1], tags=[{'key': tag_key, 'value': tag_value}])
                   else:
                       THROTTLE_CODES = {'ThrottlingException', 'RequestLimitExceeded', 'TooManyRequestsException'}
                       for attempt in range(4):
@@ -4174,9 +4162,6 @@ ${crossAccountCode}
                   elif event_name == 'CreateTargetGroup':
                       tgs = resp.get('targetGroups', [])
                       if tgs: arn = tgs[0].get('targetGroupArn')
-                  elif event_name == 'CreateApplication' and detail.get('eventSource') == 'codedeploy.amazonaws.com':
-                      n = req.get('applicationName')
-                      arn = f"arn:{p}:codedeploy:{region}:{account_id}:application:{n}" if n else None
                   elif event_name == 'CreateApplication' and 'kinesisanalytics' in detail.get('eventSource',''):
                       arn = (resp.get('applicationDetail') or {}).get('applicationARN')
                   elif event_name == 'CreateKeyspace':
@@ -4202,12 +4187,6 @@ ${crossAccountCode}
                   elif event_name == 'CreateTrigger':
                       n = req.get('name') or req.get('triggerName')
                       arn = f"arn:{p}:glue:{region}:{account_id}:trigger/{n}" if n else None
-                  elif event_name == 'CreateDomain' and detail.get('eventSource') == 'codeartifact.amazonaws.com':
-                      n = req.get('domain')
-                      arn = f"arn:{p}:codeartifact:{region}:{account_id}:domain/{n}" if n else None
-                  elif event_name == 'CreateRepository' and detail.get('eventSource') == 'codeartifact.amazonaws.com':
-                      domain = req.get('domain'); repo = req.get('repository')
-                      arn = f"arn:{p}:codeartifact:{region}:{account_id}:repository/{domain}/{repo}" if domain and repo else None
                   elif event_name in ['CreateRestApi', 'CreateApi']:
                       api_id = resp.get('id') or resp.get('apiId')
                       api_type = 'restapis' if event_name == 'CreateRestApi' else 'apis'
@@ -4284,10 +4263,6 @@ ${crossAccountCode}
                       boto3.client('quicksight', region_name=qs_r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
                       boto3.client('bedrock-agent', region_name=arn.split(':')[3]).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
-                  elif ':ivs:' in arn or ':apprunner:' in arn:
-                      svc = 'ivs' if ':ivs:' in arn else 'apprunner'
-                      r = arn.split(':')[3] or region
-                      boto3.client(svc, region_name=r).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
                   elif ':memorydb:' in arn:
                       get_svc('memorydb').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':iot:' in arn and ':policy/' in arn:
@@ -4322,8 +4297,6 @@ ${crossAccountCode}
                       boto3.client('networkmanager', region_name='us-east-1').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':kinesisvideo:' in arn:
                       get_svc('kinesisvideo').tag_stream(StreamARN=arn, Tags={tag_key: tag_value})
-                  elif ':lightsail:' in arn:
-                      get_svc('lightsail').tag_resource(resourceName=arn.split('/')[-1], tags=[{'key': tag_key, 'value': tag_value}])
                   else:
                       # Universal Resource Groups Tagging API
                       resp2 = _tag.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})

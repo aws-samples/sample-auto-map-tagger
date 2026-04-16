@@ -15,8 +15,6 @@ Creates:
   - Bedrock agent
   - Bedrock guardrail
   - Comprehend document classifier (no wait)
-  - Rekognition collection
-  - Transcribe vocabulary
   - HealthLake data store (no wait)
 """
 
@@ -286,41 +284,6 @@ def create(
         log.info("Comprehend classifier: %s (not waiting)", cls_arn)
     except Exception as exc:
         log.warning("Comprehend classifier creation failed: %s", exc)
-
-    # ── Rekognition collection ────────────────────────────────────────────────
-    try:
-        rekognition = boto3.client("rekognition", region_name=region)
-        coll_id = prefix("rekognition")
-        resp = rekognition.create_collection(
-            CollectionId=coll_id,
-            Tags=tags_dict,
-        )
-        coll_arn = resp["CollectionArn"]
-        # Rekognition API returns ARN without 'arn:' prefix — normalize it
-        if not coll_arn.startswith("arn:"):
-            coll_arn = "arn:" + coll_arn
-        rec(coll_arn, "rekognition", coll_id)
-        log.info("Rekognition collection: %s", coll_arn)
-    except Exception as exc:
-        log.error("Rekognition collection creation failed: %s", exc)
-
-    # ── Transcribe vocabulary ─────────────────────────────────────────────────
-    try:
-        transcribe = boto3.client("transcribe", region_name=region)
-        vocab_name = prefix("transcribe")
-        transcribe.create_vocabulary(
-            VocabularyName=vocab_name,
-            LanguageCode="en-US",
-            Phrases=["AWS", "MapMigrated", "CloudFormation", "E2E"],
-            Tags=tags,
-        )
-        vocab_arn = (
-            f"arn:aws:transcribe:{region}:{account}:vocabulary/{vocab_name}"
-        )
-        rec(vocab_arn, "transcribe", vocab_name)
-        log.info("Transcribe vocabulary: %s", vocab_name)
-    except Exception as exc:
-        log.error("Transcribe vocabulary creation failed: %s", exc)
 
     # ── HealthLake data store ─────────────────────────────────────────────────
     try:

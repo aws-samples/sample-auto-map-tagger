@@ -2,13 +2,8 @@
 devtools.py — Creates developer tooling resources for E2E tests.
 
 Creates:
-  - CodeCommit repository
   - CodeBuild project
-  - CodeDeploy application + deployment group
-  - CodePipeline pipeline (CodeCommit source → CodeBuild build)
-  - Amplify app
-  - CodeArtifact domain + repository
-  - CodeGuru Profiler profiling group
+  - CodePipeline pipeline
   - CloudFormation stack (simple S3 bucket template)
   - Service Catalog portfolio
 """
@@ -40,13 +35,8 @@ def create(
     tags = [{"Key": TAG_KEY, "Value": tag_value}]
     tags_dict = {TAG_KEY: tag_value}
 
-    codecommit = boto3.client("codecommit", region_name=region)
     codebuild = boto3.client("codebuild", region_name=region)
-    codedeploy = boto3.client("codedeploy", region_name=region)
     codepipeline = boto3.client("codepipeline", region_name=region)
-    amplify = boto3.client("amplify", region_name=region)
-    codeartifact = boto3.client("codeartifact", region_name=region)
-    codeguru = boto3.client("codeguruprofiler", region_name=region)
     cfn = boto3.client("cloudformation", region_name=region)
     servicecatalog = boto3.client("servicecatalog", region_name=region)
     iam = boto3.client("iam")
@@ -58,21 +48,6 @@ def create(
             resource_id=resource_id, tag_key=TAG_KEY, tag_value=tag_value,
             taggable=taggable,
         ))
-
-    # ── CodeCommit repository ─────────────────────────────────────────────────
-    repo_name = prefix("codecommit")
-    repo_arn = None
-    try:
-        resp = codecommit.create_repository(
-            repositoryName=repo_name,
-            repositoryDescription="E2E test CodeCommit repo",
-            tags=tags_dict,
-        )
-        repo_arn = resp["repositoryMetadata"]["Arn"]
-        rec(repo_arn, "codecommit", repo_name)
-        log.info("CodeCommit: %s", repo_arn)
-    except Exception as exc:
-        log.error("CodeCommit creation failed: %s", exc)
 
     # ── CodeBuild role ────────────────────────────────────────────────────────
     cb_role_arn = _ensure_codebuild_role(iam, account, prefix("cb-role"))
@@ -102,33 +77,6 @@ def create(
     except Exception as exc:
         log.error("CodeBuild creation failed: %s", exc)
 
-    # ── CodeDeploy application ────────────────────────────────────────────────
-    cd_app_name = prefix("codedeploy")
-    try:
-        codedeploy.create_application(applicationName=cd_app_name, computePlatform="Server")
-        cd_app_arn = f"arn:aws:codedeploy:{region}:{account}:application:{cd_app_name}"
-        rec(cd_app_arn, "codedeploy", cd_app_name)
-        log.info("CodeDeploy app: %s", cd_app_name)
-
-        # Deployment group (requires IAM role)
-        cd_role_arn = _ensure_codedeploy_role(iam, account, prefix("cd-role"))
-        dg_name = prefix("cd-dg")
-        codedeploy.create_deployment_group(
-            applicationName=cd_app_name,
-            deploymentGroupName=dg_name,
-            serviceRoleArn=cd_role_arn,
-            deploymentConfigName="CodeDeployDefault.AllAtOnce",
-            tags=tags,
-        )
-        dg_arn = (
-            f"arn:aws:codedeploy:{region}:{account}:deploymentgroup:"
-            f"{cd_app_name}/{dg_name}"
-        )
-        rec(dg_arn, "codedeploy", dg_name)
-        log.info("CodeDeploy DG: %s", dg_name)
-    except Exception as exc:
-        log.error("CodeDeploy creation failed: %s", exc)
-
     # ── S3 artifact bucket for CodePipeline ───────────────────────────────────
     artifact_bucket = f"e2e-pr{pr_number}-{timestamp}-devtools-{account}"
     artifact_bucket = artifact_bucket[:63].lower()
@@ -149,7 +97,7 @@ def create(
         log.warning("Artifact bucket: %s", exc)
 
     # ── CodePipeline ──────────────────────────────────────────────────────────
-    if repo_arn and cb_project_arn:
+    if cb_project_arn:
         cp_name = prefix("codepipeline")
         try:
             cp_role_arn = _ensure_codepipeline_role(iam, account, prefix("cp-role"))
@@ -169,12 +117,12 @@ def create(
                                 "actionTypeId": {
                                     "category": "Source",
                                     "owner": "AWS",
-                                    "provider": "CodeCommit",
+                                    "provider": "S3",
                                     "version": "1",
                                 },
                                 "configuration": {
-                                    "RepositoryName": repo_name,
-                                    "BranchName": "main",
+                                    "S3Bucket": artifact_bucket,
+                                    "S3ObjectKey": "source.zip",
                                     "PollForSourceChanges": "false",
                                 },
                                 "outputArtifacts": [{"name": "SourceOutput"}],
@@ -205,61 +153,6 @@ def create(
             log.info("CodePipeline: %s", cp_arn)
         except Exception as exc:
             log.error("CodePipeline creation failed: %s", exc)
-
-    # ── Amplify app ───────────────────────────────────────────────────────────
-    amplify_name = prefix("amplify")
-    try:
-        resp = amplify.create_app(
-            name=amplify_name,
-            tags=tags_dict,
-        )
-        amplify_arn = resp["app"]["appArn"]
-        rec(amplify_arn, "amplify", amplify_name)
-        log.info("Amplify: %s", amplify_arn)
-    except Exception as exc:
-        log.error("Amplify creation failed: %s", exc)
-
-    # ── CodeArtifact domain ───────────────────────────────────────────────────
-    ca_domain_name = prefix("ca-domain").replace("-", "")[:50]
-    ca_domain_arn = None
-    try:
-        resp = codeartifact.create_domain(
-            domain=ca_domain_name,
-            tags=tags,
-        )
-        ca_domain_arn = resp["domain"]["arn"]
-        rec(ca_domain_arn, "codeartifact", ca_domain_name, taggable=False)
-        log.info("CodeArtifact domain: %s", ca_domain_arn)
-    except Exception as exc:
-        log.error("CodeArtifact domain creation failed: %s", exc)
-
-    # ── CodeArtifact repository ───────────────────────────────────────────────
-    if ca_domain_arn:
-        ca_repo_name = prefix("ca-repo")
-        try:
-            resp = codeartifact.create_repository(
-                domain=ca_domain_name,
-                repository=ca_repo_name,
-                tags=tags,
-            )
-            ca_repo_arn = resp["repository"]["arn"]
-            rec(ca_repo_arn, "codeartifact", ca_repo_name)
-            log.info("CodeArtifact repo: %s", ca_repo_arn)
-        except Exception as exc:
-            log.error("CodeArtifact repo creation failed: %s", exc)
-
-    # ── CodeGuru Profiler ─────────────────────────────────────────────────────
-    cg_name = prefix("codeguru")
-    try:
-        resp = codeguru.create_profiling_group(
-            profilingGroupName=cg_name,
-            tags=tags_dict,
-        )
-        cg_arn = resp["profilingGroup"]["arn"]
-        rec(cg_arn, "codeguru-profiler", cg_name)
-        log.info("CodeGuru Profiler: %s", cg_arn)
-    except Exception as exc:
-        log.error("CodeGuru Profiler creation failed: %s", exc)
 
     # ── CloudFormation stack ──────────────────────────────────────────────────
     cfn_stack_name = prefix("cfn")
@@ -336,30 +229,6 @@ def _ensure_codebuild_role(iam_client, account: str, role_name: str) -> str:
         return f"arn:aws:iam::{account}:role/{role_name}"
     except Exception as exc:
         log.warning("CodeBuild role: %s", exc)
-        return f"arn:aws:iam::{account}:role/{role_name}"
-
-
-def _ensure_codedeploy_role(iam_client, account: str, role_name: str) -> str:
-    trust = json.dumps({
-        "Version": "2012-10-17",
-        "Statement": [{
-            "Effect": "Allow",
-            "Principal": {"Service": "codedeploy.amazonaws.com"},
-            "Action": "sts:AssumeRole",
-        }],
-    })
-    try:
-        resp = iam_client.create_role(RoleName=role_name, AssumeRolePolicyDocument=trust)
-        iam_client.attach_role_policy(
-            RoleName=role_name,
-            PolicyArn="arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole",
-        )
-        time.sleep(10)
-        return resp["Role"]["Arn"]
-    except iam_client.exceptions.EntityAlreadyExistsException:
-        return f"arn:aws:iam::{account}:role/{role_name}"
-    except Exception as exc:
-        log.warning("CodeDeploy role: %s", exc)
         return f"arn:aws:iam::{account}:role/{role_name}"
 
 

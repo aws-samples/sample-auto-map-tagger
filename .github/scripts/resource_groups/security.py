@@ -4,9 +4,6 @@ security.py — Creates security and compliance resources for E2E tests.
 Creates:
   - KMS key
   - ACM certificate (example.com, DNS validation — no wait)
-  - WAFv2 web ACL (REGIONAL)
-  - WAFv2 rule group (REGIONAL)
-  - GuardDuty detector
   - Cognito User Pool
   - Cognito Identity Pool
   - IAM role (S3 read policy)
@@ -15,7 +12,6 @@ Creates:
   - SSM parameter
   - AWS Backup vault + plan
   - AWS RAM resource share
-  - Access Analyzer
 """
 
 from __future__ import annotations
@@ -47,8 +43,6 @@ def create(
 
     kms = boto3.client("kms", region_name=region)
     acm = boto3.client("acm", region_name=region)
-    wafv2 = boto3.client("wafv2", region_name=region)
-    guardduty = boto3.client("guardduty", region_name=region)
     cognito_idp = boto3.client("cognito-idp", region_name=region)
     cognito_identity = boto3.client("cognito-identity", region_name=region)
     iam = boto3.client("iam")
@@ -57,7 +51,6 @@ def create(
     ssm = boto3.client("ssm", region_name=region)
     backup = boto3.client("backup", region_name=region)
     ram = boto3.client("ram", region_name=region)
-    access_analyzer = boto3.client("accessanalyzer", region_name=region)
 
     def rec(arn, service, resource_id, taggable=True):
         arns.append(make_record(
@@ -92,61 +85,6 @@ def create(
         log.info("ACM cert: %s", cert_arn)
     except Exception as exc:
         log.error("ACM certificate creation failed: %s", exc)
-
-    # ── WAFv2 web ACL ─────────────────────────────────────────────────────────
-    waf_acl_name = prefix("waf-acl")
-    try:
-        resp = wafv2.create_web_acl(
-            Name=waf_acl_name,
-            Scope="REGIONAL",
-            DefaultAction={"Allow": {}},
-            Rules=[],
-            VisibilityConfig={
-                "SampledRequestsEnabled": True,
-                "CloudWatchMetricsEnabled": True,
-                "MetricName": waf_acl_name.replace("-", ""),
-            },
-            Tags=tags,
-        )
-        waf_arn = resp["Summary"]["ARN"]
-        rec(waf_arn, "wafv2", waf_acl_name)
-        log.info("WAFv2 ACL: %s", waf_arn)
-    except Exception as exc:
-        log.error("WAFv2 ACL creation failed: %s", exc)
-
-    # ── WAFv2 rule group ──────────────────────────────────────────────────────
-    waf_rg_name = prefix("waf-rg")
-    try:
-        resp = wafv2.create_rule_group(
-            Name=waf_rg_name,
-            Scope="REGIONAL",
-            Capacity=10,
-            Rules=[],
-            VisibilityConfig={
-                "SampledRequestsEnabled": True,
-                "CloudWatchMetricsEnabled": True,
-                "MetricName": waf_rg_name.replace("-", ""),
-            },
-            Tags=tags,
-        )
-        rg_arn = resp["Summary"]["ARN"]
-        rec(rg_arn, "wafv2", waf_rg_name)
-        log.info("WAFv2 rule group: %s", rg_arn)
-    except Exception as exc:
-        log.error("WAFv2 rule group creation failed: %s", exc)
-
-    # ── GuardDuty detector ────────────────────────────────────────────────────
-    try:
-        resp = guardduty.create_detector(
-            Enable=True,
-            Tags=tags_dict,
-        )
-        detector_id = resp["DetectorId"]
-        detector_arn = f"arn:aws:guardduty:{region}:{account}:detector/{detector_id}"
-        rec(detector_arn, "guardduty", detector_id)
-        log.info("GuardDuty detector: %s", detector_id)
-    except Exception as exc:
-        log.error("GuardDuty detector creation failed: %s", exc)
 
     # ── Cognito User Pool ─────────────────────────────────────────────────────
     user_pool_id = None
@@ -319,18 +257,5 @@ def create(
     except Exception as exc:
         log.error("RAM resource share creation failed: %s", exc)
 
-    # ── Access Analyzer ───────────────────────────────────────────────────────
-    analyzer_name = prefix("analyzer")
-    try:
-        resp = access_analyzer.create_analyzer(
-            analyzerName=analyzer_name,
-            type="ACCOUNT",
-            tags=tags_dict,
-        )
-        analyzer_arn = resp["arn"]
-        rec(analyzer_arn, "access-analyzer", analyzer_name)
-        log.info("Access Analyzer: %s", analyzer_arn)
-    except Exception as exc:
-        log.error("Access Analyzer creation failed: %s", exc)
 
     return {"arns": arns, "outputs": {}}
