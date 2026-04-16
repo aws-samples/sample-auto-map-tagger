@@ -3913,6 +3913,8 @@ ${crossAccountCode}
                       vpc_id = detail['vpcId']
                   elif resp_els.get('vpcId'):
                       vpc_id = resp_els['vpcId']
+                  elif (detail.get('requestParameters') or {}).get('vpcId'):
+                      vpc_id = detail['requestParameters']['vpcId']
                   elif 'volumeId' in detail:
                       try:
                           resp = ec2.describe_volumes(VolumeIds=[detail['volumeId']])
