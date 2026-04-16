@@ -10,6 +10,7 @@ Creates:
   - Auto Scaling Group (with inline launch template)
   - Lambda function (python3.12 hello-world)
   - ECS cluster
+  - EKS cluster (minimal, no node groups)
   - ECR repository
   - CloudWatch Log Group
   - SNS topic
@@ -44,6 +45,7 @@ def create(
     ec2_res = boto3.resource("ec2", region_name=region)
     lambda_client = boto3.client("lambda", region_name=region)
     ecs = boto3.client("ecs", region_name=region)
+    eks = boto3.client("eks", region_name=region)
     ecr = boto3.client("ecr", region_name=region)
     logs_client = boto3.client("logs", region_name=region)
     sns = boto3.client("sns", region_name=region)
@@ -239,6 +241,28 @@ def create(
     except Exception as exc:
         log.error("ECS cluster creation failed: %s", exc)
 
+    # ── EKS cluster ───────────────────────────────────────────────────────────
+    eks_name = prefix("eks")
+    try:
+        eks_role_arn = _ensure_eks_role(iam, account, prefix("eks-role"))
+        eks_kwargs: dict = {
+            "name": eks_name,
+            "roleArn": eks_role_arn,
+            "resourcesVpcConfig": {
+                "endpointPublicAccess": True,
+                "endpointPrivateAccess": False,
+            },
+            "tags": {TAG_KEY: tag_value},
+        }
+        if subnet_ids and len(subnet_ids) >= 2:
+            eks_kwargs["resourcesVpcConfig"]["subnetIds"] = subnet_ids[:2]
+        resp = eks.create_cluster(**eks_kwargs)
+        eks_arn = resp["cluster"]["arn"]
+        rec(eks_arn, "eks", eks_name)
+        log.info("EKS cluster: %s (creation takes ~12 min, not waiting)", eks_name)
+    except Exception as exc:
+        log.error("EKS cluster creation failed: %s", exc)
+
     # ── ECR repository ────────────────────────────────────────────────────────
     try:
         resp = ecr.create_repository(
@@ -336,6 +360,34 @@ def _wait_volume_available(ec2_client, volume_id: str, max_secs: int = 60) -> No
             pass
         time.sleep(5)
     log.warning("Volume %s not available after %ds — continuing anyway", volume_id, max_secs)
+
+
+def _ensure_eks_role(iam_client, account: str, role_name: str) -> str:
+    """Return ARN of an EKS cluster role, creating it if needed."""
+    trust = json.dumps({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Service": "eks.amazonaws.com"},
+            "Action": "sts:AssumeRole",
+        }],
+    })
+    try:
+        resp = iam_client.create_role(
+            RoleName=role_name,
+            AssumeRolePolicyDocument=trust,
+        )
+        iam_client.attach_role_policy(
+            RoleName=role_name,
+            PolicyArn="arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+        )
+        time.sleep(10)
+        return resp["Role"]["Arn"]
+    except iam_client.exceptions.EntityAlreadyExistsException:
+        return f"arn:aws:iam::{account}:role/{role_name}"
+    except Exception as exc:
+        log.warning("EKS role creation failed (%s), using placeholder", exc)
+        return f"arn:aws:iam::{account}:role/{role_name}"
 
 
 def _ensure_lambda_role(iam_client, account: str, role_name: str) -> str:
