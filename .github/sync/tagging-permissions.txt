@@ -78,7 +78,11 @@ servicecatalog:TagResource
 servicecatalog:UpdatePortfolio
 servicecatalog:UpdateProduct
 servicediscovery:TagResource
+sns:Publish
 sns:TagResource
+sqs:DeleteMessage
+sqs:GetQueueAttributes
+sqs:ReceiveMessage
 sqs:TagQueue
 ssm:AddTagsToResource
 states:TagResource
