@@ -88,7 +88,7 @@ The auto-tagger covers **190+ AWS resource types** across every major service ca
 | **Migration** | Transfer Family, DataSync, DMS |
 | **IoT** | IoT Greengrass, IoT SiteWise, IoT TwinMaker |
 | **Media** | IVS (Channels + Chat), MediaConvert, MediaPackage |
-| **Emerging** | AWS Supply Chain, HealthLake, Omics, DataZone, Q Business, Location Service, Pinpoint |
+| **Emerging** | AWS Supply Chain, HealthLake, Omics, DataZone, Q Business, Location Service |
 | **Other** | AppStream 2.0, WorkSpaces Web, MWAA, GameLift, Service Catalog, Clean Rooms |
 
 > **Not taggable** (AWS platform limitations, not a tool issue): IoT Things, Lambda Layers, Glue Tables (only taggable at creation), Individual EventBridge Schedules, CloudWatch Log Streams.
