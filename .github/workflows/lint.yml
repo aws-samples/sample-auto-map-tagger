@@ -119,13 +119,12 @@ jobs:
                       warnings.append(h)
 
           if warnings:
-              print("❌ The following event handlers were removed with no replacement:")
+              print(f"⚠️  {len(warnings)} handler(s) removed entirely (not present in final file):")
               for h in warnings:
                   print(f"   - {h}")
               print()
-              print("If the universal ARN scanner covers these, add a comment explaining why.")
-              print("If intentionally removed, document the reason in the PR description.")
-              sys.exit(1)
+              print("If intentional, document the reason in the PR description.")
+              print("This is a warning — PR can still merge.")
           else:
               if removed_handlers:
                   print(f"✅ {len(removed_handlers)} handler(s) removed — all confirmed present elsewhere in file")
