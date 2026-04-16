@@ -19,10 +19,9 @@ defaults:
 
 env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
-  # MPE_ID drives the expected tag value.  Uses the unique run ID so every
-  # workflow run gets its own resource names — no collisions between
-  # concurrent or overlapping runs.
-  MPE_ID: mig${{ github.run_id }}
+  # MPE_ID drives the expected tag value.  Stored as a secret so the real
+  # test MPE is not hard-coded here; falls back to migTEST0000001 for forks.
+  MPE_ID: ${{ secrets.TEST_MPE_ID || 'migTEST0000001' }}
   STACK_NAME: map-auto-tagger-e2e-pr${{ github.event.pull_request.number }}
 
 # ---------------------------------------------------------------------------

@@ -71,27 +71,27 @@ It works by listening to AWS's own audit log (CloudTrail) and reacting automatic
 
 ## What Gets Tagged
 
-The auto-tagger covers **190+ AWS resource types** across every major service category — all confirmed through real-world testing across 9 AWS accounts.
+The auto-tagger covers **140 AWS resource types** across every major service category — all confirmed through real-world testing across 9 AWS accounts.
 
 | Category | Examples |
 |----------|---------|
-| **Compute** | EC2 instances, Lambda, ECS/EKS containers, Auto Scaling, EMR, Lightsail, App Runner, Elastic Beanstalk |
+| **Compute** | EC2 instances, Lambda, ECS/EKS containers, Auto Scaling, EMR, Elastic Beanstalk |
 | **Databases** | RDS (all engines), Aurora, DynamoDB, Neptune, Redshift, DocumentDB, MemoryDB, ElastiCache, OpenSearch |
 | **Storage** | S3 buckets, EFS, FSx (all variants), EBS snapshots, AMIs, ECR |
 | **Networking** | VPCs, Load Balancers, Transit Gateways, VPN, CloudFront, Route53, Global Accelerator |
-| **Analytics** | Kinesis, MSK (Kafka), Glue, Athena, OpenSearch, EMR, DataBrew, CodeArtifact |
-| **Messaging** | SNS, SQS, Amazon MQ (ActiveMQ + RabbitMQ), EventBridge |
-| **AI / ML** | SageMaker (all types), Bedrock (Agents, Guardrails, Flows, Prompts, Knowledge Bases), Comprehend, Rekognition, Kendra, Lex v2 |
-| **Security** | KMS, ACM, WAFv2, Macie, Cognito, GuardDuty, Verified Permissions, Detective |
-| **Integration** | Step Functions, EventBridge, API Gateway (REST + HTTP + WebSocket), AppSync |
-| **Developer Tools** | CodeBuild, CodeDeploy, CodePipeline, Amplify, CodeArtifact, CodeGuru |
+| **Analytics** | Kinesis, MSK (Kafka), Glue, Athena, OpenSearch, EMR, DataBrew |
+| **Messaging** | SNS, SQS, Amazon MQ (ActiveMQ + RabbitMQ) |
+| **AI / ML** | SageMaker (all types), Bedrock (Agents, Guardrails, Flows, Prompts, Knowledge Bases), Comprehend, Kendra |
+| **Security** | KMS, ACM, Cognito, Security Hub |
+| **Integration** | Step Functions, API Gateway (REST + HTTP + WebSocket), AppSync |
+| **Developer Tools** | CodeBuild, CodePipeline, CloudFormation, Cloud9, Service Catalog |
 | **Migration** | Transfer Family, DataSync, DMS |
-| **IoT** | IoT Greengrass, IoT SiteWise, IoT TwinMaker |
-| **Media** | IVS (Channels + Chat), MediaConvert, MediaPackage |
-| **Emerging** | AWS Supply Chain, HealthLake, Omics, DataZone, Q Business, Location Service |
-| **Other** | AppStream 2.0, WorkSpaces Web, MWAA, GameLift, Service Catalog, Clean Rooms |
+| **IoT** | IoT Core, IoT SiteWise, IoT Analytics, IoT Events |
+| **Media** | MediaConvert, MediaLive, MediaPackage |
+| **Emerging** | HealthLake, Omics, AppStream 2.0, Deadline Cloud |
+| **Other** | WorkSpaces Web, GameLift, Timestream |
 
-> **Not taggable** (AWS platform limitations, not a tool issue): IoT Things, Lambda Layers, Glue Tables (only taggable at creation), Individual EventBridge Schedules, CloudWatch Log Streams.
+> **Not taggable** (AWS platform limitations, not a tool issue): IoT Things, Lambda Layers, Glue Tables (only taggable at creation), CloudWatch Log Streams.
 
 ---
 
@@ -170,7 +170,7 @@ The tool has been validated through **extensive multi-phase end-to-end testing**
 - **55+ bugs** discovered and fixed
 
 **Phase 2 & 3** — Multi-account org validation across 9 AWS accounts (single account + org with 5 linked + 2 security OU accounts):
-- **190+ resource types** confirmed working
+- **140 resource types** confirmed working
 - **500+ resources** tagged across all accounts
 - All 88 MAP 2.0 eligible services verified against the official Included Services List
 - All MAP 2.0 eligible services tested (including Bedrock KBs, EMR Serverless, IoT, Media, Emerging)
@@ -189,7 +189,7 @@ The tool has been validated through **extensive multi-phase end-to-end testing**
 | ElastiCache, NAT Gateways | 2-5 min provisioning delay | Tag applied once resource becomes available |
 | ECS tasks | Require `propagateTags: SERVICE` in ECS service config | Customer setting, not auto-configurable |
 | EKS Auto Mode nodes | Node tagging requires NodePool configuration | Customer architecture change needed |
-| Global services | CloudFront/Route53/IVS require Lambda in us-east-1 | Handled automatically by deploy script |
+| Global services | CloudFront/Route53 require Lambda in us-east-1 | Handled automatically by deploy script |
 
 ---
 
@@ -211,7 +211,7 @@ The configurator takes ~2 minutes and produces a fully self-contained script wit
 | What | Detail |
 |------|--------|
 | **Purpose** | Auto-tag AWS resources for MAP 2.0 credits |
-| **Coverage** | 190+ resource types, all major AWS services |
+| **Coverage** | 140 resource types, all major AWS services |
 | **Latency** | typically 60–90 seconds (up to 15 minutes during high-volume activity) from creation to tagged |
 | **Deployment** | 1 command in CloudShell (single or org-wide) |
 | **Cost** | < $2/month per account |
