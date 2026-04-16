@@ -342,7 +342,10 @@ def create(
         )
         pp_id = resp["ApplicationResponse"]["Id"]
         pp_arn = f"arn:aws:mobiletargeting:{region}:{account}:apps/{pp_id}"
-        rec(pp_arn, "mobiletargeting", pp_id)
+        # Pinpoint (mobiletargeting) is not yet handled by the auto-tagger —
+        # CreateApp event from mobiletargeting.amazonaws.com is not in the
+        # EventBridge rule source list. Mark as non-taggable to skip verification.
+        rec(pp_arn, "mobiletargeting", pp_id, taggable=False)
         log.info("Pinpoint app: %s", pp_id)
     except Exception as exc:
         log.error("Pinpoint app creation failed: %s", exc)
