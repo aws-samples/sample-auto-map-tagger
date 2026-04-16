@@ -924,9 +924,9 @@ jobs:
 
   # ── Account scope test ─────────────────────────────────────────────────────
   deploy-scope-account:
-    name: "[Scope] Deploy account-scoped stack (linked1 only)"
+    name: "[Scope] Deploy account-scoped stack (single account only)"
     runs-on: ubuntu-latest
-    needs: [deploy-stackset]
+    needs: [deploy-single]
     permissions:
       id-token: write
       contents: read
@@ -942,7 +942,8 @@ jobs:
           ACCT=$(aws sts get-caller-identity --query Account --output text)
           S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
           aws s3api create-bucket --bucket "$S3_BUCKET" --region ap-northeast-2 --create-bucket-configuration LocationConstraint=ap-northeast-2 2>/dev/null || true
-          # Use distinct MPE ID to avoid IAM role name collision with main E2E stack
+          # Scope to the single account itself — Lambda processes events in its own account
+          # and verifies the account matches the scoped list before tagging.
           aws cloudformation deploy \
             --stack-name "${STACK_NAME}-scope-acct" \
             --template-file map2-auto-tagger-optimized.yaml \
@@ -950,7 +951,7 @@ jobs:
               MpeId="migTEST0000002" \
               AgreementStartDate="2024-01-01" \
               ScopeMode="account" \
-              ScopedAccountIds="${{ secrets.AWS_LINKED1_ACCOUNT_ID }}" \
+              ScopedAccountIds="${{ secrets.AWS_SINGLE_ACCOUNT_ID }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --s3-bucket "$S3_BUCKET" \
             --s3-prefix "e2e-scope-acct" \
@@ -958,7 +959,7 @@ jobs:
             --no-fail-on-empty-changeset
 
   create-scope-account-inscope:
-    name: "[Scope] Create resource in-scope account (linked1)"
+    name: "[Scope] Create resource in-scope (should be tagged)"
     runs-on: ubuntu-latest
     needs: [deploy-scope-account]
     permissions:
@@ -968,13 +969,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install boto3
-      - name: Create S3 bucket in linked1 (should be tagged)
+      - name: Create S3 bucket in single account (in scope — should be tagged)
         run: |
           python3 - <<'EOF'
           import boto3, json, os, time
@@ -998,7 +999,10 @@ jobs:
           if-no-files-found: warn
 
   create-scope-account-outscope:
-    name: "[Scope] Create resource out-of-scope account (linked2)"
+    # Deploy a second stack scoped to a NON-EXISTENT account ID — Lambda will filter
+    # out ALL resources since account 999999999999 never matches.
+    # Resources created in single account should NOT be tagged by this scoped Lambda.
+    name: "[Scope] Create resource out-of-scope (different account scope)"
     runs-on: ubuntu-latest
     needs: [deploy-scope-account]
     permissions:
@@ -1008,13 +1012,32 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED2_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
+      - name: Deploy out-of-scope stack (scoped to nonexistent account)
+        working-directory: .
+        run: |
+          ACCT=$(aws sts get-caller-identity --query Account --output text)
+          S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
+          # Stack scoped to 999999999999 — will never tag resources in this account
+          aws cloudformation deploy \
+            --stack-name "${STACK_NAME}-scope-acct-out" \
+            --template-file map2-auto-tagger-optimized.yaml \
+            --parameter-overrides \
+              MpeId="migTEST0000005" \
+              AgreementStartDate="2024-01-01" \
+              ScopeMode="account" \
+              ScopedAccountIds="999999999999" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --s3-bucket "$S3_BUCKET" \
+            --s3-prefix "e2e-scope-acct-out" \
+            --region ap-northeast-2 \
+            --no-fail-on-empty-changeset
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install boto3
-      - name: Create S3 bucket in linked2 (should NOT be tagged)
+      - name: Create S3 bucket (should NOT be tagged — account not in scope)
         run: |
           python3 - <<'EOF'
           import boto3, json, os, time
@@ -1024,7 +1047,7 @@ jobs:
           record = {"arn": f"arn:aws:s3:::{name}", "service": "s3", "region": "ap-northeast-2",
                     "account": boto3.client('sts').get_caller_identity()['Account'],
                     "resource_id": name, "taggable": True,
-                    "expected_tag_key": "map-migrated", "expected_tag_value": 'migTEST0000002'}
+                    "expected_tag_key": "map-migrated", "expected_tag_value": 'migTEST0000005'}
           with open('created-arns-scope-acct-outscope.json', 'w') as f:
               json.dump([record], f)
           print(f"Created S3 bucket: {name}")
@@ -1048,7 +1071,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1078,7 +1101,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED2_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1092,7 +1115,7 @@ jobs:
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
-            --tag-value "migTEST0000002" \
+            --tag-value "migTEST0000005" \
             --expect-not-tagged \
             --not-tagged-wait 120
         working-directory: .github/scripts
@@ -1468,7 +1491,7 @@ jobs:
             aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION" || true
           done
           # Delete scoped test stacks
-          for SUFFIX in scope-acct scope-vpc scope-date; do
+          for SUFFIX in scope-acct scope-acct-out scope-vpc scope-date; do
             aws cloudformation delete-stack --stack-name "${STACK_NAME}-${SUFFIX}" --region ap-northeast-2 || true
           done
           # Delete the stack deployed by deploy.sh test

@@ -286,9 +286,15 @@ def _check_logs(arn: str, key: str, value: str, region: str, account: str) -> bo
 
 
 def _check_asg(arn: str, key: str, value: str, region: str, account: str) -> bool:
-    """Check ASG tags by name — ARN has wildcard UUID so RGTA lookup fails."""
-    # ARN format: arn:aws:autoscaling:region:account:autoScalingGroup:*:autoScalingGroupName/{name}
-    name = arn.split("autoScalingGroupName/")[-1] if "autoScalingGroupName/" in arn else None
+    """Check ASG tags by name — ARN has wildcard/empty UUID so RGTA lookup fails."""
+    # ARN formats:
+    #   arn:aws:autoscaling:region:account:autoScalingGroup:{uuid}:autoScalingGroupName/{name}
+    #   arn:aws:autoscaling:region:account:autoScalingGroup::{name}  (UUID omitted)
+    if "autoScalingGroupName/" in arn:
+        name = arn.split("autoScalingGroupName/")[-1]
+    else:
+        # UUID-less format: last colon-separated segment is the name
+        name = arn.split(":")[-1]
     if not name:
         return False
     asg = _client("autoscaling", region, account)

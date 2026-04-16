@@ -296,6 +296,9 @@ def create(
             Tags=tags_dict,
         )
         coll_arn = resp["CollectionArn"]
+        # Rekognition API returns ARN without 'arn:' prefix — normalize it
+        if not coll_arn.startswith("arn:"):
+            coll_arn = "arn:" + coll_arn
         rec(coll_arn, "rekognition", coll_id)
         log.info("Rekognition collection: %s", coll_arn)
     except Exception as exc:
