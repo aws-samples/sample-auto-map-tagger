@@ -44,66 +44,29 @@ def main() -> None:
         log.info("StackSet %s does not exist — nothing to delete.", args.name)
         return
 
-    # ── Detect permission model ────────────────────────────────────────────
-    try:
-        ss_desc = cfn.describe_stack_set(StackSetName=args.name)
-        perm_model = ss_desc["StackSet"].get("PermissionModel", "SELF_MANAGED")
-    except ClientError:
-        perm_model = "SELF_MANAGED"
-    log.info("StackSet permission model: %s", perm_model)
-
     # ── Delete stack instances ────────────────────────────────────────────────
-    if perm_model == "SERVICE_MANAGED":
-        # SERVICE_MANAGED requires OrganizationalUnitIds, not Accounts
-        log.info("Discovering org root OU for SERVICE_MANAGED deletion...")
-        try:
-            orgs = boto3.client("organizations")
-            roots = orgs.list_roots()["Roots"]
-            root_id = roots[0]["Id"]
-            log.info("Using org root OU: %s", root_id)
-            resp = cfn.delete_stack_instances(
-                StackSetName=args.name,
-                DeploymentTargets={"OrganizationalUnitIds": [root_id]},
-                Regions=[args.region],
-                RetainStacks=False,
-                OperationPreferences={
-                    "MaxConcurrentPercentage": 100,
-                    "FailureTolerancePercentage": 100,
-                    "RegionConcurrencyType": "PARALLEL",
-                },
-            )
-            op_id = resp["OperationId"]
-            log.info("Delete instances operation: %s", op_id)
-            _wait_operation(cfn, args.name, op_id, "delete instances")
-        except ClientError as exc:
-            code = exc.response["Error"]["Code"]
-            if code in ("StackSetNotFoundException", "StackInstanceNotFoundException"):
-                log.info("No stack instances found — skipping instance deletion.")
-            else:
-                log.warning("Delete instances error (continuing): %s", exc)
-    else:
-        log.info("Deleting stack instances in accounts: %s region: %s", account_ids, args.region)
-        try:
-            resp = cfn.delete_stack_instances(
-                StackSetName=args.name,
-                DeploymentTargets={"Accounts": account_ids},
-                Regions=[args.region],
-                RetainStacks=False,
-                OperationPreferences={
-                    "MaxConcurrentPercentage": 100,
-                    "FailureTolerancePercentage": 100,
-                    "RegionConcurrencyType": "PARALLEL",
-                },
-            )
-            op_id = resp["OperationId"]
-            log.info("Delete instances operation: %s", op_id)
-            _wait_operation(cfn, args.name, op_id, "delete instances")
-        except ClientError as exc:
-            code = exc.response["Error"]["Code"]
-            if code in ("StackSetNotFoundException", "StackInstanceNotFoundException"):
-                log.info("No stack instances found — skipping instance deletion.")
-            else:
-                log.warning("Delete instances error (continuing): %s", exc)
+    log.info("Deleting stack instances in accounts: %s region: %s", account_ids, args.region)
+    try:
+        resp = cfn.delete_stack_instances(
+            StackSetName=args.name,
+            DeploymentTargets={"Accounts": account_ids},
+            Regions=[args.region],
+            RetainStacks=False,
+            OperationPreferences={
+                "MaxConcurrentPercentage": 100,
+                "FailureTolerancePercentage": 100,  # Don't fail on partial errors during cleanup
+                "RegionConcurrencyType": "PARALLEL",
+            },
+        )
+        op_id = resp["OperationId"]
+        log.info("Delete instances operation: %s", op_id)
+        _wait_operation(cfn, args.name, op_id, "delete instances")
+    except ClientError as exc:
+        code = exc.response["Error"]["Code"]
+        if code in ("StackSetNotFoundException", "StackInstanceNotFoundException"):
+            log.info("No stack instances found — skipping instance deletion.")
+        else:
+            log.warning("Delete instances error (continuing): %s", exc)
 
     # ── Delete the StackSet ───────────────────────────────────────────────────
     log.info("Deleting StackSet: %s", args.name)
