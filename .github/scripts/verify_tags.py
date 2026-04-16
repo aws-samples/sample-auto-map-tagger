@@ -210,6 +210,11 @@ def _check_ec2(arn: str, key: str, value: str, region: str, account: str) -> boo
     # Extract resource ID from ARN
     resource_id = arn.split("/")[-1]
     ec2 = _client("ec2", region, account)
+    # Placement group ARNs contain the name, but describe_tags needs the group ID
+    if ":placement-group/" in arn:
+        pgs = ec2.describe_placement_groups(GroupNames=[resource_id]).get("PlacementGroups", [])
+        if pgs:
+            resource_id = pgs[0]["GroupId"]
     resp = ec2.describe_tags(Filters=[
         {"Name": "resource-id", "Values": [resource_id]},
         {"Name": "key", "Values": [key]},
