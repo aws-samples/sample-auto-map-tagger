@@ -6,9 +6,6 @@ Creates (all in us-east-1):
   - CloudFront distribution (no wait)
   - Route53 hosted zone
   - Route53 health check
-  - IVS channel
-  - IVS chat room
-  - WAFv2 web ACL (CLOUDFRONT scope — must be us-east-1)
 """
 
 from __future__ import annotations
@@ -43,9 +40,6 @@ def create(
     s3 = boto3.client("s3", region_name=REGION)
     cloudfront = boto3.client("cloudfront", region_name=REGION)
     route53 = boto3.client("route53")
-    wafv2 = boto3.client("wafv2", region_name=REGION)
-    ivs = boto3.client("ivs", region_name=REGION)
-    ivschat = boto3.client("ivschat", region_name=REGION)
 
     def rec(arn, service, resource_id, taggable=True):
         arns.append(make_record(
@@ -155,51 +149,5 @@ def create(
     except Exception as exc:
         log.error("Route53 health check creation failed: %s", exc)
 
-    # ── IVS channel ───────────────────────────────────────────────────────────
-    try:
-        resp = ivs.create_channel(
-            name=prefix("ivs-channel"),
-            type="STANDARD",
-            tags=tags_dict,
-        )
-        ivs_arn = resp["channel"]["arn"]
-        rec(ivs_arn, "ivs", prefix("ivs-channel"))
-        log.info("IVS channel: %s", ivs_arn)
-    except Exception as exc:
-        log.error("IVS channel creation failed: %s", exc)
-
-    # ── IVS chat room ─────────────────────────────────────────────────────────
-    try:
-        resp = ivschat.create_room(
-            name=prefix("ivs-chat"),
-            tags=tags_dict,
-        )
-        chat_arn = resp["arn"]
-        rec(chat_arn, "ivschat", prefix("ivs-chat"))
-        log.info("IVS chat room: %s", chat_arn)
-    except Exception as exc:
-        log.error("IVS chat room creation failed: %s", exc)
-
-    # ── WAFv2 web ACL (CLOUDFRONT scope) ─────────────────────────────────────
-    # This MUST be created in us-east-1 for CloudFront
-    waf_acl_name = prefix("waf-cf")
-    try:
-        resp = wafv2.create_web_acl(
-            Name=waf_acl_name,
-            Scope="CLOUDFRONT",
-            DefaultAction={"Allow": {}},
-            Rules=[],
-            VisibilityConfig={
-                "SampledRequestsEnabled": True,
-                "CloudWatchMetricsEnabled": True,
-                "MetricName": waf_acl_name.replace("-", ""),
-            },
-            Tags=tags,
-        )
-        waf_arn = resp["Summary"]["ARN"]
-        rec(waf_arn, "wafv2", waf_acl_name)
-        log.info("WAFv2 CloudFront ACL: %s", waf_arn)
-    except Exception as exc:
-        log.error("WAFv2 CloudFront ACL creation failed: %s", exc)
 
     return {"arns": arns, "outputs": {}}

@@ -16,7 +16,7 @@ Customer-deployable CloudFormation solution that automatically tags newly create
 
 ## 🎯 Quick Facts
 
-- ✅ **190+ resource types proven working** — validated against 9 real AWS accounts including CT org
+- ✅ **140 resource types proven working** — validated against 9 real AWS accounts including CT org
 - ✅ **All 88 MAP-eligible services covered** — cross-referenced against official MAP Included Services List (6 April 2026)
 - ✅ **100% success rate** on all taggable MAP-eligible resources
 - ✅ **Typically 60–90 seconds** automatic tagging latency (CloudTrail → EventBridge → Lambda → Tag)
@@ -33,7 +33,7 @@ Customers manually tag resources for MAP 2.0 credits. They forget, tag incorrect
 
 ## Solution
 
-EventBridge catches resource creation events and triggers a Lambda that applies the correct `map-migrated` tag automatically — within typically 60–90 seconds of creation, across 190+ resource types spanning every major AWS service category.
+EventBridge catches resource creation events and triggers a Lambda that applies the correct `map-migrated` tag automatically — within typically 60–90 seconds of creation, across 140 resource types spanning every major AWS service category.
 
 ---
 
@@ -49,7 +49,7 @@ EventBridge catches resource creation events and triggers a Lambda that applies 
 
 ## Components
 
-- **`map2-auto-tagger-optimized.yaml`** — CloudFormation template (190+ services, IAM hardened)
+- **`map2-auto-tagger-optimized.yaml`** — CloudFormation template (140 services, IAM hardened)
 - **`configurator.html`** — Self-service UI. Generates a customized `deploy.sh` for CloudShell or local AWS CLI deployment.
 - **`editor.html`** — Day-2 operations UI. Add or remove accounts from an existing deployment without redeploying. Generates an `update.sh` script.
 
@@ -96,26 +96,26 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 
 ## 📊 Service Coverage
 
-### Fully Tested & Working (190+ resource types)
+### Fully Tested & Working (140 resource types)
 
 | Category | Key Services | Status |
 |----------|-------------|--------|
-| **Compute** | Lambda, EC2, ECS, EKS, Auto Scaling, App Runner, Batch, Lightsail, EMR, EMR Serverless, Elastic Beanstalk | ✅ |
+| **Compute** | Lambda, EC2, ECS, EKS, Auto Scaling, EMR, EMR Serverless, Elastic Beanstalk | ✅ |
 | **Storage** | S3, EFS, FSx (Lustre/ONTAP/OpenZFS), ECR, EBS, AMIs, Backup | ✅ |
 | **Database** | RDS (all engines + snapshots + replicas), Aurora, Neptune, DocumentDB, DynamoDB, DynamoDB DAX, Redshift, MemoryDB, OpenSearch, ElastiCache (incl. Serverless), MSK (incl. Serverless) | ✅ |
 | **Messaging** | Amazon MQ (ActiveMQ + RabbitMQ), SNS, SQS | ✅ |
 | **Networking** | VPC, Subnets, Security Groups, Load Balancers, Transit Gateway, VPN, CloudFront, Route53, Global Accelerator, Network Firewall, Direct Connect, VPC Lattice | ✅ |
-| **Analytics** | Kinesis (Data Streams + Video Streams), MSK, Glue (all types + DataBrew), Athena, OpenSearch, EMR, CodeArtifact | ✅ |
-| **Integration** | SNS, SQS, Step Functions, EventBridge (Rules + Buses + Pipes + Scheduler Groups), AppSync, API Gateway (REST + HTTP + WebSocket) | ✅ |
-| **ML & AI** | SageMaker (all types incl. Pipeline/FeatureStore/Domain), Bedrock (Agents + Guardrails + Flows + Prompts + Inference Profiles + Knowledge Bases + AgentCore), Comprehend, Rekognition, Kendra, Lex v2 | ✅ |
-| **Security** | KMS, ACM, WAFv2, Macie, GuardDuty, Cognito, Verified Permissions, Clean Rooms, Detective | ✅ |
-| **Developer** | CodeCommit, CodeBuild, CodeDeploy, CodePipeline, CloudFormation, Amplify, CodeArtifact, CodeGuru Profiler | ✅ |
-| **Management** | CloudWatch, SSM, Secrets Manager, X-Ray, AppConfig, MWAA, Transcribe | ✅ |
+| **Analytics** | Kinesis (Data Streams + Video Streams), MSK, Glue (all types + DataBrew), Athena, OpenSearch, EMR | ✅ |
+| **Integration** | SNS, SQS, Step Functions, AppSync, API Gateway (REST + HTTP + WebSocket) | ✅ |
+| **ML & AI** | SageMaker (all types incl. Pipeline/FeatureStore/Domain), Bedrock (Agents + Guardrails + Flows + Prompts + Inference Profiles + Knowledge Bases + AgentCore), Comprehend, Kendra | ✅ |
+| **Security** | KMS, ACM, Cognito, Security Hub | ✅ |
+| **Developer** | CodeBuild, CodePipeline, CloudFormation, Cloud9, Service Catalog | ✅ |
+| **Management** | CloudWatch, SSM, Secrets Manager, AppConfig, Service Discovery | ✅ |
 | **Migration** | Transfer Family (Servers + Connectors + Users), DataSync, DMS (Instances + Endpoints + Tasks + Serverless), Elastic Disaster Recovery | ✅ |
-| **IoT** | IoT Core (Topic Rules), IoT Greengrass, IoT SiteWise (Assets + Models + Gateways + Portals), IoT TwinMaker | ✅ |
-| **Media** | IVS (Channels + Chat), MediaConvert, MediaPackage | ✅ |
-| **Global** | CloudFront, Route53, Global Accelerator, IVS — via us-east-1/us-west-2 Lambda | ✅ |
-| **Emerging** | AWS Supply Chain, HealthLake, Omics, DataZone, Q Business, Location Service, AppStream 2.0, Deadline Cloud, Kinesis Video Streams | ✅ |
+| **IoT** | IoT Core (Topic Rules), IoT SiteWise (Assets + Models + Gateways + Portals), IoT Analytics, IoT Events | ✅ |
+| **Media** | MediaConvert, MediaLive, MediaPackage | ✅ |
+| **Global** | CloudFront, Route53, Global Accelerator — via us-east-1/us-west-2 Lambda | ✅ |
+| **Emerging** | HealthLake, Omics, AppStream 2.0, Deadline Cloud, Kinesis Video Streams | ✅ |
 
 ### Not Taggable — Confirmed AWS Platform Limitations
 
@@ -126,9 +126,7 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 | Keyspaces Tables | Resource Groups API doesn't support Cassandra/Keyspaces |
 | CloudWatch Log Streams | Inherit tags from parent Log Group by design |
 | API Gateway API Keys | ARN format rejected by all tagging APIs |
-| EventBridge Connections | UUID suffix in ARN makes it invalid for tagging |
 | Glue Tables | Can only be tagged at creation time via Tags param; post-creation tagging rejected |
-| Individual EventBridge Schedules | TagResource API only accepts schedule-group ARNs |
 | S3 Glacier Deep Archive | MAP ineligible — always excluded from credit calculations |
 | Fargate on EKS | MAP ineligible (Fargate on ECS IS eligible) |
 
@@ -178,9 +176,8 @@ AWS Resource Created
 
 | Global Service | Lambda Region |
 |---------------|--------------|
-| CloudFront, Route53, IVS, IVS Chat | us-east-1 |
+| CloudFront, Route53 | us-east-1 |
 | Global Accelerator | us-west-2 |
-| App Runner (if not in primary region) | ap-northeast-1 |
 
 **IAM note:** The Lambda execution role name uses `!Sub 'map-auto-tagger-role-${AWS::Region}'` to enable safe multi-region deployment (IAM is global; same role name would conflict across regions in the same account).
 
@@ -236,7 +233,7 @@ Validated across **9 real AWS accounts** (single account + multi-account org wit
 
 | Metric | Result |
 |--------|--------|
-| Resource types tested | **190+ unique** |
+| Resource types tested | **140 unique** |
 | Bugs found & fixed | **100+** |
 | False positives | **0** |
 | Lambda errors | **0** |

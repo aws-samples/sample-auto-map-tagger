@@ -421,32 +421,6 @@ def delete_record(record: dict) -> None:
         elif ":activity:" in arn:
             safe_delete(sfn.delete_activity, activityArn=arn, resource_desc=arn)
 
-    # ── EventBridge ───────────────────────────────────────────────────────────
-    elif service == "events":
-        events = _client("events", region, account)
-        if ":rule/" in arn:
-            # Remove targets first
-            parts = arn.split("/")
-            rule_name = parts[-1]
-            bus_name = parts[-2] if len(parts) > 2 else "default"
-            try:
-                targets = events.list_targets_by_rule(Rule=rule_name, EventBusName=bus_name)
-                ids = [t["Id"] for t in targets.get("Targets", [])]
-                if ids:
-                    safe_call_silent(events.remove_targets,
-                                     Rule=rule_name, EventBusName=bus_name, Ids=ids)
-            except Exception:
-                pass
-            safe_delete(events.delete_rule, Name=rule_name,
-                        EventBusName=bus_name, resource_desc=arn)
-        else:
-            safe_delete(events.delete_event_bus,
-                        Name=resource_id, resource_desc=arn)
-
-    elif service == "scheduler":
-        safe_delete(_client("scheduler", region, account).delete_schedule_group,
-                    Name=resource_id, resource_desc=arn)
-
     # ── API Gateway ───────────────────────────────────────────────────────────
     elif service == "apigateway":
         api_id = resource_id
@@ -480,15 +454,6 @@ def delete_record(record: dict) -> None:
     elif service == "acm":
         safe_delete(_client("acm", region, account).delete_certificate,
                     CertificateArn=arn, resource_desc=arn)
-
-    # ── WAFv2 ─────────────────────────────────────────────────────────────────
-    elif service == "wafv2":
-        _delete_wafv2(arn, resource_id, region, account)
-
-    # ── GuardDuty ─────────────────────────────────────────────────────────────
-    elif service == "guardduty":
-        safe_delete(_client("guardduty", region, account).delete_detector,
-                    DetectorId=resource_id, resource_desc=arn)
 
     # ── Cognito User Pool ─────────────────────────────────────────────────────
     elif service == "cognito-idp":
@@ -532,59 +497,15 @@ def delete_record(record: dict) -> None:
         safe_delete(_client("ram", region, account).delete_resource_share,
                     resourceShareArn=arn, resource_desc=arn)
 
-    # ── Access Analyzer ───────────────────────────────────────────────────────
-    elif service == "access-analyzer":
-        safe_delete(_client("accessanalyzer", region, account).delete_analyzer,
-                    analyzerName=resource_id, resource_desc=arn)
-
-    # ── CodeCommit ────────────────────────────────────────────────────────────
-    elif service == "codecommit":
-        safe_delete(_client("codecommit", region, account).delete_repository,
-                    repositoryName=resource_id, resource_desc=arn)
-
     # ── CodeBuild ─────────────────────────────────────────────────────────────
     elif service == "codebuild":
         safe_delete(_client("codebuild", region, account).delete_project,
                     name=resource_id, resource_desc=arn)
 
-    # ── CodeDeploy ────────────────────────────────────────────────────────────
-    elif service == "codedeploy":
-        cd = _client("codedeploy", region, account)
-        if "/" in resource_id:
-            app, dg = resource_id.split("/", 1)
-            safe_delete(cd.delete_deployment_group,
-                        applicationName=app, deploymentGroupName=dg, resource_desc=arn)
-        else:
-            safe_delete(cd.delete_application,
-                        applicationName=resource_id, resource_desc=arn)
-
     # ── CodePipeline ──────────────────────────────────────────────────────────
     elif service == "codepipeline":
         safe_delete(_client("codepipeline", region, account).delete_pipeline,
                     name=resource_id, resource_desc=arn)
-
-    # ── Amplify ───────────────────────────────────────────────────────────────
-    elif service == "amplify":
-        app_id = arn.split("/")[-1]
-        safe_delete(_client("amplify", region, account).delete_app,
-                    appId=app_id, resource_desc=arn)
-
-    # ── CodeArtifact ──────────────────────────────────────────────────────────
-    elif service == "codeartifact":
-        ca = _client("codeartifact", region, account)
-        if ":repository/" in arn:
-            parts = arn.split("/")
-            domain = parts[-3] if len(parts) >= 3 else resource_id
-            repo = parts[-1]
-            safe_delete(ca.delete_repository,
-                        domain=domain, repository=repo, resource_desc=arn)
-        elif ":domain/" in arn:
-            safe_delete(ca.delete_domain, domain=resource_id, resource_desc=arn)
-
-    # ── CodeGuru Profiler ─────────────────────────────────────────────────────
-    elif service == "codeguru-profiler":
-        safe_delete(_client("codeguruprofiler", region, account).delete_profiling_group,
-                    profilingGroupName=resource_id, resource_desc=arn)
 
     # ── CloudFormation ────────────────────────────────────────────────────────
     elif service == "cloudformation":
@@ -605,6 +526,11 @@ def delete_record(record: dict) -> None:
     elif service == "ecs":
         ecs = _client("ecs", region, account)
         safe_delete(ecs.delete_cluster, cluster=arn, resource_desc=arn)
+
+    # ── EKS ───────────────────────────────────────────────────────────────────
+    elif service == "eks":
+        eks = _client("eks", region, account)
+        safe_delete(eks.delete_cluster, name=resource_id, resource_desc=arn)
 
     # ── ECR ───────────────────────────────────────────────────────────────────
     elif service == "ecr":
@@ -636,16 +562,6 @@ def delete_record(record: dict) -> None:
     elif service == "iotsitewise":
         _delete_iotsitewise(arn, resource_id, region, account)
 
-    # ── IoT TwinMaker ─────────────────────────────────────────────────────────
-    elif service == "iottwinmaker":
-        safe_delete(_client("iottwinmaker", region, account).delete_workspace,
-                    workspaceId=resource_id, resource_desc=arn)
-
-    # ── Greengrass ────────────────────────────────────────────────────────────
-    elif service == "greengrass":
-        safe_delete(_client("greengrassv2", region, account).delete_component,
-                    arn=arn, resource_desc=arn)
-
     # ── Transfer Family ───────────────────────────────────────────────────────
     elif service == "transfer":
         _delete_transfer(arn, resource_id, region, account)
@@ -664,19 +580,10 @@ def delete_record(record: dict) -> None:
         safe_delete(_client("directconnect", region, account).delete_lag,
                     lagId=lag_id, resource_desc=arn)
 
-    # ── Location Service ──────────────────────────────────────────────────────
-    elif service == "geo":
-        _delete_location(arn, resource_id, region, account)
-
     # ── AppStream ─────────────────────────────────────────────────────────────
     elif service == "appstream":
         safe_delete(_client("appstream", region, account).delete_fleet,
                     Name=resource_id, resource_desc=arn)
-
-    # ── Supply Chain ──────────────────────────────────────────────────────────
-    elif service == "scn":
-        safe_delete(_client("supplychain", region, account).delete_instance,
-                    instanceId=resource_id, resource_desc=arn)
 
     # ── CloudFront ────────────────────────────────────────────────────────────
     elif service == "cloudfront" or ":cloudfront::" in arn:
@@ -690,28 +597,9 @@ def delete_record(record: dict) -> None:
     elif service == "globalaccelerator":
         _delete_global_accelerator(arn, account)
 
-    # ── IVS ───────────────────────────────────────────────────────────────────
-    elif service == "ivs":
-        safe_delete(_client("ivs", "us-east-1", account).delete_channel,
-                    arn=arn, resource_desc=arn)
-
-    elif service == "ivschat":
-        safe_delete(_client("ivschat", "us-east-1", account).delete_room,
-                    identifier=arn, resource_desc=arn)
-
     # ── Bedrock ───────────────────────────────────────────────────────────────
     elif service == "bedrock":
         _delete_bedrock(arn, resource_id, region, account)
-
-    # ── Rekognition ───────────────────────────────────────────────────────────
-    elif service == "rekognition":
-        safe_delete(_client("rekognition", region, account).delete_collection,
-                    CollectionId=resource_id, resource_desc=arn)
-
-    # ── Transcribe ────────────────────────────────────────────────────────────
-    elif service == "transcribe":
-        safe_delete(_client("transcribe", region, account).delete_vocabulary,
-                    VocabularyName=resource_id, resource_desc=arn)
 
     # ── Deadline ──────────────────────────────────────────────────────────────
     elif service == "deadline":
@@ -769,33 +657,6 @@ def _is_s3(arn: str) -> bool:
 
 def _is_ec2_resource(arn: str, resource_type: str) -> bool:
     return f":{resource_type}/" in arn and ":ec2:" in arn
-
-
-def _delete_wafv2(arn: str, name: str, region: str, account: str) -> None:
-    wafv2 = _client("wafv2", region, account)
-    scope = "CLOUDFRONT" if region == "us-east-1" and "CLOUDFRONT" in arn else "REGIONAL"
-    try:
-        if ":webacl/" in arn:
-            acl_id = arn.split("/")[-1]
-            resp = wafv2.get_web_acl(Name=name, Scope=scope, Id=acl_id)
-            lock_token = resp["WebACL"]["LockToken"]  # not standard — use list
-            resp2 = wafv2.list_web_acls(Scope=scope)
-            for item in resp2.get("WebACLs", []):
-                if item["ARN"] == arn:
-                    safe_delete(wafv2.delete_web_acl, Name=name, Scope=scope,
-                                Id=item["Id"], LockToken=item["LockToken"],
-                                resource_desc=arn)
-                    break
-        elif ":rulegroup/" in arn:
-            resp = wafv2.list_rule_groups(Scope=scope)
-            for item in resp.get("RuleGroups", []):
-                if item["ARN"] == arn:
-                    safe_delete(wafv2.delete_rule_group, Name=name, Scope=scope,
-                                Id=item["Id"], LockToken=item["LockToken"],
-                                resource_desc=arn)
-                    break
-    except Exception as exc:
-        log.warning("WAFv2 delete %s: %s", arn, exc)
 
 
 def _delete_sagemaker(arn: str, name: str, region: str, account: str) -> None:
@@ -1049,8 +910,6 @@ DELETION_PRIORITY: dict[str, int] = {
     "ecr": 3,
     "autoscaling": 3,
     "states": 3,
-    "events": 3,
-    "scheduler": 3,
     "apigateway": 3,
     "appsync": 3,
     "sns": 3,
@@ -1061,13 +920,8 @@ DELETION_PRIORITY: dict[str, int] = {
     "glue": 3,
     "athena": 3,
     "dynamodb": 3,
-    "codecommit": 3,
     "codebuild": 3,
-    "codedeploy": 3,
     "codepipeline": 3,
-    "amplify": 3,
-    "codeartifact": 3,
-    "codeguru-profiler": 3,
     "cloudformation": 3,
     "catalog": 3,
 
@@ -1075,13 +929,10 @@ DELETION_PRIORITY: dict[str, int] = {
     "secretsmanager": 4,
     "kms": 4,
     "acm": 4,
-    "wafv2": 4,
-    "guardduty": 4,
     "cognito-idp": 4,
     "cognito-identity": 4,
     "backup": 4,
     "ram": 4,
-    "access-analyzer": 4,
     "cloudwatch": 4,
     "ssm": 4,
     "logs": 4,
@@ -1090,16 +941,10 @@ DELETION_PRIORITY: dict[str, int] = {
     "mediaconvert": 5,
     "iot": 5,
     "iotsitewise": 5,
-    "iottwinmaker": 5,
-    "greengrass": 5,
     "transfer": 5,
     "datasync": 5,
-    "geo": 5,
     "appstream": 5,
-    "scn": 5,
     "bedrock": 5,
-    "rekognition": 5,
-    "transcribe": 5,
     "deadline": 5,
     "dms": 5,
 
@@ -1107,8 +952,6 @@ DELETION_PRIORITY: dict[str, int] = {
     "cloudfront": 6,
     "route53": 6,
     "globalaccelerator": 6,
-    "ivs": 6,
-    "ivschat": 6,
     "directconnect": 6,
 
     # Seventh: EC2 compute (before networking)

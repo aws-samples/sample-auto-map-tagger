@@ -45,7 +45,6 @@ def create(
     transfer = boto3.client("transfer", region_name=region)
     datasync = boto3.client("datasync", region_name=region)
     directconnect = boto3.client("directconnect", region_name=region)
-    location = boto3.client("location", region_name=region)
     appstream = boto3.client("appstream", region_name=region)
     s3 = boto3.client("s3", region_name=region)
     iam = boto3.client("iam")

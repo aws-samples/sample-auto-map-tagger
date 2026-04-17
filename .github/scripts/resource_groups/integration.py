@@ -7,9 +7,6 @@ Creates:
   - SQS FIFO queue
   - Step Functions state machine
   - Step Functions activity
-  - EventBridge rule
-  - EventBridge event bus
-  - EventBridge schedule group
   - API Gateway REST API
   - API Gateway HTTP API
   - API Gateway WebSocket API
@@ -47,8 +44,6 @@ def create(
     sns = boto3.client("sns", region_name=region)
     sqs = boto3.client("sqs", region_name=region)
     sfn = boto3.client("stepfunctions", region_name=region)
-    events = boto3.client("events", region_name=region)
-    scheduler = boto3.client("scheduler", region_name=region)
     apigw_v1 = boto3.client("apigateway", region_name=region)
     apigw_v2 = boto3.client("apigatewayv2", region_name=region)
     appsync = boto3.client("appsync", region_name=region)
@@ -153,49 +148,6 @@ def create(
         log.info("SFN Activity: %s", activity_arn)
     except Exception as exc:
         log.error("SFN Activity creation failed: %s", exc)
-
-    # ── EventBridge event bus ─────────────────────────────────────────────────
-    bus_name = prefix("evtbus")
-    bus_arn = None
-    try:
-        resp = events.create_event_bus(Name=bus_name, Tags=tags)
-        bus_arn = resp["EventBusArn"]
-        rec(bus_arn, "events", bus_name)
-        log.info("EventBridge bus: %s", bus_arn)
-    except Exception as exc:
-        log.error("EventBridge bus creation failed: %s", exc)
-
-    # ── EventBridge rule ──────────────────────────────────────────────────────
-    rule_name = prefix("evtrule")
-    try:
-        rule_kwargs: dict = {
-            "Name": rule_name,
-            "EventPattern": json.dumps({
-                "source": ["aws.ec2"],
-                "detail-type": ["EC2 Instance State-change Notification"],
-            }),
-            "State": "ENABLED",
-            "Tags": tags,
-        }
-        if bus_arn:
-            rule_kwargs["EventBusName"] = bus_name
-
-        resp = events.put_rule(**rule_kwargs)
-        rule_arn = resp["RuleArn"]
-        rec(rule_arn, "events", rule_name)
-        log.info("EventBridge rule: %s", rule_arn)
-    except Exception as exc:
-        log.error("EventBridge rule creation failed: %s", exc)
-
-    # ── EventBridge schedule group ────────────────────────────────────────────
-    sg_name = prefix("evtsched")
-    try:
-        resp = scheduler.create_schedule_group(Name=sg_name, Tags=tags)
-        sg_arn = resp["ScheduleGroupArn"]
-        rec(sg_arn, "scheduler", sg_name)
-        log.info("EventBridge schedule group: %s", sg_arn)
-    except Exception as exc:
-        log.error("EventBridge schedule group creation failed: %s", exc)
 
     # ── API Gateway REST API ──────────────────────────────────────────────────
     rest_api_name = prefix("apigw-rest")
