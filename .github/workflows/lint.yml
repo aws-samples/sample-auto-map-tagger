@@ -307,3 +307,26 @@ jobs:
 
       - name: Check IAM permissions and critical handler sync
         run: python3 .github/scripts/sync-check.py
+
+  # ── 7. Handler coverage regression gate ──────────────────────────────────
+  # The `new-handler-coverage-check` above only warns on NEW handlers added
+  # by the current PR. This gate enforces the full baseline: any handler
+  # that was E2E-covered on main must stay covered. Regenerate the baseline
+  # with `python3 .github/scripts/audit_handler_coverage.py --update` after
+  # intentional coverage additions/removals.
+  handler-coverage-regression-gate:
+    name: Handler Coverage Regression Gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Enforce no handler-coverage regressions vs baseline
+        run: python3 .github/scripts/audit_handler_coverage.py --check
+
+      - name: Print full coverage report (for PR review)
+        if: always()
+        run: python3 .github/scripts/audit_handler_coverage.py --report
