@@ -34,7 +34,14 @@ import boto3
 from ._common import get_account_id, make_record, resource_name, safe_call
 
 log = logging.getLogger(__name__)
-TAG_KEY = "map-migrated"
+# Tag key used to mark E2E-created resources for teardown bookkeeping.
+# NOT `map-migrated` — that is the tag the auto-tagger Lambda is supposed
+# to apply; pre-tagging with it would make verify_tags a tautology and
+# mask any Lambda failure (see auto-map-tagger-e2e-audit.md).
+PRE_TAG_KEY = "e2e-run-id"
+
+# Tag key the Lambda is expected to apply — what verify_tags polls for.
+EXPECTED_TAG_KEY = "map-migrated"
 
 
 def create(
@@ -58,14 +65,14 @@ def create(
             region=region,
             account=account,
             resource_id=resource_id,
-            tag_key=TAG_KEY,
+            tag_key=EXPECTED_TAG_KEY,
             tag_value=tag_value,
             taggable=taggable,
         ))
 
     subnets = subnet_ids or []
     sgs = [sg_id] if sg_id else []
-    tags = [{"Key": TAG_KEY, "Value": tag_value}]
+    tags = [{"Key": PRE_TAG_KEY, "Value": tag_value}]
 
     rds = boto3.client("rds", region_name=region)
     elasticache = boto3.client("elasticache", region_name=region)
@@ -415,7 +422,7 @@ def create(
                     "StorageInfo": {"EbsStorageInfo": {"VolumeSize": 1}},
                 },
                 KafkaVersion="2.8.1",
-                Tags={TAG_KEY: tag_value},
+                Tags={PRE_TAG_KEY: tag_value},
             )
             msk_arn = resp["ClusterArn"]
             rec(msk_arn, "kafka", msk_name)
@@ -433,7 +440,7 @@ def create(
                     "VpcConfigs": [{"SubnetIds": subnets, "SecurityGroupIds": sgs}],
                     "ClientAuthentication": {"Sasl": {"Iam": {"Enabled": True}}},
                 },
-                Tags={TAG_KEY: tag_value},
+                Tags={PRE_TAG_KEY: tag_value},
             )
             msk2_arn = resp["ClusterArn"]
             rec(msk2_arn, "kafka", msk2_name)
@@ -453,7 +460,7 @@ def create(
             "AutoMinorVersionUpgrade": False,
             "PubliclyAccessible": False,
             "User": [{"Username": "mqadmin", "Password": "TestPass1234!"}],
-            "Tags": {TAG_KEY: tag_value},
+            "Tags": {PRE_TAG_KEY: tag_value},
         }
         if subnets:
             mq_kwargs["SubnetIds"] = [subnets[0]]

@@ -35,9 +35,14 @@ jobs:
       - name: Delete tagged resources — single account
         working-directory: .github/scripts
         run: |
+          # Sweep resources tagged with either the Lambda-applied
+          # `map-migrated` key or the pre-applied `e2e-run-id` key (PR #7.a
+          # switched E2E pre-tagging from map-migrated to e2e-run-id so
+          # verify_tags actually tests the Lambda). Empty --tag-value means
+          # "match any value" — covers every past run's per-run MPE/run-id tag.
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --sweep-keys map-migrated,e2e-run-id \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -95,9 +100,14 @@ jobs:
       - name: Delete tagged resources — management account
         working-directory: .github/scripts
         run: |
+          # Sweep resources tagged with either the Lambda-applied
+          # `map-migrated` key or the pre-applied `e2e-run-id` key (PR #7.a
+          # switched E2E pre-tagging from map-migrated to e2e-run-id so
+          # verify_tags actually tests the Lambda). Empty --tag-value means
+          # "match any value" — covers every past run's per-run MPE/run-id tag.
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --sweep-keys map-migrated,e2e-run-id \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -145,9 +155,14 @@ jobs:
       - name: Delete tagged resources — linked account 1
         working-directory: .github/scripts
         run: |
+          # Sweep resources tagged with either the Lambda-applied
+          # `map-migrated` key or the pre-applied `e2e-run-id` key (PR #7.a
+          # switched E2E pre-tagging from map-migrated to e2e-run-id so
+          # verify_tags actually tests the Lambda). Empty --tag-value means
+          # "match any value" — covers every past run's per-run MPE/run-id tag.
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --sweep-keys map-migrated,e2e-run-id \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -167,9 +182,14 @@ jobs:
       - name: Delete tagged resources — linked account 2
         working-directory: .github/scripts
         run: |
+          # Sweep resources tagged with either the Lambda-applied
+          # `map-migrated` key or the pre-applied `e2e-run-id` key (PR #7.a
+          # switched E2E pre-tagging from map-migrated to e2e-run-id so
+          # verify_tags actually tests the Lambda). Empty --tag-value means
+          # "match any value" — covers every past run's per-run MPE/run-id tag.
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --sweep-keys map-migrated,e2e-run-id \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -189,9 +209,14 @@ jobs:
       - name: Delete tagged resources — linked account 3
         working-directory: .github/scripts
         run: |
+          # Sweep resources tagged with either the Lambda-applied
+          # `map-migrated` key or the pre-applied `e2e-run-id` key (PR #7.a
+          # switched E2E pre-tagging from map-migrated to e2e-run-id so
+          # verify_tags actually tests the Lambda). Empty --tag-value means
+          # "match any value" — covers every past run's per-run MPE/run-id tag.
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --sweep-keys map-migrated,e2e-run-id \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -211,9 +236,14 @@ jobs:
       - name: Delete tagged resources — linked account 4
         working-directory: .github/scripts
         run: |
+          # Sweep resources tagged with either the Lambda-applied
+          # `map-migrated` key or the pre-applied `e2e-run-id` key (PR #7.a
+          # switched E2E pre-tagging from map-migrated to e2e-run-id so
+          # verify_tags actually tests the Lambda). Empty --tag-value means
+          # "match any value" — covers every past run's per-run MPE/run-id tag.
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --sweep-keys map-migrated,e2e-run-id \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
@@ -233,9 +263,14 @@ jobs:
       - name: Delete tagged resources — linked account 5
         working-directory: .github/scripts
         run: |
+          # Sweep resources tagged with either the Lambda-applied
+          # `map-migrated` key or the pre-applied `e2e-run-id` key (PR #7.a
+          # switched E2E pre-tagging from map-migrated to e2e-run-id so
+          # verify_tags actually tests the Lambda). Empty --tag-value means
+          # "match any value" — covers every past run's per-run MPE/run-id tag.
           python3 teardown.py \
             --all \
-            --tag-value migTEST0000001 \
+            --sweep-keys map-migrated,e2e-run-id \
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 

@@ -868,6 +868,19 @@ jobs:
         run: ls -la artifacts/ || echo "No artifacts directory"
         working-directory: .
 
+      # Fast-fail signal: if the Lambda has not been invoked at all or its
+      # DLQ is full, abort in ~10s instead of letting verify_tags poll for 900s.
+      # Before PR #7.a, resources were pre-tagged with `map-migrated` so verify
+      # always passed regardless of Lambda state — a broken Lambda could ship
+      # undetected. This step + the pre-tagging removal are the real gate now.
+      - name: Assert auto-tagger Lambda is healthy
+        run: |
+          python3 assert_tagger_health.py \
+            --mpe-id "$MPE_ID" \
+            --region ap-northeast-2 \
+            --window-minutes 15 \
+            --min-invocations 1
+
       - name: Verify tags on all resources
         run: |
           python3 verify_tags.py \

@@ -1063,13 +1063,13 @@ def _delete_records_parallel(records: list[dict]) -> None:
 # Tag-based orphan sweep
 # ---------------------------------------------------------------------------
 
-def _sweep_one(tag_value: str, region: str, account: str) -> None:
+def _sweep_one(tag_key: str, tag_value: str, region: str, account: str) -> None:
     """Sweep a single (region, account) pair and delete matched resources."""
     try:
         tagging = _client("resourcegroupstaggingapi", region, account)
         paginator = tagging.get_paginator("get_resources")
         for page in paginator.paginate(
-            TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
+            TagFilters=[{"Key": tag_key, "Values": [tag_value]}]
         ):
             for rm in page.get("ResourceTagMappingList", []):
                 arn = rm["ResourceARN"]
@@ -1086,8 +1086,8 @@ def _sweep_one(tag_value: str, region: str, account: str) -> None:
         log.warning("Orphan sweep %s/%s: %s", region, account, exc)
 
 
-def orphan_sweep(tag_value: str, regions: list[str], accounts: list[str]) -> None:
-    """Find remaining resources tagged with tag_value and delete them.
+def orphan_sweep(tag_key: str, tag_value: str, regions: list[str], accounts: list[str]) -> None:
+    """Find remaining resources tagged with tag_key=tag_value and delete them.
 
     Fans out across (region × account) pairs in parallel — orphan sweep is
     pure read/delete on disjoint accounts, so there is no ordering constraint.
@@ -1095,11 +1095,11 @@ def orphan_sweep(tag_value: str, regions: list[str], accounts: list[str]) -> Non
     target_accounts = accounts or [_get_current_account()]
     pairs = [(r, a) for r in regions for a in target_accounts]
     log.info(
-        "Running orphan sweep for tag-value=%s across %d region(s) × %d account(s) = %d worker(s)",
-        tag_value, len(regions), len(target_accounts), len(pairs),
+        "Running orphan sweep for %s=%s across %d region(s) × %d account(s) = %d worker(s)",
+        tag_key, tag_value, len(regions), len(target_accounts), len(pairs),
     )
     with ThreadPoolExecutor(max_workers=min(TEARDOWN_MAX_WORKERS, max(1, len(pairs)))) as pool:
-        futures = [pool.submit(_sweep_one, tag_value, r, a) for (r, a) in pairs]
+        futures = [pool.submit(_sweep_one, tag_key, tag_value, r, a) for (r, a) in pairs]
         for f in as_completed(futures):
             try:
                 f.result()
@@ -1118,13 +1118,20 @@ def _service_from_arn(arn: str) -> str:
 # Main
 # ---------------------------------------------------------------------------
 
-def _tag_sweep_one_region(tag_value: str, region: str, account: str) -> int:
+def _tag_sweep_one_region(tag_key: str, tag_value: str, region: str, account: str) -> int:
     try:
         tagging = _client("resourcegroupstaggingapi", region, account)
         paginator = tagging.get_paginator("get_resources")
         found = 0
+        # tag_value == "" means "match any value" — the resourcegroupstaggingapi
+        # API treats an absent Values list as a wildcard over all values for
+        # that key. Used by the nightly cleanup to catch resources from all
+        # past runs regardless of their per-run MPE/run-id tag value.
+        tag_filter: dict = {"Key": tag_key}
+        if tag_value:
+            tag_filter["Values"] = [tag_value]
         for page in paginator.paginate(
-            TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
+            TagFilters=[tag_filter]
         ):
             for rm in page.get("ResourceTagMappingList", []):
                 arn = rm["ResourceARN"]
@@ -1148,21 +1155,23 @@ def _tag_sweep_one_region(tag_value: str, region: str, account: str) -> int:
         return 0
 
 
-def tag_sweep_all(tag_value: str, regions: list[str]) -> None:
+def tag_sweep_all(tag_keys: list[str], tag_value: str, regions: list[str]) -> None:
     """--all mode: sweep all resources tagged with tag_value using resourcegroupstaggingapi.
 
     Skips ARN file loading entirely — useful for nightly cleanup where there are
-    no ARN artifact files, only orphaned resources identified by the test MPE tag.
-    Fans out across regions in parallel.
+    no ARN artifact files, only orphaned resources identified by the test tag.
+    Fans out across (tag_key × region) pairs in parallel.
     """
     log.info(
-        "Running --all tag sweep for map-migrated=%s across regions: %s",
-        tag_value,
-        ", ".join(regions),
+        "Running --all tag sweep for keys=%s value=%s across regions: %s",
+        tag_keys, tag_value, ", ".join(regions),
     )
     current_account = _get_current_account()
-    with ThreadPoolExecutor(max_workers=min(TEARDOWN_MAX_WORKERS, max(1, len(regions)))) as pool:
-        futures = [pool.submit(_tag_sweep_one_region, tag_value, r, current_account) for r in regions]
+    pairs = [(k, r) for k in tag_keys for r in regions]
+    workers = min(TEARDOWN_MAX_WORKERS, max(1, len(pairs)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_tag_sweep_one_region, k, tag_value, r, current_account)
+                   for (k, r) in pairs]
         for f in as_completed(futures):
             try:
                 f.result()
@@ -1175,7 +1184,16 @@ def main() -> None:
     parser.add_argument("--arns-dir", default=None, help="Directory with ARN JSON files")
     parser.add_argument("--pr", default=None, help="PR number (used for sweep)")
     parser.add_argument("--tag-value", default=None,
-                        help="Tag value for orphan sweep (defaults to migTEST from records)")
+                        help="Tag value for orphan sweep (defaults to MPE from records)")
+    parser.add_argument(
+        "--sweep-keys",
+        default="map-migrated,e2e-run-id",
+        help=(
+            "Comma-separated tag keys to sweep. Default covers both the "
+            "Lambda-applied `map-migrated` key (catches what Lambda tagged) "
+            "and the pre-applied `e2e-run-id` key (catches what Lambda missed)."
+        ),
+    )
     parser.add_argument("--no-sweep", action="store_true",
                         help="Skip the tag-based orphan sweep")
     parser.add_argument(
@@ -1194,13 +1212,14 @@ def main() -> None:
     )
     args = parser.parse_args()
 
+    sweep_keys = [k.strip() for k in args.sweep_keys.split(",") if k.strip()]
+
     # ── --all mode: pure tag-based sweep, no ARN file needed ─────────────────
     if args.sweep_all:
-        if not args.tag_value:
-            log.error("--all requires --tag-value")
-            sys.exit(1)
         regions = [r.strip() for r in args.regions.split(",") if r.strip()]
-        tag_sweep_all(args.tag_value, regions)
+        # Empty tag_value sweeps every resource carrying any of the sweep_keys,
+        # regardless of value — used by nightly cleanup now that MPE is per-run.
+        tag_sweep_all(sweep_keys, args.tag_value or "", regions)
         log.info("Teardown complete (--all mode).")
         return
 
@@ -1239,7 +1258,8 @@ def main() -> None:
             # Collect unique regions and accounts from records
             regions = list({r.get("region", "ap-northeast-2") for r in all_records}) or ["ap-northeast-2"]
             accounts = list({r.get("account", "") for r in all_records if r.get("account")})
-            orphan_sweep(tag_value, regions, accounts)
+            for sweep_key in sweep_keys:
+                orphan_sweep(sweep_key, tag_value, regions, accounts)
         else:
             log.warning("Could not determine tag value for orphan sweep — skipping")
 

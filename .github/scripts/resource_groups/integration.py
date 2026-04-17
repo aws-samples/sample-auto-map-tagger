@@ -25,7 +25,14 @@ import boto3
 from ._common import get_account_id, make_record, resource_name, safe_call
 
 log = logging.getLogger(__name__)
-TAG_KEY = "map-migrated"
+# Tag key used to mark E2E-created resources for teardown bookkeeping.
+# NOT `map-migrated` — that is the tag the auto-tagger Lambda is supposed
+# to apply; pre-tagging with it would make verify_tags a tautology and
+# mask any Lambda failure (see auto-map-tagger-e2e-audit.md).
+PRE_TAG_KEY = "e2e-run-id"
+
+# Tag key the Lambda is expected to apply — what verify_tags polls for.
+EXPECTED_TAG_KEY = "map-migrated"
 
 
 def create(
@@ -38,8 +45,8 @@ def create(
     account = get_account_id()
     arns: list[dict] = []
     prefix = lambda svc: resource_name(pr_number, timestamp, svc)
-    tags = [{"Key": TAG_KEY, "Value": tag_value}]
-    tags_dict = {TAG_KEY: tag_value}
+    tags = [{"Key": PRE_TAG_KEY, "Value": tag_value}]
+    tags_dict = {PRE_TAG_KEY: tag_value}
 
     sns = boto3.client("sns", region_name=region)
     sqs = boto3.client("sqs", region_name=region)
@@ -53,7 +60,7 @@ def create(
     def rec(arn, service, resource_id, taggable=True):
         arns.append(make_record(
             arn=arn, service=service, region=region, account=account,
-            resource_id=resource_id, tag_key=TAG_KEY, tag_value=tag_value,
+            resource_id=resource_id, tag_key=EXPECTED_TAG_KEY, tag_value=tag_value,
             taggable=taggable,
         ))
 
