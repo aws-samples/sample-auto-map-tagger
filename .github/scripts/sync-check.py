@@ -103,6 +103,70 @@ if "CreatePipeline" in html_handlers:
             "SageMaker CreatePipeline and tag the IAM role instead"
         )
 
+# ── Check 4: v20 architecture parity ────────────────────────────────────────
+# The configurator generates CFN inline. Its architecture MUST match v20 YAML.
+# Key resources must exist in both files.
+V20_RESOURCES = [
+    ("EventQueue",        "v20 SQS buffering queue (EventBridge target)"),
+    ("EventDLQ",          "v20 dead letter queue after 3 failed attempts"),
+    ("EventQueueMapping", "v20 Lambda event source mapping from EventQueue"),
+    ("EventQueuePolicy",  "v20 SQS queue policy allowing EventBridge to send"),
+    ("DLQAlarm",          "v20 alarm on DLQ depth (catches silent drops)"),
+    ("AlertTopic",        "v20 SNS topic for alert notifications"),
+]
+for resource_name, purpose in V20_RESOURCES:
+    if f"\n  {resource_name}:" not in yaml:
+        fails.append(f"V20_ARCH: '{resource_name}' missing from YAML — {purpose}")
+    if f"\n  {resource_name}:" not in html:
+        fails.append(
+            f"V20_ARCH: '{resource_name}' missing from configurator.html — {purpose}\n"
+            f"          The configurator generates CFN inline. If this resource is absent, "
+            f"every customer running deploy.sh gets a pre-v20 architecture."
+        )
+
+# ── Check 5: v20 anti-patterns — must NEVER reappear ────────────────────────
+# These are bugs fixed in v20 that would cause silent data loss if reintroduced.
+V20_ANTIPATTERNS = [
+    (
+        "KmsMasterKeyId: alias/aws/sqs",
+        "PR #5 bug: EventBridge cannot deliver to KMS-encrypted SQS with AWS-managed "
+        "key (no kms:GenerateDataKey grant). Use SqsManagedSseEnabled: true instead."
+    ),
+]
+for needle, reason in V20_ANTIPATTERNS:
+    if needle in yaml:
+        fails.append(f"V20_ANTIPATTERN in YAML: '{needle}'\n  Reason: {reason}")
+    if needle in html:
+        fails.append(f"V20_ANTIPATTERN in configurator.html: '{needle}'\n  Reason: {reason}")
+
+# In configurator only, ReservedConcurrentExecutions must not be set as a Lambda property.
+# (v20 removed this to prevent deployment failure on accounts with reduced quota.)
+# Allow mentions in comments/descriptions; forbid actual CFN property assignment.
+rce_config_match = re.search(r'^\s*ReservedConcurrentExecutions:\s*\d', html, re.MULTILINE)
+if rce_config_match:
+    fails.append(
+        "V20_ANTIPATTERN in configurator.html: ReservedConcurrentExecutions config line\n"
+        "  Reason: v20 removed this — CT-managed accounts have quota=400, smaller than "
+        "the hard-coded 10 reservation left UnreservedConcurrentExecutions below AWS "
+        "minimum, causing deployment failure."
+    )
+
+# ── Check 6: Version parity between YAML and configurator ────────────────────
+# Both files embed a version string in their Description. They must match.
+yaml_version_match = re.search(r'MAP 2\.0 Auto-Tagger (v\d+)', yaml)
+html_version_match = re.search(r"TEMPLATE_VERSION\s*=\s*'(v\d+)'", html)
+yaml_version = yaml_version_match.group(1) if yaml_version_match else None
+html_version = html_version_match.group(1) if html_version_match else None
+if not yaml_version:
+    fails.append("VERSION: could not find 'MAP 2.0 Auto-Tagger vNN' in YAML Description")
+if not html_version:
+    fails.append("VERSION: could not find TEMPLATE_VERSION = 'vNN' constant in configurator.html")
+if yaml_version and html_version and yaml_version != html_version:
+    fails.append(
+        f"VERSION: YAML is {yaml_version} but configurator.html TEMPLATE_VERSION is {html_version}\n"
+        f"         These must match or customers deploy the wrong architecture."
+    )
+
 # ── Report ────────────────────────────────────────────────────────────────────
 print()
 if warns:
