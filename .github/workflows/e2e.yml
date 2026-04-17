@@ -33,6 +33,15 @@ env:
   # Length check: `map-auto-tagger-role-migTEST<11-digit-run-id>-ap-northeast-2`
   # = 61 chars, safely under the 64-char IAM role name limit.
   MPE_ID: migTEST${{ github.run_id }}
+  # Scope test MPEs — also per-run (not static) to prevent cross-PR
+  # collisions in linked1 (which now hosts all scope stacks). Fixed
+  # suffixes (A/B/C/D) distinguish the four scope stacks inside a
+  # single run while keeping the migTEST prefix so verify-scope-*
+  # prefix-match still works.
+  SCOPE_ACCT_MPE: migTEST${{ github.run_id }}A
+  SCOPE_VPC_MPE: migTEST${{ github.run_id }}B
+  SCOPE_DATE_MPE: migTEST${{ github.run_id }}C
+  SCOPE_ACCT_OUT_MPE: migTEST${{ github.run_id }}D
   STACK_NAME: map-auto-tagger-e2e-pr${{ github.event.pull_request.number }}
 
 # ---------------------------------------------------------------------------
@@ -1050,7 +1059,7 @@ jobs:
             --stack-name "${STACK_NAME}-scope-acct" \
             --template-file map2-auto-tagger-optimized.yaml \
             --parameter-overrides \
-              MpeId="migTEST0000002" \
+              MpeId="$SCOPE_ACCT_MPE" \
               AgreementStartDate="2024-01-01" \
               ScopeMode="account" \
               ScopedAccountIds="${{ secrets.AWS_LINKED1_ACCOUNT_ID }}" \
@@ -1087,7 +1096,7 @@ jobs:
           record = {"arn": f"arn:aws:s3:::{name}", "service": "s3", "region": "ap-northeast-2",
                     "account": boto3.client('sts').get_caller_identity()['Account'],
                     "resource_id": name, "taggable": True,
-                    "expected_tag_key": "map-migrated", "expected_tag_value": 'migTEST0000002'}
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['SCOPE_ACCT_MPE']}
           with open('created-arns-scope-acct-inscope.json', 'w') as f:
               json.dump([record], f)
           print(f"Created S3 bucket: {name}")
@@ -1127,7 +1136,7 @@ jobs:
             --stack-name "${STACK_NAME}-scope-acct-out" \
             --template-file map2-auto-tagger-optimized.yaml \
             --parameter-overrides \
-              MpeId="migTEST0000005" \
+              MpeId="$SCOPE_ACCT_OUT_MPE" \
               AgreementStartDate="2024-01-01" \
               ScopeMode="account" \
               ScopedAccountIds="999999999999" \
@@ -1150,7 +1159,7 @@ jobs:
           record = {"arn": f"arn:aws:s3:::{name}", "service": "s3", "region": "ap-northeast-2",
                     "account": boto3.client('sts').get_caller_identity()['Account'],
                     "resource_id": name, "taggable": True,
-                    "expected_tag_key": "map-migrated", "expected_tag_value": 'migTEST0000005'}
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['SCOPE_ACCT_OUT_MPE']}
           with open('created-arns-scope-acct-outscope.json', 'w') as f:
               json.dump([record], f)
           print(f"Created S3 bucket: {name}")
@@ -1193,7 +1202,7 @@ jobs:
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
-            --tag-value "migTEST0000002" \
+            --tag-value "$SCOPE_ACCT_MPE" \
             --tag-value-prefix "migTEST" \
             --max-wait 600 \
             --poll-interval 30
@@ -1226,7 +1235,7 @@ jobs:
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
-            --tag-value "migTEST0000005" \
+            --tag-value "$SCOPE_ACCT_OUT_MPE" \
             --expect-not-tagged \
             --not-tagged-wait 120
         working-directory: .github/scripts
@@ -1285,7 +1294,7 @@ jobs:
             --stack-name "${STACK_NAME}-scope-vpc" \
             --template-file map2-auto-tagger-optimized.yaml \
             --parameter-overrides \
-              MpeId="migTEST0000003" \
+              MpeId="$SCOPE_VPC_MPE" \
               AgreementStartDate="2024-01-01" \
               ScopeMode="vpc" \
               ScopedVpcIds="${{ steps.vpc.outputs.vpc-id }}" \
@@ -1329,7 +1338,7 @@ jobs:
           arn = f"arn:aws:ec2:ap-northeast-2:{account}:security-group/{sg_id}"
           record = {"arn": arn, "service": "ec2", "region": "ap-northeast-2", "account": account,
                     "resource_id": sg_id, "taggable": True,
-                    "expected_tag_key": "map-migrated", "expected_tag_value": 'migTEST0000003'}
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['SCOPE_VPC_MPE']}
           with open('created-arns-scope-vpc-inscope.json', 'w') as f:
               json.dump([record], f)
           print(f"Created SG {sg_id} in VPC {vpc_id}")
@@ -1378,7 +1387,7 @@ jobs:
           arn = f"arn:aws:ec2:ap-northeast-2:{account}:security-group/{sg_id}"
           record = {"arn": arn, "service": "ec2", "region": "ap-northeast-2", "account": account,
                     "resource_id": sg_id, "taggable": True,
-                    "expected_tag_key": "map-migrated", "expected_tag_value": 'migTEST0000003'}
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['SCOPE_VPC_MPE']}
           with open('created-arns-scope-vpc-outscope.json', 'w') as f:
               json.dump([record], f)
           print(f"Created SG {sg_id} in default VPC {default_vpc}")
@@ -1415,13 +1424,13 @@ jobs:
           name: arns-scope-vpc-inscope
           path: artifacts/
       - run: |
-          # Scope-positive: accept any `migTEST*` MPE. scope-acct (migTEST0000002)
+          # Scope-positive: accept any `migTEST*` MPE. scope-acct ($SCOPE_ACCT_MPE)
           # also tags in-account resources, so last-writer-wins between it and
-          # scope-vpc (migTEST0000003) is a test-infra race, not a product bug.
+          # scope-vpc ($SCOPE_VPC_MPE) is a test-infra race, not a product bug.
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
-            --tag-value "migTEST0000003" \
+            --tag-value "$SCOPE_VPC_MPE" \
             --tag-value-prefix "migTEST" \
             --max-wait 600 \
             --poll-interval 30
@@ -1453,7 +1462,7 @@ jobs:
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
-            --tag-value "migTEST0000003" \
+            --tag-value "$SCOPE_VPC_MPE" \
             --expect-not-tagged \
             --not-tagged-wait 120
         working-directory: .github/scripts
@@ -1483,7 +1492,7 @@ jobs:
             --stack-name "${STACK_NAME}-scope-date" \
             --template-file map2-auto-tagger-optimized.yaml \
             --parameter-overrides \
-              MpeId="migTEST0000004" \
+              MpeId="$SCOPE_DATE_MPE" \
               AgreementStartDate="${TOMORROW}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --s3-bucket "$S3_BUCKET" \
@@ -1518,7 +1527,7 @@ jobs:
           record = {"arn": f"arn:aws:s3:::{name}", "service": "s3", "region": "ap-northeast-2",
                     "account": boto3.client('sts').get_caller_identity()['Account'],
                     "resource_id": name, "taggable": True,
-                    "expected_tag_key": "map-migrated", "expected_tag_value": 'migTEST0000004'}
+                    "expected_tag_key": "map-migrated", "expected_tag_value": os.environ['SCOPE_DATE_MPE']}
           with open('created-arns-scope-date.json', 'w') as f:
               json.dump([record], f)
           print(f"Created S3 bucket: {name} (should NOT be tagged — before agreement start)")
@@ -1556,7 +1565,7 @@ jobs:
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
-            --tag-value "migTEST0000004" \
+            --tag-value "$SCOPE_DATE_MPE" \
             --expect-not-tagged \
             --not-tagged-wait 120
         working-directory: .github/scripts
