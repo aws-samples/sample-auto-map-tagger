@@ -157,11 +157,13 @@ Resources:
                   # AWS maps this to 'apigateway:PUT' — no narrower IAM action exists for v1 tagging.
                   # Lambda code only calls tagging APIs; no other API GW mutation code paths exist.
                   - apigateway:PUT
-                  # API Gateway v2 (HTTP APIs) tags via PATCH /tags/{arn} and AWS
-                  # maps tag:TagResources on v1 REST APIs to apigateway:PATCH as
-                  # well (confirmed via AccessDenied testing — both v1 and v2
-                  # TagResource calls fail without this).
+                  # v1 REST APIs also use PATCH (AWS routes tag:TagResources
+                  # through PATCH /tags/{arn} internally).
                   - apigateway:PATCH
+                  # v2 HTTP APIs actually use POST /tags/{arn} (confirmed via
+                  # AccessDenied testing on PR #8 iteration 2). The v1/v2
+                  # routing for tagging is POST for v2, PATCH for v1.
+                  - apigateway:POST
                   # --- Management & Monitoring ---
                   - logs:TagResource
                   - cloudwatch:TagResource
@@ -1657,6 +1659,12 @@ Resources:
                       'InvalidDBClusterStateFault',
                       'InvalidDBInstanceState',
                       'ResourceNotFoundException',
+                      # CFN stacks reach a taggable state only after
+                      # CREATE_COMPLETE — CloudTrail fires on CreateStack
+                      # before that.
+                      'CREATE_IN_PROGRESS',
+                      'UPDATE_IN_PROGRESS',
+                      'can not be updated',
                   )
                   if any(m in err_msg for m in TRANSIENT_MARKERS):
                       print(f'Transient failure tagging {arn}: {err_msg} — re-raising for SQS redelivery')

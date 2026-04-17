@@ -3472,7 +3472,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             // AWS maps tag_resource() to apigateway:PATCH internally (confirmed via AccessDenied testing).
             // Precedent: MAP Taggr (AppSec-approved) grants all 5 API GW methods (GET/PUT/PATCH/DELETE/POST).
             // We grant only PUT and PATCH — more conservative than the approved precedent.
-            'apigateway:PUT','apigateway:PATCH',
+            'apigateway:PUT','apigateway:PATCH','apigateway:POST',
             // Management & Monitoring
             'logs:TagResource','cloudwatch:TagResource','ssm:AddTagsToResource',
             'secretsmanager:TagResource',
@@ -4336,6 +4336,7 @@ ${crossAccountCode}
                       'InvalidClusterState','InvalidServerlessCacheStateFault',
                       'InvalidDBClusterStateFault','InvalidDBInstanceState',
                       'ResourceNotFoundException',
+                      'CREATE_IN_PROGRESS','UPDATE_IN_PROGRESS','can not be updated',
                   )
                   if any(m in err_msg for m in TRANSIENT_MARKERS):
                       print(f'Transient failure tagging {arn}: {err_msg} -- re-raising for SQS redelivery')
