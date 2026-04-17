@@ -38,7 +38,14 @@ from ._common import get_account_id, make_record, resource_name, safe_call
 
 log = logging.getLogger(__name__)
 
-TAG_KEY = "map-migrated"
+# Tag key used to mark E2E-created resources for teardown bookkeeping.
+# NOT `map-migrated` — that is the tag the auto-tagger Lambda is supposed
+# to apply; pre-tagging with it would make verify_tags a tautology and
+# mask any Lambda failure (see auto-map-tagger-e2e-audit.md).
+PRE_TAG_KEY = "e2e-run-id"
+
+# Tag key the Lambda is expected to apply — what verify_tags polls for.
+EXPECTED_TAG_KEY = "map-migrated"
 
 
 def create(
@@ -60,7 +67,7 @@ def create(
         safe_call(
             ec2.create_tags,
             Resources=[resource_id],
-            Tags=[{"Key": TAG_KEY, "Value": tag_value}],
+            Tags=[{"Key": PRE_TAG_KEY, "Value": tag_value}],
         )
 
     def rec(arn, service, resource_id, taggable=True):
@@ -70,7 +77,7 @@ def create(
             region=region,
             account=account,
             resource_id=resource_id,
-            tag_key=TAG_KEY,
+            tag_key=EXPECTED_TAG_KEY,
             tag_value=tag_value,
             taggable=taggable,
         ))
@@ -209,7 +216,7 @@ def create(
                 AllocationId=eip_alloc_id,
                 TagSpecifications=[{
                     "ResourceType": "natgateway",
-                    "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                    "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
                 }],
             )
             nat_id = resp["NatGateway"]["NatGatewayId"]
@@ -246,7 +253,7 @@ def create(
             },
             TagSpecifications=[{
                 "ResourceType": "transit-gateway",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         tgw_id = resp["TransitGateway"]["TransitGatewayId"]
@@ -265,7 +272,7 @@ def create(
             ServiceName=f"com.amazonaws.{region}.s3",
             TagSpecifications=[{
                 "ResourceType": "vpc-endpoint",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         vpce_id = resp["VpcEndpoint"]["VpcEndpointId"]
@@ -313,7 +320,7 @@ def create(
             DeliverLogsPermissionArn=fl_role_arn,
             TagSpecifications=[{
                 "ResourceType": "vpc-flow-log",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         fl_ids = resp.get("FlowLogIds", [])
@@ -332,7 +339,7 @@ def create(
             Type="ipsec.1",
             TagSpecifications=[{
                 "ResourceType": "customer-gateway",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         cgw_id = resp["CustomerGateway"]["CustomerGatewayId"]
@@ -347,7 +354,7 @@ def create(
             Type="ipsec.1",
             TagSpecifications=[{
                 "ResourceType": "vpn-gateway",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         vgw_id = resp["VpnGateway"]["VpnGatewayId"]
@@ -363,7 +370,7 @@ def create(
             VpcId=vpc_id,
             TagSpecifications=[{
                 "ResourceType": "egress-only-internet-gateway",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         eigw_id = resp["EgressOnlyInternetGateway"]["EgressOnlyInternetGatewayId"]
@@ -381,7 +388,7 @@ def create(
                 Groups=[sg_id],
                 TagSpecifications=[{
                     "ResourceType": "network-interface",
-                    "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                    "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
                 }],
             )
             eni_id = resp["NetworkInterface"]["NetworkInterfaceId"]
@@ -398,7 +405,7 @@ def create(
             Strategy="cluster",
             TagSpecifications=[{
                 "ResourceType": "placement-group",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         rec(f"arn:aws:ec2:{region}:{account}:placement-group/{pg_name}", "ec2", pg_name)
@@ -423,12 +430,12 @@ def create(
                     }],
                     "TagSpecifications": [{
                         "ResourceType": "instance",
-                        "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                        "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
                     }],
                 },
                 TagSpecifications=[{
                     "ResourceType": "launch-template",
-                    "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                    "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
                 }],
             )
             lt_id = resp["LaunchTemplate"]["LaunchTemplateId"]

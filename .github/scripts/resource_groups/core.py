@@ -28,7 +28,14 @@ import boto3
 from ._common import get_account_id, make_record, resource_name, safe_call
 
 log = logging.getLogger(__name__)
-TAG_KEY = "map-migrated"
+# Tag key used to mark E2E-created resources for teardown bookkeeping.
+# NOT `map-migrated` — that is the tag the auto-tagger Lambda is supposed
+# to apply; pre-tagging with it would make verify_tags a tautology and
+# mask any Lambda failure (see auto-map-tagger-e2e-audit.md).
+PRE_TAG_KEY = "e2e-run-id"
+
+# Tag key the Lambda is expected to apply — what verify_tags polls for.
+EXPECTED_TAG_KEY = "map-migrated"
 
 
 def create(
@@ -63,7 +70,7 @@ def create(
             region=region,
             account=account,
             resource_id=resource_id,
-            tag_key=TAG_KEY,
+            tag_key=EXPECTED_TAG_KEY,
             tag_value=tag_value,
             taggable=taggable,
         ))
@@ -77,7 +84,7 @@ def create(
         logs_client.create_log_group(logGroupName=log_group_name)
         logs_client.tag_log_group(
             logGroupName=log_group_name,
-            tags={TAG_KEY: tag_value},
+            tags={PRE_TAG_KEY: tag_value},
         )
         rec(
             f"arn:aws:logs:{region}:{account}:log-group:{log_group_name}",
@@ -92,7 +99,7 @@ def create(
     try:
         resp = sns.create_topic(
             Name=prefix("sns"),
-            Tags=[{"Key": TAG_KEY, "Value": tag_value}],
+            Tags=[{"Key": PRE_TAG_KEY, "Value": tag_value}],
         )
         sns_topic_arn = resp["TopicArn"]
         rec(sns_topic_arn, "sns", prefix("sns"))
@@ -107,7 +114,7 @@ def create(
             KeyName=kp_name,
             TagSpecifications=[{
                 "ResourceType": "key-pair",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         kp_id = resp["KeyPairId"]
@@ -126,7 +133,7 @@ def create(
             "MaxCount": 1,
             "TagSpecifications": [{
                 "ResourceType": "instance",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         }
         if subnet_ids:
@@ -150,7 +157,7 @@ def create(
             VolumeType="gp3",
             TagSpecifications=[{
                 "ResourceType": "volume",
-                "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
             }],
         )
         volume_id = resp["VolumeId"]
@@ -169,7 +176,7 @@ def create(
                 Description=f"E2E test snapshot {prefix('snap')}",
                 TagSpecifications=[{
                     "ResourceType": "snapshot",
-                    "Tags": [{"Key": TAG_KEY, "Value": tag_value}],
+                    "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
                 }],
             )
             snap_id = resp["SnapshotId"]
@@ -191,7 +198,7 @@ def create(
             # Tag the new AMI
             ec2.create_tags(
                 Resources=[ami_new_id],
-                Tags=[{"Key": TAG_KEY, "Value": tag_value}],
+                Tags=[{"Key": PRE_TAG_KEY, "Value": tag_value}],
             )
             rec(f"arn:aws:ec2:{region}:{account}:image/{ami_new_id}", "ec2", ami_new_id)
             log.info("AMI: %s", ami_new_id)
@@ -221,7 +228,7 @@ def create(
             Role=lambda_role_arn,
             Handler="index.handler",
             Code={"ZipFile": zip_bytes},
-            Tags={TAG_KEY: tag_value},
+            Tags={PRE_TAG_KEY: tag_value},
         )
         lambda_arn = resp["FunctionArn"]
         rec(lambda_arn, "lambda", lambda_name)
@@ -233,7 +240,7 @@ def create(
     try:
         resp = ecs.create_cluster(
             clusterName=prefix("ecs"),
-            tags=[{"key": TAG_KEY, "value": tag_value}],
+            tags=[{"key": PRE_TAG_KEY, "value": tag_value}],
         )
         cluster_arn = resp["cluster"]["clusterArn"]
         rec(cluster_arn, "ecs", prefix("ecs"))
@@ -252,7 +259,7 @@ def create(
                 "endpointPublicAccess": True,
                 "endpointPrivateAccess": False,
             },
-            "tags": {TAG_KEY: tag_value},
+            "tags": {PRE_TAG_KEY: tag_value},
         }
         if subnet_ids and len(subnet_ids) >= 2:
             eks_kwargs["resourcesVpcConfig"]["subnetIds"] = subnet_ids[:2]
@@ -267,7 +274,7 @@ def create(
     try:
         resp = ecr.create_repository(
             repositoryName=prefix("ecr"),
-            tags=[{"Key": TAG_KEY, "Value": tag_value}],
+            tags=[{"Key": PRE_TAG_KEY, "Value": tag_value}],
         )
         ecr_arn = resp["repository"]["repositoryArn"]
         rec(ecr_arn, "ecr", prefix("ecr"))
@@ -293,7 +300,7 @@ def create(
             "DesiredCapacity": 0,
             "LaunchTemplate": {"LaunchTemplateId": asg_lt_id, "Version": "$Default"},
             "Tags": [{
-                "Key": TAG_KEY,
+                "Key": PRE_TAG_KEY,
                 "Value": tag_value,
                 "ResourceId": prefix("asg"),
                 "ResourceType": "auto-scaling-group",
