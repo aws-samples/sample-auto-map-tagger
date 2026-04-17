@@ -151,6 +151,10 @@ jobs:
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
+      - name: Sweep orphaned map-auto-tagger IAM roles — linked account 1
+        run: python3 .github/scripts/sweep_iam_roles.py
+        continue-on-error: true
+
       # ── Linked account 2 ──────────────────────────────────────────────────
 
       - name: Assume role — linked account 2
@@ -167,6 +171,10 @@ jobs:
             --all \
             --tag-value migTEST0000001 \
             --regions ap-northeast-2,us-east-1,us-west-2
+        continue-on-error: true
+
+      - name: Sweep orphaned map-auto-tagger IAM roles — linked account 2
+        run: python3 .github/scripts/sweep_iam_roles.py
         continue-on-error: true
 
       # ── Linked account 3 ──────────────────────────────────────────────────
@@ -187,6 +195,10 @@ jobs:
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
+      - name: Sweep orphaned map-auto-tagger IAM roles — linked account 3
+        run: python3 .github/scripts/sweep_iam_roles.py
+        continue-on-error: true
+
       # ── Linked account 4 ──────────────────────────────────────────────────
 
       - name: Assume role — linked account 4
@@ -205,6 +217,10 @@ jobs:
             --regions ap-northeast-2,us-east-1,us-west-2
         continue-on-error: true
 
+      - name: Sweep orphaned map-auto-tagger IAM roles — linked account 4
+        run: python3 .github/scripts/sweep_iam_roles.py
+        continue-on-error: true
+
       # ── Linked account 5 ──────────────────────────────────────────────────
 
       - name: Assume role — linked account 5
@@ -221,4 +237,8 @@ jobs:
             --all \
             --tag-value migTEST0000001 \
             --regions ap-northeast-2,us-east-1,us-west-2
+        continue-on-error: true
+
+      - name: Sweep orphaned map-auto-tagger IAM roles — linked account 5
+        run: python3 .github/scripts/sweep_iam_roles.py
         continue-on-error: true

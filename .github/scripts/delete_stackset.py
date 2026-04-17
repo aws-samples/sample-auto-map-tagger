@@ -34,6 +34,7 @@ def main() -> None:
     parser.add_argument("--name", required=True, help="StackSet name")
     parser.add_argument("--accounts", required=True, help="Comma-separated account IDs")
     parser.add_argument("--region", default="ap-northeast-2", help="Region where instances were created")
+    parser.add_argument("--org-unit-ids", default="", help="Comma-separated OU IDs (required for SERVICE_MANAGED StackSets)")
     args = parser.parse_args()
 
     cfn = boto3.client("cloudformation", region_name=args.region)
@@ -44,12 +45,34 @@ def main() -> None:
         log.info("StackSet %s does not exist — nothing to delete.", args.name)
         return
 
+    # ── Determine permission model ────────────────────────────────────────────
+    try:
+        ss_detail = cfn.describe_stack_set(StackSetName=args.name)["StackSet"]
+        permission_model = ss_detail.get("PermissionModel", "SELF_MANAGED")
+    except Exception:
+        permission_model = "SELF_MANAGED"
+    log.info("StackSet permission model: %s", permission_model)
+
     # ── Delete stack instances ────────────────────────────────────────────────
     log.info("Deleting stack instances in accounts: %s region: %s", account_ids, args.region)
     try:
+        if permission_model == "SERVICE_MANAGED":
+            # SERVICE_MANAGED StackSets require OrganizationalUnitIds in DeploymentTargets.
+            # Use empty list to target all deployed accounts within the org.
+            ou_ids = [ou.strip() for ou in args.org_unit_ids.split(",") if ou.strip()] if args.org_unit_ids else []
+            deployment_targets: dict = {
+                "OrganizationalUnitIds": ou_ids,
+                "AccountFilterType": "INTERSECTION",
+                "Accounts": account_ids,
+            } if ou_ids else {
+                "OrganizationalUnitIds": [],
+            }
+        else:
+            deployment_targets = {"Accounts": account_ids}
+
         resp = cfn.delete_stack_instances(
             StackSetName=args.name,
-            DeploymentTargets={"Accounts": account_ids},
+            DeploymentTargets=deployment_targets,
             Regions=[args.region],
             RetainStacks=False,
             OperationPreferences={

@@ -1,7 +1,5 @@
 acm:AddTagsToCertificate
-aoss:TagResource
 apigateway:PUT
-appconfig:TagResource
 appmesh:TagResource
 appstream:TagResource
 appsync:TagResource
@@ -80,7 +78,12 @@ servicecatalog:TagResource
 servicecatalog:UpdatePortfolio
 servicecatalog:UpdateProduct
 servicediscovery:TagResource
+sns:Publish
 sns:TagResource
+sqs:DeleteMessage
+sqs:GetQueueAttributes
+sqs:ReceiveMessage
+sqs:SendMessage
 sqs:TagQueue
 ssm:AddTagsToResource
 states:TagResource

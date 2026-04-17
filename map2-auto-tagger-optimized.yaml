@@ -3,12 +3,13 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v18 - Automatically tags newly created AWS resources with the
+  MAP 2.0 Auto-Tagger v20 - Automatically tags newly created AWS resources with the
   map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
   across all major AWS services. Deploy once; tagging happens automatically within
-  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v18: AppSec hardening - removed cross-account
-  AssumeRole, removed discontinued service permissions, added security justification
-  comments, added threat model.
+  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
+  vs EventBridge 24h limit); removed ReservedConcurrentExecutions to prevent deployment
+  failures on accounts near Lambda concurrency quota; added DLQ alarm with SNS email
+  notification; Lambda now publishes specific failed resource ARN to SNS on tagging failure.
 
 Parameters:
   MpeId:
@@ -161,7 +162,6 @@ Resources:
                   - cloudwatch:TagResource
                   - ssm:AddTagsToResource
                   - secretsmanager:TagResource
-                  - appconfig:TagResource
                   - servicediscovery:TagResource
                   # --- Security & Identity ---
                   - kms:TagResource
@@ -199,7 +199,6 @@ Resources:
                   - comprehend:TagResource
                   - kendra:TagResource
                   - bedrock:TagResource
-                  - aoss:TagResource
                   - braket:TagResource
                   # --- IoT ---
                   - iot:TagResource
@@ -243,6 +242,21 @@ Resources:
                   # IAM role tagging (iam:TagRole not covered by tag:TagResources)
                   - iam:TagRole
                 Resource: '*'
+              - Sid: SqsEventSource
+                Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt EventQueue.Arn
+                  - !GetAtt EventDLQ.Arn
+              - Sid: AlertPublish
+                Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref AlertTopic
               - Sid: ReadConfig
                 Effect: Allow
                 Action:
@@ -275,12 +289,15 @@ Resources:
       Role: !GetAtt AutoTaggerRole.Arn
       Timeout: 60
       MemorySize: 256
-      # ReservedConcurrentExecutions limits Lambda concurrency during bursts
-      # Adjust based on expected resource creation rate; 10 is conservative
-      ReservedConcurrentExecutions: 10
+      # No ReservedConcurrentExecutions — using SQS buffering instead of direct
+      # Lambda invocation means throttling delays processing but never drops events.
+      # Messages are retained in SQS for up to 14 days.
+      DeadLetterConfig:
+        TargetArn: !GetAtt EventDLQ.Arn
       Environment:
         Variables:
           CONFIG_PARAM: !Sub '/auto-map-tagger/${MpeId}/config'
+          ALERT_TOPIC_ARN: !Ref AlertTopic
       Code:
         ZipFile: |
           import json, os, boto3, re, time, random
@@ -550,7 +567,7 @@ Resources:
                   api_id = resp.get('id') or resp.get('apiId')
                   api_type = 'restapis' if event_name == 'CreateRestApi' else 'apis'
                   return f"arn:aws:apigateway:{region}::/{api_type}/{api_id}" if api_id else None
-              elif event_name == 'CreateQueue':
+              elif event_name == 'CreateQueue' and event_source == 'sqs.amazonaws.com':
                   # SQS returns URL, need to construct ARN
                   queue_url = resp.get('queueUrl')
                   if queue_url:
@@ -731,7 +748,7 @@ Resources:
                   return resp.get('documentClassifierArn')
 
               # AppSync
-              elif event_name == 'CreateGraphqlApi':
+              elif event_name == 'CreateGraphqlApi' and event_source == 'appsync.amazonaws.com':
                   api = resp.get('graphqlApi', {})
                   return api.get('arn')
 
@@ -814,6 +831,13 @@ Resources:
                   if cluster_id:
                       return f"arn:aws:elasticmapreduce:{region}:{account_id}:cluster/{cluster_id}"
 
+              # EKS Cluster
+              elif event_name == 'CreateCluster' and event_source == 'eks.amazonaws.com':
+                  cluster = resp.get('cluster', {})
+                  cluster_arn = cluster.get('arn')
+                  if cluster_arn:
+                      return cluster_arn
+
               # EKS Nodegroup
               elif event_name == 'CreateNodegroup':
                   nodegroup = resp.get('nodegroup', {})
@@ -823,11 +847,6 @@ Resources:
               elif event_name == 'CreateCacheCluster':
                   cache = resp.get('cacheCluster', {})
                   return cache.get('aRN')
-
-              # OpenSearch Serverless Collection
-              elif event_name == 'CreateCollection' and event_source == 'aoss.amazonaws.com':
-                  detail = resp.get('createCollectionDetail', {})
-                  return detail.get('arn')
 
               # Route53 Hosted Zone
               elif event_name == 'CreateHostedZone':
@@ -904,20 +923,6 @@ Resources:
                   task_arn = resp.get('taskArn')
                   if task_arn:
                       return task_arn
-
-              # AppConfig Configuration Profile
-              elif event_name == 'CreateConfigurationProfile':
-                  app_id = req.get('applicationId') or resp.get('applicationId')
-                  profile_id = resp.get('id')
-                  if app_id and profile_id:
-                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}/configurationprofile/{profile_id}"
-
-              # AppConfig Environment
-              elif event_name == 'CreateEnvironment' and event_source == 'appconfig.amazonaws.com':
-                  app_id = req.get('applicationId')
-                  env_id = resp.get('id')
-                  if app_id and env_id:
-                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}/environment/{env_id}"
 
               # Glue DataBrew Dataset
               elif event_name == 'CreateDataset' and event_source == 'databrew.amazonaws.com':
@@ -1116,12 +1121,6 @@ Resources:
                   # For now, skip - would need async operation tracking
                   return None
 
-              # AppConfig Application
-              elif event_name == 'CreateApplication' and event_source == 'appconfig.amazonaws.com':
-                  app_id = resp.get('id')
-                  if app_id:
-                      return f"arn:aws:appconfig:{region}:{account_id}:application/{app_id}"
-
               # ELB Classic (different from ALB/NLB)
               elif event_name == 'CreateLoadBalancer' and event_source == 'elasticloadbalancing.amazonaws.com':
                   # Classic ELB (v1) vs ALB/NLB (v2)
@@ -1156,7 +1155,7 @@ Resources:
                       return pool_arn
 
               # Cognito User Pool
-              elif event_name == 'CreateUserPool':
+              elif event_name == 'CreateUserPool' and event_source == 'cognito-idp.amazonaws.com':
                   pool = resp.get('userPool', {})
                   pool_id = pool.get('id')
                   if pool_id:
@@ -1275,6 +1274,13 @@ Resources:
                   cluster_arn = resp.get('clusterArn')
                   if cluster_arn:
                       return cluster_arn
+
+              # Amazon OpenSearch Service (managed — NOT Serverless)
+              elif event_name == 'CreateDomain' and event_source == 'es.amazonaws.com':
+                  domain_status = resp.get('domainStatus', {})
+                  domain_arn = domain_status.get('ARN') or domain_status.get('arn')
+                  if domain_arn:
+                      return domain_arn
 
               # SageMaker Domain (Studio)
               elif event_name == 'CreateDomain' and event_source == 'sagemaker.amazonaws.com':
@@ -1540,7 +1546,15 @@ Resources:
                               return True
                           raise e
 
+          def _unwrap_event(event):
+              """Unwrap SQS envelope if present, returning the inner EventBridge event."""
+              records = event.get('Records', [])
+              if records and records[0].get('eventSource') == 'aws:sqs':
+                  return json.loads(records[0]['body'])
+              return event
+
           def handler(event, context):
+              event = _unwrap_event(event)
               config = get_config()
               if not is_after_agreement(config):
                   print('Before agreement start date, skipping.')
@@ -1602,6 +1616,21 @@ Resources:
                   return {'status': 'tagged', 'resources': [arn]}
               except Exception as e:
                   print(f'Failed to tag {arn}: {e}')
+                  alert_arn = os.environ.get('ALERT_TOPIC_ARN')
+                  if alert_arn:
+                      try:
+                          boto3.client('sns').publish(
+                              TopicArn=alert_arn,
+                              Subject='MAP Auto-Tagger: Tagging failure',
+                              Message=(
+                                  f'Failed to apply map-migrated tag.\n\n'
+                                  f'Resource ARN: {arn}\n'
+                                  f'MPE ID: {tag_value}\n'
+                                  f'Error: {str(e)}\n'
+                              )
+                          )
+                      except Exception as sns_e:
+                          print(f'Could not publish SNS alert: {sns_e}')
                   return {'status': 'failed', 'error': str(e)}
 
   # EventBridge rule - matches ALL resource creation events
@@ -1632,17 +1661,55 @@ Resources:
             - prefix: "Restore"    # RDS/Aurora/Redshift from snapshots
             - prefix: "Enable"     # SecurityHub
       Targets:
-        - Arn: !GetAtt AutoTaggerFunction.Arn
-          Id: MapAutoTagger
+        - Arn: !GetAtt EventQueue.Arn
+          Id: MapAutoTaggerQueue
 
-  # Permission for EventBridge to invoke Lambda
-  AutoTagEventPermission:
-    Type: AWS::Lambda::Permission
+  # Permission for EventBridge to send to SQS
+  EventQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
     Properties:
+      Queues:
+        - !Ref EventQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt EventQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt AutoTagEventRule.Arn
+
+  # SQS queue — buffers CloudTrail events for up to 14 days
+  # Replaces direct EventBridge → Lambda invocation to avoid 24h retry limit
+  EventQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'map-auto-tagger-events-${MpeId}'
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 1209600  # 14 days
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EventDLQ.Arn
+        maxReceiveCount: 3
+
+  # Dead letter queue — receives events that fail after 3 processing attempts
+  EventDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub 'map-auto-tagger-dlq-${MpeId}'
+      MessageRetentionPeriod: 1209600  # 14 days
+      SqsManagedSseEnabled: true
+
+  # Lambda event source mapping — polls SQS and invokes Lambda
+  EventQueueMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt EventQueue.Arn
       FunctionName: !Ref AutoTaggerFunction
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt AutoTagEventRule.Arn
+      BatchSize: 1
+      Enabled: true
 
   # SNS topic for tagging alerts
   AlertTopic:
@@ -1670,6 +1737,29 @@ Resources:
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
         - !Ref AlertTopic
+
+  # CloudWatch alarm - fires if events land in DLQ (failed after 3 SQS retries)
+  DLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'map-auto-tagger-dlq-${MpeId}'
+      AlarmDescription: >
+        MAP auto-tagger events failed after 3 processing attempts and were moved
+        to the dead letter queue. Check DLQ for stranded events and investigate
+        Lambda errors. Events are retained for 14 days.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt EventDLQ.QueueName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
 
 Outputs:
   LambdaArn:

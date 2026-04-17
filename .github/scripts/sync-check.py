@@ -33,10 +33,10 @@ html = HTML_FILE.read_text()
 
 canonical = {l.strip() for l in PERMS_FILE.read_text().splitlines() if l.strip()}
 
-# YAML: extract from UniversalTagging + ServiceSpecificTagging Sids
+# YAML: extract from all Sids in the Lambda execution role IAM policy
 yaml_perms: set[str] = set()
-for block in re.findall(r'Sid: (?:UniversalTagging|ServiceSpecificTagging).*?Resource:', yaml, re.DOTALL):
-    yaml_perms |= set(re.findall(r'- ([\w]+:[\w]+)', block))
+for block in re.findall(r'Sid: \w+.*?Resource:', yaml, re.DOTALL):
+    yaml_perms |= set(re.findall(r'- ([\w-]+:[\w]+)', block))
 
 # HTML: extract from TAGGING_PERMISSIONS JS array
 html_perms_match = re.search(r'const TAGGING_PERMISSIONS = \[([\s\S]+?)\];', html)

@@ -3475,8 +3475,10 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'apigateway:PUT','apigateway:PATCH',
             // Management & Monitoring
             'logs:TagResource','cloudwatch:TagResource','ssm:AddTagsToResource',
-            'secretsmanager:TagResource','appconfig:TagResource',
+            'secretsmanager:TagResource',
             'servicediscovery:TagResource',
+            'sns:Publish',
+            'sqs:DeleteMessage','sqs:GetQueueAttributes','sqs:ReceiveMessage','sqs:SendMessage',
             // Security
             'kms:TagResource','acm:AddTagsToCertificate',
             'acm-pca:TagCertificateAuthority',
@@ -3497,7 +3499,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             // ML / AI
             'sagemaker:AddTags','comprehend:TagResource',
             'kendra:TagResource',
-            'bedrock:TagResource','aoss:TagResource','braket:TagResource',
+            'bedrock:TagResource','braket:TagResource',
             // IoT
             'iot:TagResource','iotanalytics:TagResource','iotevents:TagResource',
             'iotsitewise:TagResource',
@@ -4790,7 +4792,7 @@ else
 fi
 
 for CHECK_REGION in \$REGIONS; do
-    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --no-include-shadow-trails --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
     if [ "\$TRAIL_COUNT" -eq 0 ]; then
         echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
         echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
@@ -5124,7 +5126,7 @@ else
 fi
 
 for CHECK_REGION in ${regionArgs}; do
-    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --no-include-shadow-trails --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
     if [ "\$TRAIL_COUNT" -eq 0 ]; then
         echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
         echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"

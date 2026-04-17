@@ -527,6 +527,11 @@ def delete_record(record: dict) -> None:
         ecs = _client("ecs", region, account)
         safe_delete(ecs.delete_cluster, cluster=arn, resource_desc=arn)
 
+    # ── EKS ───────────────────────────────────────────────────────────────────
+    elif service == "eks":
+        eks = _client("eks", region, account)
+        safe_delete(eks.delete_cluster, name=resource_id, resource_desc=arn)
+
     # ── ECR ───────────────────────────────────────────────────────────────────
     elif service == "ecr":
         safe_delete(_client("ecr", region, account).delete_repository,
