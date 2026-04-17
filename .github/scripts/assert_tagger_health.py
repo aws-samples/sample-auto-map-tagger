@@ -96,35 +96,65 @@ def assert_lambda_invoked(
     function_name: str,
     window_minutes: int = 10,
     min_invocations: int = 1,
+    max_wait_seconds: int = 300,
+    poll_interval: int = 30,
 ) -> bool:
-    """Assert Lambda has been invoked at least N times in the last window_minutes."""
-    end = datetime.datetime.utcnow()
-    start = end - datetime.timedelta(minutes=window_minutes)
+    """Assert Lambda has been invoked at least N times in the last window_minutes.
+
+    CloudWatch's Invocations metric has a 1-2 minute publishing lag after
+    the invocation happens. When the create-resource job finishes and this
+    assertion runs immediately after, the metric may not yet reflect the
+    just-triggered CloudTrail events. Poll until the metric appears, up to
+    max_wait_seconds.
+    """
     try:
         cw = _client("cloudwatch", region, account)
-        resp = cw.get_metric_statistics(
-            Namespace="AWS/Lambda",
-            MetricName="Invocations",
-            Dimensions=[{"Name": "FunctionName", "Value": function_name}],
-            StartTime=start,
-            EndTime=end,
-            Period=60,
-            Statistics=["Sum"],
-        )
-        total = sum(dp["Sum"] for dp in resp.get("Datapoints", []))
+    except Exception as exc:
+        log.error("  ❌ CloudWatch client init failed: %s", exc)
+        return False
+
+    deadline = datetime.datetime.utcnow() + datetime.timedelta(seconds=max_wait_seconds)
+    attempt = 0
+    while True:
+        attempt += 1
+        end = datetime.datetime.utcnow()
+        start = end - datetime.timedelta(minutes=window_minutes)
+        try:
+            resp = cw.get_metric_statistics(
+                Namespace="AWS/Lambda",
+                MetricName="Invocations",
+                Dimensions=[{"Name": "FunctionName", "Value": function_name}],
+                StartTime=start,
+                EndTime=end,
+                Period=60,
+                Statistics=["Sum"],
+            )
+            total = sum(dp["Sum"] for dp in resp.get("Datapoints", []))
+        except Exception as exc:
+            log.warning("  CloudWatch poll %d: %s", attempt, exc)
+            total = 0
+
         if total >= min_invocations:
             log.info("  ✅ Lambda Invocations (last %dmin): %d", window_minutes, int(total))
             return True
-        log.error(
-            "  ❌ Lambda Invocations in last %dmin: %d (expected >= %d). "
-            "The auto-tagger is not processing EventBridge events — check EventBridge rule, "
-            "SQS event source mapping, and IAM permissions.",
-            window_minutes, int(total), min_invocations,
+
+        now = datetime.datetime.utcnow()
+        if now >= deadline:
+            log.error(
+                "  ❌ Lambda Invocations in last %dmin: %d (expected >= %d) after %ds of polling. "
+                "The auto-tagger is not processing EventBridge events — check EventBridge rule, "
+                "SQS event source mapping, and IAM permissions.",
+                window_minutes, int(total), min_invocations, max_wait_seconds,
+            )
+            return False
+
+        log.info(
+            "  ⏳ Attempt %d: Invocations=%d (need >= %d). CloudWatch has ~1-2min publishing lag "
+            "— sleeping %ds and retrying (deadline in %ds).",
+            attempt, int(total), min_invocations, poll_interval,
+            int((deadline - now).total_seconds()),
         )
-        return False
-    except Exception as exc:
-        log.error("  ❌ CloudWatch metric check failed: %s", exc)
-        return False
+        time.sleep(poll_interval)
 
 
 def assert_dlq_empty(region: str, account: str, mpe_id: str) -> bool:
