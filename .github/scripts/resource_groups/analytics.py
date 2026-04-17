@@ -244,16 +244,8 @@ def create(
         resp = emr.run_job_flow(**emr_kwargs)
         emr_cluster_id = resp["JobFlowId"]
         emr_arn = f"arn:aws:elasticmapreduce:{region}:{account}:cluster/{emr_cluster_id}"
-        # NOTE: taggable=False here because the EMR cluster lives in the same
-        # account as the scope-vpc and scope-acct test stacks, whose Lambdas
-        # (distinct MPE IDs migTEST0000002/3/5) race with the main Lambda to
-        # tag the same ARN. Last-writer-wins and the scope Lambdas often win,
-        # leaving the cluster tagged with the wrong value for the main verify.
-        # The main Lambda IS tagging correctly (confirmed in CW Logs), it just
-        # gets overwritten. Task #4 / PR #7.b moves scope tests to an isolated
-        # linked account, at which point this can be set back to taggable=True.
-        rec(emr_arn, "elasticmapreduce", emr_cluster_id, taggable=False)
-        log.info("EMR cluster: %s (marked non-taggable due to scope-stack race)", emr_cluster_id)
+        rec(emr_arn, "elasticmapreduce", emr_cluster_id)
+        log.info("EMR cluster: %s", emr_cluster_id)
     except Exception as exc:
         log.error("EMR cluster creation failed: %s", exc)
 
