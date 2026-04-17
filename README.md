@@ -220,6 +220,7 @@ Each creates a separate StackSet, Lambda, SSM config, and EventBridge rule. They
 - CloudTrail enabled in target region(s)
 - Deployer needs: `iam:*Role*`, `lambda:CreateFunction`, `events:PutRule`, `ssm:PutParameter`, `sns:CreateTopic`, `sqs:CreateQueue`, `cloudwatch:PutMetricAlarm`
 - Or use a CloudFormation service role
+- **Lambda concurrency quota** — the per-region account default is 1,000 concurrent executions. New AWS accounts and Control Tower-managed accounts often start with a reduced quota (we've observed 400 on CT-managed linked accounts). This does not cause deployment failure or event loss — the SQS pipeline buffers events for 14 days and retries. Reduced quotas only increase tagging latency during bursts. For high-volume workloads (>100 resource creations/min), request a Service Quota increase for `AWS Lambda → Concurrent executions` before deployment.
 - **Multi-account only:** Trusted access for CloudFormation StackSets must be enabled in your organization:
   ```bash
   aws organizations enable-aws-service-access --service-principal member.org.stacksets.cloudformation.amazonaws.com
