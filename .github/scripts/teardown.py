@@ -21,12 +21,18 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
 import boto3
 from botocore.exceptions import ClientError
+
+# Max concurrent per-account teardown workers. 6 fits the 7-account E2E matrix
+# (single + 6 linked) without saturating boto3's default pool or GH runner CPU.
+TEARDOWN_MAX_WORKERS = 6
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,41 +42,56 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Boto3 client cache
+# Boto3 client cache (thread-safe: per-account fanout runs in parallel)
 # ---------------------------------------------------------------------------
 _clients: dict[tuple, Any] = {}
+_clients_lock = threading.Lock()
 
 
 def _client(service: str, region: str, account: str | None = None) -> Any:
     key = (service, region, account or "")
-    if key in _clients:
-        return _clients[key]
+    with _clients_lock:
+        cached = _clients.get(key)
+    if cached is not None:
+        return cached
     current = _get_current_account()
     if account and account != current:
         session = _assume_role(account, region)
         c = session.client(service, region_name=region)
     else:
         c = boto3.client(service, region_name=region)
-    _clients[key] = c
+    with _clients_lock:
+        # Another thread may have populated the cache while we were building.
+        existing = _clients.get(key)
+        if existing is not None:
+            return existing
+        _clients[key] = c
     return c
 
 
 _current_account_cache: str | None = None
+_current_account_lock = threading.Lock()
 
 
 def _get_current_account() -> str:
     global _current_account_cache
-    if _current_account_cache is None:
-        _current_account_cache = boto3.client("sts").get_caller_identity()["Account"]
-    return _current_account_cache
+    if _current_account_cache is not None:
+        return _current_account_cache
+    with _current_account_lock:
+        if _current_account_cache is None:
+            _current_account_cache = boto3.client("sts").get_caller_identity()["Account"]
+        return _current_account_cache
 
 
 _assumed: dict[str, boto3.Session] = {}
+_assumed_lock = threading.Lock()
 
 
 def _assume_role(account: str, region: str) -> boto3.Session:
-    if account in _assumed:
-        return _assumed[account]
+    with _assumed_lock:
+        cached = _assumed.get(account)
+    if cached is not None:
+        return cached
     sts = boto3.client("sts")
     role_arn = f"arn:aws:iam::{account}:role/GitHubActionsE2ERole"
     try:
@@ -83,7 +104,11 @@ def _assume_role(account: str, region: str) -> boto3.Session:
             aws_session_token=creds["SessionToken"],
             region_name=region,
         )
-        _assumed[account] = session
+        with _assumed_lock:
+            existing = _assumed.get(account)
+            if existing is not None:
+                return existing
+            _assumed[account] = session
         return session
     except Exception as exc:
         log.warning("Could not assume role in %s: %s", account, exc)
@@ -988,34 +1013,98 @@ def _deletion_priority(record: dict) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Parallel per-account deletion
+# ---------------------------------------------------------------------------
+
+def _delete_account_records(account_label: str, records: list[dict]) -> None:
+    """Delete all records for one account, preserving intra-account priority ordering.
+
+    Per-account chains are independent (resources in account A don't block
+    deletions in account B), so chains can run in parallel across accounts.
+    Within an account, ordering still matters (databases before subnets, etc).
+    """
+    ordered = sorted(records, key=_deletion_priority)
+    log.info("[acct=%s] Deleting %d record(s)", account_label, len(ordered))
+    for record in ordered:
+        try:
+            delete_record(record)
+        except Exception as exc:
+            log.warning("[acct=%s] Unexpected error deleting %s: %s",
+                        account_label, record.get("arn"), exc)
+    log.info("[acct=%s] Done (%d record(s))", account_label, len(ordered))
+
+
+def _delete_records_parallel(records: list[dict]) -> None:
+    """Group records by account and fan out account chains across a thread pool."""
+    by_account: dict[str, list[dict]] = {}
+    for record in records:
+        key = record.get("account") or "_current"
+        by_account.setdefault(key, []).append(record)
+
+    accounts = list(by_account.keys())
+    workers = min(TEARDOWN_MAX_WORKERS, max(1, len(accounts)))
+    log.info("Fan-out deletion across %d account(s) with %d worker(s)",
+             len(accounts), workers)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(_delete_account_records, acct, by_account[acct]): acct
+            for acct in accounts
+        }
+        for f in as_completed(futures):
+            acct = futures[f]
+            try:
+                f.result()
+            except Exception as exc:
+                log.warning("[acct=%s] Account-level teardown crashed: %s", acct, exc)
+
+
+# ---------------------------------------------------------------------------
 # Tag-based orphan sweep
 # ---------------------------------------------------------------------------
 
+def _sweep_one(tag_value: str, region: str, account: str) -> None:
+    """Sweep a single (region, account) pair and delete matched resources."""
+    try:
+        tagging = _client("resourcegroupstaggingapi", region, account)
+        paginator = tagging.get_paginator("get_resources")
+        for page in paginator.paginate(
+            TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
+        ):
+            for rm in page.get("ResourceTagMappingList", []):
+                arn = rm["ResourceARN"]
+                log.info("  Orphan sweep: %s", arn)
+                rec = {
+                    "arn": arn,
+                    "service": _service_from_arn(arn),
+                    "region": region,
+                    "account": account,
+                    "resource_id": arn.split("/")[-1],
+                }
+                safe_delete(lambda: delete_record(rec), resource_desc=arn)
+    except Exception as exc:
+        log.warning("Orphan sweep %s/%s: %s", region, account, exc)
+
+
 def orphan_sweep(tag_value: str, regions: list[str], accounts: list[str]) -> None:
-    """Find any remaining resources tagged with tag_value and delete them."""
-    log.info("Running orphan sweep for tag-value=%s across %d region(s)", tag_value, len(regions))
-    for region in regions:
-        for account in (accounts or [_get_current_account()]):
+    """Find remaining resources tagged with tag_value and delete them.
+
+    Fans out across (region × account) pairs in parallel — orphan sweep is
+    pure read/delete on disjoint accounts, so there is no ordering constraint.
+    """
+    target_accounts = accounts or [_get_current_account()]
+    pairs = [(r, a) for r in regions for a in target_accounts]
+    log.info(
+        "Running orphan sweep for tag-value=%s across %d region(s) × %d account(s) = %d worker(s)",
+        tag_value, len(regions), len(target_accounts), len(pairs),
+    )
+    with ThreadPoolExecutor(max_workers=min(TEARDOWN_MAX_WORKERS, max(1, len(pairs)))) as pool:
+        futures = [pool.submit(_sweep_one, tag_value, r, a) for (r, a) in pairs]
+        for f in as_completed(futures):
             try:
-                tagging = _client("resourcegroupstaggingapi", region, account)
-                paginator = tagging.get_paginator("get_resources")
-                for page in paginator.paginate(
-                    TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
-                ):
-                    for rm in page.get("ResourceTagMappingList", []):
-                        arn = rm["ResourceARN"]
-                        log.info("  Orphan sweep: %s", arn)
-                        # Build a minimal record
-                        rec = {
-                            "arn": arn,
-                            "service": _service_from_arn(arn),
-                            "region": region,
-                            "account": account,
-                            "resource_id": arn.split("/")[-1],
-                        }
-                        safe_delete(lambda: delete_record(rec), resource_desc=arn)
+                f.result()
             except Exception as exc:
-                log.warning("Orphan sweep %s/%s: %s", region, account, exc)
+                log.warning("Orphan sweep worker crashed: %s", exc)
 
 
 def _service_from_arn(arn: str) -> str:
@@ -1029,11 +1118,42 @@ def _service_from_arn(arn: str) -> str:
 # Main
 # ---------------------------------------------------------------------------
 
+def _tag_sweep_one_region(tag_value: str, region: str, account: str) -> int:
+    try:
+        tagging = _client("resourcegroupstaggingapi", region, account)
+        paginator = tagging.get_paginator("get_resources")
+        found = 0
+        for page in paginator.paginate(
+            TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
+        ):
+            for rm in page.get("ResourceTagMappingList", []):
+                arn = rm["ResourceARN"]
+                log.info("  Tag sweep (%s): %s", region, arn)
+                rec = {
+                    "arn": arn,
+                    "service": _service_from_arn(arn),
+                    "region": region,
+                    "account": account,
+                    "resource_id": arn.split("/")[-1],
+                }
+                try:
+                    delete_record(rec)
+                except Exception as exc:
+                    log.warning("  Error deleting %s: %s", arn, exc)
+                found += 1
+        log.info("  Region %s: swept %d resource(s)", region, found)
+        return found
+    except Exception as exc:
+        log.warning("Tag sweep failed for region %s: %s", region, exc)
+        return 0
+
+
 def tag_sweep_all(tag_value: str, regions: list[str]) -> None:
     """--all mode: sweep all resources tagged with tag_value using resourcegroupstaggingapi.
 
     Skips ARN file loading entirely — useful for nightly cleanup where there are
     no ARN artifact files, only orphaned resources identified by the test MPE tag.
+    Fans out across regions in parallel.
     """
     log.info(
         "Running --all tag sweep for map-migrated=%s across regions: %s",
@@ -1041,32 +1161,13 @@ def tag_sweep_all(tag_value: str, regions: list[str]) -> None:
         ", ".join(regions),
     )
     current_account = _get_current_account()
-    for region in regions:
-        try:
-            tagging = _client("resourcegroupstaggingapi", region, current_account)
-            paginator = tagging.get_paginator("get_resources")
-            found = 0
-            for page in paginator.paginate(
-                TagFilters=[{"Key": "map-migrated", "Values": [tag_value]}]
-            ):
-                for rm in page.get("ResourceTagMappingList", []):
-                    arn = rm["ResourceARN"]
-                    log.info("  Tag sweep (%s): %s", region, arn)
-                    rec = {
-                        "arn": arn,
-                        "service": _service_from_arn(arn),
-                        "region": region,
-                        "account": current_account,
-                        "resource_id": arn.split("/")[-1],
-                    }
-                    try:
-                        delete_record(rec)
-                    except Exception as exc:
-                        log.warning("  Error deleting %s: %s", arn, exc)
-                    found += 1
-            log.info("  Region %s: swept %d resource(s)", region, found)
-        except Exception as exc:
-            log.warning("Tag sweep failed for region %s: %s", region, exc)
+    with ThreadPoolExecutor(max_workers=min(TEARDOWN_MAX_WORKERS, max(1, len(regions)))) as pool:
+        futures = [pool.submit(_tag_sweep_one_region, tag_value, r, current_account) for r in regions]
+        for f in as_completed(futures):
+            try:
+                f.result()
+            except Exception as exc:
+                log.warning("Tag sweep worker crashed: %s", exc)
 
 
 def main() -> None:
@@ -1126,14 +1227,7 @@ def main() -> None:
     if not all_records:
         log.warning("No records found — skipping record-based deletion")
     else:
-        # Sort by deletion priority
-        ordered = sorted(all_records, key=_deletion_priority)
-
-        for record in ordered:
-            try:
-                delete_record(record)
-            except Exception as exc:
-                log.warning("Unexpected error deleting %s: %s", record.get("arn"), exc)
+        _delete_records_parallel(all_records)
 
     # Tag-based orphan sweep
     if not args.no_sweep:

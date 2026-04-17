@@ -6,6 +6,9 @@ on:
     paths:
       - 'map2-auto-tagger-optimized.yaml'
       - 'configurator.html'
+      - '.github/scripts/**'
+      - '.github/workflows/e2e.yml'
+  workflow_dispatch:
 
 # Cancel in-progress runs for the same PR
 concurrency:
@@ -19,9 +22,17 @@ defaults:
 
 env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
-  # MPE_ID drives the expected tag value.  Stored as a secret so the real
-  # test MPE is not hard-coded here; falls back to migTEST0000001 for forks.
-  MPE_ID: ${{ secrets.TEST_MPE_ID || 'migTEST0000001' }}
+  # MPE_ID drives the expected tag value. Keeps the `migTEST` prefix so the
+  # scope-vpc-positive verify step (which filters tags by `migTEST*`) keeps
+  # working — scope tests run in the same account as the main stack and both
+  # Lambdas race to tag the same resource; last-writer wins, and the prefix
+  # match is what absorbs the race. Appends the run ID so resource names
+  # (IAM role, Lambda, SQS, SSM) are unique per workflow run and we don't hit
+  # "already exists" collisions when two runs overlap. Fixed in PR #4, lost
+  # when PR #5 merged on top of an older main; restoring here.
+  # Length check: `map-auto-tagger-role-migTEST<11-digit-run-id>-ap-northeast-2`
+  # = 61 chars, safely under the 64-char IAM role name limit.
+  MPE_ID: migTEST${{ github.run_id }}
   STACK_NAME: map-auto-tagger-e2e-pr${{ github.event.pull_request.number }}
 
 # ---------------------------------------------------------------------------
