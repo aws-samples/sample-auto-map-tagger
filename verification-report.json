@@ -1,0 +1,17 @@
+{
+  "tag_key": "map-migrated",
+  "tag_value": "migTEST24560234194",
+  "max_wait_seconds": 120,
+  "total_passed": 7,
+  "total_failed": 0,
+  "passed": [
+    "arn:aws:s3:::e2e-pr10-1776421827-linked2-606065958700",
+    "arn:aws:lambda:ap-northeast-2:606065958700:function:e2e-pr10-1776421827-linked2-lambda",
+    "arn:aws:dynamodb:ap-northeast-2:606065958700:table/e2e-pr10-1776421827-linked2-dynamodb",
+    "arn:aws:sns:ap-northeast-2:606065958700:e2e-pr10-1776421827-linked2-sns",
+    "arn:aws:sqs:ap-northeast-2:606065958700:e2e-pr10-1776421827-linked2-sqs",
+    "arn:aws:logs:ap-northeast-2:606065958700:log-group:/e2e/e2e-pr10-1776421827-linked2-logs",
+    "arn:aws:ssm:ap-northeast-2:606065958700:parameter/e2e/e2e-pr10-1776421827-linked2-ssm"
+  ],
+  "failed": []
+}
