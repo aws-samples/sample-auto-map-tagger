@@ -4094,31 +4094,58 @@ ${crossAccountCode}
                   if arn: break
 
               # Service-specific ARN construction for events without ARN in response
-              # RunInstances emits multiple ARNs (instances + attached EBS volumes +
-              # ENIs); extra_arns accumulates children for the tagging loop below.
+              # RunInstances emits multiple ARNs (instance + attached ENI from the
+              # event itself + attached EBS volumes resolved via describe_instances,
+              # since AWS does not populate blockDeviceMapping in the RunInstances
+              # response). extra_arns accumulates children for the batch tag call.
               extra_arns = []
               if not arn:
                   p = 'aws'
                   if event_name == 'RunInstances':
                       items = resp.get('instancesSet',{}).get('items',[])
+                      inst_ids = []
                       for idx, it in enumerate(items):
                           inst_id = it.get('instanceId')
                           if inst_id:
                               inst_arn = f"arn:{p}:ec2:{region}:{account_id}:instance/{inst_id}"
                               if idx == 0 and not arn: arn = inst_arn
                               else: extra_arns.append(inst_arn)
-                          # Attached EBS volumes: blockDeviceMapping.items[*].ebs.volumeId
-                          # AWS does not emit CreateVolume for these; they must be
-                          # extracted from this RunInstances event or they miss credit.
-                          for bdm in (it.get('blockDeviceMapping',{}) or {}).get('items') or []:
-                              vol_id = (bdm.get('ebs') or {}).get('volumeId')
-                              if vol_id:
-                                  extra_arns.append(f"arn:{p}:ec2:{region}:{account_id}:volume/{vol_id}")
-                          # Attached ENIs: networkInterfaceSet.items[*]
+                              inst_ids.append(inst_id)
                           for ni in (it.get('networkInterfaceSet',{}) or {}).get('items') or []:
                               ni_id = ni.get('networkInterfaceId')
                               if ni_id:
                                   extra_arns.append(f"arn:{p}:ec2:{region}:{account_id}:network-interface/{ni_id}")
+                      # Resolve attached EBS volumes via describe_instances. AWS
+                      # does NOT populate blockDeviceMapping in the RunInstances
+                      # CloudTrail response — volume attachments appear later.
+                      # Note: configurator Lambda is single-account-only; the
+                      # StackSet mode deploys the Lambda into each target account
+                      # so account_id already matches the caller's account here.
+                      if inst_ids:
+                          try:
+                              import time as _t
+                              ec2_lookup = boto3.client('ec2', region_name=region)
+                              deadline = _t.time() + 30
+                              vols = set()
+                              while _t.time() < deadline:
+                                  all_have = True
+                                  try:
+                                      d2 = ec2_lookup.describe_instances(InstanceIds=inst_ids)
+                                      vols.clear()
+                                      for rv in d2.get('Reservations',[]):
+                                          for inst in rv.get('Instances',[]):
+                                              bdm = inst.get('BlockDeviceMappings',[]) or []
+                                              if not bdm: all_have = False
+                                              for m in bdm:
+                                                  v = (m.get('Ebs') or {}).get('VolumeId')
+                                                  if v: vols.add(v)
+                                      if all_have and vols: break
+                                  except Exception: pass
+                                  _t.sleep(3)
+                              for v in vols:
+                                  extra_arns.append(f"arn:{p}:ec2:{region}:{account_id}:volume/{v}")
+                          except Exception as e:
+                              print(f'RunInstances volume lookup failed: {e}')
                   elif event_name == 'CreateBucket':
                       b = req.get('bucketName'); arn = f"arn:{p}:s3:::{b}" if b else None
                   elif event_name == 'CreateStream':

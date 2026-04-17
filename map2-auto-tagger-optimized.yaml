@@ -417,12 +417,14 @@ Resources:
               """Return a list of ARNs for events that create multiple resources.
 
               Used for events where AWS does NOT emit separate CloudTrail events
-              for each child resource — the children must be extracted from the
-              parent event. Returns None if the event is not one of these; callers
-              should fall back to single-ARN extract_arn.
+              for each child resource. Returns None if the event is not one of
+              these; callers should fall back to single-ARN extract_arn.
 
-              RunInstances creates: N instances + their root/additional EBS volumes
-              + their primary/secondary ENIs, all visible only in this one event.
+              RunInstances: the CloudTrail responseElements contains instance IDs
+              and the primary ENI, but the block-device-mapping is usually empty
+              — AWS populates the attached EBS volume IDs AFTER the instance
+              reaches pending/running, not in the RunInstances API response.
+              We therefore describe_instances to fetch the volume IDs.
               """
               event_name = detail.get('eventName', '')
               if event_name != 'RunInstances':
@@ -432,21 +434,59 @@ Resources:
               if not items:
                   return None
               arns = []
+              # Gather instance IDs + any attached ENIs present in the event.
+              # Volumes come from describe_instances below.
+              inst_ids = []
               for it in items:
                   inst_id = it.get('instanceId')
                   if inst_id:
                       arns.append(f"arn:aws:ec2:{region}:{account_id}:instance/{inst_id}")
-                  # Attached EBS volumes (root + extras) — volumeId lives under
-                  # blockDeviceMapping.items[*].ebs.volumeId in the CloudTrail event.
-                  for bdm in (it.get('blockDeviceMapping', {}) or {}).get('items') or []:
-                      vol_id = (bdm.get('ebs') or {}).get('volumeId')
-                      if vol_id:
-                          arns.append(f"arn:aws:ec2:{region}:{account_id}:volume/{vol_id}")
-                  # Attached ENIs (primary + secondary) — networkInterfaceSet.items[*].
+                      inst_ids.append(inst_id)
                   for ni in (it.get('networkInterfaceSet', {}) or {}).get('items') or []:
                       ni_id = ni.get('networkInterfaceId')
                       if ni_id:
                           arns.append(f"arn:aws:ec2:{region}:{account_id}:network-interface/{ni_id}")
+
+              # Look up attached volume IDs via describe_instances. CloudTrail
+              # fires RunInstances milliseconds after the API call returns;
+              # volumes may not yet be attached. Poll briefly (up to 30s) for
+              # BlockDeviceMappings to populate. If this Lambda runs in a
+              # different account than the target (StackSet case), use the
+              # cross-account EC2 client.
+              if inst_ids:
+                  try:
+                      local_account = boto3.client('sts').get_caller_identity()['Account']
+                      if account_id != local_account:
+                          ec2_lookup = get_cross_account_client('ec2', account_id, region)
+                      else:
+                          ec2_lookup = boto3.client('ec2', region_name=region)
+                      if ec2_lookup:
+                          deadline = time.time() + 30
+                          volume_ids = set()
+                          while time.time() < deadline:
+                              try:
+                                  desc = ec2_lookup.describe_instances(InstanceIds=inst_ids)
+                                  all_have_vols = True
+                                  volume_ids.clear()
+                                  for resv in desc.get('Reservations', []):
+                                      for inst in resv.get('Instances', []):
+                                          bdm = inst.get('BlockDeviceMappings', []) or []
+                                          if not bdm:
+                                              all_have_vols = False
+                                          for m in bdm:
+                                              vid = (m.get('Ebs') or {}).get('VolumeId')
+                                              if vid:
+                                                  volume_ids.add(vid)
+                                  if all_have_vols and volume_ids:
+                                      break
+                              except Exception as e:
+                                  print(f'describe_instances poll: {e}')
+                              time.sleep(3)
+                          for vid in volume_ids:
+                              arns.append(f"arn:aws:ec2:{region}:{account_id}:volume/{vid}")
+                  except Exception as e:
+                      print(f'Could not resolve RunInstances attached volumes: {e}')
+
               return arns or None
 
 
