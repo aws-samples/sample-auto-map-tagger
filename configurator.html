@@ -4337,6 +4337,8 @@ ${crossAccountCode}
                       'InvalidDBClusterStateFault','InvalidDBInstanceState',
                       'ResourceNotFoundException',
                       'CREATE_IN_PROGRESS','UPDATE_IN_PROGRESS','can not be updated',
+                      'rate of control plane requests','ThrottlingException','Throttling',
+                      'RequestLimitExceeded','TooManyRequestsException','LimitExceededException',
                   )
                   if any(m in err_msg for m in TRANSIENT_MARKERS):
                       print(f'Transient failure tagging {arn}: {err_msg} -- re-raising for SQS redelivery')

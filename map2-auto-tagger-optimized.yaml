@@ -1665,6 +1665,19 @@ Resources:
                       'CREATE_IN_PROGRESS',
                       'UPDATE_IN_PROGRESS',
                       'can not be updated',
+                      # Service-specific throttles (separate from the
+                      # universal tag_resources retry loop). When DynamoDB /
+                      # RDS / other services report control-plane rate
+                      # limits, let SQS redeliver after the visibility
+                      # timeout — spreading retries across minutes is
+                      # more effective than the in-Lambda seconds-level
+                      # backoff for sustained bursts.
+                      'rate of control plane requests',
+                      'ThrottlingException',
+                      'Throttling',
+                      'RequestLimitExceeded',
+                      'TooManyRequestsException',
+                      'LimitExceededException',
                   )
                   if any(m in err_msg for m in TRANSIENT_MARKERS):
                       print(f'Transient failure tagging {arn}: {err_msg} — re-raising for SQS redelivery')
