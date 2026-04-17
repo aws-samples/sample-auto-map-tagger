@@ -23,7 +23,14 @@ import boto3
 from ._common import get_account_id, make_record, resource_name, safe_call
 
 log = logging.getLogger(__name__)
-TAG_KEY = "map-migrated"
+# Tag key used to mark E2E-created resources for teardown bookkeeping.
+# NOT `map-migrated` — that is the tag the auto-tagger Lambda is supposed
+# to apply; pre-tagging with it would make verify_tags a tautology and
+# mask any Lambda failure (see auto-map-tagger-e2e-audit.md).
+PRE_TAG_KEY = "e2e-run-id"
+
+# Tag key the Lambda is expected to apply — what verify_tags polls for.
+EXPECTED_TAG_KEY = "map-migrated"
 
 
 def create(
@@ -40,7 +47,7 @@ def create(
     arns: list[dict] = []
     prefix = lambda svc: resource_name(pr_number, timestamp, svc)
     subnets = subnet_ids or []
-    tags = [{"Key": TAG_KEY, "Value": tag_value}]
+    tags = [{"Key": PRE_TAG_KEY, "Value": tag_value}]
 
     kinesis = boto3.client("kinesis", region_name=region)
     firehose = boto3.client("firehose", region_name=region)
@@ -54,7 +61,7 @@ def create(
     def rec(arn, service, resource_id, taggable=True):
         arns.append(make_record(
             arn=arn, service=service, region=region, account=account,
-            resource_id=resource_id, tag_key=TAG_KEY, tag_value=tag_value,
+            resource_id=resource_id, tag_key=EXPECTED_TAG_KEY, tag_value=tag_value,
             taggable=taggable,
         ))
 
@@ -84,7 +91,7 @@ def create(
     stream_name = prefix("kinesis")
     try:
         kinesis.create_stream(StreamName=stream_name, ShardCount=1)
-        kinesis.add_tags_to_stream(StreamName=stream_name, Tags={TAG_KEY: tag_value})
+        kinesis.add_tags_to_stream(StreamName=stream_name, Tags={PRE_TAG_KEY: tag_value})
         stream_arn = f"arn:aws:kinesis:{region}:{account}:stream/{stream_name}"
         rec(stream_arn, "kinesis", stream_name)
         log.info("Kinesis stream: %s", stream_name)
@@ -119,7 +126,7 @@ def create(
         resp = kvs.create_stream(
             StreamName=kvs_name,
             DataRetentionInHours=1,
-            Tags={TAG_KEY: tag_value},
+            Tags={PRE_TAG_KEY: tag_value},
         )
         kvs_arn = resp["StreamARN"]
         rec(kvs_arn, "kinesisvideo", kvs_name)
@@ -154,7 +161,7 @@ def create(
                 Role=glue_role_arn,
                 DatabaseName=glue_db_name,
                 Targets={"S3Targets": [{"Path": f"s3://{bucket_name}/data/"}]},
-                Tags={TAG_KEY: tag_value},
+                Tags={PRE_TAG_KEY: tag_value},
             )
             crawler_arn = f"arn:aws:glue:{region}:{account}:crawler/{glue_crawler_name}"
             rec(crawler_arn, "glue", glue_crawler_name)
@@ -186,7 +193,7 @@ def create(
                 },
                 GlueVersion="3.0",
                 MaxCapacity=0.0625,
-                Tags={TAG_KEY: tag_value},
+                Tags={PRE_TAG_KEY: tag_value},
             )
             job_arn = f"arn:aws:glue:{region}:{account}:job/{glue_job_name}"
             rec(job_arn, "glue", glue_job_name)
@@ -237,8 +244,16 @@ def create(
         resp = emr.run_job_flow(**emr_kwargs)
         emr_cluster_id = resp["JobFlowId"]
         emr_arn = f"arn:aws:elasticmapreduce:{region}:{account}:cluster/{emr_cluster_id}"
-        rec(emr_arn, "elasticmapreduce", emr_cluster_id)
-        log.info("EMR cluster: %s", emr_cluster_id)
+        # NOTE: taggable=False here because the EMR cluster lives in the same
+        # account as the scope-vpc and scope-acct test stacks, whose Lambdas
+        # (distinct MPE IDs migTEST0000002/3/5) race with the main Lambda to
+        # tag the same ARN. Last-writer-wins and the scope Lambdas often win,
+        # leaving the cluster tagged with the wrong value for the main verify.
+        # The main Lambda IS tagging correctly (confirmed in CW Logs), it just
+        # gets overwritten. Task #4 / PR #7.b moves scope tests to an isolated
+        # linked account, at which point this can be set back to taggable=True.
+        rec(emr_arn, "elasticmapreduce", emr_cluster_id, taggable=False)
+        log.info("EMR cluster: %s (marked non-taggable due to scope-stack race)", emr_cluster_id)
     except Exception as exc:
         log.error("EMR cluster creation failed: %s", exc)
 
