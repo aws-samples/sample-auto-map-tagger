@@ -4335,7 +4335,7 @@ ${crossAccountCode}
                       'is not currently available',
                       'InvalidClusterState','InvalidServerlessCacheStateFault',
                       'InvalidDBClusterStateFault','InvalidDBInstanceState',
-                      'ResourceNotFoundException',
+                      'ResourceNotFoundException','Requested resource not found',
                       'CREATE_IN_PROGRESS','UPDATE_IN_PROGRESS','can not be updated',
                       'rate of control plane requests','ThrottlingException','Throttling',
                       'RequestLimitExceeded','TooManyRequestsException','LimitExceededException',
@@ -4400,7 +4400,8 @@ ${crossAccountCode}
     Type: AWS::SQS::Queue
     Properties:
       QueueName: map-auto-tagger-events-${mpe}
-      VisibilityTimeout: 300
+      # 90s = 1.5x Lambda timeout (60s). 3 retries x 90s = 270s worst case.
+      VisibilityTimeout: 90
       MessageRetentionPeriod: 1209600
       SqsManagedSseEnabled: true
       RedrivePolicy:

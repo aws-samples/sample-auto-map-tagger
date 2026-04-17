@@ -1659,6 +1659,9 @@ Resources:
                       'InvalidDBClusterStateFault',
                       'InvalidDBInstanceState',
                       'ResourceNotFoundException',
+                      # DynamoDB propagation lag: CloudTrail fires on
+                      # CreateTable before TagResource can see the table.
+                      'Requested resource not found',
                       # CFN stacks reach a taggable state only after
                       # CREATE_COMPLETE — CloudTrail fires on CreateStack
                       # before that.
@@ -1754,7 +1757,12 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub 'map-auto-tagger-events-${MpeId}'
-      VisibilityTimeout: 300
+      # VisibilityTimeout must be ≥ Lambda timeout (60s). 90s gives a safety
+      # margin without delaying retries of transient failures (DDB/RDS propagation
+      # lag, ElastiCache not-available, CFN CREATE_IN_PROGRESS). 3 retries × 90s
+      # = 270s worst case, well within E2E verify's 900s poll budget. Previously
+      # 300s — a single retry alone consumed 1/3 of the verify window.
+      VisibilityTimeout: 90
       MessageRetentionPeriod: 1209600  # 14 days
       SqsManagedSseEnabled: true
       RedrivePolicy:
