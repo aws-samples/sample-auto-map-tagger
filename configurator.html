@@ -4384,7 +4384,7 @@ ${crossAccountCode}
                       except: pass
                   err_msg = str(e)
                   # Transient "not available" errors: re-raise so SQS redelivers
-                  # up to maxReceiveCount=3, then DLQ. Permanent failures are
+                  # up to maxReceiveCount=5, then DLQ. Permanent failures are
                   # swallowed so they do not permanently fill the DLQ -- the
                   # SNS alert is the signal for those.
                   TRANSIENT_MARKERS = (
@@ -4457,13 +4457,14 @@ ${crossAccountCode}
     Type: AWS::SQS::Queue
     Properties:
       QueueName: map-auto-tagger-events-${mpe}
-      # 90s = 1.5x Lambda timeout (60s). 3 retries x 90s = 270s worst case.
-      VisibilityTimeout: 90
+      # Retry cadence covers slow-provisioning services (ElastiCache Serverless
+      # 3-8 min, Aurora 5-10 min). 5 retries x 180s = 900s total retry window.
+      VisibilityTimeout: 180
       MessageRetentionPeriod: 1209600
       SqsManagedSseEnabled: true
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt EventDLQ.Arn
-        maxReceiveCount: 3
+        maxReceiveCount: 5
 
   # Dead letter queue -- receives events that fail after 3 processing attempts
   EventDLQ:
