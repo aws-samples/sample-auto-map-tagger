@@ -1574,17 +1574,53 @@ jobs:
 
       - name: Delete scope-test CloudFormation stacks in linked1
         run: |
+          # Start all CFN deletes in parallel
           for SUFFIX in scope-acct scope-acct-out scope-vpc scope-date; do
             aws cloudformation delete-stack --stack-name "${STACK_NAME}-${SUFFIX}" --region ap-northeast-2 || true
           done
-          # Scoped VPC the deploy-scope-vpc job created (if it orphans after stack delete)
+          # Wait for all CFN deletes to complete so stack-managed resources
+          # (SGs, policies) are gone before we try to delete the parent VPC.
+          for SUFFIX in scope-acct scope-acct-out scope-vpc scope-date; do
+            aws cloudformation wait stack-delete-complete \
+              --stack-name "${STACK_NAME}-${SUFFIX}" --region ap-northeast-2 2>/dev/null || true
+          done
+
+          # Delete the raw VPC that deploy-scope-vpc created outside CFN.
+          # Before delete-vpc succeeds, we need any remaining SGs/subnets/RTs
+          # in it cleared — create_security_group from our scope tests was
+          # done outside CFN too, so find + delete them here.
           for VPC in $(aws ec2 describe-vpcs --region ap-northeast-2 \
               --filters "Name=tag:e2e-scope-vpc,Values=pr${PR_NUMBER}" \
               --query 'Vpcs[].VpcId' --output text 2>/dev/null); do
-            echo "Deleting scope VPC: $VPC"
-            aws ec2 delete-vpc --region ap-northeast-2 --vpc-id "$VPC" 2>/dev/null || true
+            echo "Cleaning scope VPC: $VPC"
+            # Delete non-default SGs first
+            for SG in $(aws ec2 describe-security-groups --region ap-northeast-2 \
+                --filters "Name=vpc-id,Values=$VPC" \
+                --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text 2>/dev/null); do
+              aws ec2 delete-security-group --region ap-northeast-2 --group-id "$SG" 2>/dev/null || true
+            done
+            # Delete subnets (usually none for a freshly-created scope VPC)
+            for SN in $(aws ec2 describe-subnets --region ap-northeast-2 \
+                --filters "Name=vpc-id,Values=$VPC" \
+                --query 'Subnets[].SubnetId' --output text 2>/dev/null); do
+              aws ec2 delete-subnet --region ap-northeast-2 --subnet-id "$SN" 2>/dev/null || true
+            done
+            # Detach + delete any IGWs attached
+            for IGW in $(aws ec2 describe-internet-gateways --region ap-northeast-2 \
+                --filters "Name=attachment.vpc-id,Values=$VPC" \
+                --query 'InternetGateways[].InternetGatewayId' --output text 2>/dev/null); do
+              aws ec2 detach-internet-gateway --region ap-northeast-2 --internet-gateway-id "$IGW" --vpc-id "$VPC" 2>/dev/null || true
+              aws ec2 delete-internet-gateway --region ap-northeast-2 --internet-gateway-id "$IGW" 2>/dev/null || true
+            done
+            aws ec2 delete-vpc --region ap-northeast-2 --vpc-id "$VPC" 2>/dev/null && echo "  deleted VPC $VPC" || echo "  VPC $VPC still has attached resources"
           done
+
+          # Scope-test S3 buckets created by inline python (not covered by
+          # the ARN-artifact teardown because that ran under single-account role).
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          for B in $(aws s3api list-buckets --query "Buckets[?starts_with(Name, 'e2e-scope-')].Name" --output text 2>/dev/null); do
+            aws s3 rb "s3://$B" --force 2>/dev/null && echo "  deleted bucket s3://$B" || true
+          done
           aws s3 rb "s3://cfn-e2e-${ACCOUNT}-${PR_NUMBER}-ap-northeast-2" --force 2>/dev/null || true
           echo "linked1 scope-test teardown complete"
         continue-on-error: true
