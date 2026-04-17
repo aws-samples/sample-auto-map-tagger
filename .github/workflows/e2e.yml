@@ -172,12 +172,17 @@ jobs:
 
       - name: Deploy StackSet to linked accounts
         run: |
+          # PR #7.b: linked1 is reserved for scope tests (isolation from the
+          # main StackSet Lambda). Strip linked1 from the StackSet targets
+          # so no main Lambda runs there and scope Lambdas don't race.
+          ACCOUNTS=$(echo "${{ secrets.E2E_LINKED_ACCOUNT_IDS }}" | tr ',' '\n' | grep -v "^${{ secrets.AWS_LINKED1_ACCOUNT_ID }}$" | paste -sd, -)
+          echo "StackSet target accounts (linked1 excluded): $ACCOUNTS"
           python3 deploy_stackset.py \
             --stack-set-name "$STACK_NAME-stackset" \
             --template ../../map2-auto-tagger-optimized.yaml \
             --mpe-id "$MPE_ID" \
             --agreement-date "2024-01-01" \
-            --accounts "${{ secrets.E2E_LINKED_ACCOUNT_IDS }}" \
+            --accounts "$ACCOUNTS" \
             --org-unit-ids "${{ secrets.AWS_SANDBOX_OU_ID }}" \
             --region ap-northeast-2
 
@@ -583,41 +588,9 @@ jobs:
 
   # ── Multi-account linked account resource creation ────────────────────────
   # Each linked account job assumes a separate role specific to that account.
-
-  create-multiaccount-linked1:
-    name: Create resources in linked account 1
-    runs-on: ubuntu-latest
-    needs: [deploy-stackset]
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
-          aws-region: ap-northeast-2
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - run: pip install boto3
-
-      - name: Create resources in linked account 1
-        run: |
-          python3 create_resources.py \
-            --group multiaccount-linked1 \
-            --account-index 1 \
-            --region ap-northeast-2
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: arns-multiaccount-linked1
-          path: .github/scripts/created-arns-multiaccount-linked1.json
-          if-no-files-found: warn
+  # PR #7.b: linked1 is reserved for scope tests — no main-Lambda resources
+  # are created there. Scope tests create their own resources in linked1
+  # (see deploy-scope-* jobs).
 
   create-multiaccount-linked2:
     name: Create resources in linked account 2
@@ -779,7 +752,7 @@ jobs:
       - create-misc
       - create-global-us-east-1
       - create-global-us-west-2
-      - create-multiaccount-linked1
+      # linked1 intentionally omitted: reserved for scope tests (PR #7.b)
       - create-multiaccount-linked2
       - create-multiaccount-linked3
       - create-multiaccount-linked4
@@ -972,9 +945,9 @@ jobs:
 
   # ── Account scope test ─────────────────────────────────────────────────────
   deploy-scope-account:
-    name: "[Scope] Deploy account-scoped stack (single account only)"
+    # PR #7.b: scope stacks deploy to linked1 (isolation from main Lambda)
+    name: "[Scope] Deploy account-scoped stack (linked1)"
     runs-on: ubuntu-latest
-    needs: [deploy-single]
     permissions:
       id-token: write
       contents: read
@@ -982,15 +955,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
-      - name: Deploy account-scoped stack
+      - name: Deploy account-scoped stack in linked1
         working-directory: .
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
           S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
           aws s3api create-bucket --bucket "$S3_BUCKET" --region ap-northeast-2 --create-bucket-configuration LocationConstraint=ap-northeast-2 2>/dev/null || true
-          # Scope to the single account itself — Lambda processes events in its own account
+          # Scope to linked1 itself — Lambda processes events in its own account
           # and verifies the account matches the scoped list before tagging.
           aws cloudformation deploy \
             --stack-name "${STACK_NAME}-scope-acct" \
@@ -999,7 +972,7 @@ jobs:
               MpeId="migTEST0000002" \
               AgreementStartDate="2024-01-01" \
               ScopeMode="account" \
-              ScopedAccountIds="${{ secrets.AWS_SINGLE_ACCOUNT_ID }}" \
+              ScopedAccountIds="${{ secrets.AWS_LINKED1_ACCOUNT_ID }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --s3-bucket "$S3_BUCKET" \
             --s3-prefix "e2e-scope-acct" \
@@ -1017,13 +990,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install boto3
-      - name: Create S3 bucket in single account (in scope — should be tagged)
+      - name: Create S3 bucket in linked1 (in scope — should be tagged)
         run: |
           python3 - <<'EOF'
           import boto3, json, os, time
@@ -1047,9 +1020,10 @@ jobs:
           if-no-files-found: warn
 
   create-scope-account-outscope:
-    # Deploy a second stack scoped to a NON-EXISTENT account ID — Lambda will filter
-    # out ALL resources since account 999999999999 never matches.
-    # Resources created in single account should NOT be tagged by this scoped Lambda.
+    # Deploy a second stack in linked1 scoped to a NON-EXISTENT account ID —
+    # Lambda will filter out ALL resources since account 999999999999 never
+    # matches. Resources created in linked1 should NOT be tagged by this
+    # scoped Lambda.
     name: "[Scope] Create resource out-of-scope (different account scope)"
     runs-on: ubuntu-latest
     needs: [deploy-scope-account]
@@ -1060,7 +1034,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - name: Deploy out-of-scope stack (scoped to nonexistent account)
         working-directory: .
@@ -1119,7 +1093,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1130,9 +1104,11 @@ jobs:
           name: arns-scope-acct-inscope
           path: artifacts/
       - run: |
-          # Accept any migTEST* tag value — multiple Lambdas race in same account
-          # (main stack migTEST0000001 and scope stack migTEST0000002 both fire).
-          # We just need to confirm the resource IS tagged, proving the tagger works.
+          # Scope-positive: confirm the resource got tagged. linked1 hosts 3
+          # scope Lambdas (acct, acct-out, vpc) and they race for in-account
+          # resources — the scope filter means not all 3 tag, but any one of
+          # them tagging proves the positive path works. Accept any `migTEST*`
+          # MPE as a success signal. Negative tests still use strict match.
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
@@ -1145,7 +1121,8 @@ jobs:
   verify-scope-account-negative:
     name: "[Scope] Verify out-of-scope resource is NOT tagged"
     runs-on: ubuntu-latest
-    continue-on-error: true  # Negative scope tests are flaky — multiple Lambdas race in same account
+    # PR #7.b: removed continue-on-error. linked1 has no main Lambda
+    # racing to tag, so the scope filter is now testable deterministically.
     needs: [create-scope-account-outscope]
     permissions:
       id-token: write
@@ -1154,7 +1131,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1175,24 +1152,54 @@ jobs:
 
   # ── VPC scope test ──────────────────────────────────────────────────────────
   deploy-scope-vpc:
-    name: "[Scope] Deploy VPC-scoped stack"
+    # PR #7.b: scope stacks deploy to linked1 (isolation from main Lambda).
+    # This job also creates the VPC in linked1 so the scope-vpc Lambda has
+    # a real VPC to filter by. Output the VPC ID for downstream jobs.
+    name: "[Scope] Deploy VPC-scoped stack (linked1)"
     runs-on: ubuntu-latest
-    needs: [create-networking]
     permissions:
       id-token: write
       contents: read
+    outputs:
+      vpc-id: ${{ steps.vpc.outputs.vpc-id }}
+      default-vpc-id: ${{ steps.vpc.outputs.default-vpc-id }}
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
-      - name: Deploy VPC-scoped stack
+      - name: Create scoped VPC in linked1
+        id: vpc
+        run: |
+          # Create a scoped VPC dedicated to this PR's scope-vpc test.
+          VPC_ID=$(aws ec2 create-vpc \
+            --cidr-block 10.42.0.0/16 \
+            --region ap-northeast-2 \
+            --tag-specifications "ResourceType=vpc,Tags=[{Key=e2e-scope-vpc,Value=pr${PR_NUMBER}}]" \
+            --query Vpc.VpcId --output text)
+          echo "vpc-id=$VPC_ID" >> "$GITHUB_OUTPUT"
+          echo "Scoped VPC: $VPC_ID"
+          # Default VPC for negative test (SG in default VPC = out of scope)
+          DEFAULT_VPC=$(aws ec2 describe-vpcs \
+            --filters Name=isDefault,Values=true \
+            --region ap-northeast-2 \
+            --query 'Vpcs[0].VpcId' --output text 2>/dev/null)
+          if [ "$DEFAULT_VPC" = "None" ] || [ -z "$DEFAULT_VPC" ]; then
+            DEFAULT_VPC=$(aws ec2 create-default-vpc --region ap-northeast-2 --query Vpc.VpcId --output text 2>/dev/null || echo "")
+            if [ -z "$DEFAULT_VPC" ]; then
+              # Fallback: create a second VPC to serve as "default"
+              DEFAULT_VPC=$(aws ec2 create-vpc --cidr-block 172.31.0.0/16 --region ap-northeast-2 --query Vpc.VpcId --output text)
+            fi
+          fi
+          echo "default-vpc-id=$DEFAULT_VPC" >> "$GITHUB_OUTPUT"
+          echo "Default VPC (for out-of-scope negative): $DEFAULT_VPC"
+      - name: Deploy VPC-scoped stack in linked1
         working-directory: .
         run: |
           ACCT=$(aws sts get-caller-identity --query Account --output text)
           S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
-          # Use distinct MPE ID to avoid IAM role name collision with main E2E stack
+          aws s3api create-bucket --bucket "$S3_BUCKET" --region ap-northeast-2 --create-bucket-configuration LocationConstraint=ap-northeast-2 2>/dev/null || true
           aws cloudformation deploy \
             --stack-name "${STACK_NAME}-scope-vpc" \
             --template-file map2-auto-tagger-optimized.yaml \
@@ -1200,7 +1207,7 @@ jobs:
               MpeId="migTEST0000003" \
               AgreementStartDate="2024-01-01" \
               ScopeMode="vpc" \
-              ScopedVpcIds="${{ needs.create-networking.outputs.vpc-id }}" \
+              ScopedVpcIds="${{ steps.vpc.outputs.vpc-id }}" \
             --capabilities CAPABILITY_NAMED_IAM \
             --s3-bucket "$S3_BUCKET" \
             --s3-prefix "e2e-scope-vpc" \
@@ -1210,7 +1217,7 @@ jobs:
   create-scope-vpc-inscope:
     name: "[Scope] Create SG in scoped VPC (should be tagged)"
     runs-on: ubuntu-latest
-    needs: [deploy-scope-vpc, create-networking]
+    needs: [deploy-scope-vpc]
     permissions:
       id-token: write
       contents: read
@@ -1218,7 +1225,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1248,7 +1255,7 @@ jobs:
           EOF
         working-directory: .github/scripts
         env:
-          VPC_ID: ${{ needs.create-networking.outputs.vpc-id }}
+          VPC_ID: ${{ needs.deploy-scope-vpc.outputs.vpc-id }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -1267,7 +1274,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1280,12 +1287,7 @@ jobs:
           ec2 = boto3.client('ec2', region_name='ap-northeast-2')
           sts = boto3.client('sts')
           account = sts.get_caller_identity()['Account']
-          # Get default VPC (different from scoped VPC)
-          vpcs = ec2.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
-          default_vpc = vpcs['Vpcs'][0]['VpcId'] if vpcs['Vpcs'] else None
-          if not default_vpc:
-              print("No default VPC found — creating VPC for test")
-              default_vpc = ec2.create_vpc(CidrBlock='172.31.0.0/16')['Vpc']['VpcId']
+          default_vpc = os.environ['DEFAULT_VPC_ID']
           sg = ec2.create_security_group(
               GroupName=f"e2e-scope-vpc-outscope-{os.environ['PR_NUMBER']}-{int(time.time())}",
               Description="E2E scope test - out of VPC scope",
@@ -1301,6 +1303,8 @@ jobs:
           print(f"Created SG {sg_id} in default VPC {default_vpc}")
           EOF
         working-directory: .github/scripts
+        env:
+          DEFAULT_VPC_ID: ${{ needs.deploy-scope-vpc.outputs.default-vpc-id }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -1319,7 +1323,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1330,7 +1334,9 @@ jobs:
           name: arns-scope-vpc-inscope
           path: artifacts/
       - run: |
-          # Accept any migTEST* tag value — multiple Lambdas race in same account
+          # Scope-positive: accept any `migTEST*` MPE. scope-acct (migTEST0000002)
+          # also tags in-account resources, so last-writer-wins between it and
+          # scope-vpc (migTEST0000003) is a test-infra race, not a product bug.
           python3 verify_tags.py \
             --arns-dir ../../artifacts/ \
             --tag-key map-migrated \
@@ -1343,7 +1349,7 @@ jobs:
   verify-scope-vpc-negative:
     name: "[Scope] Verify out-of-VPC SG is NOT tagged"
     runs-on: ubuntu-latest
-    continue-on-error: true  # Negative scope tests are flaky — multiple Lambdas race in same account
+    # PR #7.b: removed continue-on-error. linked1 isolation makes this deterministic.
     needs: [create-scope-vpc-outscope]
     permissions:
       id-token: write
@@ -1352,7 +1358,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1372,10 +1378,10 @@ jobs:
         working-directory: .github/scripts
 
   # ── Date filter test ────────────────────────────────────────────────────────
+  # PR #7.b: scope stacks deploy to linked1 (isolation from main Lambda).
   deploy-scope-date:
-    name: "[Scope] Deploy future-dated stack"
+    name: "[Scope] Deploy future-dated stack (linked1)"
     runs-on: ubuntu-latest
-    needs: [deploy-single]
     permissions:
       id-token: write
       contents: read
@@ -1383,15 +1389,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
-      - name: Deploy stack with future agreement start date
+      - name: Deploy stack with future agreement start date in linked1
         working-directory: .
         run: |
           TOMORROW=$(date -d '+1 day' '+%Y-%m-%d')
           ACCT=$(aws sts get-caller-identity --query Account --output text)
           S3_BUCKET="cfn-e2e-${ACCT}-${PR_NUMBER}-ap-northeast-2"
-          # Use distinct MPE ID to avoid IAM role name collision with main E2E stack
+          aws s3api create-bucket --bucket "$S3_BUCKET" --region ap-northeast-2 --create-bucket-configuration LocationConstraint=ap-northeast-2 2>/dev/null || true
           aws cloudformation deploy \
             --stack-name "${STACK_NAME}-scope-date" \
             --template-file map2-auto-tagger-optimized.yaml \
@@ -1415,7 +1421,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1455,7 +1461,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
           aws-region: ap-northeast-2
       - uses: actions/setup-python@v5
         with:
@@ -1502,7 +1508,7 @@ jobs:
       - create-misc
       - create-global-us-east-1
       - create-global-us-west-2
-      - create-multiaccount-linked1
+      # linked1 intentionally omitted: reserved for scope tests (PR #7.b)
       - create-multiaccount-linked2
       - create-multiaccount-linked3
       - create-multiaccount-linked4
@@ -1546,10 +1552,6 @@ jobs:
           for REGION in ap-northeast-2 us-east-1 us-west-2; do
             aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$REGION" || true
           done
-          # Delete scoped test stacks
-          for SUFFIX in scope-acct scope-acct-out scope-vpc scope-date; do
-            aws cloudformation delete-stack --stack-name "${STACK_NAME}-${SUFFIX}" --region ap-northeast-2 || true
-          done
           # Delete the stack deployed by deploy.sh test
           aws cloudformation delete-stack --stack-name "map-auto-tagger-migTEST9999999" --region ap-northeast-2 || true
           ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
@@ -1557,9 +1559,42 @@ jobs:
           for REGION in ap-northeast-2 us-east-1 us-west-2; do
             aws s3 rb "s3://cfn-e2e-${ACCOUNT}-${PR_NUMBER}-${REGION}" --force 2>/dev/null || true
           done
-          # Delete single ap-northeast-2 bucket used by scoped test deploys
           aws s3 rb "s3://cfn-e2e-${ACCOUNT}-${PR_NUMBER}" --force 2>/dev/null || true
-          echo "Stack deletions initiated and S3 staging buckets removed"
+          echo "Single-account stack deletions initiated"
+        continue-on-error: true
+
+      # PR #7.b: scope-test stacks (acct, acct-out, vpc, date) live in linked1.
+      # Teardown them from linked1 with their own role assumption.
+      - name: Assume role in linked1 for scope-stack teardown
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_LINKED1_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
+        continue-on-error: true
+
+      - name: Delete scope-test CloudFormation stacks in linked1
+        run: |
+          for SUFFIX in scope-acct scope-acct-out scope-vpc scope-date; do
+            aws cloudformation delete-stack --stack-name "${STACK_NAME}-${SUFFIX}" --region ap-northeast-2 || true
+          done
+          # Scoped VPC the deploy-scope-vpc job created (if it orphans after stack delete)
+          for VPC in $(aws ec2 describe-vpcs --region ap-northeast-2 \
+              --filters "Name=tag:e2e-scope-vpc,Values=pr${PR_NUMBER}" \
+              --query 'Vpcs[].VpcId' --output text 2>/dev/null); do
+            echo "Deleting scope VPC: $VPC"
+            aws ec2 delete-vpc --region ap-northeast-2 --vpc-id "$VPC" 2>/dev/null || true
+          done
+          ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          aws s3 rb "s3://cfn-e2e-${ACCOUNT}-${PR_NUMBER}-ap-northeast-2" --force 2>/dev/null || true
+          echo "linked1 scope-test teardown complete"
+        continue-on-error: true
+
+      # Switch back to the single-account role for the StackSet delete step.
+      - name: Re-assume single-account role for StackSet delete
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_SINGLE_ACCOUNT_ID }}:role/GitHubActionsE2ERole
+          aws-region: ap-northeast-2
         continue-on-error: true
 
       - name: Delete multi-account StackSet

@@ -37,7 +37,8 @@ VALID_GROUPS = [
     "misc",
     "global-us-east-1",
     "global-us-west-2",
-    *[f"multiaccount-linked{i}" for i in range(1, 6)],
+    # linked1 reserved for scope tests (PR #7.b); main Lambda runs in linked2-5 via StackSet.
+    *[f"multiaccount-linked{i}" for i in range(2, 6)],
 ]
 
 # Map CLI group name → module name inside resource_groups/
@@ -54,7 +55,7 @@ GROUP_TO_MODULE = {
     "misc": "misc",
     "global-us-east-1": "global_us_east_1",
     "global-us-west-2": "global_us_west_2",
-    **{f"multiaccount-linked{i}": "multiaccount_linked" for i in range(1, 6)},
+    **{f"multiaccount-linked{i}": "multiaccount_linked" for i in range(2, 6)},
 }
 
 
