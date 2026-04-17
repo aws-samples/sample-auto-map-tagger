@@ -1,0 +1,197 @@
+<mxfile><diagram name="Architecture v20" id="page-1"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="t1" value="&lt;font style='font-size:20px'&gt;&lt;b&gt;MAP 2.0 Auto-Tagger&lt;/b&gt;&lt;/font&gt;&lt;br&gt;AWS Architecture &amp; Workflow (v20 — SQS Buffered Pipeline)" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontColor=#232F3E;" vertex="1" parent="1">
+  <mxGeometry x="200" y="10" width="600" height="50" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="c1" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;dashPattern=8 4;fillColor=#F5F5F5;strokeColor=#999999;opacity=40;arcSize=5;" vertex="1" parent="1">
+  <mxGeometry x="260" y="75" width="810" height="470" as="geometry"/>
+</mxCell>
+<mxCell id="c1label" value="&lt;font color='#666666'&gt;&lt;i&gt;CloudFormation Stack (deployed per account, per region)&lt;/i&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;" vertex="1" parent="1">
+  <mxGeometry x="275" y="78" width="330" height="20" as="geometry"/>
+</mxCell>
+
+
+
+
+<mxCell id="s1" value="&lt;b&gt;AWS Resource&lt;br&gt;Creation&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;140+ resource types&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF8E1;strokeColor=#FF9900;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="30" y="195" width="130" height="60" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="s2" value="&lt;b&gt;CloudTrail&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;API audit log&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#3F8624;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="200" y="200" width="120" height="50" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="s3" value="&lt;b&gt;EventBridge&lt;br&gt;Rule&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;Create* pattern&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDE8EE;strokeColor=#E7157B;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="370" y="195" width="120" height="60" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="s4" value="&lt;b&gt;SQS Queue&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;14-day retention&lt;br&gt;KMS encrypted&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FDE8EE;strokeColor=#DD344C;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="540" y="190" width="120" height="70" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="s5" value="&lt;b&gt;Lambda&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;Python 3.12&lt;br&gt;ARN extract + tag&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#ED7100;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="715" y="190" width="130" height="70" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="s6" value="&lt;b&gt;Resource Groups&lt;br&gt;Tagging API&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;tag:TagResources&lt;br&gt;+30 service APIs&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E6F3FF;strokeColor=#2D72B8;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="910" y="185" width="140" height="80" as="geometry"/>
+</mxCell>
+
+
+
+<mxCell id="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3F8624;strokeWidth=2;" edge="1" source="s1" target="s2" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="a1l" value="~5s" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666;fontStyle=2;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="a1">
+  <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+</mxCell>
+
+<mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#E7157B;strokeWidth=2;" edge="1" source="s2" target="s3" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="a2l" value="~30-60s" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666;fontStyle=2;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="a2">
+  <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+</mxCell>
+
+<mxCell id="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DD344C;strokeWidth=2;" edge="1" source="s3" target="s4" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="a3l" value="Create* events" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666;fontStyle=2;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="a3">
+  <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+</mxCell>
+
+<mxCell id="a4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#ED7100;strokeWidth=2;" edge="1" source="s4" target="s5" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="a4l" value="EventSourceMapping&lt;br&gt;BatchSize=1" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666;fontStyle=2;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="a4">
+  <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+</mxCell>
+
+<mxCell id="a5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2D72B8;strokeWidth=2;" edge="1" source="s5" target="s6" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="a5l" value="map-migrated={MpeId}" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666;fontStyle=2;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="a5">
+  <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+</mxCell>
+
+
+<mxCell id="s7" value="&lt;b&gt;SSM Parameter Store&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;/auto-map-tagger/{MpeId}/config&lt;br&gt;scope, agreement date, MPE ID&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#3F8624;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="690" y="98" width="180" height="60" as="geometry"/>
+</mxCell>
+
+<mxCell id="a6" style="rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#3F8624;strokeWidth=1.5;dashed=1;dashPattern=4 4;" edge="1" source="s5" target="s7" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="a6l" value="read config" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#666;fontStyle=2;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="a6">
+  <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+</mxCell>
+
+
+<mxCell id="s8" value="&lt;b&gt;CloudWatch Logs&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;90-day retention&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="730" y="480" width="120" height="45" as="geometry"/>
+</mxCell>
+
+<mxCell id="a7" style="rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7B1FA2;strokeWidth=1.5;dashed=1;dashPattern=4 4;" edge="1" source="s5" target="s8" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+
+
+
+
+<mxCell id="s9" value="&lt;b&gt;SQS DLQ&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;14-day retention&lt;br&gt;max 3 receives&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="540" y="355" width="120" height="60" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="a8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C62828;strokeWidth=2;" edge="1" source="s4" target="s9" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+<mxCell id="a8l" value="after 3 failures" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#C62828;fontStyle=2;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="a8">
+  <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+</mxCell>
+
+
+<mxCell id="s10" value="&lt;b&gt;CloudWatch&lt;br&gt;Alarm&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;DLQ depth &amp;ge; 1&lt;br&gt;errors &amp;gt; 3/5min&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#7B1FA2;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="715" y="350" width="125" height="70" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="a9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C62828;strokeWidth=2;" edge="1" source="s9" target="s10" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="s11" value="&lt;b&gt;SNS Alert&lt;br&gt;Topic&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px;color:#666'&gt;tagging failures&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#DD344C;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="900" y="355" width="120" height="55" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="a10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C62828;strokeWidth=2;" edge="1" source="s10" target="s11" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="a10b" style="rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DD344C;strokeWidth=1.5;dashed=1;dashPattern=4 4;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="s5" target="s11" parent="1">
+  <mxGeometry relative="1" as="geometry">
+    <Array as="points">
+      <mxPoint x="870" y="243"/>
+      <mxPoint x="870" y="310"/>
+      <mxPoint x="960" y="310"/>
+    </Array>
+  </mxGeometry>
+</mxCell>
+<mxCell id="a10bl" value="publish failure&lt;br&gt;&lt;font style='font-size:8px'&gt;(NEW in v20)&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#DD344C;fontStyle=2;labelBackgroundColor=#FFF;" vertex="1" connectable="0" parent="a10b">
+  <mxGeometry x="-0.3" relative="1" as="geometry"><mxPoint as="offset"/></mxGeometry>
+</mxCell>
+
+
+<mxCell id="s12" value="&lt;b&gt;Email&lt;br&gt;Notification&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#DD344C;strokeWidth=2;fontSize=11;fontColor=#232F3E;arcSize=20;" vertex="1" parent="1">
+  <mxGeometry x="1090" y="357" width="100" height="50" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="a11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#DD344C;strokeWidth=2;" edge="1" source="s11" target="s12" parent="1">
+  <mxGeometry relative="1" as="geometry"/>
+</mxCell>
+
+
+
+
+<mxCell id="n1" value="&lt;font color='#FF9900'&gt;End-to-end latency: ~60-90 seconds typical&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;fontStyle=3;" vertex="1" parent="1">
+  <mxGeometry x="270" y="160" width="270" height="25" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="n2" value="&lt;font color='#2D72B8'&gt;&lt;b&gt;Happy Path&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;" vertex="1" parent="1">
+  <mxGeometry x="275" y="270" width="90" height="20" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="n3" value="&lt;font color='#C62828'&gt;&lt;b&gt;Error Path&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fillColor=none;strokeColor=none;fontSize=10;" vertex="1" parent="1">
+  <mxGeometry x="275" y="430" width="90" height="20" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="n4" value="&lt;b&gt;Deployment&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px'&gt;CloudFormation StackSet&lt;br&gt;SERVICE_MANAGED (Orgs)&lt;br&gt;deploy.sh via configurator.html&lt;br&gt;&lt;br&gt;&lt;b&gt;Global Services:&lt;/b&gt;&lt;br&gt;us-east-1: CloudFront, Route53&lt;br&gt;us-west-2: Global Accelerator&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#FFF8E1;strokeColor=#FF9900;fontSize=10;align=left;spacingLeft=8;fontColor=#232F3E;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+  <mxGeometry x="25" y="290" width="200" height="130" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="n5" value="&lt;b&gt;PR #5 Changes (v18 &amp;rarr; v20)&lt;/b&gt;&lt;br&gt;&lt;font style='font-size:9px'&gt;+ SQS buffering (was direct invoke)&lt;br&gt;+ DLQ + CloudWatch Alarm&lt;br&gt;+ SNS failure alerts from Lambda&lt;br&gt;+ EKS CreateCluster handler&lt;br&gt;+ OpenSearch managed (es.amazonaws.com)&lt;br&gt;- AppConfig (not MAP-eligible)&lt;br&gt;- OpenSearch Serverless (not eligible)&lt;br&gt;+ event_source guards (SQS/AppSync/Cognito)&lt;br&gt;+ CloudTrail shadow-trail fix&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;size=15;fillColor=#E6F3FF;strokeColor=#2D72B8;fontSize=10;align=left;spacingLeft=8;fontColor=#232F3E;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+  <mxGeometry x="25" y="440" width="210" height="155" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="n6" value="&lt;font style='font-size:8px;color:#ED7100'&gt;Checks: account/VPC scope,&lt;br&gt;agreement date, feedback loop&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+  <mxGeometry x="700" y="265" width="165" height="30" as="geometry"/>
+</mxCell>
+
+
+<mxCell id="n7" value="&lt;font style='font-size:8px;color:#2D72B8'&gt;Retry: 3x exponential backoff&lt;br&gt;EC2 fallback: ec2:create_tags&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+  <mxGeometry x="900" y="270" width="160" height="30" as="geometry"/>
+</mxCell></root></mxGraphModel></diagram></mxfile>

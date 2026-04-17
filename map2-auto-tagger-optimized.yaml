@@ -157,6 +157,11 @@ Resources:
                   # AWS maps this to 'apigateway:PUT' — no narrower IAM action exists for v1 tagging.
                   # Lambda code only calls tagging APIs; no other API GW mutation code paths exist.
                   - apigateway:PUT
+                  # API Gateway v2 (HTTP APIs) tags via PATCH /tags/{arn} and AWS
+                  # maps tag:TagResources on v1 REST APIs to apigateway:PATCH as
+                  # well (confirmed via AccessDenied testing — both v1 and v2
+                  # TagResource calls fail without this).
+                  - apigateway:PATCH
                   # --- Management & Monitoring ---
                   - logs:TagResource
                   - cloudwatch:TagResource
@@ -239,6 +244,14 @@ Resources:
                   - ec2:DescribeVolumes
                   # Determine local account ID for cross-account tagging logic
                   - sts:GetCallerIdentity
+                  # SSM TagResource validates the param name via GetParameters
+                  # internally (AccessDenied without it). Lambda code only
+                  # calls tag:TagResources.
+                  - ssm:GetParameters
+                  # CFN TagResource validates the stack ARN via DescribeStacks
+                  # internally (AccessDenied without it). Lambda code only
+                  # calls tag:TagResources.
+                  - cloudformation:DescribeStacks
                   # IAM role tagging (iam:TagRole not covered by tag:TagResources)
                   - iam:TagRole
                 Resource: '*'
@@ -551,7 +564,11 @@ Resources:
               elif event_name == 'CreateBucket':
                   bucket = req.get('bucketName')
                   return f"arn:aws:s3:::{bucket}" if bucket else None
-              elif event_name == 'CreateStream' and 'kinesis' in service:
+              elif event_name == 'CreateStream' and event_source == 'kinesis.amazonaws.com':
+                  # Exact match — `'kinesis' in service` also matched
+                  # kinesisvideo.amazonaws.com and produced a broken
+                  # arn:aws:kinesis:... ARN for KVS streams. KVS has its
+                  # own handler (look further down for kinesisvideo).
                   name = req.get('streamName')
                   return f"arn:aws:kinesis:{region}:{account_id}:stream/{name}" if name else None
               elif event_name == 'CreateDeliveryStream':
@@ -1582,6 +1599,13 @@ Resources:
                   'CreateOrUpdateTags', 'ModifyTags', 'DeleteTags',
                   'PutBucketTagging', 'TagResource', 'TagResources',
                   'UntagResource', 'UntagResources', 'AddTagsToResource',
+                  # CloudFormation change sets are intermediate — the stack
+                  # itself is tagged separately via CreateStack → TagResource.
+                  # Tagging change sets themselves isn't meaningful.
+                  'CreateChangeSet',
+                  # Cognito user-pool clients are child resources of the
+                  # already-tagged user pool; they don't need their own tags.
+                  'CreateUserPoolClient',
               ]
               if event_name in IGNORE_EVENTS:
                   print(f'Skipping non-taggable event: {event_name}')
@@ -1615,7 +1639,29 @@ Resources:
                   print(f'Tagged {arn} with {tag_key}={tag_value}')
                   return {'status': 'tagged', 'resources': [arn]}
               except Exception as e:
-                  print(f'Failed to tag {arn}: {e}')
+                  err_msg = str(e)
+                  # Transient "resource not yet available" errors: re-raise so
+                  # SQS redelivers (up to maxReceiveCount=3, then DLQ). Catches
+                  # the race where CloudTrail fires before the resource reaches
+                  # a taggable state — ElastiCache serverless, RDS clusters,
+                  # and cases where control-plane propagation lags CloudTrail.
+                  # Permanent failures (AccessDenied, invalid ARN shape, etc.)
+                  # are swallowed so they don't permanently fill the DLQ — the
+                  # SNS alert is the signal for those, not the DLQ depth.
+                  TRANSIENT_MARKERS = (
+                      'not in an available state',
+                      'not in available state',
+                      'is not currently available',
+                      'InvalidClusterState',
+                      'InvalidServerlessCacheStateFault',
+                      'InvalidDBClusterStateFault',
+                      'InvalidDBInstanceState',
+                      'ResourceNotFoundException',
+                  )
+                  if any(m in err_msg for m in TRANSIENT_MARKERS):
+                      print(f'Transient failure tagging {arn}: {err_msg} — re-raising for SQS redelivery')
+                      raise
+                  print(f'Failed to tag {arn}: {err_msg}')
                   alert_arn = os.environ.get('ALERT_TOPIC_ARN')
                   if alert_arn:
                       try:
@@ -1626,12 +1672,12 @@ Resources:
                                   f'Failed to apply map-migrated tag.\n\n'
                                   f'Resource ARN: {arn}\n'
                                   f'MPE ID: {tag_value}\n'
-                                  f'Error: {str(e)}\n'
+                                  f'Error: {err_msg}\n'
                               )
                           )
                       except Exception as sns_e:
                           print(f'Could not publish SNS alert: {sns_e}')
-                  return {'status': 'failed', 'error': str(e)}
+                  return {'status': 'failed', 'error': err_msg}
 
   # EventBridge rule - matches ALL resource creation events
   AutoTagEventRule:

@@ -127,9 +127,13 @@ def assert_lambda_invoked(
         return False
 
 
-def assert_dlq_empty(region: str, account: str, function_name: str) -> bool:
-    """Assert the Lambda's DLQ has 0 visible messages."""
-    dlq_name = f"{function_name}-dlq"
+def assert_dlq_empty(region: str, account: str, mpe_id: str) -> bool:
+    """Assert the Lambda's DLQ has 0 visible messages.
+
+    DLQ name is `map-auto-tagger-dlq-{MpeId}` per the CFN template
+    (EventDLQ.QueueName). Not `{function_name}-dlq`.
+    """
+    dlq_name = f"map-auto-tagger-dlq-{mpe_id}"
     try:
         sqs = _client("sqs", region, account)
         url = sqs.get_queue_url(QueueName=dlq_name)["QueueUrl"]
@@ -193,7 +197,7 @@ def main() -> int:
         )
 
     if not args.skip_dlq:
-        ok &= assert_dlq_empty(args.region, args.account, function_name)
+        ok &= assert_dlq_empty(args.region, args.account, args.mpe_id)
 
     if ok:
         log.info("✅ All assertions passed — Lambda is healthy")

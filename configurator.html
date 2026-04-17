@@ -3489,8 +3489,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'cloud9:TagResource',
             // CodeBuild: tags applied via UpdateProject; BatchGetProjects needed for tag resolution
             'codebuild:UpdateProject','codebuild:BatchGetProjects',
-            // CloudFormation: tagging maps to UpdateStack internally
-            'cloudformation:TagResource','cloudformation:UpdateStack','cloudformation:UpdateStackSet',
+            // CloudFormation: tagging maps to UpdateStack internally; DescribeStacks is AWS's internal read for ARN validation
+            'cloudformation:TagResource','cloudformation:UpdateStack','cloudformation:UpdateStackSet','cloudformation:DescribeStacks',
             // Service Catalog: tagging routes through Update* actions
             'servicecatalog:TagResource',
             'servicecatalog:UpdatePortfolio','servicecatalog:UpdateProduct',
@@ -3822,6 +3822,7 @@ ${permissionsList}
                   - ec2:DescribeVolumes
                   - sts:GetCallerIdentity
                   - ssm:GetParameters
+                  - cloudformation:DescribeStacks
                   - iam:TagRole
                 Resource: '*'
               - Sid: SqsEventSource
@@ -4039,7 +4040,11 @@ ${crossAccountCode}
                   return {'status': 'skipped', 'reason': 'out_of_scope'}
               event_name = detail.get('eventName', '')
               SKIP = ['CreateGrant','CreateLogStream','CreateTags','CreateOrUpdateTags','ModifyTags','DeleteTags',
-                      'PutBucketTagging','TagResource','TagResources','UntagResource','UntagResources','AddTagsToResource']
+                      'PutBucketTagging','TagResource','TagResources','UntagResource','UntagResources','AddTagsToResource',
+                      # CFN change sets are intermediate — the stack is tagged via CreateStack
+                      'CreateChangeSet',
+                      # Cognito user-pool clients are child resources of the already-tagged pool
+                      'CreateUserPoolClient']
               if event_name in SKIP:
                   return {'status': 'skipped', 'reason': 'non_taggable'}
 
@@ -4320,11 +4325,24 @@ ${crossAccountCode}
                           print(f'Tagged {arn} via EC2 fallback')
                           return {'status': 'tagged', 'arn': arn}
                       except: pass
-                  print(f'Failed to tag {arn}: {e}')
+                  err_msg = str(e)
+                  # Transient "not available" errors: re-raise so SQS redelivers
+                  # up to maxReceiveCount=3, then DLQ. Permanent failures are
+                  # swallowed so they do not permanently fill the DLQ -- the
+                  # SNS alert is the signal for those.
+                  TRANSIENT_MARKERS = (
+                      'not in an available state', 'not in available state',
+                      'is not currently available',
+                      'InvalidClusterState','InvalidServerlessCacheStateFault',
+                      'InvalidDBClusterStateFault','InvalidDBInstanceState',
+                      'ResourceNotFoundException',
+                  )
+                  if any(m in err_msg for m in TRANSIENT_MARKERS):
+                      print(f'Transient failure tagging {arn}: {err_msg} -- re-raising for SQS redelivery')
+                      raise
+                  print(f'Failed to tag {arn}: {err_msg}')
                   _publish_failure_alert(arn, tag_value, e)
-                  # Raise to trigger SQS redrive -- message goes back to EventQueue,
-                  # then to EventDLQ after maxReceiveCount=3 attempts.
-                  raise
+                  return {'status': 'failed', 'error': err_msg}
 
   AutoTagEventRule:
     Type: AWS::Events::Rule
