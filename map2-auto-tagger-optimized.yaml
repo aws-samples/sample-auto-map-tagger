@@ -413,6 +413,83 @@ Resources:
                   return False
               return False
 
+          def extract_arns_multi(detail, account_id, region):
+              """Return a list of ARNs for events that create multiple resources.
+
+              Used for events where AWS does NOT emit separate CloudTrail events
+              for each child resource. Returns None if the event is not one of
+              these; callers should fall back to single-ARN extract_arn.
+
+              RunInstances: the CloudTrail responseElements contains instance IDs
+              and the primary ENI, but the block-device-mapping is usually empty
+              — AWS populates the attached EBS volume IDs AFTER the instance
+              reaches pending/running, not in the RunInstances API response.
+              We therefore describe_instances to fetch the volume IDs.
+              """
+              event_name = detail.get('eventName', '')
+              if event_name != 'RunInstances':
+                  return None
+              resp = detail.get('responseElements') or {}
+              items = resp.get('instancesSet', {}).get('items') or []
+              if not items:
+                  return None
+              arns = []
+              # Gather instance IDs + any attached ENIs present in the event.
+              # Volumes come from describe_instances below.
+              inst_ids = []
+              for it in items:
+                  inst_id = it.get('instanceId')
+                  if inst_id:
+                      arns.append(f"arn:aws:ec2:{region}:{account_id}:instance/{inst_id}")
+                      inst_ids.append(inst_id)
+                  for ni in (it.get('networkInterfaceSet', {}) or {}).get('items') or []:
+                      ni_id = ni.get('networkInterfaceId')
+                      if ni_id:
+                          arns.append(f"arn:aws:ec2:{region}:{account_id}:network-interface/{ni_id}")
+
+              # Look up attached volume IDs via describe_instances. CloudTrail
+              # fires RunInstances milliseconds after the API call returns;
+              # volumes may not yet be attached. Poll briefly (up to 30s) for
+              # BlockDeviceMappings to populate. If this Lambda runs in a
+              # different account than the target (StackSet case), use the
+              # cross-account EC2 client.
+              if inst_ids:
+                  try:
+                      local_account = boto3.client('sts').get_caller_identity()['Account']
+                      if account_id != local_account:
+                          ec2_lookup = get_cross_account_client('ec2', account_id, region)
+                      else:
+                          ec2_lookup = boto3.client('ec2', region_name=region)
+                      if ec2_lookup:
+                          deadline = time.time() + 30
+                          volume_ids = set()
+                          while time.time() < deadline:
+                              try:
+                                  desc = ec2_lookup.describe_instances(InstanceIds=inst_ids)
+                                  all_have_vols = True
+                                  volume_ids.clear()
+                                  for resv in desc.get('Reservations', []):
+                                      for inst in resv.get('Instances', []):
+                                          bdm = inst.get('BlockDeviceMappings', []) or []
+                                          if not bdm:
+                                              all_have_vols = False
+                                          for m in bdm:
+                                              vid = (m.get('Ebs') or {}).get('VolumeId')
+                                              if vid:
+                                                  volume_ids.add(vid)
+                                  if all_have_vols and volume_ids:
+                                      break
+                              except Exception as e:
+                                  print(f'describe_instances poll: {e}')
+                              time.sleep(3)
+                          for vid in volume_ids:
+                              arns.append(f"arn:aws:ec2:{region}:{account_id}:volume/{vid}")
+                  except Exception as e:
+                      print(f'Could not resolve RunInstances attached volumes: {e}')
+
+              return arns or None
+
+
           def extract_arn(detail, account_id, region):
               event_name = detail.get('eventName', '')
               event_source = detail.get('eventSource', '')
@@ -557,6 +634,15 @@ Resources:
               service = event_source.split('.')[0].replace('aws.', '')
               
               if event_name == 'RunInstances':
+                  # RunInstances is handled via extract_arns_multi (called from
+                  # the handler) because it emits multiple resources: all instance
+                  # IDs, all attached EBS volume IDs, and all attached ENI IDs.
+                  # AWS does NOT emit separate CreateVolume / CreateNetworkInterface
+                  # CloudTrail events for resources born inline with RunInstances,
+                  # so we must extract them from the RunInstances event itself.
+                  # Returning the first instance ARN here preserves backward
+                  # compatibility if this single-ARN path is hit (should not be
+                  # for RunInstances — the handler calls extract_arns_multi first).
                   items = resp.get('instancesSet', {}).get('items', [])
                   if items:
                       return f"arn:aws:ec2:{region}:{account_id}:instance/{items[0].get('instanceId')}"
@@ -1613,95 +1699,96 @@ Resources:
                   print(f'Skipping non-taggable event: {event_name}')
                   return {'status': 'skipped', 'reason': 'non_taggable_event'}
 
-              arn = extract_arn(detail, account_id, region)
-              if not arn:
+              # Events that emit multiple resources in a single CloudTrail event
+              # (RunInstances → instances + attached EBS volumes + ENIs). AWS does
+              # not publish separate CreateVolume / CreateNetworkInterface events
+              # for children born inline with the parent, so we must extract them
+              # all from this one event.
+              arns = extract_arns_multi(detail, account_id, region)
+              if not arns:
+                  single = extract_arn(detail, account_id, region)
+                  arns = [single] if single else []
+              if not arns:
                   print(f'Could not extract ARN from event: {detail.get("eventName")}')
                   return {'status': 'skipped', 'reason': 'no_arn'}
-              
+
               tag_key = 'map-migrated'
               tag_value = config['mpe_id']
 
-              # Determine if cross-account tagging is needed
               local_account = boto3.client('sts').get_caller_identity()['Account']
-              target_account = get_account_from_arn(arn) or account_id
+              tagged, failed = [], []
 
-              try:
-                  if target_account and target_account != local_account:
-                      # Cross-account: assume role in target account
-                      cross_tagging = get_cross_account_client('resourcegroupstaggingapi', target_account, region)
-                      cross_ec2 = get_cross_account_client('ec2', target_account, region)
-                      if cross_tagging:
-                          tag_resource(arn, tag_key, tag_value,
-                                       tagging_client=cross_tagging, ec2_client=cross_ec2,
-                                       target_account=target_account, target_region=region)
+              for arn in arns:
+                  target_account = get_account_from_arn(arn) or account_id
+                  try:
+                      if target_account and target_account != local_account:
+                          cross_tagging = get_cross_account_client('resourcegroupstaggingapi', target_account, region)
+                          cross_ec2 = get_cross_account_client('ec2', target_account, region)
+                          if cross_tagging:
+                              tag_resource(arn, tag_key, tag_value,
+                                           tagging_client=cross_tagging, ec2_client=cross_ec2,
+                                           target_account=target_account, target_region=region)
+                          else:
+                              tag_resource(arn, tag_key, tag_value)
                       else:
                           tag_resource(arn, tag_key, tag_value)
-                  else:
-                      tag_resource(arn, tag_key, tag_value)
-                  print(f'Tagged {arn} with {tag_key}={tag_value}')
-                  return {'status': 'tagged', 'resources': [arn]}
-              except Exception as e:
-                  err_msg = str(e)
-                  # Transient "resource not yet available" errors: re-raise so
-                  # SQS redelivers (up to maxReceiveCount=3, then DLQ). Catches
-                  # the race where CloudTrail fires before the resource reaches
-                  # a taggable state — ElastiCache serverless, RDS clusters,
-                  # and cases where control-plane propagation lags CloudTrail.
-                  # Permanent failures (AccessDenied, invalid ARN shape, etc.)
-                  # are swallowed so they don't permanently fill the DLQ — the
-                  # SNS alert is the signal for those, not the DLQ depth.
-                  TRANSIENT_MARKERS = (
-                      'not in an available state',
-                      'not in available state',
-                      'is not currently available',
-                      'InvalidClusterState',
-                      'InvalidServerlessCacheStateFault',
-                      'InvalidDBClusterStateFault',
-                      'InvalidDBInstanceState',
-                      'ResourceNotFoundException',
-                      # DynamoDB propagation lag: CloudTrail fires on
-                      # CreateTable before TagResource can see the table.
-                      'Requested resource not found',
-                      # CFN stacks reach a taggable state only after
-                      # CREATE_COMPLETE — CloudTrail fires on CreateStack
-                      # before that.
-                      'CREATE_IN_PROGRESS',
-                      'UPDATE_IN_PROGRESS',
-                      'can not be updated',
-                      # Service-specific throttles (separate from the
-                      # universal tag_resources retry loop). When DynamoDB /
-                      # RDS / other services report control-plane rate
-                      # limits, let SQS redeliver after the visibility
-                      # timeout — spreading retries across minutes is
-                      # more effective than the in-Lambda seconds-level
-                      # backoff for sustained bursts.
-                      'rate of control plane requests',
-                      'ThrottlingException',
-                      'Throttling',
-                      'RequestLimitExceeded',
-                      'TooManyRequestsException',
-                      'LimitExceededException',
-                  )
-                  if any(m in err_msg for m in TRANSIENT_MARKERS):
-                      print(f'Transient failure tagging {arn}: {err_msg} — re-raising for SQS redelivery')
-                      raise
-                  print(f'Failed to tag {arn}: {err_msg}')
-                  alert_arn = os.environ.get('ALERT_TOPIC_ARN')
-                  if alert_arn:
-                      try:
-                          boto3.client('sns').publish(
-                              TopicArn=alert_arn,
-                              Subject='MAP Auto-Tagger: Tagging failure',
-                              Message=(
-                                  f'Failed to apply map-migrated tag.\n\n'
-                                  f'Resource ARN: {arn}\n'
-                                  f'MPE ID: {tag_value}\n'
-                                  f'Error: {err_msg}\n'
+                      print(f'Tagged {arn} with {tag_key}={tag_value}')
+                      tagged.append(arn)
+                      continue
+                  except Exception as e:
+                      err_msg = str(e)
+                      # Transient "resource not yet available" errors: re-raise
+                      # so SQS redelivers (up to maxReceiveCount=5, then DLQ).
+                      # We re-raise the WHOLE event — SQS has no per-ARN retry,
+                      # so all ARNs in this event will be re-processed together.
+                      # Already-tagged ARNs will no-op (tagging is idempotent).
+                      TRANSIENT_MARKERS = (
+                          'not in an available state',
+                          'not in available state',
+                          'is not currently available',
+                          'InvalidClusterState',
+                          'InvalidServerlessCacheStateFault',
+                          'InvalidDBClusterStateFault',
+                          'InvalidDBInstanceState',
+                          'ResourceNotFoundException',
+                          'Requested resource not found',
+                          'CREATE_IN_PROGRESS',
+                          'UPDATE_IN_PROGRESS',
+                          'can not be updated',
+                          'rate of control plane requests',
+                          'ThrottlingException',
+                          'Throttling',
+                          'RequestLimitExceeded',
+                          'TooManyRequestsException',
+                          'LimitExceededException',
+                      )
+                      if any(m in err_msg for m in TRANSIENT_MARKERS):
+                          print(f'Transient failure tagging {arn}: {err_msg} — re-raising for SQS redelivery')
+                          raise
+                      print(f'Failed to tag {arn}: {err_msg}')
+                      alert_arn = os.environ.get('ALERT_TOPIC_ARN')
+                      if alert_arn:
+                          try:
+                              boto3.client('sns').publish(
+                                  TopicArn=alert_arn,
+                                  Subject='MAP Auto-Tagger: Tagging failure',
+                                  Message=(
+                                      f'Failed to apply map-migrated tag.\n\n'
+                                      f'Resource ARN: {arn}\n'
+                                      f'MPE ID: {tag_value}\n'
+                                      f'Error: {err_msg}\n'
+                                  )
                               )
-                          )
-                      except Exception as sns_e:
-                          print(f'Could not publish SNS alert: {sns_e}')
-                  return {'status': 'failed', 'error': err_msg}
+                          except Exception as sns_e:
+                              print(f'Could not publish SNS alert: {sns_e}')
+                      failed.append({'arn': arn, 'error': err_msg})
+                      continue
+
+              if tagged and not failed:
+                  return {'status': 'tagged', 'resources': tagged}
+              if tagged and failed:
+                  return {'status': 'partial', 'tagged': tagged, 'failed': failed}
+              return {'status': 'failed', 'failed': failed}
 
   # EventBridge rule - matches ALL resource creation events
   AutoTagEventRule:
@@ -1757,17 +1844,18 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Sub 'map-auto-tagger-events-${MpeId}'
-      # VisibilityTimeout must be ≥ Lambda timeout (60s). 90s gives a safety
-      # margin without delaying retries of transient failures (DDB/RDS propagation
-      # lag, ElastiCache not-available, CFN CREATE_IN_PROGRESS). 3 retries × 90s
-      # = 270s worst case, well within E2E verify's 900s poll budget. Previously
-      # 300s — a single retry alone consumed 1/3 of the verify window.
-      VisibilityTimeout: 90
+      # VisibilityTimeout must be ≥ Lambda timeout (60s). Retry cadence needs to
+      # cover slow-provisioning services: ElastiCache Serverless takes 3-8 min
+      # to become taggable, Aurora clusters 5-10 min, MSK Serverless 3-5 min.
+      # 5 retries × 180s = 900s total retry window, matching the E2E verify
+      # poll budget. Previously 3 × 90s = 270s, which exhausted before
+      # ElastiCache Serverless finished provisioning → DLQ + tagging miss.
+      VisibilityTimeout: 180
       MessageRetentionPeriod: 1209600  # 14 days
       SqsManagedSseEnabled: true
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt EventDLQ.Arn
-        maxReceiveCount: 3
+        maxReceiveCount: 5
 
   # Dead letter queue — receives events that fail after 3 processing attempts
   EventDLQ:
