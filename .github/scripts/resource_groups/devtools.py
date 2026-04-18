@@ -44,6 +44,7 @@ def create(
 
     codebuild = boto3.client("codebuild", region_name=region)
     codepipeline = boto3.client("codepipeline", region_name=region)
+    codedeploy = boto3.client("codedeploy", region_name=region)
     cfn = boto3.client("cloudformation", region_name=region)
     servicecatalog = boto3.client("servicecatalog", region_name=region)
     iam = boto3.client("iam")
@@ -190,6 +191,37 @@ def create(
     except Exception as exc:
         log.error("CloudFormation stack creation failed: %s", exc)
 
+    # ── CodeDeploy Application + DeploymentGroup ──────────────────────────────
+    # CloudTrail events: CreateApplication, CreateDeploymentGroup (source
+    # codedeploy.amazonaws.com). Lambda compute platform avoids needing any
+    # EC2 instances or Lambda functions to actually exist — the resources
+    # are still taggable.
+    cd_app_name = prefix("cd-app")[:100]
+    try:
+        codedeploy.create_application(
+            applicationName=cd_app_name,
+            computePlatform="Lambda",
+            tags=tags,
+        )
+        cd_app_arn = f"arn:aws:codedeploy:{region}:{account}:application:{cd_app_name}"
+        rec(cd_app_arn, "codedeploy", cd_app_name)
+        log.info("CodeDeploy Application: %s", cd_app_arn)
+
+        # DeploymentGroup requires an IAM role trusting codedeploy.amazonaws.com.
+        cd_role_arn = _ensure_codedeploy_role(iam, account, prefix("cd-role")[:64])
+        cd_group_name = prefix("cd-group")[:100]
+        codedeploy.create_deployment_group(
+            applicationName=cd_app_name,
+            deploymentGroupName=cd_group_name,
+            serviceRoleArn=cd_role_arn,
+            tags=tags,
+        )
+        cd_group_arn = f"arn:aws:codedeploy:{region}:{account}:deploymentgroup:{cd_app_name}/{cd_group_name}"
+        rec(cd_group_arn, "codedeploy", f"{cd_app_name}/{cd_group_name}")
+        log.info("CodeDeploy DeploymentGroup: %s", cd_group_arn)
+    except Exception as exc:
+        log.error("CodeDeploy creation failed: %s", exc)
+
     # ── Service Catalog portfolio ─────────────────────────────────────────────
     try:
         resp = servicecatalog.create_portfolio(
@@ -264,4 +296,28 @@ def _ensure_codepipeline_role(iam_client, account: str, role_name: str) -> str:
         return f"arn:aws:iam::{account}:role/{role_name}"
     except Exception as exc:
         log.warning("CodePipeline role: %s", exc)
+        return f"arn:aws:iam::{account}:role/{role_name}"
+
+
+def _ensure_codedeploy_role(iam_client, account: str, role_name: str) -> str:
+    trust = json.dumps({
+        "Version": "2012-10-17",
+        "Statement": [{
+            "Effect": "Allow",
+            "Principal": {"Service": "codedeploy.amazonaws.com"},
+            "Action": "sts:AssumeRole",
+        }],
+    })
+    try:
+        resp = iam_client.create_role(RoleName=role_name, AssumeRolePolicyDocument=trust)
+        iam_client.attach_role_policy(
+            RoleName=role_name,
+            PolicyArn="arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForLambda",
+        )
+        time.sleep(10)
+        return resp["Role"]["Arn"]
+    except iam_client.exceptions.EntityAlreadyExistsException:
+        return f"arn:aws:iam::{account}:role/{role_name}"
+    except Exception as exc:
+        log.warning("CodeDeploy role: %s", exc)
         return f"arn:aws:iam::{account}:role/{role_name}"

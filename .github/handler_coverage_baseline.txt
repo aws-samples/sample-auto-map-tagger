@@ -14,9 +14,10 @@ UNCOVERED CreateAgentAlias|bedrock.amazonaws.com
 UNCOVERED CreateAlias
 UNCOVERED CreateAlias20150331
 UNCOVERED CreateApiKey
-UNCOVERED CreateApplication|elasticbeanstalk.amazonaws.com
-UNCOVERED CreateApplication|emr-serverless.amazonaws.com
-UNCOVERED CreateApplication|kinesisanalytics.amazonaws.com
+COVERED   CreateApplication|codedeploy.amazonaws.com
+COVERED   CreateApplication|elasticbeanstalk.amazonaws.com
+COVERED   CreateApplication|emr-serverless.amazonaws.com
+COVERED   CreateApplication|kinesisanalytics.amazonaws.com
 COVERED   CreateAsset|iotsitewise.amazonaws.com
 COVERED   CreateAssetModel|iotsitewise.amazonaws.com
 COVERED   CreateAutoScalingGroup
@@ -48,6 +49,7 @@ COVERED   CreateDatabase|glue.amazonaws.com
 COVERED   CreateDatabase|timestream.amazonaws.com
 UNCOVERED CreateDataset|databrew.amazonaws.com
 COVERED   CreateDeliveryStream
+COVERED   CreateDeploymentGroup|codedeploy.amazonaws.com
 COVERED   CreateDhcpOptions
 UNCOVERED CreateDirectConnectGateway|directconnect.amazonaws.com
 UNCOVERED CreateDocument
@@ -71,6 +73,7 @@ COVERED   CreateGraphqlApi|appsync.amazonaws.com
 COVERED   CreateHealthCheck
 COVERED   CreateHostedZone
 UNCOVERED CreateHttpNamespace
+COVERED   CreateIPSet|wafv2.amazonaws.com
 COVERED   CreateIdentityPool
 COVERED   CreateImage
 UNCOVERED CreateIndex|kendra.amazonaws.com
@@ -137,6 +140,7 @@ UNCOVERED CreateVpcLink|apigateway.amazonaws.com
 COVERED   CreateVpcPeeringConnection
 COVERED   CreateVpnConnection
 COVERED   CreateVpnGateway
+COVERED   CreateWebACL|wafv2.amazonaws.com
 COVERED   CreateWorkGroup
 UNCOVERED CreateWorkflow
 COVERED   CreateWorkgroup

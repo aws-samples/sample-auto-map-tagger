@@ -17,6 +17,7 @@ cloudfront:TagResource
 cloudwatch:TagResource
 codebuild:BatchGetProjects
 codebuild:UpdateProject
+codedeploy:TagResource
 codepipeline:TagResource
 comprehend:TagResource
 connect:TagResource
@@ -92,4 +93,5 @@ tag:GetResources
 tag:TagResources
 timestream:TagResource
 transfer:TagResource
+wafv2:TagResource
 workspaces:CreateTags
