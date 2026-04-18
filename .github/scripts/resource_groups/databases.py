@@ -232,6 +232,13 @@ def create(
             log.error("ElastiCache Redis creation failed: %s", exc)
 
     # ── ElastiCache Serverless cache ──────────────────────────────────────────
+    # Pre-cleanup: ElastiCache Serverless occasionally leaks caches in
+    # create-failed state that teardown's prior branch-order bug left
+    # orphaned. These accumulate and eventually hit the 40-per-region quota
+    # or destabilize the ElastiCache control plane, making new creates fail.
+    # Brute-force delete any stale e2e-* caches before creating a new one.
+    _cleanup_stale_serverless_caches(elasticache)
+
     ecs_name = prefix("ecache-srv")[:36]  # max 40 chars
     try:
         ecs_kwargs: dict = {
@@ -615,3 +622,34 @@ def _create_dms_s3_endpoint(
     except Exception as exc:
         log.warning("DMS S3 endpoint %s: %s", endpoint_id, exc)
         return None
+
+
+def _cleanup_stale_serverless_caches(elasticache_client) -> None:
+    """Delete any stale e2e-* ElastiCache Serverless caches.
+
+    Why: teardown had a branch-order bug that routed serverlesscache ARNs to
+    delete_replication_group, leaving failed caches orphaned. Accumulated
+    create-failed caches destabilize the ElastiCache control plane and cause
+    subsequent CreateServerlessCache calls to also fail. Defense-in-depth:
+    brute-force delete any e2e-prefixed caches at the start of each run.
+    Non-blocking — best-effort only.
+    """
+    try:
+        paginator = elasticache_client.get_paginator("describe_serverless_caches")
+        stale = []
+        for page in paginator.paginate():
+            for c in page.get("ServerlessCaches", []):
+                name = c.get("ServerlessCacheName", "")
+                status = c.get("Status", "")
+                if name.startswith("e2e-") and status not in ("deleting", "deleted"):
+                    stale.append(name)
+        if not stale:
+            return
+        log.info("Cleaning up %d stale serverless cache(s): %s", len(stale), stale[:5])
+        for name in stale:
+            try:
+                elasticache_client.delete_serverless_cache(ServerlessCacheName=name)
+            except Exception as exc:
+                log.warning("  could not delete stale cache %s: %s", name, exc)
+    except Exception as exc:
+        log.warning("Stale cache cleanup failed: %s", exc)

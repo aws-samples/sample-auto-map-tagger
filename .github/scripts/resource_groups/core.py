@@ -123,7 +123,13 @@ def create(
     except Exception as exc:
         log.error("Key Pair creation failed: %s", exc)
 
-    # ── EC2 instance ──────────────────────────────────────────────────────────
+    # ── EC2 instance (with root + extra EBS volumes) ─────────────────────────
+    # Launches an EC2 with an explicit second EBS volume to exercise the
+    # RunInstances-attached-EBS code path. AWS does NOT emit CreateVolume for
+    # volumes created inline with RunInstances, so the Lambda must extract the
+    # volume IDs from the RunInstances event itself. Same for the primary ENI.
+    # This is the regression gate for PR #12 — if the Lambda drops attached
+    # volumes / ENIs, verify_tags will fail.
     instance_id = None
     try:
         run_kwargs: dict = {
@@ -131,6 +137,19 @@ def create(
             "InstanceType": "t3.micro",
             "MinCount": 1,
             "MaxCount": 1,
+            "BlockDeviceMappings": [
+                # Root: inherited from AMI (device name matches Amazon Linux 2).
+                # Extra data volume at /dev/sdf — a SECOND volume attached at
+                # instance launch. No CreateVolume event fires for this.
+                {
+                    "DeviceName": "/dev/sdf",
+                    "Ebs": {
+                        "VolumeSize": 1,
+                        "VolumeType": "gp3",
+                        "DeleteOnTermination": True,
+                    },
+                },
+            ],
             "TagSpecifications": [{
                 "ResourceType": "instance",
                 "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
@@ -142,9 +161,35 @@ def create(
             run_kwargs["SecurityGroupIds"] = [sg_id]
 
         resp = ec2.run_instances(**run_kwargs)
-        instance_id = resp["Instances"][0]["InstanceId"]
+        inst = resp["Instances"][0]
+        instance_id = inst["InstanceId"]
         rec(f"arn:aws:ec2:{region}:{account}:instance/{instance_id}", "ec2", instance_id)
         log.info("EC2 instance: %s", instance_id)
+
+        # Describe the instance to capture all attached volume IDs + ENI IDs.
+        # These are the resources the Lambda must tag from the RunInstances
+        # event (no separate CloudTrail events exist for them).
+        try:
+            _wait_instance_registered(ec2, instance_id, max_secs=60)
+            desc = ec2.describe_instances(InstanceIds=[instance_id])
+            inst_desc = desc["Reservations"][0]["Instances"][0]
+            for bdm in inst_desc.get("BlockDeviceMappings", []) or []:
+                vol_id = (bdm.get("Ebs") or {}).get("VolumeId")
+                if vol_id:
+                    rec(f"arn:aws:ec2:{region}:{account}:volume/{vol_id}", "ec2", vol_id)
+                    log.info("  attached EBS volume: %s (device=%s)",
+                             vol_id, bdm.get("DeviceName"))
+            for ni in inst_desc.get("NetworkInterfaces", []) or []:
+                ni_id = ni.get("NetworkInterfaceId")
+                if ni_id:
+                    rec(f"arn:aws:ec2:{region}:{account}:network-interface/{ni_id}",
+                        "ec2", ni_id)
+                    log.info("  attached ENI: %s", ni_id)
+        except Exception as inner:
+            log.warning(
+                "Could not describe instance %s for attached volumes/ENIs: %s",
+                instance_id, inner,
+            )
     except Exception as exc:
         log.error("EC2 instance creation failed: %s", exc)
 
@@ -352,6 +397,24 @@ def _get_ami(ec2_client, region: str) -> str:
     except Exception as exc:
         log.error("AMI lookup completely failed: %s", exc)
         return "ami-0000000000000000"
+
+
+def _wait_instance_registered(ec2_client, instance_id: str, max_secs: int = 60) -> None:
+    """Poll describe_instances until the instance shows up with BlockDeviceMappings.
+
+    Just-launched instances can take a few seconds before describe_instances
+    returns the attached volume IDs / ENIs (control-plane propagation).
+    """
+    deadline = time.time() + max_secs
+    while time.time() < deadline:
+        try:
+            resp = ec2_client.describe_instances(InstanceIds=[instance_id])
+            inst = resp["Reservations"][0]["Instances"][0]
+            if inst.get("BlockDeviceMappings") and inst.get("NetworkInterfaces"):
+                return
+        except Exception:
+            pass
+        time.sleep(3)
 
 
 def _wait_volume_available(ec2_client, volume_id: str, max_secs: int = 60) -> None:

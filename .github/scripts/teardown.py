@@ -328,16 +328,23 @@ def delete_record(record: dict) -> None:
     # ── ElastiCache ───────────────────────────────────────────────────────────
     elif service == "elasticache":
         ec_client = _client("elasticache", region, account)
-        if ":replicationgroup:" in arn or ":cluster" not in arn:
-            safe_delete(ec_client.delete_replication_group,
-                        ReplicationGroupId=resource_id,
-                        RetainPrimaryCluster=False, resource_desc=arn)
-        elif ":serverlesscache:" in arn:
+        # ORDER MATTERS. serverlesscache ARNs do not contain `:cluster:` so the
+        # old `:cluster not in arn` fallback routed them to delete_replication_group
+        # — which threw ReplicationGroupNotFoundFault and leaked caches into
+        # the next run. Check specific resource types first.
+        if ":serverlesscache:" in arn:
             safe_delete(ec_client.delete_serverless_cache,
                         ServerlessCacheName=resource_id, resource_desc=arn)
         elif ":subnetgroup:" in arn:
             safe_delete(ec_client.delete_cache_subnet_group,
                         CacheSubnetGroupName=resource_id, resource_desc=arn)
+        elif ":replicationgroup:" in arn:
+            safe_delete(ec_client.delete_replication_group,
+                        ReplicationGroupId=resource_id,
+                        RetainPrimaryCluster=False, resource_desc=arn)
+        elif ":cluster:" in arn:
+            safe_delete(ec_client.delete_cache_cluster,
+                        CacheClusterId=resource_id, resource_desc=arn)
 
     # ── Redshift ──────────────────────────────────────────────────────────────
     elif service == "redshift":
