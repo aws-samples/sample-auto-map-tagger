@@ -248,6 +248,10 @@ def delete_record(record: dict) -> None:
         safe_delete(_client("ec2", region, account).delete_egress_only_internet_gateway,
                     EgressOnlyInternetGatewayId=resource_id, resource_desc=arn)
 
+    elif _is_ec2_resource(arn, "vpn-connection"):
+        safe_delete(_client("ec2", region, account).delete_vpn_connection,
+                    VpnConnectionId=resource_id, resource_desc=arn)
+
     elif _is_ec2_resource(arn, "network-interface"):
         safe_delete(_client("ec2", region, account).delete_network_interface,
                     NetworkInterfaceId=resource_id, resource_desc=arn)
@@ -557,7 +561,24 @@ def delete_record(record: dict) -> None:
     # ── ECS ───────────────────────────────────────────────────────────────────
     elif service == "ecs":
         ecs = _client("ecs", region, account)
-        safe_delete(ecs.delete_cluster, cluster=arn, resource_desc=arn)
+        # ARN forms we record:
+        #   cluster:         arn:aws:ecs:<r>:<a>:cluster/<name>
+        #   service:         arn:aws:ecs:<r>:<a>:service/<cluster>/<name>
+        #   task-definition: arn:aws:ecs:<r>:<a>:task-definition/<family>:<rev>
+        if ":service/" in arn:
+            # Delete requires force=True when desiredCount>0 or tasks running.
+            # ours is desiredCount=0, but force is harmless and idempotent.
+            parts = arn.split(":service/")[-1].split("/")
+            cluster = parts[0] if len(parts) == 2 else "default"
+            svc_name = parts[-1]
+            safe_delete(ecs.delete_service,
+                        cluster=cluster, service=svc_name, force=True,
+                        resource_desc=arn)
+        elif ":task-definition/" in arn:
+            safe_delete(ecs.deregister_task_definition,
+                        taskDefinition=arn, resource_desc=arn)
+        else:
+            safe_delete(ecs.delete_cluster, cluster=arn, resource_desc=arn)
 
     # ── EKS ───────────────────────────────────────────────────────────────────
     elif service == "eks":
@@ -628,6 +649,27 @@ def delete_record(record: dict) -> None:
     # ── Global Accelerator ────────────────────────────────────────────────────
     elif service == "globalaccelerator":
         _delete_global_accelerator(arn, account)
+
+    # ── Elastic Load Balancing (v1 Classic + v2 ALB/NLB) ──────────────────────
+    elif service == "elasticloadbalancing":
+        # ARN forms:
+        #   v1 CLB:      arn:aws:elasticloadbalancing:<r>:<a>:loadbalancer/<name>
+        #   v2 LB:       arn:aws:elasticloadbalancing:<r>:<a>:loadbalancer/<type>/<name>/<id>
+        #   v2 TG:       arn:aws:elasticloadbalancing:<r>:<a>:targetgroup/<name>/<id>
+        if ":targetgroup/" in arn:
+            safe_delete(_client("elbv2", region, account).delete_target_group,
+                        TargetGroupArn=arn, resource_desc=arn)
+        elif ":loadbalancer/" in arn:
+            # v2 LB ARNs have 3 path segments (app/name/id); v1 has 1 (name).
+            path_part = arn.split(":loadbalancer/")[-1]
+            if path_part.count("/") >= 2:
+                # v2 ALB / NLB
+                safe_delete(_client("elbv2", region, account).delete_load_balancer,
+                            LoadBalancerArn=arn, resource_desc=arn)
+            else:
+                # v1 Classic
+                safe_delete(_client("elb", region, account).delete_load_balancer,
+                            LoadBalancerName=path_part, resource_desc=arn)
 
     # ── Bedrock ───────────────────────────────────────────────────────────────
     elif service == "bedrock":
@@ -998,6 +1040,8 @@ DELETION_PRIORITY: dict[str, int] = {
 EC2_COMPUTE_TYPES = {
     ":instance/", ":volume/", ":snapshot/", ":image/", ":key-pair/",
     ":natgateway/", ":elastic-ip/",
+    # VPN connection must be deleted before the VPN/customer gateways it attaches to.
+    ":vpn-connection/",
 }
 EC2_NETWORKING_TYPES = {
     ":vpc/", ":subnet/", ":security-group/", ":internet-gateway/",
@@ -1016,6 +1060,9 @@ def _deletion_priority(record: dict) -> int:
         if any(t in arn for t in EC2_COMPUTE_TYPES):
             return DELETION_PRIORITY.get("ec2-compute", 7)
         return DELETION_PRIORITY.get("ec2-networking", 10)
+    # ECS Service must delete before its Cluster (both service=ecs, priority 3).
+    if service == "ecs" and ":service/" in arn:
+        return 2
     return DELETION_PRIORITY.get(service, 5)
 
 
