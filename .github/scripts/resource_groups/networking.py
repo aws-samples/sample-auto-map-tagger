@@ -22,6 +22,9 @@ Creates (in dependency order):
   18. Network Interface (in Subnet A)
   19. Placement Group
   20. Launch Template
+  21. Classic ELB (v1, CLB)
+  22. Application Load Balancer (v2) + Target Group
+  23. Site-to-Site VPN Connection (uses CGW + VGW from above)
 
 Returns:
   arns   — list of ARN records
@@ -57,6 +60,8 @@ def create(
 ) -> dict:
     ec2 = boto3.client("ec2", region_name=region)
     logs = boto3.client("logs", region_name=region)
+    elb = boto3.client("elb", region_name=region)
+    elbv2 = boto3.client("elbv2", region_name=region)
     account = get_account_id()
 
     arns: list[dict] = []
@@ -443,6 +448,93 @@ def create(
             log.info("Launch Template: %s", lt_id)
         except Exception as exc:
             log.error("Launch Template creation failed: %s", exc)
+
+    # ── 21. Classic ELB (v1) ──────────────────────────────────────────────────
+    # CloudTrail event: CreateLoadBalancer [elasticloadbalancing.amazonaws.com]
+    # (ARN synthesised from loadBalancerName — v1 response omits ARN.)
+    clb_name = prefix("clb")[:32]  # CLB name max length 32
+    if subnet_a_id and sg_id:
+        try:
+            elb.create_load_balancer(
+                LoadBalancerName=clb_name,
+                Listeners=[{
+                    "Protocol": "HTTP",
+                    "LoadBalancerPort": 80,
+                    "InstanceProtocol": "HTTP",
+                    "InstancePort": 80,
+                }],
+                Subnets=[subnet_a_id],
+                SecurityGroups=[sg_id],
+                Tags=[{"Key": PRE_TAG_KEY, "Value": tag_value}],
+            )
+            clb_arn = f"arn:aws:elasticloadbalancing:{region}:{account}:loadbalancer/{clb_name}"
+            rec(clb_arn, "elasticloadbalancing", clb_name)
+            log.info("Classic ELB: %s", clb_name)
+        except Exception as exc:
+            log.error("Classic ELB creation failed: %s", exc)
+
+    # ── 22. Application Load Balancer (v2) + Target Group ─────────────────────
+    # CloudTrail events: CreateLoadBalancer, CreateTargetGroup
+    if subnet_a_id and subnet_b_id and sg_id and vpc_id:
+        try:
+            resp = elbv2.create_load_balancer(
+                Name=prefix("alb")[:32],
+                Subnets=[subnet_a_id, subnet_b_id],
+                SecurityGroups=[sg_id],
+                Scheme="internal",  # internal so no public IP requirement
+                Type="application",
+                IpAddressType="ipv4",
+                Tags=[{"Key": PRE_TAG_KEY, "Value": tag_value}],
+            )
+            alb_arn = resp["LoadBalancers"][0]["LoadBalancerArn"]
+            rec(alb_arn, "elasticloadbalancing", alb_arn.split("/")[-1])
+            log.info("ALB: %s", alb_arn)
+        except Exception as exc:
+            log.error("ALB creation failed: %s", exc)
+
+        try:
+            resp = elbv2.create_target_group(
+                Name=prefix("tg")[:32],
+                Protocol="HTTP",
+                Port=80,
+                VpcId=vpc_id,
+                TargetType="ip",
+                Tags=[{"Key": PRE_TAG_KEY, "Value": tag_value}],
+            )
+            tg_arn = resp["TargetGroups"][0]["TargetGroupArn"]
+            rec(tg_arn, "elasticloadbalancing", tg_arn.split("/")[-1])
+            log.info("Target Group: %s", tg_arn)
+        except Exception as exc:
+            log.error("Target Group creation failed: %s", exc)
+
+    # ── 23. Site-to-Site VPN Connection ───────────────────────────────────────
+    # CloudTrail event: CreateVpnConnection
+    # Requires CustomerGateway + VpnGateway from steps 15, 16.
+    if cgw_id:
+        # Re-read VGW ID from the records list (we didn't keep it in a local).
+        vgw_id = None
+        for r in arns:
+            if "vpn-gateway/" in r["arn"]:
+                vgw_id = r["arn"].split("/")[-1]
+                break
+        if vgw_id:
+            try:
+                resp = ec2.create_vpn_connection(
+                    Type="ipsec.1",
+                    CustomerGatewayId=cgw_id,
+                    VpnGatewayId=vgw_id,
+                    Options={"StaticRoutesOnly": True},
+                    TagSpecifications=[{
+                        "ResourceType": "vpn-connection",
+                        "Tags": [{"Key": PRE_TAG_KEY, "Value": tag_value}],
+                    }],
+                )
+                vpn_id = resp["VpnConnection"]["VpnConnectionId"]
+                rec(f"arn:aws:ec2:{region}:{account}:vpn-connection/{vpn_id}",
+                    "ec2", vpn_id)
+                log.info("VPN Connection: %s", vpn_id)
+            except Exception as exc:
+                log.error("VPN Connection creation failed: %s", exc)
 
     # Build subnet-ids string for output
     subnet_ids_out = ",".join(x for x in [subnet_a_id, subnet_b_id] if x)

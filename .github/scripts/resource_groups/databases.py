@@ -231,6 +231,30 @@ def create(
         except Exception as exc:
             log.error("ElastiCache Redis creation failed: %s", exc)
 
+    # ── ElastiCache standalone cache cluster (memcached) ──────────────────────
+    # CloudTrail event: CreateCacheCluster (distinct from the CreateReplicationGroup
+    # path above — AWS fires different events). Memcached keeps it single-node
+    # and avoids Redis TLS/auth ceremony.
+    standalone_cache_id = prefix("memcached")[:20]  # max 20 chars, ^[a-z][a-z0-9-]*
+    if ec_subnetgrp_ok:
+        try:
+            cc_kwargs: dict = {
+                "CacheClusterId": standalone_cache_id,
+                "Engine": "memcached",
+                "CacheNodeType": "cache.t3.micro",
+                "NumCacheNodes": 1,
+                "Tags": tags,
+                "CacheSubnetGroupName": ec_sg_name,
+            }
+            if sgs:
+                cc_kwargs["SecurityGroupIds"] = sgs
+            resp = elasticache.create_cache_cluster(**cc_kwargs)
+            cache_arn = resp["CacheCluster"]["ARN"]
+            rec(cache_arn, "elasticache", standalone_cache_id)
+            log.info("ElastiCache standalone: %s (not waiting)", cache_arn)
+        except Exception as exc:
+            log.error("ElastiCache standalone creation failed: %s", exc)
+
     # ── ElastiCache Serverless cache ──────────────────────────────────────────
     # Pre-cleanup: ElastiCache Serverless occasionally leaks caches in
     # create-failed state that teardown's prior branch-order bug left

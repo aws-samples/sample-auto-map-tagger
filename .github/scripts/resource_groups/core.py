@@ -282,16 +282,66 @@ def create(
         log.error("Lambda creation failed: %s", exc)
 
     # ── ECS cluster ───────────────────────────────────────────────────────────
+    cluster_name = prefix("ecs")
+    cluster_ready = False
     try:
         resp = ecs.create_cluster(
-            clusterName=prefix("ecs"),
+            clusterName=cluster_name,
             tags=[{"key": PRE_TAG_KEY, "value": tag_value}],
         )
         cluster_arn = resp["cluster"]["clusterArn"]
-        rec(cluster_arn, "ecs", prefix("ecs"))
+        rec(cluster_arn, "ecs", cluster_name)
+        cluster_ready = True
         log.info("ECS cluster: %s", cluster_arn)
     except Exception as exc:
         log.error("ECS cluster creation failed: %s", exc)
+
+    # ── ECS Fargate Service ───────────────────────────────────────────────────
+    # CloudTrail event: CreateService [ecs.amazonaws.com]
+    # Requires: task definition, cluster, subnets, security group. Fargate
+    # avoids needing a container instance (no EC2 to launch). desiredCount=0
+    # prevents any task from actually starting — the service resource still
+    # fires CreateService and is taggable.
+    if cluster_ready and subnet_ids and sg_id:
+        try:
+            # Task definition is a dependency of create_service but is not itself
+            # tagged by the Lambda (no RegisterTaskDefinition handler), so we
+            # create it without recording it — teardown clears it via cluster
+            # sweep/orphan_sweep if needed.
+            td = ecs.register_task_definition(
+                family=prefix("ecs-task"),
+                networkMode="awsvpc",
+                requiresCompatibilities=["FARGATE"],
+                cpu="256",
+                memory="512",
+                containerDefinitions=[{
+                    "name": "app",
+                    "image": "public.ecr.aws/docker/library/hello-world:latest",
+                    "essential": True,
+                }],
+            )
+            td_arn = td["taskDefinition"]["taskDefinitionArn"]
+
+            svc_resp = ecs.create_service(
+                cluster=cluster_name,
+                serviceName=prefix("ecs-svc"),
+                taskDefinition=td_arn,
+                desiredCount=0,
+                launchType="FARGATE",
+                networkConfiguration={
+                    "awsvpcConfiguration": {
+                        "subnets": subnet_ids[:2] if len(subnet_ids) >= 2 else subnet_ids,
+                        "securityGroups": [sg_id],
+                        "assignPublicIp": "DISABLED",
+                    },
+                },
+                tags=[{"key": PRE_TAG_KEY, "value": tag_value}],
+            )
+            svc_arn = svc_resp["service"]["serviceArn"]
+            rec(svc_arn, "ecs", prefix("ecs-svc"))
+            log.info("ECS Service: %s", svc_arn)
+        except Exception as exc:
+            log.error("ECS Service creation failed: %s", exc)
 
     # ── EKS cluster ───────────────────────────────────────────────────────────
     eks_name = prefix("eks")

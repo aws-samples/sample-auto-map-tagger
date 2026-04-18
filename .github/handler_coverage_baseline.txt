@@ -24,7 +24,7 @@ UNCOVERED CreateBackup|fsx.amazonaws.com
 COVERED   CreateBackupPlan
 COVERED   CreateBucket
 UNCOVERED CreateBuild|gamelift.amazonaws.com
-UNCOVERED CreateCacheCluster
+COVERED   CreateCacheCluster
 UNCOVERED CreateCarrierGateway
 UNCOVERED CreateCertificateAuthority
 COVERED   CreateCluster|dax.amazonaws.com
@@ -80,8 +80,8 @@ COVERED   CreateJob
 COVERED   CreateKeyPair
 COVERED   CreateLag|directconnect.amazonaws.com
 COVERED   CreateLaunchTemplate
-UNCOVERED CreateLoadBalancer
-UNCOVERED CreateLoadBalancer|elasticloadbalancing.amazonaws.com
+COVERED   CreateLoadBalancer
+COVERED   CreateLoadBalancer|elasticloadbalancing.amazonaws.com
 COVERED   CreateLogGroup
 UNCOVERED CreateMesh
 UNCOVERED CreateNamespace
@@ -109,7 +109,7 @@ UNCOVERED CreateScript|gamelift.amazonaws.com
 COVERED   CreateSecurityGroup
 COVERED   CreateServer|transfer.amazonaws.com
 COVERED   CreateServerlessCache|elasticache.amazonaws.com
-UNCOVERED CreateService|ecs.amazonaws.com
+COVERED   CreateService|ecs.amazonaws.com
 COVERED   CreateSnapshot
 COVERED   CreateSnapshot|elasticache.amazonaws.com
 UNCOVERED CreateSourceServer|drs.amazonaws.com
@@ -121,7 +121,7 @@ COVERED   CreateSubnet
 COVERED   CreateTable|glue.amazonaws.com
 COVERED   CreateTable|timestream.amazonaws.com
 UNCOVERED CreateTapePool
-UNCOVERED CreateTargetGroup
+COVERED   CreateTargetGroup
 COVERED   CreateTask
 UNCOVERED CreateThing
 COVERED   CreateTopicRule|iot.amazonaws.com
@@ -135,7 +135,7 @@ COVERED   CreateVpc
 COVERED   CreateVpcEndpoint
 UNCOVERED CreateVpcLink|apigateway.amazonaws.com
 COVERED   CreateVpcPeeringConnection
-UNCOVERED CreateVpnConnection
+COVERED   CreateVpnConnection
 COVERED   CreateVpnGateway
 COVERED   CreateWorkGroup
 UNCOVERED CreateWorkflow
