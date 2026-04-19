@@ -91,27 +91,46 @@ def _is_inflight(stack: dict, now: datetime) -> bool:
     return age < timedelta(minutes=INFLIGHT_WINDOW_MIN)
 
 
+def _check_once(now: datetime) -> tuple[bool, str]:
+    """One scan over all regions. Returns (inflight_found, reason_or_ok)."""
+    for region in REGIONS:
+        for s in _list_stacks(region):
+            if _is_inflight(s, now):
+                age_min = (now - s["CreationTime"]).total_seconds() / 60
+                return (
+                    True,
+                    f"IN-FLIGHT: {s['StackName']} in {region} "
+                    f"(status={s['StackStatus']}, age={age_min:.1f}min) — "
+                    f"skipping cleanup for this account.",
+                )
+    return (False, "No in-flight E2E stacks detected — safe to sweep.")
+
+
 def cmd_check_account() -> int:
-    now = datetime.now(timezone.utc)
+    """Check twice, 15s apart. CloudFormation list-stacks has ~10s propagation
+    delay from CreateStack; a stack started within seconds of our query can
+    be invisible on the first pass but visible on the second. Two passes
+    close the narrow race that caused PR #16's self-induced E2E failure.
+    """
+    import time
     try:
-        for region in REGIONS:
-            for s in _list_stacks(region):
-                if _is_inflight(s, now):
-                    age_min = (now - s["CreationTime"]).total_seconds() / 60
-                    print(
-                        f"IN-FLIGHT: {s['StackName']} in {region} "
-                        f"(status={s['StackStatus']}, age={age_min:.1f}min) — "
-                        f"skipping cleanup for this account."
-                    )
-                    return 1
+        first = _check_once(datetime.now(timezone.utc))
+        if first[0]:
+            print(first[1])
+            return 1
+        time.sleep(15)
+        second = _check_once(datetime.now(timezone.utc))
+        if second[0]:
+            print(second[1])
+            return 1
+        print(second[1])
+        return 0
     except (BotoCoreError, ClientError) as exc:
         print(f"WARN: stack listing failed: {exc}", file=sys.stderr)
         # Don't block cleanup on a transient AWS read error — exit 0 so the
         # sweep proceeds. If a stack is truly in-flight we'd rather skip,
         # but a CloudFormation outage shouldn't deadlock the whole nightly.
         return 0
-    print("No in-flight E2E stacks detected — safe to sweep.")
-    return 0
 
 
 def cmd_list_stale() -> int:
