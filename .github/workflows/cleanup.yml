@@ -32,7 +32,22 @@ jobs:
           aws-region: ap-northeast-2
         continue-on-error: true
 
+      # Guard: if any map-auto-tagger-e2e-pr* stack in this account is younger
+      # than the in-flight window or actively IN_PROGRESS, skip the sweep to
+      # avoid deleting a live E2E run's resources mid-test. Stacks skipped
+      # tonight are caught tomorrow night once they age past the window.
+      - name: Guard — detect in-flight E2E (single account)
+        id: guard_single
+        run: |
+          if python3 .github/scripts/nightly_cleanup_guard.py check-account; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
       - name: Delete tagged resources — single account
+        if: steps.guard_single.outputs.skip != 'true'
         working-directory: .github/scripts
         run: |
           # Sweep resources tagged with either the Lambda-applied
@@ -47,6 +62,7 @@ jobs:
         continue-on-error: true
 
       - name: Delete stale CF stacks — single account (ap-northeast-2)
+        if: steps.guard_single.outputs.skip != 'true'
         run: |
           for stack in $(aws cloudformation list-stacks \
               --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE \
@@ -61,6 +77,7 @@ jobs:
         continue-on-error: true
 
       - name: Delete stale CF stacks — single account (us-east-1)
+        if: steps.guard_single.outputs.skip != 'true'
         run: |
           for stack in $(aws cloudformation list-stacks \
               --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE \
@@ -75,6 +92,7 @@ jobs:
         continue-on-error: true
 
       - name: Delete stale CF stacks — single account (us-west-2)
+        if: steps.guard_single.outputs.skip != 'true'
         run: |
           for stack in $(aws cloudformation list-stacks \
               --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE \
@@ -97,7 +115,18 @@ jobs:
           aws-region: ap-northeast-2
         continue-on-error: true
 
+      - name: Guard — detect in-flight E2E (management account)
+        id: guard_mgmt
+        run: |
+          if python3 .github/scripts/nightly_cleanup_guard.py check-account; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
       - name: Delete tagged resources — management account
+        if: steps.guard_mgmt.outputs.skip != 'true'
         working-directory: .github/scripts
         run: |
           # Sweep resources tagged with either the Lambda-applied
@@ -112,6 +141,7 @@ jobs:
         continue-on-error: true
 
       - name: Delete stale StackSets — management account
+        if: steps.guard_mgmt.outputs.skip != 'true'
         run: |
           for ss in $(aws cloudformation list-stack-sets \
               --status ACTIVE \
@@ -152,7 +182,18 @@ jobs:
           aws-region: ap-northeast-2
         continue-on-error: true
 
+      - name: Guard — detect in-flight E2E (linked account 1)
+        id: guard_l1
+        run: |
+          if python3 .github/scripts/nightly_cleanup_guard.py check-account; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
       - name: Delete tagged resources — linked account 1
+        if: steps.guard_l1.outputs.skip != 'true'
         working-directory: .github/scripts
         run: |
           # Sweep resources tagged with either the Lambda-applied
@@ -167,6 +208,7 @@ jobs:
         continue-on-error: true
 
       - name: Sweep orphaned map-auto-tagger IAM roles — linked account 1
+        if: steps.guard_l1.outputs.skip != 'true'
         run: python3 .github/scripts/sweep_iam_roles.py
         continue-on-error: true
 
@@ -179,7 +221,18 @@ jobs:
           aws-region: ap-northeast-2
         continue-on-error: true
 
+      - name: Guard — detect in-flight E2E (linked account 2)
+        id: guard_l2
+        run: |
+          if python3 .github/scripts/nightly_cleanup_guard.py check-account; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
       - name: Delete tagged resources — linked account 2
+        if: steps.guard_l2.outputs.skip != 'true'
         working-directory: .github/scripts
         run: |
           # Sweep resources tagged with either the Lambda-applied
@@ -194,6 +247,7 @@ jobs:
         continue-on-error: true
 
       - name: Sweep orphaned map-auto-tagger IAM roles — linked account 2
+        if: steps.guard_l2.outputs.skip != 'true'
         run: python3 .github/scripts/sweep_iam_roles.py
         continue-on-error: true
 
@@ -206,7 +260,18 @@ jobs:
           aws-region: ap-northeast-2
         continue-on-error: true
 
+      - name: Guard — detect in-flight E2E (linked account 3)
+        id: guard_l3
+        run: |
+          if python3 .github/scripts/nightly_cleanup_guard.py check-account; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
       - name: Delete tagged resources — linked account 3
+        if: steps.guard_l3.outputs.skip != 'true'
         working-directory: .github/scripts
         run: |
           # Sweep resources tagged with either the Lambda-applied
@@ -221,6 +286,7 @@ jobs:
         continue-on-error: true
 
       - name: Sweep orphaned map-auto-tagger IAM roles — linked account 3
+        if: steps.guard_l3.outputs.skip != 'true'
         run: python3 .github/scripts/sweep_iam_roles.py
         continue-on-error: true
 
@@ -233,7 +299,18 @@ jobs:
           aws-region: ap-northeast-2
         continue-on-error: true
 
+      - name: Guard — detect in-flight E2E (linked account 4)
+        id: guard_l4
+        run: |
+          if python3 .github/scripts/nightly_cleanup_guard.py check-account; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
       - name: Delete tagged resources — linked account 4
+        if: steps.guard_l4.outputs.skip != 'true'
         working-directory: .github/scripts
         run: |
           # Sweep resources tagged with either the Lambda-applied
@@ -248,6 +325,7 @@ jobs:
         continue-on-error: true
 
       - name: Sweep orphaned map-auto-tagger IAM roles — linked account 4
+        if: steps.guard_l4.outputs.skip != 'true'
         run: python3 .github/scripts/sweep_iam_roles.py
         continue-on-error: true
 
@@ -260,7 +338,18 @@ jobs:
           aws-region: ap-northeast-2
         continue-on-error: true
 
+      - name: Guard — detect in-flight E2E (linked account 5)
+        id: guard_l5
+        run: |
+          if python3 .github/scripts/nightly_cleanup_guard.py check-account; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+        continue-on-error: true
+
       - name: Delete tagged resources — linked account 5
+        if: steps.guard_l5.outputs.skip != 'true'
         working-directory: .github/scripts
         run: |
           # Sweep resources tagged with either the Lambda-applied
@@ -275,5 +364,6 @@ jobs:
         continue-on-error: true
 
       - name: Sweep orphaned map-auto-tagger IAM roles — linked account 5
+        if: steps.guard_l5.outputs.skip != 'true'
         run: python3 .github/scripts/sweep_iam_roles.py
         continue-on-error: true
