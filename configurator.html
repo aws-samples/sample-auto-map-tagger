@@ -3393,6 +3393,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'CreateUserPool','CreateIdentityPool',
             'CreateConfigurationProfile',
             'CreateFirewallPolicy','CreateFirewall',
+            'CreateWebACL','CreateIPSet','CreateDeploymentGroup',
             'PutParameter','PutRule','PutDashboard','PutQueryDefinition',
             'CreateAutoScalingGroup','CreateSecurityGroup','CreateInternetGateway',
             'CreateRouteTable','CreateNetworkAcl','CreateNetworkInterface',
@@ -3439,7 +3440,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'aws.servicecatalog','aws.ram','aws.acm-pca','aws.aoss',
             'aws.kinesisvideo','aws.dsql','aws.vpc-lattice','aws.bedrock-agentcore',
             'aws.payment-cryptography','aws.networkmanager','aws.workspaces-instances',
-            'aws.dax','aws.drs','aws.deadline','aws.iot'
+            'aws.dax','aws.drs','aws.deadline','aws.iot',
+            'aws.wafv2','aws.codedeploy'
         ];
 
         const TAGGING_PERMISSIONS = [
@@ -3483,9 +3485,9 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'kms:TagResource','acm:AddTagsToCertificate',
             'acm-pca:TagCertificateAuthority',
             'cognito-idp:TagResource','cognito-identity:TagResource',
-            'securityhub:TagResource',
+            'securityhub:TagResource','wafv2:TagResource',
             // Developer Tools
-            'codepipeline:TagResource',
+            'codepipeline:TagResource','codedeploy:TagResource',
             'cloud9:TagResource',
             // CodeBuild: tags applied via UpdateProject; BatchGetProjects needed for tag resolution
             'codebuild:UpdateProject','codebuild:BatchGetProjects',

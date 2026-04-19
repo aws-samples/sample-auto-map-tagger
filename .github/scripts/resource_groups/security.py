@@ -58,6 +58,7 @@ def create(
     ssm = boto3.client("ssm", region_name=region)
     backup = boto3.client("backup", region_name=region)
     ram = boto3.client("ram", region_name=region)
+    wafv2 = boto3.client("wafv2", region_name=region)
 
     def rec(arn, service, resource_id, taggable=True):
         arns.append(make_record(
@@ -249,6 +250,47 @@ def create(
             log.info("Backup plan: %s", plan_arn)
         except Exception as exc:
             log.error("Backup plan creation failed: %s", exc)
+
+    # ── WAFv2 IPSet + WebACL (REGIONAL scope) ─────────────────────────────────
+    # CloudTrail events: CreateIPSet, CreateWebACL (source wafv2.amazonaws.com).
+    # REGIONAL scope (not CLOUDFRONT) so these can be created in ap-northeast-2
+    # without routing through us-east-1. Tagging goes via RGTA.
+    ipset_name = prefix("ipset")[:128]
+    try:
+        resp = wafv2.create_ip_set(
+            Name=ipset_name,
+            Scope="REGIONAL",
+            Description="E2E test IPSet",
+            IPAddressVersion="IPV4",
+            Addresses=["10.0.0.0/32"],
+            Tags=tags,
+        )
+        ipset_arn = resp["Summary"]["ARN"]
+        rec(ipset_arn, "wafv2", ipset_arn.split("/")[-1])
+        log.info("WAFv2 IPSet: %s", ipset_arn)
+    except Exception as exc:
+        log.error("WAFv2 IPSet creation failed: %s", exc)
+
+    webacl_name = prefix("webacl")[:128]
+    try:
+        resp = wafv2.create_web_acl(
+            Name=webacl_name,
+            Scope="REGIONAL",
+            DefaultAction={"Allow": {}},
+            Description="E2E test WebACL",
+            Rules=[],
+            VisibilityConfig={
+                "SampledRequestsEnabled": False,
+                "CloudWatchMetricsEnabled": False,
+                "MetricName": webacl_name.replace("-", "_")[:128],
+            },
+            Tags=tags,
+        )
+        webacl_arn = resp["Summary"]["ARN"]
+        rec(webacl_arn, "wafv2", webacl_arn.split("/")[-1])
+        log.info("WAFv2 WebACL: %s", webacl_arn)
+    except Exception as exc:
+        log.error("WAFv2 WebACL creation failed: %s", exc)
 
     # ── AWS RAM resource share ────────────────────────────────────────────────
     ram_name = prefix("ram-share")
