@@ -177,8 +177,10 @@ Resources:
                   - cognito-idp:TagResource
                   - cognito-identity:TagResource
                   - securityhub:TagResource
+                  - wafv2:TagResource
                   # --- Developer Tools ---
                   - codepipeline:TagResource
+                  - codedeploy:TagResource
                   - cloud9:TagResource
                   # SECURITY NOTE: CodeBuild has no standalone TagResource IAM action.
                   # AWS requires UpdateProject to apply tags (confirmed via AccessDenied testing).
@@ -1285,6 +1287,36 @@ Resources:
                   fw_arn = fw.get('firewallArn')
                   if fw_arn:
                       return fw_arn
+
+              # AWS WAFv2 WebACL
+              # responseElements.summary.aRN — works for both REGIONAL and CLOUDFRONT scope.
+              # (CLOUDFRONT-scope WebACLs only exist in us-east-1; ARN reflects scope via
+              #  global/ vs regional/ path prefix.)
+              elif event_name == 'CreateWebACL' and event_source == 'wafv2.amazonaws.com':
+                  summary = resp.get('summary', {})
+                  webacl_arn = summary.get('aRN') or summary.get('ARN') or summary.get('arn')
+                  if webacl_arn:
+                      return webacl_arn
+
+              # AWS WAFv2 IPSet
+              elif event_name == 'CreateIPSet' and event_source == 'wafv2.amazonaws.com':
+                  summary = resp.get('summary', {})
+                  ipset_arn = summary.get('aRN') or summary.get('ARN') or summary.get('arn')
+                  if ipset_arn:
+                      return ipset_arn
+
+              # AWS CodeDeploy Application — response has only applicationId; build ARN.
+              elif event_name == 'CreateApplication' and event_source == 'codedeploy.amazonaws.com':
+                  app_name = req.get('applicationName')
+                  if app_name:
+                      return f"arn:aws:codedeploy:{region}:{account_id}:application:{app_name}"
+
+              # AWS CodeDeploy DeploymentGroup — response has only deploymentGroupId; build ARN.
+              elif event_name == 'CreateDeploymentGroup' and event_source == 'codedeploy.amazonaws.com':
+                  app_name = req.get('applicationName')
+                  dg_name = req.get('deploymentGroupName')
+                  if app_name and dg_name:
+                      return f"arn:aws:codedeploy:{region}:{account_id}:deploymentgroup:{app_name}/{dg_name}"
 
               # EKS Add-on
               elif event_name == 'CreateAddon':

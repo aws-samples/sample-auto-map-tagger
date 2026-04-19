@@ -650,6 +650,26 @@ def delete_record(record: dict) -> None:
     elif service == "globalaccelerator":
         _delete_global_accelerator(arn, account)
 
+    # ── WAFv2 (WebACL + IPSet) ────────────────────────────────────────────────
+    elif service == "wafv2":
+        _delete_wafv2(arn, region, account)
+
+    # ── CodeDeploy (Application + DeploymentGroup) ────────────────────────────
+    elif service == "codedeploy":
+        cd = _client("codedeploy", region, account)
+        if ":deploymentgroup:" in arn:
+            # arn:aws:codedeploy:<r>:<a>:deploymentgroup:<app>/<group>
+            app_and_group = arn.split(":deploymentgroup:")[-1]
+            app, _, group = app_and_group.partition("/")
+            if app and group:
+                safe_delete(cd.delete_deployment_group,
+                            applicationName=app, deploymentGroupName=group,
+                            resource_desc=arn)
+        elif ":application:" in arn:
+            app_name = arn.split(":application:")[-1]
+            safe_delete(cd.delete_application,
+                        applicationName=app_name, resource_desc=arn)
+
     # ── Elastic Load Balancing (v1 Classic + v2 ALB/NLB) ──────────────────────
     elif service == "elasticloadbalancing":
         # ARN forms:
@@ -932,6 +952,40 @@ def _delete_deadline(arn: str, resource_id: str, region: str, account: str) -> N
         log.warning("Deadline delete %s: %s", arn, exc)
 
 
+def _delete_wafv2(arn: str, region: str, account: str) -> None:
+    """Delete a WAFv2 WebACL or IPSet.
+
+    Delete requires the resource's current LockToken, fetched via get_*.
+    ARN forms:
+      arn:aws:wafv2:<r>:<a>:<scope>/webacl/<name>/<id>
+      arn:aws:wafv2:<r>:<a>:<scope>/ipset/<name>/<id>
+    Scope path segment is 'regional' or 'global' (CLOUDFRONT).
+    """
+    wafv2 = _client("wafv2", region, account)
+    parts = arn.split(":")
+    # parts[-1] = <scope>/webacl/<name>/<id>  (scope slashed into the path)
+    path = parts[-1]
+    segs = path.split("/")
+    if len(segs) < 4:
+        return
+    scope_raw, kind, name, res_id = segs[0], segs[1], segs[2], segs[3]
+    scope = "CLOUDFRONT" if scope_raw == "global" else "REGIONAL"
+
+    try:
+        if kind == "webacl":
+            lock = wafv2.get_web_acl(Name=name, Scope=scope, Id=res_id)["LockToken"]
+            safe_delete(wafv2.delete_web_acl,
+                        Name=name, Scope=scope, Id=res_id, LockToken=lock,
+                        resource_desc=arn)
+        elif kind == "ipset":
+            lock = wafv2.get_ip_set(Name=name, Scope=scope, Id=res_id)["LockToken"]
+            safe_delete(wafv2.delete_ip_set,
+                        Name=name, Scope=scope, Id=res_id, LockToken=lock,
+                        resource_desc=arn)
+    except Exception as exc:
+        log.warning("WAFv2 delete failed for %s: %s", arn, exc)
+
+
 def _delete_iam_role(role_name: str) -> None:
     """Detach all policies, then delete the IAM role."""
     iam = boto3.client("iam")
@@ -1063,6 +1117,9 @@ def _deletion_priority(record: dict) -> int:
     # ECS Service must delete before its Cluster (both service=ecs, priority 3).
     if service == "ecs" and ":service/" in arn:
         return 2
+    # CodeDeploy DeploymentGroup must delete before its parent Application.
+    if service == "codedeploy" and ":deploymentgroup:" in arn:
+        return 4  # before default=5
     return DELETION_PRIORITY.get(service, 5)
 
 
