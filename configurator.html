@@ -4753,7 +4753,12 @@ Resources:
                       cf.delete_stack_instances(StackSetName=stackset_name,
                           DeploymentTargets={'OrganizationalUnitIds': [root_id]},
                           Regions=props.get('Regions', ['ap-northeast-2']),
-                          RetainStacks=False)
+                          RetainStacks=False,
+                          OperationPreferences={
+                              'MaxConcurrentPercentage': 100,
+                              'FailureTolerancePercentage': 100,
+                              'RegionConcurrencyType': 'PARALLEL',
+                          })
                       time.sleep(90)
                       cf.delete_stack_set(StackSetName=stackset_name)
                   except Exception as e:
@@ -4807,9 +4812,19 @@ Resources:
                   except cf.exceptions.NameAlreadyExistsException:
                       print('StackSet already exists')
                   try:
+                      # Parallel deployment across all accounts. Per-account Lambdas are
+                      # independent (no cross-account runtime deps), so 100/100 is safe:
+                      # deploy everywhere in parallel, recover partial failures by re-running
+                      # deploy.sh (CFN sees existing stacks and no-ops). Without this, AWS
+                      # defaults to MaxConcurrentCount=1 — a 500-account customer waits hours.
                       op = cf.create_stack_instances(StackSetName=stackset_name,
                           DeploymentTargets=targets,
-                          Regions=props.get('Regions', ['ap-northeast-2']))
+                          Regions=props.get('Regions', ['ap-northeast-2']),
+                          OperationPreferences={
+                              'MaxConcurrentPercentage': 100,
+                              'FailureTolerancePercentage': 100,
+                              'RegionConcurrencyType': 'PARALLEL',
+                          })
                       print('Op:', op['OperationId'])
                   except cf.exceptions.OperationInProgressException:
                       print('OperationInProgress — responding SUCCESS to let deploy.sh poll')
