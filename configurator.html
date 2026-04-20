@@ -3977,7 +3977,9 @@ ${crossAccountCode}
                   elif ':iot:' in arn and ':policy/' in arn:
                       get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
                   else:
-                      THROTTLE_CODES = {'ThrottlingException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+                      # RGTA throws 'ThrottledException' (with "ed") — most other AWS services
+                      # throw 'ThrottlingException' (with "ing"). Both variants must be enumerated.
+                      THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
                       for attempt in range(4):
                           try:
                               resp2 = _t.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
@@ -4396,7 +4398,7 @@ ${crossAccountCode}
                       'InvalidDBClusterStateFault','InvalidDBInstanceState',
                       'ResourceNotFoundException','Requested resource not found',
                       'CREATE_IN_PROGRESS','UPDATE_IN_PROGRESS','can not be updated',
-                      'rate of control plane requests','ThrottlingException','Throttling',
+                      'rate of control plane requests','ThrottlingException','ThrottledException','Throttling',
                       'RequestLimitExceeded','TooManyRequestsException','LimitExceededException',
                   )
                   if any(m in err_msg for m in TRANSIENT_MARKERS):

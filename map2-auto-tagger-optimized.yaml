@@ -1653,8 +1653,10 @@ Resources:
                   return True
               else:
                   # Use universal Resource Groups Tagging API (with optional cross-account client)
-                  # Retry up to 3 times with exponential backoff for throttling errors
-                  THROTTLE_CODES = {'ThrottlingException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+                  # Retry up to 3 times with exponential backoff for throttling errors.
+                  # RGTA throws 'ThrottledException' (with "ed") — most other AWS services
+                  # throw 'ThrottlingException' (with "ing"). Both variants must be enumerated.
+                  THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
                   for attempt in range(4):
                       try:
                           response = _tagging.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
@@ -1789,6 +1791,7 @@ Resources:
                           'can not be updated',
                           'rate of control plane requests',
                           'ThrottlingException',
+                          'ThrottledException',
                           'Throttling',
                           'RequestLimitExceeded',
                           'TooManyRequestsException',
