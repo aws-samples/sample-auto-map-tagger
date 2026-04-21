@@ -514,7 +514,18 @@ def delete_record(record: dict) -> None:
 
     # ── SSM ───────────────────────────────────────────────────────────────────
     elif service == "ssm":
-        param_name = arn.split(":parameter", 1)[-1]
+        # E2E fixtures produce two ARN shapes:
+        #   hierarchical: ":parameter/e2e/foo"  (split on ":parameter" → "/e2e/foo")
+        #   flat:         ":parameter/CFA-Foo"  (split on ":parameter" → "/CFA-Foo")
+        # For hierarchical, delete_parameter needs "/e2e/foo".
+        # For flat, delete_parameter needs "CFA-Foo" (no leading slash).
+        # Distinguish by counting path segments after the leading slash.
+        suffix = arn.split(":parameter", 1)[-1]
+        # Hierarchical = more than one path segment after the leading slash
+        if suffix.startswith("/") and suffix.count("/") > 1:
+            param_name = suffix
+        else:
+            param_name = suffix.lstrip("/")
         safe_delete(_client("ssm", region, account).delete_parameter,
                     Name=param_name, resource_desc=arn)
 

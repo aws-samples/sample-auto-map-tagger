@@ -191,8 +191,10 @@ def create(
             Type="String",
             Tags=tags,
         )
+        # Valid ARN is always "parameter/<name>"; the leading "/" in param_name
+        # double-duties as the separator. lstrip("/") normalizes either way.
         rec(
-            f"arn:aws:ssm:{region}:{account}:parameter{param_name}",
+            f"arn:aws:ssm:{region}:{account}:parameter/{param_name.lstrip('/')}",
             "ssm", param_name,
         )
         log.info("SSM parameter: %s", param_name)
