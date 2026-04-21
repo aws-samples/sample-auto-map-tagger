@@ -4048,7 +4048,9 @@ ${crossAccountCode}
                       # CFN change sets are intermediate — the stack is tagged via CreateStack
                       'CreateChangeSet',
                       # Cognito user-pool clients are child resources of the already-tagged pool
-                      'CreateUserPoolClient']
+                      'CreateUserPoolClient',
+                      # Lambda Layers are not taggable per Lambda TagResource API regex
+                      'PublishLayerVersion','PublishLayerVersion20181031']
               if event_name in SKIP:
                   return {'status': 'skipped', 'reason': 'non_taggable'}
 
@@ -4077,11 +4079,11 @@ ${crossAccountCode}
                   'backupVaultArn','dBInstanceArn','dBClusterArn','queueArn','loadBalancerArn',
                   'eventBusArn','notebookInstanceArn','documentClassifierArn','applicationArn',
                   'ApplicationARN','backupPlanArn','locationArn','computeEnvironmentArn','appArn',
-                  'layerVersionArn','groupArn','groupARN','activityArn','serviceArn','replicationGroupArn',
+                  'groupArn','groupARN','activityArn','serviceArn','replicationGroupArn',
                   'modelArn','endpointArn','endpointConfigArn','guardrailArn','agentArn',
                   'knowledgeBaseArn','flowArn','promptArn','inferenceProfileArn','namespaceArn',
                   'workgroupArn','firewallArn','firewallPolicyArn','addonArn','userPoolArn',
-                  'channelArn','acceleratorArn','jobArn','layerArn','pipeArn',
+                  'channelArn','acceleratorArn','jobArn','pipeArn',
                   'fileSystemArn','repositoryArn','registryArn','imageArn',
                   'keyArn','policyArn','trainingJobArn','connectionArn',
                   'nodeGroupArn','containerArn','aliasArn',
@@ -4219,9 +4221,15 @@ ${crossAccountCode}
                   elif event_name in ['CreateDeliveryStream']:
                       n = req.get('deliveryStreamName')
                       arn = f"arn:{p}:firehose:{region}:{account_id}:deliverystream/{n}" if n else None
-                  elif event_name == 'CreateLoadBalancer':
+                  elif event_name == 'CreateLoadBalancer' and detail.get('eventSource') == 'elasticloadbalancing.amazonaws.com':
+                      # ELBv1 Classic and ELBv2 share eventSource — disambiguate by shape.
                       lbs = resp.get('loadBalancers', [])
-                      if lbs: arn = lbs[0].get('loadBalancerArn')
+                      if lbs:
+                          arn = lbs[0].get('loadBalancerArn')  # ELBv2
+                      else:
+                          lb_name = req.get('loadBalancerName')  # ELBv1 Classic
+                          if lb_name:
+                              arn = f"arn:{p}:elasticloadbalancing:{region}:{account_id}:loadbalancer/{lb_name}"
                   elif event_name == 'CreateTargetGroup':
                       tgs = resp.get('targetGroups', [])
                       if tgs: arn = tgs[0].get('targetGroupArn')
