@@ -21,6 +21,56 @@ jobs:
       - name: Lint CloudFormation template
         run: cfn-lint map2-auto-tagger-optimized.yaml
 
+  # ── 1a. cfn-nag (anti-pattern scanner, advisory) ─────────────────────────
+  # AWS's long-established scanner for common CFN anti-patterns (open security
+  # groups, wildcard IAM outside of our documented tagging permissions, missing
+  # log retention, etc). Runs as advisory — warnings printed, does NOT fail the
+  # build. Promote to required once the backlog of suppressions is vetted.
+  # Reference: https://w.amazon.com/bin/view/AWS/Teams/WWPS/Engineering/SecurityWorkstream/CDKCFNNag/
+  cfn-nag:
+    name: cfn-nag (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cfn_nag
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby
+          sudo gem install cfn-nag
+
+      - name: Scan CloudFormation template
+        run: cfn_nag_scan --input-path map2-auto-tagger-optimized.yaml || true
+
+  # ── 1b. cfn-guard (policy-as-code, advisory) ─────────────────────────────
+  # AWS-published declarative policy engine. Validates the CFN template against
+  # the AWS Guard Rules Registry (security + well-architected). Advisory in
+  # Layer 1 — findings are printed but do not block. Reference:
+  # https://w.amazon.com/bin/view/LabContentSecurityHub/LCSR/Security_Scanners/CFN-Guard_Runbook/
+  cfn-guard:
+    name: cfn-guard (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cfn-guard
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/aws-cloudformation/cloudformation-guard/main/install-guard.sh | sh
+          echo "$HOME/.guard/bin" >> $GITHUB_PATH
+
+      - name: Fetch AWS Guard Rules Registry
+        run: |
+          git clone --depth 1 https://github.com/aws-cloudformation/aws-guard-rules-registry.git /tmp/guard-rules
+
+      - name: Validate template against rules
+        run: |
+          cfn-guard validate \
+            --rules /tmp/guard-rules/rules/aws \
+            --data map2-auto-tagger-optimized.yaml \
+            --show-summary all || true
+
   # ── 2. Lambda Python syntax check ─────────────────────────────────────────
   python-syntax:
     name: Lambda Python Syntax
@@ -71,6 +121,68 @@ jobs:
 
           if errors:
               sys.exit(1)
+          EOF
+
+  # ── 2a. bandit Python security scan (advisory) ───────────────────────────
+  # Scans the inline Lambda code for common security issues (hardcoded secrets,
+  # insecure deserialization, shell=True, etc). Advisory — current inline code
+  # has known benign try/except/pass patterns that bandit flags as B110; these
+  # are intentional fallbacks in scope-detection code paths. Upgrade to required
+  # once suppressions are added with `# nosec` comments.
+  bandit:
+    name: bandit (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install bandit
+        run: pip install bandit
+
+      - name: Extract and scan inline Lambda code
+        run: |
+          python3 - <<'EOF'
+          import re, sys, tempfile, subprocess, os
+
+          with open('map2-auto-tagger-optimized.yaml') as f:
+              content = f.read()
+
+          zipfile_positions = [m.start() for m in re.finditer(r'ZipFile: \|', content)]
+          if not zipfile_positions:
+              print("No ZipFile blocks found — skipping bandit")
+              sys.exit(0)
+
+          # Extract each block into a temp file, then run bandit on all of them.
+          extracted_files = []
+          for i, pos in enumerate(zipfile_positions):
+              block_start = content.find('\n', pos) + 1
+              code_lines = []
+              for line in content[block_start:].split('\n'):
+                  if line == '' or line.startswith(' ' * 10):
+                      code_lines.append(line[10:] if line.startswith(' ' * 10) else '')
+                  else:
+                      break
+              code = '\n'.join(code_lines)
+              tmp = tempfile.NamedTemporaryFile(
+                  mode='w', suffix=f'_lambda_block_{i}.py', delete=False
+              )
+              tmp.write(code)
+              tmp.close()
+              extracted_files.append(tmp.name)
+
+          # Run bandit — `-ll` reports medium+ severity; `-ii` medium+ confidence.
+          # Exit code 0 means no findings, 1 means findings. We print but don't
+          # fail (continue-on-error in the workflow step).
+          result = subprocess.run(
+              ['bandit', '-ll', '-ii'] + extracted_files,
+              capture_output=True, text=True
+          )
+          print(result.stdout)
+          if result.returncode != 0:
+              print("bandit found issues (advisory — not blocking).")
+
+          for f in extracted_files:
+              os.unlink(f)
           EOF
 
   # ── 3. Handler regression check ───────────────────────────────────────────
