@@ -4211,7 +4211,8 @@ ${crossAccountCode}
                       arn = f"arn:{p}:cloudwatch:{region}:{account_id}:alarm:{n}" if n else None
                   elif event_name in ['PutParameter']:
                       n = req.get('name')
-                      arn = f"arn:{p}:ssm:{region}:{account_id}:parameter{n}" if n else None
+                      # Param name may or may not have leading "/"; valid ARN is always "parameter/<name>"
+                      arn = f"arn:{p}:ssm:{region}:{account_id}:parameter/{n.lstrip('/')}" if n else None
                   elif event_name in ['CreateLogGroup']:
                       n = req.get('logGroupName')
                       arn = f"arn:{p}:logs:{region}:{account_id}:log-group:{n}" if n else None
