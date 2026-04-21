@@ -1751,6 +1751,16 @@ Note: Only resources created AFTER this update will be tagged in newly added acc
             d_fail_scp:'A security policy in your organization is blocking the tagging service.',
             d_fix_scp:"Contact your AWS security team and ask them to allow the 'tag:TagResources' action for Lambda execution roles.",
             d_scp_note:"(Note: if your org requires tags at resource creation time, ask your security team to exempt the 'map-migrated' tag key.)",
+            d_ok_iam:'Deploy-time IAM permissions verified for batched actions',
+            d_fail_iam:'Your deployer principal is missing or denied on IAM actions required by deploy.sh:',
+            d_fix_iam:"Attach AdministratorAccess to the deployer principal, or grant the specific actions listed above. Re-run deploy.sh after fixing.",
+            d_skip_iam:'Skipping batched IAM check — could not resolve caller ARN (continuing anyway).',
+            d_ok_stack_state:'Stack state ready for deploy in',
+            d_fail_stack_inprogress:'Stack has an operation in progress in',
+            d_fix_stack_inprogress:'Another deploy is running. Wait for it to finish, or investigate in the CloudFormation console.',
+            d_fail_stack_stuck:'Stack is in an unrecoverable state in',
+            d_fix_stack_stuck:'Manual intervention required. See the command options below:',
+            d_warn_stack_unknown:'Stack is in an unrecognized state (proceeding anyway) in',
             d_ok_vpc:'VPC exists in this account:',
             d_fail_vpc:'VPC not found in this account/region:',
             d_fix_vpc:'Verify the VPC ID is correct and exists in the target account and region.',
@@ -3725,7 +3735,7 @@ ${backfillEventNamesList}
               parts = arn.split(':')
               return parts[4] if len(parts) > 4 else None`;
 
-            const TEMPLATE_VERSION = 'v20';
+            const TEMPLATE_VERSION = 'v20.1.0';
             return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 AWSTemplateFormatVersion: '2010-09-09'
@@ -3767,6 +3777,16 @@ Conditions:
   HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
 
 Resources:
+
+  # Template version pinned at deploy time — read by ops, update.sh, and
+  # external tooling. No outbound network calls; discovered locally via SSM.
+  MapVersion:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /auto-map-tagger/${mpe}/version
+      Type: String
+      Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
+      Value: ${TEMPLATE_VERSION}
 
   MapConfig:
     Type: AWS::SSM::Parameter
@@ -3872,6 +3892,11 @@ ${permissionsList}
           import json, os, boto3, re, time, random
           from datetime import datetime, timezone
           from botocore.exceptions import ClientError
+
+          # Template version pinned at deploy time. Logged on every cold start
+          # so ops can trace which version processed an event.
+          TEMPLATE_VERSION = '${TEMPLATE_VERSION}'
+          print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
           ec2 = boto3.client('ec2')
@@ -4554,6 +4579,9 @@ Outputs:
     Value: !GetAtt AutoTaggerFunction.Arn
   ConfigParameter:
     Value: !Ref MapConfig
+  TemplateVersion:
+    Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
+    Value: ${TEMPLATE_VERSION}
   AlertTopicArn:
     Value: !Ref AlertTopic
   EventQueueUrl:
@@ -4964,6 +4992,103 @@ else
     PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_scp')}\\n"
 fi
 
+# ── Deploy-time IAM actions ─────────────────────
+# Simulate the permissions deploy.sh actually needs (not Lambda runtime — that's
+# granted by the Lambda's own role). explicitDeny means an SCP blocks the action.
+# implicitDeny means the principal has no policy granting it. Both fail deploy.
+# Single batched simulate-principal-policy call ≈ 200ms for all checks combined.
+CALLER_ARN=\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
+# simulate-principal-policy needs an IAM user/role ARN, NOT the assumed-role session
+# ARN returned by get-caller-identity (e.g. arn:aws:sts::...:assumed-role/Foo/session).
+# Convert assumed-role → role ARN for SSO / role callers; pass through for IAM users.
+if [[ "\$CALLER_ARN" == *":assumed-role/"* ]]; then
+    SIM_ACCT=\$(echo "\$CALLER_ARN" | cut -d: -f5)
+    SIM_ROLE=\$(echo "\$CALLER_ARN" | sed 's|.*:assumed-role/||' | cut -d/ -f1)
+    SIM_ARN="arn:aws:iam::\${SIM_ACCT}:role/\${SIM_ROLE}"
+else
+    SIM_ARN="\$CALLER_ARN"
+fi
+IAM_CHECK_ACTIONS=( \\
+  "cloudformation:CreateStack" \\
+  "cloudformation:UpdateStack" \\
+  "cloudformation:DescribeStacks" \\
+  "cloudformation:GetTemplateSummary" \\
+  "iam:CreateRole" \\
+  "iam:PutRolePolicy" \\
+  "iam:AttachRolePolicy" \\
+  "iam:PassRole" \\
+  "lambda:CreateFunction" \\
+  "lambda:AddPermission" \\
+  "events:PutRule" \\
+  "events:PutTargets" \\
+  "sqs:CreateQueue" \\
+  "sqs:SetQueueAttributes" \\
+  "ssm:PutParameter" \\
+  "logs:CreateLogGroup" \\
+  "logs:PutRetentionPolicy" \\
+  "sns:CreateTopic" \\
+  "sns:Subscribe" \\
+  "s3:CreateBucket" \\
+  "s3:PutBucketPolicy" \\
+)
+if [ -n "\$SIM_ARN" ]; then
+    IAM_DENIED=\$(aws iam simulate-principal-policy \\
+        --policy-source-arn "\$SIM_ARN" \\
+        --action-names "\${IAM_CHECK_ACTIONS[@]}" \\
+        --query 'EvaluationResults[?EvalDecision != \`allowed\`].[EvalActionName,EvalDecision]' \\
+        --output text 2>/dev/null || echo "")
+    if [ -n "\$IAM_DENIED" ]; then
+        echo "  ❌ ${t('d_fail_iam')}"
+        echo "\$IAM_DENIED" | while IFS=\$'\\t' read -r action decision; do
+            echo "     - \$action → \$decision"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} IAM: \$action \$decision\\n"
+        done
+        echo "     ${t('d_fix_label')} ${t('d_fix_iam')}"
+        ERRORS=\$((ERRORS + 1))
+    else
+        echo "  ✅ ${t('d_ok_iam')} (\${#IAM_CHECK_ACTIONS[@]})"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_iam')}\\n"
+    fi
+else
+    echo "  ⚠️  ${t('d_skip_iam')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}[SKIP] ${t('d_skip_iam')}\\n"
+fi
+
+# ── Stack state ready for deploy ───────────────────────────────────
+# Deploy.sh below handles NOT_FOUND / DELETE_COMPLETE (fresh create),
+# ROLLBACK_COMPLETE (delete + recreate), and *_COMPLETE (update). Any
+# other state leaves the deployer in a cryptic-error tarpit. Fail
+# fast with a specific remediation instead.
+for CHECK_REGION in \$REGIONS; do
+    PREDEPLOY_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" \\
+        --region "\$CHECK_REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null \\
+        || echo "NOT_FOUND")
+    case "\$PREDEPLOY_STATUS" in
+        NOT_FOUND|DELETE_COMPLETE|ROLLBACK_COMPLETE|CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+            echo "  ✅ ${t('d_ok_stack_state')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stack_state')} \$CHECK_REGION\\n"
+            ;;
+        *_IN_PROGRESS)
+            echo "  ❌ ${t('d_fail_stack_inprogress')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_stack_inprogress')}"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_stack_inprogress')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ERRORS=\$((ERRORS + 1))
+            ;;
+        UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED|DELETE_FAILED)
+            echo "  ❌ ${t('d_fail_stack_stuck')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_stack_stuck')}"
+            echo "     - UPDATE_ROLLBACK_FAILED: aws cloudformation continue-update-rollback --stack-name \$STACK_NAME --region \$CHECK_REGION"
+            echo "     - ROLLBACK_FAILED / DELETE_FAILED: delete via console (may require AWS Support)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_stack_stuck')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ERRORS=\$((ERRORS + 1))
+            ;;
+        *)
+            echo "  ⚠️  ${t('d_warn_stack_unknown')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}[WARN] ${t('d_warn_stack_unknown')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ;;
+    esac
+done
+
 ${config.scopeMode === 'vpc' && config.scopedVpcIds && config.scopedVpcIds[0] !== 'NONE' ? `
 for CHECK_VPC in ${config.scopedVpcIds.map(v => '"' + v + '"').join(' ')}; do
     VPC_RESULT=\$(aws ec2 describe-vpcs --vpc-ids "\$CHECK_VPC" --region "\$REGION" --query 'Vpcs[0].VpcId' --output text 2>/dev/null) || VPC_RESULT=""
@@ -5287,6 +5412,104 @@ else
     echo "     ${t('d_scp_note')}"
     PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_scp')}\\n"
 fi
+
+# ── Deploy-time IAM actions (multi-account path) ────────────────
+# Multi-account adds StackSets + Organizations actions on top of the
+# single-account set. Single batched simulate-principal-policy call.
+CALLER_ARN=\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
+# simulate-principal-policy needs an IAM user/role ARN, NOT the assumed-role session
+# ARN returned by get-caller-identity (e.g. arn:aws:sts::...:assumed-role/Foo/session).
+# Convert assumed-role → role ARN for SSO / role callers; pass through for IAM users.
+if [[ "\$CALLER_ARN" == *":assumed-role/"* ]]; then
+    SIM_ACCT=\$(echo "\$CALLER_ARN" | cut -d: -f5)
+    SIM_ROLE=\$(echo "\$CALLER_ARN" | sed 's|.*:assumed-role/||' | cut -d/ -f1)
+    SIM_ARN="arn:aws:iam::\${SIM_ACCT}:role/\${SIM_ROLE}"
+else
+    SIM_ARN="\$CALLER_ARN"
+fi
+IAM_CHECK_ACTIONS=( \\
+  "cloudformation:CreateStack" \\
+  "cloudformation:UpdateStack" \\
+  "cloudformation:DescribeStacks" \\
+  "cloudformation:GetTemplateSummary" \\
+  "cloudformation:CreateStackSet" \\
+  "cloudformation:CreateStackInstances" \\
+  "cloudformation:DescribeStackSet" \\
+  "organizations:ListRoots" \\
+  "organizations:DescribeOrganization" \\
+  "iam:CreateRole" \\
+  "iam:PutRolePolicy" \\
+  "iam:AttachRolePolicy" \\
+  "iam:PassRole" \\
+  "lambda:CreateFunction" \\
+  "lambda:AddPermission" \\
+  "events:PutRule" \\
+  "events:PutTargets" \\
+  "sqs:CreateQueue" \\
+  "sqs:SetQueueAttributes" \\
+  "ssm:PutParameter" \\
+  "logs:CreateLogGroup" \\
+  "logs:PutRetentionPolicy" \\
+  "sns:CreateTopic" \\
+  "sns:Subscribe" \\
+  "s3:CreateBucket" \\
+  "s3:PutBucketPolicy" \\
+)
+if [ -n "\$SIM_ARN" ]; then
+    IAM_DENIED=\$(aws iam simulate-principal-policy \\
+        --policy-source-arn "\$SIM_ARN" \\
+        --action-names "\${IAM_CHECK_ACTIONS[@]}" \\
+        --query 'EvaluationResults[?EvalDecision != \`allowed\`].[EvalActionName,EvalDecision]' \\
+        --output text 2>/dev/null || echo "")
+    if [ -n "\$IAM_DENIED" ]; then
+        echo "  ❌ ${t('d_fail_iam')}"
+        echo "\$IAM_DENIED" | while IFS=\$'\\t' read -r action decision; do
+            echo "     - \$action → \$decision"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} IAM: \$action \$decision\\n"
+        done
+        echo "     ${t('d_fix_label')} ${t('d_fix_iam')}"
+        ERRORS=\$((ERRORS + 1))
+    else
+        echo "  ✅ ${t('d_ok_iam')} (\${#IAM_CHECK_ACTIONS[@]})"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_iam')}\\n"
+    fi
+else
+    echo "  ⚠️  ${t('d_skip_iam')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}[SKIP] ${t('d_skip_iam')}\\n"
+fi
+
+# ── Stack state ready for deploy (multi-account management account) ──
+# Only checks the management-account stack. Per-target-account StackSet
+# instances are managed by CloudFormation and don't need preflight here.
+for CHECK_REGION in \$REGIONS; do
+    PREDEPLOY_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" \\
+        --region "\$CHECK_REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null \\
+        || echo "NOT_FOUND")
+    case "\$PREDEPLOY_STATUS" in
+        NOT_FOUND|DELETE_COMPLETE|ROLLBACK_COMPLETE|CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+            echo "  ✅ ${t('d_ok_stack_state')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stack_state')} \$CHECK_REGION\\n"
+            ;;
+        *_IN_PROGRESS)
+            echo "  ❌ ${t('d_fail_stack_inprogress')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_stack_inprogress')}"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_stack_inprogress')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ERRORS=\$((ERRORS + 1))
+            ;;
+        UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED|DELETE_FAILED)
+            echo "  ❌ ${t('d_fail_stack_stuck')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_stack_stuck')}"
+            echo "     - UPDATE_ROLLBACK_FAILED: aws cloudformation continue-update-rollback --stack-name \$STACK_NAME --region \$CHECK_REGION"
+            echo "     - ROLLBACK_FAILED / DELETE_FAILED: delete via console (may require AWS Support)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_stack_stuck')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ERRORS=\$((ERRORS + 1))
+            ;;
+        *)
+            echo "  ⚠️  ${t('d_warn_stack_unknown')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}[WARN] ${t('d_warn_stack_unknown')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ;;
+    esac
+done
 
 ${config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0 ? `
 for CHECK_ACCT in ${config.stacksetAccounts.map(a => '"' + a.id + '"').join(' ')}; do

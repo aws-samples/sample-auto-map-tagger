@@ -151,21 +151,33 @@ if rce_config_match:
         "minimum, causing deployment failure."
     )
 
-# ── Check 6: Version parity between YAML and configurator ────────────────────
-# Both files embed a version string in their Description. They must match.
-yaml_version_match = re.search(r'MAP 2\.0 Auto-Tagger (v\d+)', yaml)
-html_version_match = re.search(r"TEMPLATE_VERSION\s*=\s*'(v\d+)'", html)
-yaml_version = yaml_version_match.group(1) if yaml_version_match else None
-html_version = html_version_match.group(1) if html_version_match else None
-if not yaml_version:
-    fails.append("VERSION: could not find 'MAP 2.0 Auto-Tagger vNN' in YAML Description")
-if not html_version:
-    fails.append("VERSION: could not find TEMPLATE_VERSION = 'vNN' constant in configurator.html")
-if yaml_version and html_version and yaml_version != html_version:
-    fails.append(
-        f"VERSION: YAML is {yaml_version} but configurator.html TEMPLATE_VERSION is {html_version}\n"
-        f"         These must match or customers deploy the wrong architecture."
-    )
+# ── Check 6: Version parity (SemVer per VERSIONING.md) ───────────────────────
+# Version is SemVer: vMAJOR.MINOR.PATCH (e.g., v20.1.0). MAJOR bump = customer
+# must take action to upgrade. MINOR = new capability or behavior. PATCH = fix.
+# Every v20-prefixed reference in both files must match. Drift = customers get
+# mixed architecture.
+VERSION_RE = r'v\d+\.\d+\.\d+'
+yaml_versions = set(re.findall(VERSION_RE, yaml))
+html_versions = set(re.findall(VERSION_RE, html))
+# The single source of truth: the TEMPLATE_VERSION constant in configurator.html.
+html_src_match = re.search(rf"TEMPLATE_VERSION\s*=\s*'({VERSION_RE})'", html)
+html_src = html_src_match.group(1) if html_src_match else None
+if not html_src:
+    fails.append("VERSION: could not find TEMPLATE_VERSION = 'vN.N.N' in configurator.html")
+else:
+    # All YAML version mentions must equal the canonical version.
+    for v in yaml_versions - {html_src}:
+        fails.append(
+            f"VERSION: YAML has '{v}' but canonical is '{html_src}'. "
+            f"Bump every reference together per VERSIONING.md."
+        )
+    # All HTML version mentions must also match.
+    for v in html_versions - {html_src}:
+        fails.append(
+            f"VERSION: configurator.html has '{v}' but TEMPLATE_VERSION is '{html_src}'."
+        )
+    if not yaml_versions:
+        fails.append(f"VERSION: YAML has no vN.N.N reference (expected {html_src})")
 
 # ── Report ────────────────────────────────────────────────────────────────────
 print()
