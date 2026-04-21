@@ -320,35 +320,52 @@ Resources:
           import json, os, boto3, re, time, random
           from datetime import datetime, timezone
           from botocore.exceptions import ClientError
+          from botocore.credentials import RefreshableCredentials
+          from botocore.session import Session as BotocoreSession
 
           ssm = boto3.client('ssm')
           ec2 = boto3.client('ec2')
           tagging = boto3.client('resourcegroupstaggingapi')
           _config = None
-          _cross_account_clients = {}
+          _cross_account_sessions = {}
 
           def get_cross_account_client(service, target_account_id, region):
-              """Assume cross-account role and return a boto3 client for the target account."""
-              cache_key = f"{service}:{target_account_id}:{region}"
-              if cache_key not in _cross_account_clients:
-                  sts = boto3.client('sts')
+              """Return a boto3 client for the target account using auto-refreshing
+              assumed-role credentials. Cached per (account, region) at the session
+              level so credentials refresh in place; boto3 calls assume_role again
+              automatically when the previous creds are within 15 min of expiry.
+              Without this, STS's 1-hour token TTL would strand long-lived warm
+              Lambda containers with ExpiredTokenException on cross-account calls.
+              """
+              session_key = f"{target_account_id}:{region}"
+              if session_key not in _cross_account_sessions:
                   role_arn = f"arn:aws:iam::{target_account_id}:role/MapAutoTaggerCrossAccount"
                   try:
-                      creds = sts.assume_role(
-                          RoleArn=role_arn,
-                          RoleSessionName="map-auto-tagger-cross-account"
-                      )['Credentials']
-                      _cross_account_clients[cache_key] = boto3.client(
-                          service,
-                          region_name=region,
-                          aws_access_key_id=creds['AccessKeyId'],
-                          aws_secret_access_key=creds['SecretAccessKey'],
-                          aws_session_token=creds['SessionToken']
+                      def _refresh():
+                          creds = boto3.client('sts').assume_role(
+                              RoleArn=role_arn,
+                              RoleSessionName="map-auto-tagger-cross-account"
+                          )['Credentials']
+                          return {
+                              'access_key': creds['AccessKeyId'],
+                              'secret_key': creds['SecretAccessKey'],
+                              'token': creds['SessionToken'],
+                              'expiry_time': creds['Expiration'].isoformat(),
+                          }
+                      refreshable = RefreshableCredentials.create_from_metadata(
+                          metadata=_refresh(),
+                          refresh_using=_refresh,
+                          method='sts-assume-role',
+                      )
+                      botocore_session = BotocoreSession()
+                      botocore_session._credentials = refreshable
+                      _cross_account_sessions[session_key] = boto3.Session(
+                          botocore_session=botocore_session, region_name=region
                       )
                   except Exception as e:
                       print(f'Cannot assume cross-account role in {target_account_id}: {e}')
                       return None
-              return _cross_account_clients[cache_key]
+              return _cross_account_sessions[session_key].client(service, region_name=region)
 
           def get_account_from_arn(arn):
               """Extract account ID from ARN."""
@@ -530,14 +547,12 @@ Resources:
                   if kb_id and ds_id:
                       return f"arn:aws:bedrock:{region}:{account_id}:knowledge-base/{kb_id}/data-source/{ds_id}"
 
-              # Lambda Layer — early exit to prefer layerArn (taggable) over layerVersionArn (not)
-              if event_name in ('PublishLayerVersion', 'PublishLayerVersion20181031'):
-                  layer_arn = resp.get('layerArn')
-                  if layer_arn:
-                      return layer_arn
+              # (Lambda Layer handling removed — layers are not taggable per AWS
+              # Lambda TagResource API regex; PublishLayerVersion is in IGNORE_EVENTS
+              # at the handler level.)
 
               # ECS Service — early exit to prevent clusterArn being picked up by universal scan
-              elif event_name == 'CreateService' and event_source == 'ecs.amazonaws.com':
+              if event_name == 'CreateService' and event_source == 'ecs.amazonaws.com':
                   svc_arn = resp.get('service', {}).get('serviceArn')
                   if svc_arn:
                       return svc_arn
@@ -566,13 +581,13 @@ Resources:
                   'backupVaultArn', 'dBInstanceArn', 'dBClusterArn', 'queueArn', 'loadBalancerArn',
                   'eventBusArn', 'aRN', 'notebookInstanceArn', 'documentClassifierArn', 'applicationArn',
                   'ApplicationARN', 'backupPlanArn', 'locationArn', 'computeEnvironmentArn', 'appArn',
-                  'layerVersionArn', 'groupARN', 'groupArn', 'activityArn', 'keyArn', 'serviceArn',
+                  'groupARN', 'groupArn', 'activityArn', 'keyArn', 'serviceArn',
                   'policyArn', 'replicationGroupArn',
                   'modelArn', 'endpointArn', 'endpointConfigArn', 'trainingJobArn',
                   'connectionArn', 'workgroupArn', 'namespaceArn',
                   'clusterArn', 'nodeGroupArn', 'containerArn',
                   'registryArn', 'imageArn', 'repositoryArn',
-                  'aliasArn', 'layerArn', 'pipeArn', 'channelArn',
+                  'aliasArn', 'pipeArn', 'channelArn',
                   'acceleratorArn', 'jobArn', 'firewallArn',
                   'firewallPolicyArn', 'addonArn', 'userPoolArn',
                   'guardrailArn', 'agentArn', 'knowledgeBaseArn',
@@ -829,11 +844,20 @@ Resources:
                   if job_name:
                       return f"arn:aws:glue:{region}:{account_id}:job/{job_name}"
 
-              # Load Balancer (ALB/NLB)
-              elif event_name == 'CreateLoadBalancer':
+              # Load Balancer — ELBv1 Classic AND ELBv2 (ALB/NLB/GWLB) share
+              # eventSource='elasticloadbalancing.amazonaws.com'. They're
+              # disambiguated only by response shape:
+              #   ELBv2: responseElements.loadBalancers[].loadBalancerArn
+              #   ELBv1 Classic: responseElements.dNSName (no ARN); name in request
+              elif event_name == 'CreateLoadBalancer' and event_source == 'elasticloadbalancing.amazonaws.com':
                   lbs = resp.get('loadBalancers', [])
                   if lbs and len(lbs) > 0:
+                      # ELBv2 path
                       return lbs[0].get('loadBalancerArn')
+                  # ELBv1 Classic path — construct ARN from request name
+                  lb_name = req.get('loadBalancerName')
+                  if lb_name:
+                      return f"arn:aws:elasticloadbalancing:{region}:{account_id}:loadbalancer/{lb_name}"
 
               # Database Clusters
               elif event_name == 'CreateDBCluster':
@@ -973,8 +997,13 @@ Resources:
                   if pcx_id:
                       return f"arn:aws:ec2:{region}:{account_id}:vpc-peering-connection/{pcx_id}"
 
-              # EBS Snapshot
-              elif event_name == 'CreateSnapshot':
+              # EBS Snapshot — scope to EC2 source to prevent catching CreateSnapshot
+              # from ElastiCache / MemoryDB / FSx (OpenZFS) / Redshift Serverless,
+              # which use the same event name but different response shapes.
+              # Non-EC2 CreateSnapshot is handled by the universal scan above
+              # (ElastiCache/MemoryDB via `snapshot.ARN` key) or by explicit
+              # handlers further down (FSx, Redshift Serverless).
+              elif event_name == 'CreateSnapshot' and event_source == 'ec2.amazonaws.com':
                   snapshot_id = resp.get('snapshotId')
                   if snapshot_id:
                       return f"arn:aws:ec2:{region}:{account_id}:snapshot/{snapshot_id}"
@@ -1229,19 +1258,8 @@ Resources:
                   # For now, skip - would need async operation tracking
                   return None
 
-              # ELB Classic (different from ALB/NLB)
-              elif event_name == 'CreateLoadBalancer' and event_source == 'elasticloadbalancing.amazonaws.com':
-                  # Classic ELB (v1) vs ALB/NLB (v2)
-                  if 'loadBalancers' in resp and resp['loadBalancers']:
-                      # ALB/NLB path (already handled above)
-                      lbs = resp.get('loadBalancers', [])
-                      if lbs and len(lbs) > 0:
-                          return lbs[0].get('loadBalancerArn')
-                  else:
-                      # Classic ELB doesn't return ARN in response
-                      lb_name = req.get('loadBalancerName')
-                      if lb_name:
-                          return f"arn:aws:elasticloadbalancing:{region}:{account_id}:loadbalancer/{lb_name}"
+              # (CreateLoadBalancer handled above at the ELBv2 branch — both
+              # ELBv1 Classic and ELBv2 share eventSource.)
 
               # ACM Private CA
               elif event_name == 'CreateCertificateAuthority':
@@ -1326,17 +1344,8 @@ Resources:
                   if addon_arn:
                       return addon_arn
 
-              # Lambda Layer — tag the layer itself (not the version ARN)
-              elif event_name in ('PublishLayerVersion', 'PublishLayerVersion20181031'):
-                  # layerArn = arn:aws:lambda:region:account:layer:name (taggable)
-                  # layerVersionArn = arn:aws:lambda:...:layer:name:version (not taggable)
-                  layer_arn = resp.get('layerArn') or resp.get('layerVersionArn')
-                  if layer_arn:
-                      return layer_arn
-
-              # Lambda Alias — aliases are not taggable (AWS limitation)
-              # elif event_name in ('CreateAlias', 'CreateAlias20150331'):
-              #     return None  # "Tags on function aliases and versions are not supported"
+              # (Lambda Layers and Aliases are not taggable — PublishLayerVersion is
+              # in IGNORE_EVENTS. Aliases were already unhandled here.)
 
               # Transit Gateway VPC Attachment
               elif event_name == 'CreateTransitGatewayVpcAttachment':
@@ -1451,6 +1460,20 @@ Resources:
                   fs_arn = fs.get('resourceARN')
                   if fs_arn:
                       return fs_arn
+
+              # FSx OpenZFS Snapshot — response.snapshot.ResourceARN (capital R in ARN)
+              elif event_name == 'CreateSnapshot' and event_source == 'fsx.amazonaws.com':
+                  snapshot = resp.get('snapshot', {})
+                  snap_arn = snapshot.get('ResourceARN') or snapshot.get('resourceARN')
+                  if snap_arn:
+                      return snap_arn
+
+              # Redshift Serverless Snapshot
+              elif event_name == 'CreateSnapshot' and event_source == 'redshift-serverless.amazonaws.com':
+                  snapshot = resp.get('snapshot', {})
+                  snap_arn = snapshot.get('snapshotArn')
+                  if snap_arn:
+                      return snap_arn
 
               # DMS Serverless (CreateReplicationConfig)
               elif event_name == 'CreateReplicationConfig' and event_source == 'dms.amazonaws.com':
@@ -1729,6 +1752,11 @@ Resources:
                   # Cognito user-pool clients are child resources of the
                   # already-tagged user pool; they don't need their own tags.
                   'CreateUserPoolClient',
+                  # Lambda Layers are not taggable — the Lambda TagResource API
+                  # regex only accepts function/code-signing-config/event-source-mapping/
+                  # capacity-provider ARNs. Both the base layer ARN and the versioned
+                  # ARN are rejected. Skip the event rather than generating SNS alerts.
+                  'PublishLayerVersion', 'PublishLayerVersion20181031',
               ]
               if event_name in IGNORE_EVENTS:
                   print(f'Skipping non-taggable event: {event_name}')
