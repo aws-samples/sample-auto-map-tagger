@@ -784,11 +784,12 @@ Resources:
                   if alarm_name:
                       return f"arn:aws:cloudwatch:{region}:{account_id}:alarm:{alarm_name}"
 
-              # SSM Parameters
+              # SSM Parameters — name may or may not have a leading "/".
+              # Valid ARN is always "parameter/<name>"; normalize to exactly one "/".
               elif event_name == 'PutParameter':
                   param_name = req.get('name')
                   if param_name:
-                      return f"arn:aws:ssm:{region}:{account_id}:parameter{param_name}"
+                      return f"arn:aws:ssm:{region}:{account_id}:parameter/{param_name.lstrip('/')}"
 
               # ACM Certificates
               elif event_name == 'RequestCertificate':

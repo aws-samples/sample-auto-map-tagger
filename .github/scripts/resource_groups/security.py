@@ -200,7 +200,7 @@ def create(
     except Exception as exc:
         log.error("CloudWatch alarm creation failed: %s", exc)
 
-    # ── SSM parameter ─────────────────────────────────────────────────────────
+    # ── SSM parameter (leading-slash name) ────────────────────────────────────
     param_name = f"/e2e/{prefix('ssm')}"
     try:
         ssm.put_parameter(
@@ -209,11 +209,31 @@ def create(
             Type="String",
             Tags=tags,
         )
-        param_arn = f"arn:aws:ssm:{region}:{account}:parameter{param_name}"
+        # Valid ARN is always "parameter/<name>"; the leading "/" in param_name
+        # double-duties as the separator. lstrip("/") normalizes either way.
+        param_arn = f"arn:aws:ssm:{region}:{account}:parameter/{param_name.lstrip('/')}"
         rec(param_arn, "ssm", param_name)
-        log.info("SSM parameter: %s", param_name)
+        log.info("SSM parameter (slash): %s", param_name)
     except Exception as exc:
         log.error("SSM parameter creation failed: %s", exc)
+
+    # ── SSM parameter (NO leading slash) ──────────────────────────────────────
+    # Covers the customer path where the parameter name is a flat identifier
+    # like "CFA-LambdaLayerArn". Prior to PR #19 this produced a malformed ARN
+    # (:parameterCFA-LambdaLayerArn) that RGTA rejected with InvalidParameterException.
+    param_name_flat = prefix("ssm-flat")
+    try:
+        ssm.put_parameter(
+            Name=param_name_flat,
+            Value="e2e-flat-value",
+            Type="String",
+            Tags=tags,
+        )
+        param_arn_flat = f"arn:aws:ssm:{region}:{account}:parameter/{param_name_flat}"
+        rec(param_arn_flat, "ssm", param_name_flat)
+        log.info("SSM parameter (flat): %s", param_name_flat)
+    except Exception as exc:
+        log.error("SSM flat parameter creation failed: %s", exc)
 
     # ── AWS Backup vault ──────────────────────────────────────────────────────
     vault_name = prefix("backup-vault")
