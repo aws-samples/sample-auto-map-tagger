@@ -6,7 +6,7 @@ Description: >
   MAP 2.0 Auto-Tagger v20.2.0 - Automatically tags newly created AWS resources with the
   map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
   across all major AWS services. Deploy once; tagging happens automatically within
-  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.2.0: AutoDeployment conditional on ALL scope + cross-MPE conflict detection (StackSet overlap for multi-account, same-account multi-Lambda with VPC precision for single-account). v20.1.0: version visibility + batched IAM preflight + stack-state preflight. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
+  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.2.0: AutoDeployment conditional on ALL scope + cross-MPE conflict detection (StackSet overlap for multi-account, same-account multi-Lambda with VPC precision for single-account) + version visibility and batched IAM preflight from prior MINOR. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
   vs EventBridge 24h limit); removed ReservedConcurrentExecutions to prevent deployment
   failures on accounts near Lambda concurrency quota; added DLQ alarm with SNS email
   notification; Lambda now publishes specific failed resource ARN to SNS on tagging failure.
