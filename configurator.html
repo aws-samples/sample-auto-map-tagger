@@ -1761,6 +1761,13 @@ Note: Only resources created AFTER this update will be tagged in newly added acc
             d_fail_stack_stuck:'Stack is in an unrecoverable state in',
             d_fix_stack_stuck:'Manual intervention required. See the command options below:',
             d_warn_stack_unknown:'Stack is in an unrecognized state (proceeding anyway) in',
+            d_ok_stackset_conflict:'No competing MAP auto-tagger deployment detected.',
+            d_fail_stackset_conflict:'Another MAP auto-tagger deployment would overlap with your new deploy:',
+            d_fix_stackset_conflict:"Either narrow your account scope to exclude the overlapping accounts, or remove the existing deployment first (aws cloudformation delete-stack-set). Re-run deploy.sh after resolving.",
+            d_ok_account_lambda:'No competing Lambda detected in this account.',
+            d_fail_account_lambda_full:'Another MAP auto-tagger is already deployed in this account:',
+            d_fail_account_lambda_vpc:'Another MAP auto-tagger in this account overlaps on VPC scope:',
+            d_fix_account_lambda:"Delete the existing map-auto-tagger stack first (aws cloudformation delete-stack) or change your MPE ID / VPC scope to avoid conflict. Re-run deploy.sh after resolving.",
             d_ok_vpc:'VPC exists in this account:',
             d_fail_vpc:'VPC not found in this account/region:',
             d_fix_vpc:'Verify the VPC ID is correct and exists in the target account and region.',
@@ -3735,7 +3742,7 @@ ${backfillEventNamesList}
               parts = arn.split(':')
               return parts[4] if len(parts) > 4 else None`;
 
-            const TEMPLATE_VERSION = 'v20.1.0';
+            const TEMPLATE_VERSION = 'v20.2.0';
             return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 AWSTemplateFormatVersion: '2010-09-09'
@@ -4830,6 +4837,14 @@ Resources:
                   print('Fetching template:', bkt, key)
                   body = s3.get_object(Bucket=bkt, Key=key)['Body'].read().decode()
                   print('Template bytes:', len(body))
+                  # AutoDeployment rule: True only when scope is ALL accounts.
+                  # When the customer narrowed scope to specific accounts, flipping
+                  # AutoDeployment=True would silently add the Lambda to any new
+                  # account that joins the org, bypassing their chosen scope. Keep
+                  # it False so scoped deploys remain predictable.
+                  scoped = json.loads(props.get('ScopedAccounts', '["ALL"]'))
+                  auto_deploy = (scoped == ['ALL'])
+                  print(f'AutoDeployment={auto_deploy} (scoped_accounts={scoped})')
                   try:
                       cf.create_stack_set(StackSetName=stackset_name,
                           Description='MAP 2.0 Auto-Tagger',
@@ -4842,7 +4857,7 @@ Resources:
                           ],
                           Capabilities=['CAPABILITY_NAMED_IAM'],
                           PermissionModel='SERVICE_MANAGED',
-                          AutoDeployment={'Enabled': True, 'RetainStacksOnAccountRemoval': False})
+                          AutoDeployment={'Enabled': auto_deploy, 'RetainStacksOnAccountRemoval': False})
                       print('StackSet created')
                   except cf.exceptions.NameAlreadyExistsException:
                       print('StackSet already exists')
@@ -4879,6 +4894,7 @@ Resources:
       MpeId: !Ref MpeId
       AgreementStartDate: !Ref AgreementStartDate
       AgreementEndDate: !Ref AgreementEndDate
+      ScopedAccounts: '${scopedAccountIdsJson}'
       Regions:
 ${regionsList}
 ${accountsNote}
@@ -5087,6 +5103,77 @@ for CHECK_REGION in \$REGIONS; do
             PREFLIGHT_LOG="\${PREFLIGHT_LOG}[WARN] ${t('d_warn_stack_unknown')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
             ;;
     esac
+done
+
+# ── Same-account multi-Lambda conflict (Class 2: single-account mode) ────
+# If another map-auto-tagger-* stack exists in this account with a different
+# MPE, both Lambdas receive the same CloudTrail events. Last-writer-wins on
+# the map-migrated tag value. Read the existing stack's SSM config and:
+#   - either deploy uses scope=all → full conflict, fail with account
+#   - both use scope=vpc → compute VPC overlap, fail only if VPCs overlap
+# If both are VPC-scoped with non-overlapping VPC lists, allow deploy to
+# continue — runtime is_in_scope filtering prevents double-tagging.
+NEW_SCOPE_MODE="${config.scopeMode || 'account'}"
+NEW_VPC_LIST="${(config.scopedVpcIds && config.scopedVpcIds[0] !== 'NONE') ? config.scopedVpcIds.join(' ') : ''}"
+for CHECK_REGION in \$REGIONS; do
+    EXISTING_STACKS=\$(aws cloudformation list-stacks --region "\$CHECK_REGION" \\
+        --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE \\
+        --query "StackSummaries[?starts_with(StackName, \\\`map-auto-tagger-\\\`)].StackName" \\
+        --output text 2>/dev/null || echo "")
+    LAMBDA_CONFLICT=0
+    for EXISTING in \$EXISTING_STACKS; do
+        EXISTING_MPE="\${EXISTING#map-auto-tagger-}"
+        if [ "\$EXISTING_MPE" = "\$MPE" ]; then continue; fi
+        # Read the existing deploy's SSM config to understand its scope
+        EXISTING_CFG=\$(aws ssm get-parameter --name "/auto-map-tagger/\$EXISTING_MPE/config" \\
+            --region "\$CHECK_REGION" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+        if [ -z "\$EXISTING_CFG" ]; then
+            echo "  ⚠️  Found existing stack \$EXISTING but could not read its config (missing ssm:GetParameter?). Treating as full conflict."
+            echo "     Resources created in this account will be double-tagged (last-writer-wins on map-migrated)."
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} \$EXISTING config unreadable — assumed full conflict\\n"
+            LAMBDA_CONFLICT=1
+            continue
+        fi
+        EXISTING_SCOPE_MODE=\$(echo "\$EXISTING_CFG" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("scope_mode","account"))' 2>/dev/null || echo "account")
+        # Full conflict if either is not VPC-scoped
+        if [ "\$EXISTING_SCOPE_MODE" != "vpc" ] || [ "\$NEW_SCOPE_MODE" != "vpc" ]; then
+            echo "  ❌ ${t('d_fail_account_lambda_full')}"
+            echo "     - \$EXISTING (MPE \$EXISTING_MPE, scope=\$EXISTING_SCOPE_MODE) vs new (MPE \$MPE, scope=\$NEW_SCOPE_MODE)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_account_lambda')}"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} full-scope conflict with \$EXISTING\\n"
+            LAMBDA_CONFLICT=1
+            continue
+        fi
+        # Both VPC-scoped — compute VPC overlap
+        EXISTING_VPCS=\$(echo "\$EXISTING_CFG" | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("scoped_vpc_ids",[])))' 2>/dev/null || echo "")
+        OVERLAP_VPCS=""
+        for NEW_VPC in \$NEW_VPC_LIST; do
+            for EXISTING_VPC in \$EXISTING_VPCS; do
+                if [ "\$NEW_VPC" = "\$EXISTING_VPC" ]; then
+                    OVERLAP_VPCS="\$OVERLAP_VPCS \$NEW_VPC"
+                fi
+            done
+        done
+        if [ -n "\$OVERLAP_VPCS" ]; then
+            echo "  ❌ ${t('d_fail_account_lambda_vpc')}"
+            echo "     Existing stack \$EXISTING (MPE \$EXISTING_MPE) shares VPCs with your new deploy:"
+            for V in \$OVERLAP_VPCS; do echo "       - \$V"; done
+            echo "     ${t('d_fix_label')} ${t('d_fix_account_lambda')}"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} VPC-scope conflict with \$EXISTING\\n"
+            LAMBDA_CONFLICT=1
+        else
+            echo "  ✅ Existing stack \$EXISTING (MPE \$EXISTING_MPE) has non-overlapping VPC scope — safe to coexist"
+        fi
+    done
+    if [ \$LAMBDA_CONFLICT -eq 1 ]; then
+        ERRORS=\$((ERRORS + 1))
+    else
+        # Only print the OK message if we actually checked something (there were existing stacks)
+        if [ -z "\$EXISTING_STACKS" ]; then
+            echo "  ✅ ${t('d_ok_account_lambda')}"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_account_lambda')}\\n"
+        fi
+    fi
 done
 
 ${config.scopeMode === 'vpc' && config.scopedVpcIds && config.scopedVpcIds[0] !== 'NONE' ? `
@@ -5510,6 +5597,50 @@ for CHECK_REGION in \$REGIONS; do
             ;;
     esac
 done
+
+# ── Cross-MPE StackSet conflict (Class 1: multi-account AutoDeployment) ──
+# Detect a customer accidentally deploying a second MAP engagement on top of
+# an existing one. If any map-auto-tagger-* StackSet in this region has a
+# different MPE and shares any account with our new target set, BOTH Lambdas
+# would tag resources and the map-migrated tag value becomes last-writer-wins.
+# Fail hard with the specific overlapping account IDs. (Layer 1 only —
+# Lambda scoped_account_ids precision requires cross-account SSM access
+# we don't have from the management account.)
+NEW_TARGET_ACCOUNTS_FILE=\$(mktemp)
+${config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0
+  ? config.stacksetAccounts.map(a => `echo "${a.id}" >> "\\$NEW_TARGET_ACCOUNTS_FILE"`).join('\n')
+  : `# ALL accounts in org
+aws organizations list-accounts --query 'Accounts[?Status==\`ACTIVE\`].Id' --output text 2>/dev/null | tr '\\\\t' '\\\\n' > "\\$NEW_TARGET_ACCOUNTS_FILE" || true`}
+
+COMPETING_STACKSETS=\$(aws cloudformation list-stack-sets --status ACTIVE --region "\$REGION" \\
+    --query "Summaries[?starts_with(StackSetName, \\\`map-auto-tagger-\\\`)].StackSetName" \\
+    --output text 2>/dev/null || echo "")
+
+CONFLICTS_FOUND=0
+for SS in \$COMPETING_STACKSETS; do
+    SS_MPE="\${SS#map-auto-tagger-}"
+    if [ "\$SS_MPE" = "\$MPE" ]; then continue; fi  # same MPE = in-place update, not a conflict
+    EXISTING_ACCOUNTS=\$(aws cloudformation list-stack-instances --stack-set-name "\$SS" --region "\$REGION" \\
+        --query 'Summaries[].Account' --output text 2>/dev/null | tr '\\t' '\\n')
+    OVERLAP=\$(comm -12 <(sort -u "\$NEW_TARGET_ACCOUNTS_FILE") <(echo "\$EXISTING_ACCOUNTS" | sort -u))
+    if [ -n "\$OVERLAP" ]; then
+        if [ \$CONFLICTS_FOUND -eq 0 ]; then
+            echo "  ❌ ${t('d_fail_stackset_conflict')}"
+            CONFLICTS_FOUND=1
+        fi
+        echo "     Conflict with StackSet \$SS (MPE \$SS_MPE) in these accounts:"
+        echo "\$OVERLAP" | sed 's/^/       - /'
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} Conflict with \$SS in \$(echo \$OVERLAP | wc -w) account(s)\\n"
+    fi
+done
+rm -f "\$NEW_TARGET_ACCOUNTS_FILE"
+if [ \$CONFLICTS_FOUND -eq 1 ]; then
+    echo "     ${t('d_fix_label')} ${t('d_fix_stackset_conflict')}"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_stackset_conflict')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stackset_conflict')}\\n"
+fi
 
 ${config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0 ? `
 for CHECK_ACCT in ${config.stacksetAccounts.map(a => '"' + a.id + '"').join(' ')}; do
