@@ -3,10 +3,10 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.1.0 - Automatically tags newly created AWS resources with the
+  MAP 2.0 Auto-Tagger v20.2.0 - Automatically tags newly created AWS resources with the
   map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
   across all major AWS services. Deploy once; tagging happens automatically within
-  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.1.0: Version visibility (SSM param + CFN Output + cold-start log) + batched IAM preflight + stack-state preflight. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
+  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.2.0: AutoDeployment conditional on ALL scope + cross-MPE conflict detection (StackSet overlap for multi-account, same-account multi-Lambda with VPC precision for single-account) + version visibility and batched IAM preflight from prior MINOR. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
   vs EventBridge 24h limit); removed ReservedConcurrentExecutions to prevent deployment
   failures on accounts near Lambda concurrency quota; added DLQ alarm with SNS email
   notification; Lambda now publishes specific failed resource ARN to SNS on tagging failure.
@@ -56,7 +56,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.1.0
+      Value: v20.2.0
 
   # SSM Parameter Store - single source of truth for config
   MapConfig:
@@ -337,7 +337,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.1.0'
+          TEMPLATE_VERSION = 'v20.2.0'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -2014,7 +2014,7 @@ Outputs:
     Value: /auto-map-tagger/config
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.1.0
+    Value: v20.2.0
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
