@@ -5123,6 +5123,10 @@ for CHECK_REGION in \$REGIONS; do
     LAMBDA_CONFLICT=0
     for EXISTING in \$EXISTING_STACKS; do
         EXISTING_MPE="\${EXISTING#map-auto-tagger-}"
+        # Only treat as a peer deploy if the suffix matches the MpeId pattern
+        # (AllowedPattern: ^mig[a-zA-Z0-9]+\$). Skips test harness / E2E stacks
+        # that happen to start with our prefix but aren't real MAP deploys.
+        case "\$EXISTING_MPE" in mig*) ;; *) continue ;; esac
         if [ "\$EXISTING_MPE" = "\$MPE" ]; then continue; fi
         # Read the existing deploy's SSM config to understand its scope
         EXISTING_CFG=\$(aws ssm get-parameter --name "/auto-map-tagger/\$EXISTING_MPE/config" \\
@@ -5619,6 +5623,9 @@ COMPETING_STACKSETS=\$(aws cloudformation list-stack-sets --status ACTIVE --regi
 CONFLICTS_FOUND=0
 for SS in \$COMPETING_STACKSETS; do
     SS_MPE="\${SS#map-auto-tagger-}"
+    # Only treat as a peer deploy if the suffix matches the MpeId pattern
+    # (AllowedPattern: ^mig[a-zA-Z0-9]+\$). Skips test harness stacks.
+    case "\$SS_MPE" in mig*) ;; *) continue ;; esac
     if [ "\$SS_MPE" = "\$MPE" ]; then continue; fi  # same MPE = in-place update, not a conflict
     EXISTING_ACCOUNTS=\$(aws cloudformation list-stack-instances --stack-set-name "\$SS" --region "\$REGION" \\
         --query 'Summaries[].Account' --output text 2>/dev/null | tr '\\t' '\\n')
