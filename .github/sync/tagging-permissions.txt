@@ -14,6 +14,7 @@ cloudformation:TagResource
 cloudformation:UpdateStack
 cloudformation:UpdateStackSet
 cloudfront:TagResource
+cloudhsm:TagResource
 cloudwatch:TagResource
 codebuild:BatchGetProjects
 codebuild:UpdateProject
@@ -28,6 +29,7 @@ deadline:TagResource
 directconnect:TagResource
 dms:AddTagsToResource
 drs:TagResource
+ds:AddTagsToResource
 dynamodb:TagResource
 ec2:CreateTags
 ecr:TagResource
