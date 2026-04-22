@@ -3,10 +3,10 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.2.0 - Automatically tags newly created AWS resources with the
+  MAP 2.0 Auto-Tagger v20.3.0 - Automatically tags newly created AWS resources with the
   map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
   across all major AWS services. Deploy once; tagging happens automatically within
-  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.2.0: AutoDeployment conditional on ALL scope + cross-MPE conflict detection (StackSet overlap for multi-account, same-account multi-Lambda with VPC precision for single-account) + version visibility and batched IAM preflight from prior MINOR. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
+  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.3.0: Tier 1 MAP service handlers — Keyspaces (CreateKeyspace), Directory Service (CreateDirectory + CreateMicrosoftAD), CloudHSM v2 (CreateCluster + CreateHsm). Closes silent credit loss for AD/LDAP migrations, Cassandra workloads, and HSM-backed compliance environments. See CHANGELOG.md for prior minor releases. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
   vs EventBridge 24h limit); removed ReservedConcurrentExecutions to prevent deployment
   failures on accounts near Lambda concurrency quota; added DLQ alarm with SNS email
   notification; Lambda now publishes specific failed resource ARN to SNS on tagging failure.
@@ -56,7 +56,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.2.0
+      Value: v20.3.0
 
   # SSM Parameter Store - single source of truth for config
   MapConfig:
@@ -245,6 +245,13 @@ Resources:
                   - drs:TagResource
                   - deadline:TagResource
                   - kinesisvideo:TagStream
+                  # --- Tier 1 MAP services (PR #25) ---
+                  # Keyspaces (Cassandra-compatible) — RGTA support is unreliable
+                  # for cassandra resources, so Lambda calls keyspaces:TagResource
+                  # directly. cassandra:TagResource already present above; adding
+                  # ds + cloudhsm here.
+                  - ds:AddTagsToResource
+                  - cloudhsm:TagResource
                 Resource: '*'
               # NOTE: This template deploys a single-account Lambda. No sts:AssumeRole or
               # cross-account permissions are present or required. For multi-account deployments,
@@ -337,7 +344,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.2.0'
+          TEMPLATE_VERSION = 'v20.3.0'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -887,6 +894,34 @@ Resources:
               elif event_name == 'CreateCluster' and event_source == 'memorydb.amazonaws.com':
                   cluster = resp.get('cluster', {})
                   return cluster.get('aRN')  # Note: capital ARN
+
+              # CloudHSM v2 Cluster — responseElements has no ARN, only cluster.clusterId
+              elif event_name == 'CreateCluster' and event_source == 'cloudhsmv2.amazonaws.com':
+                  cluster_id = (resp.get('cluster') or {}).get('clusterId')
+                  if cluster_id:
+                      return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
+
+              # CloudHSM v2 HSM — tagging routes to parent cluster (idempotent with CreateCluster handler)
+              elif event_name == 'CreateHsm' and event_source == 'cloudhsmv2.amazonaws.com':
+                  cluster_id = (resp.get('hsm') or {}).get('clusterId') or req.get('clusterId')
+                  if cluster_id:
+                      return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
+
+              # AWS Directory Service (Simple AD + Managed Microsoft AD)
+              # Note: AD Connector fires ConnectDirectory, which is not in the
+              # EventBridge prefix list (no 'Connect' prefix) — skip for now.
+              elif event_name in ('CreateDirectory', 'CreateMicrosoftAD') and event_source == 'ds.amazonaws.com':
+                  dir_id = resp.get('directoryId')
+                  if dir_id:
+                      return f"arn:aws:ds:{region}:{account_id}:directory/{dir_id}"
+
+              # Amazon Keyspaces — responseElements is empty on CreateKeyspace;
+              # name is in requestParameters.keyspaceName. Trailing slash required
+              # per keyspaces ARN format.
+              elif event_name == 'CreateKeyspace' and event_source == 'cassandra.amazonaws.com':
+                  ks_name = req.get('keyspaceName')
+                  if ks_name:
+                      return f"arn:aws:cassandra:{region}:{account_id}:/keyspace/{ks_name}/"
 
               # SageMaker
               elif event_name == 'CreateNotebookInstance':
@@ -1692,6 +1727,23 @@ Resources:
                   iot = get_service_client('iot')
                   iot.tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
                   return True
+              elif ':cassandra:' in arn:
+                  # Keyspaces TagResource uses lowercase key/value (service inconsistency).
+                  ks = get_service_client('keyspaces')
+                  ks.tag_resource(resourceArn=arn, tags=[{'key': tag_key, 'value': tag_value}])
+                  return True
+              elif ':cloudhsm:' in arn and ':cluster/' in arn:
+                  # cloudhsmv2 TagResource takes the raw cluster_id as ResourceId.
+                  chsm = get_service_client('cloudhsmv2')
+                  cluster_id = arn.split('cluster/')[-1]
+                  chsm.tag_resource(ResourceId=cluster_id, TagList=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':ds:' in arn and ':directory/' in arn:
+                  # ds AddTagsToResource takes the raw directory_id as ResourceId.
+                  ds = get_service_client('ds')
+                  dir_id = arn.split('directory/')[-1]
+                  ds.add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
               else:
                   # Use universal Resource Groups Tagging API (with optional cross-account client)
                   # Retry up to 3 times with exponential backoff for throttling errors.
@@ -2014,7 +2066,7 @@ Outputs:
     Value: /auto-map-tagger/config
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.2.0
+    Value: v20.3.0
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
