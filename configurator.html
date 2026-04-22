@@ -165,7 +165,7 @@
             background: #f2f3f3; padding: 1px 5px; border-radius: 3px;
             font-family: 'SF Mono', monospace; font-size: 12px;
         }
-        .lang-flags { display: flex; align-items: center; gap: 4px; margin-left: 12px; }
+        .lang-flags { display: flex; align-items: center; gap: 4px; margin-left: auto; }
         .lang-flag {
             font-size: 22px; cursor: pointer; opacity: 0.5;
             border-radius: 4px; padding: 2px 4px; transition: opacity 0.15s, background 0.15s;
@@ -196,7 +196,6 @@
     <div class="header">
         <h1 data-i18n="ui_title">MAP 2.0 Auto-Tagger Configurator</h1>
         <span class="badge">AWS SAMPLE</span>
-        <span class="version">v2.0 — All MAP 2.0 services verified</span>
         <div class="lang-flags">
             <span class="lang-flag active" id="lang-en" onclick="setLanguage('en')" title="English">🇺🇸</span>
             <span class="lang-flag" id="lang-ko" onclick="setLanguage('ko')" title="한국어">🇰🇷</span>
@@ -240,6 +239,14 @@
                         <h3 data-i18n="ui_mode_edit_title">Edit existing deployment</h3>
                         <p data-i18n="ui_mode_edit_desc">Add or remove AWS accounts from scope on an already-deployed MAP Auto-Tagger. Generates an update script — no full redeployment needed.</p>
                         <span class="mode-note" data-i18n="ui_mode_edit_note">Multi-account (AWS Organizations) deployments only</span>
+                    </div>
+                </div>
+
+                <div class="mode-card" onclick="selectMode('update')">
+                    <div class="mode-icon">🔄</div>
+                    <div class="mode-body">
+                        <h3 data-i18n="ui_mode_update_title">Update to latest template version</h3>
+                        <p data-i18n="ui_mode_update_desc">Upgrade Lambda code, IAM policy, and EventBridge rules to the current template version. Scope configuration (accounts, VPCs, agreement date) is preserved. Auto-detects single-account and multi-account deployments.</p>
                     </div>
                 </div>
             </div>
@@ -803,15 +810,261 @@
 
         </div>
 
+        <!-- Update flow (upgrade template version) — hidden until mode selected -->
+        <div id="update-flow" class="hidden">
+
+            <!-- Step indicator -->
+            <div class="step-indicator" style="margin-top:8px;">
+                <div class="step active" id="ustep1-indicator" data-i18n="ui_ustep1">1. Configure</div>
+                <div class="step" id="ustep2-indicator" data-i18n="ui_ustep2">2. Review</div>
+                <div class="step" id="ustep3-indicator" data-i18n="ui_ustep3">3. Download</div>
+            </div>
+
+            <div class="warn-box" style="font-size:12px;">
+                <strong>Sample Code Notice:</strong> This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. See the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/" style="color:#0073bb;">AWS Shared Responsibility Model</a>.
+            </div>
+
+            <div class="info-box">
+                <span data-i18n="ui_update_info">This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>update.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.</span>
+            </div>
+
+            <!-- Update Step 1: Configure -->
+            <div id="ustep1">
+                <div class="card">
+                    <h2 data-i18n="ui_update_step1_title">Deployment Details</h2>
+                    <p class="subtitle" data-i18n="ui_update_step1_subtitle">Enter the region and optional scope for the upgrade</p>
+
+                    <div class="form-group">
+                        <label><span data-i18n="ui_editor_region">Deployment Region</span> <span class="hint" data-i18n="ui_editor_region_hint">— region where the management stack was deployed</span></label>
+                        <select id="update-region">
+                            <option value="" disabled selected data-i18n="ui_editor_region_placeholder">Select a region...</option>
+                            <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                            <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                            <option value="us-west-1">US West (N. California) — us-west-1</option>
+                            <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                            <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                            <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                            <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                            <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                            <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                            <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                            <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                            <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                            <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                            <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                            <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                            <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                            <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                            <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                            <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                            <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                            <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                            <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                            <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                            <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                            <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                            <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                            <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                            <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                            <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                            <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                            <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                            <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                            <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                            <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                        </select>
+                        <div class="error-msg" id="update-region-error" data-i18n="err_editor_region">Please select a deployment region</div>
+                    </div>
+
+                    <div class="info-box" style="background:#f0f7fc;border-left:4px solid #0073bb;font-size:13px;margin-top:16px;">
+                        <span data-i18n="ui_update_info_detail">The generated <code>update.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.</span>
+                    </div>
+
+                    <details id="update-versionHistory" style="margin-top:16px;border:1px solid #eaeded;border-radius:4px;padding:12px 14px;background:#fafafa;">
+                        <summary style="cursor:pointer;font-weight:600;color:#16191f;font-size:13px;">
+                            <span data-i18n="ui_version_history_title">Version history — what changed?</span>
+                        </summary>
+                        <div id="update-versionHistoryContent" style="margin-top:10px;"></div>
+                    </details>
+
+                    <div class="form-group" style="margin-bottom:4px;margin-top:16px;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="update-scopeToMpe" onchange="updateToggleScope()" style="margin-top:3px;flex-shrink:0;">
+                            <div>
+                                <strong data-i18n="ui_update_scope_title">Update only specific MAP engagement(s)</strong>
+                                <p class="hint" style="margin-top:4px;" data-i18n="ui_update_scope_desc">Leave unchecked to update every MAP Auto-Tagger deployment the script finds in this account (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div id="update-mpeSection" class="hidden" style="margin-top:16px;">
+                        <div class="form-group">
+                            <label><span data-i18n="ui_update_mpe_label">MPE IDs to update</span> <span class="hint" data-i18n="ui_update_mpe_hint">— each must match a deployed MAP Auto-Tagger in this region</span></label>
+                            <div id="update-mpeList">
+                                <div class="entry-row" style="display:flex;align-items:center;gap:8px;">
+                                    <div style="display:flex;align-items:center;gap:0;flex:1;">
+                                        <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                                        <input type="text" class="update-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                                    </div>
+                                    <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="updateAddMpe()" data-i18n="ui_update_add_mpe">+ Add another MPE</button>
+                            <div class="error-msg" id="update-mpe-error" data-i18n="err_update_mpe">Please enter at least one valid 10-character MPE ID</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="selectMode(null)" data-i18n="ui_editor_back">← Back</button>
+                    <button class="btn-primary" onclick="updateReview()" style="margin-left:auto;" data-i18n="ui_editor_review">Review →</button>
+                </div>
+            </div>
+
+            <!-- Update Step 2: Review -->
+            <div id="ustep2" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_review_title">Review Configuration</h2>
+                    <p class="subtitle" data-i18n="ui_editor_review_subtitle">Verify your settings before generating the update script</p>
+                    <table style="width:100%;font-size:14px;border-collapse:collapse;" id="update-reviewTable"></table>
+                </div>
+
+                <div class="card" style="border-left:4px solid #d13212;background:#fdf3f1;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="update-confirm" style="margin-top:3px;flex-shrink:0;">
+                            <span>
+                                <span data-i18n="ui_update_confirm_text">I confirm that the listed MAP Auto-Tagger deployment(s) exist in the selected region and that upgrading them to the target template version is intended.</span>
+                                <strong data-i18n="ui_update_confirm_risk">An upgrade replaces the Lambda code, IAM policy, and EventBridge rules in every matched stack. Scope and agreement dates are preserved via <code>--use-previous-parameters</code>, but a failed rollout may leave a stack in UPDATE_ROLLBACK_COMPLETE state requiring manual recovery.</strong>
+                            </span>
+                        </label>
+                        <div class="error-msg" id="update-confirm-error" style="margin-top:8px;" data-i18n="err_update_confirm">You must confirm before generating the update script</div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="updateSetStep(1)" data-i18n="ui_btn_back">← Back</button>
+                    <button class="btn-primary" onclick="updateGenerate()" style="margin-left:auto;" data-i18n="ui_editor_generate">Generate update.sh →</button>
+                </div>
+            </div>
+
+            <!-- Update Step 3: Download -->
+            <div id="ustep3" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_step3_title">Script Ready</h2>
+                    <p class="subtitle" data-i18n="ui_update_step3_subtitle">Run this in AWS CloudShell from the account where the deployment was made</p>
+
+                    <div style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;">
+                        <button class="btn-primary" onclick="updateDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_editor_download">⬇ Download update.sh</button>
+                        <button class="btn-secondary" onclick="updateCopyInstructions()" data-i18n="ui_btn_copy">📋 Copy Instructions</button>
+                    </div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Deployment Instructions</h3>
+                    <div class="preview-box" id="update-instructions" style="color:#d4d4d4;"></div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_editor_script_preview">Script Preview</h3>
+                    <div class="preview-box" id="update-scriptContent"></div>
+
+                    <div class="actions" style="margin-top:20px;">
+                        <button class="btn-secondary" onclick="updateSetStep(1)" data-i18n="ui_start_over">Start Over</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
     </div>
 
     <script>
+        // Template version — single source of truth for the SemVer constant.
+        // Must match `TEMPLATE_VERSION = 'v20.3.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.3.0';
+
+        // Version history surfaced in the Update flow. Bullets are intentionally English-only —
+        // translating release notes across 7 languages for every PR is unsustainable. Labels
+        // (titles, buttons) go through i18n; change bullets stay in source form.
+        // Tags: bugfix, coverage, breaking, security, perf, other.
+        // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
+        const VERSION_HISTORY = [
+            {
+                version: 'v20.3.0',
+                date: '2026-04-22',
+                changes: [
+                    { tag: 'coverage', text: 'Added handlers for Amazon Keyspaces (CreateKeyspace), AWS Directory Service (CreateDirectory + CreateMicrosoftAD), and AWS CloudHSM v2 (CreateCluster + CreateHsm).' },
+                    { tag: 'coverage', text: 'Added IAM permissions: ds:AddTagsToResource and cloudhsm:TagResource.' },
+                    { tag: 'other',    text: 'AD Connector (ConnectDirectory) intentionally deferred — requires broader EventBridge prefix changes.' },
+                ],
+            },
+            {
+                version: 'v20.2.0',
+                date: '2026-04-22',
+                changes: [
+                    { tag: 'other',    text: 'AutoDeployment=True only when scope is ALL; False when scope is specific accounts — prevents new OU accounts auto-receiving Lambda when customer explicitly scoped.' },
+                    { tag: 'bugfix',   text: 'Cross-MPE conflict detection at deploy time (multi-account StackSet overlap + single-account same-account multi-Lambda with VPC precision).' },
+                ],
+            },
+            {
+                version: 'v20.1.0',
+                date: '2026-04-21',
+                changes: [
+                    { tag: 'other',    text: 'Version visibility: SSM parameter /auto-map-tagger/<mpe>/version, CFN Output TemplateVersion, and Lambda cold-start log line.' },
+                    { tag: 'other',    text: 'Batched IAM preflight: simulate-principal-policy over 21 deploy-time actions (26 for multi-account) in a single ~200ms call, catches explicitDeny + implicitDeny.' },
+                    { tag: 'bugfix',   text: 'Stack-state preflight: catches CREATE_IN_PROGRESS / ROLLBACK_COMPLETE / ROLLBACK_FAILED stuck states with specific remediation commands.' },
+                ],
+            },
+            {
+                version: 'v20.0.0',
+                date: '2026-04-18',
+                changes: [
+                    { tag: 'bugfix',   text: 'Recognize RGTA ThrottledException variant (with "ed") in addition to ThrottlingException — 8-account deploys no longer skip the SQS retry budget on RGTA throttles.' },
+                    { tag: 'perf',     text: 'Parallelize StackSet deploy/delete with OperationPreferences {Max=100%, Tolerance=100%, RegionConcurrency=PARALLEL} — hours → ~15–20 min for 8-account deployments.' },
+                    { tag: 'bugfix',   text: 'SSM parameter ARN missing "/" separator for flat parameter names — previously broke tagging for non-hierarchical parameter names.' },
+                    { tag: 'bugfix',   text: '4 latent bugs from proactive audit: Lambda Layers untaggable, Classic ELB routing, STS credential refresh, CreateSnapshot multi-service collision.' },
+                    { tag: 'coverage', text: 'WAFv2 (WebACL, IPSet) and CodeDeploy (Application, DeploymentGroup) handlers.' },
+                    { tag: 'other',    text: 'Resilient SQS pipeline: EventBridge → SQS (14-day retention) → Lambda with DLQ + SNS alarm.' },
+                ],
+            },
+        ];
+
+        function renderVersionHistory() {
+            const tagLabels = {
+                bugfix:   { label: t('ui_version_tag_bugfix'),   color: '#d13212' },
+                coverage: { label: t('ui_version_tag_coverage'), color: '#1d8102' },
+                breaking: { label: t('ui_version_tag_breaking'), color: '#ba1e04' },
+                security: { label: t('ui_version_tag_security'), color: '#9d1c2a' },
+                perf:     { label: t('ui_version_tag_perf'),     color: '#0073bb' },
+                other:    { label: t('ui_version_tag_other'),    color: '#687078' },
+            };
+            const entries = VERSION_HISTORY.map(v => {
+                const isCurrent = v.version === TEMPLATE_VERSION;
+                const header = `<div style="margin-top:14px;margin-bottom:4px;">
+                    <strong style="font-size:14px;color:#16191f;">${v.version}</strong>
+                    <span style="color:#687078;font-size:12px;"> — ${t('ui_version_released')} ${v.date}</span>
+                    ${isCurrent ? `<span style="margin-left:8px;padding:2px 6px;background:#e0f2e5;color:#1d8102;border-radius:3px;font-size:11px;font-weight:600;">${t('ui_version_current')}</span>` : ''}
+                </div>`;
+                const bullets = v.changes.map(c => {
+                    const tag = tagLabels[c.tag] || tagLabels.other;
+                    return `<li style="margin:4px 0;line-height:1.5;">
+                        <span style="display:inline-block;min-width:72px;padding:1px 6px;background:${tag.color}1a;color:${tag.color};border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;margin-right:6px;vertical-align:middle;">${tag.label}</span>
+                        <span style="font-size:13px;color:#16191f;">${c.text}</span>
+                    </li>`;
+                }).join('');
+                return header + `<ul style="margin:0;padding-left:0;list-style:none;">${bullets}</ul>`;
+            }).join('');
+            const link = `<div style="margin-top:14px;padding-top:10px;border-top:1px solid #eaeded;font-size:12px;">
+                <a href="https://github.com/aws-samples/sample-auto-map-tagger/blob/main/CHANGELOG.md" target="_blank" rel="noopener" style="color:#0073bb;">${t('ui_version_full_changelog')} →</a>
+            </div>`;
+            return entries + link;
+        }
+
         // --- Landing mode selection ---
         function selectMode(mode) {
             document.getElementById('landing').classList.toggle('hidden', mode !== null);
             document.getElementById('deploy-flow').classList.toggle('hidden', mode !== 'deploy');
             document.getElementById('edit-flow').classList.toggle('hidden', mode !== 'edit');
+            document.getElementById('update-flow').classList.toggle('hidden', mode !== 'update');
             if (mode === 'edit') editorSetStep(1);
+            if (mode === 'update') updateSetStep(1);
             window.scrollTo(0, 0);
         }
 
@@ -824,6 +1077,22 @@
                 if (i + 1 < num) ind.classList.add('done');
                 if (i + 1 === num) ind.classList.add('active');
             });
+            window.scrollTo(0, 0);
+        }
+
+        // --- Update step navigation ---
+        function updateSetStep(num) {
+            ['ustep1', 'ustep2', 'ustep3'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
+                const ind = document.getElementById(id + '-indicator');
+                ind.classList.remove('active', 'done');
+                if (i + 1 < num) ind.classList.add('done');
+                if (i + 1 === num) ind.classList.add('active');
+            });
+            if (num === 1) {
+                const host = document.getElementById('update-versionHistoryContent');
+                if (host) host.innerHTML = renderVersionHistory();
+            }
             window.scrollTo(0, 0);
         }
 
@@ -859,7 +1128,7 @@
                 document.getElementById('editor-region-error').style.display = 'none';
             }
 
-            if (!document.querySelector('input[name="editor-action"]:checked')) {
+            if (!actionVal) {
                 document.getElementById('editor-opt-add').style.outline = '2px solid #d13212';
                 document.getElementById('editor-opt-remove').style.outline = '2px solid #d13212';
                 valid = false;
@@ -920,6 +1189,115 @@
             document.getElementById('editor-opt-remove').style.outline = '';
             document.getElementById('editor-add-accounts-section').classList.toggle('hidden', action !== 'add');
             document.getElementById('editor-remove-accounts-section').classList.toggle('hidden', action !== 'remove');
+        }
+
+        // --- Update flow handlers ---
+        function updateToggleScope() {
+            const checked = document.getElementById('update-scopeToMpe').checked;
+            document.getElementById('update-mpeSection').classList.toggle('hidden', !checked);
+        }
+
+        function updateAddMpe() {
+            const list = document.getElementById('update-mpeList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+            row.innerHTML =
+                '<div style="display:flex;align-items:center;gap:0;flex:1;">' +
+                    '<span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>' +
+                    '<input type="text" class="update-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')">' +
+                '</div>' +
+                '<button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+        }
+
+        function updateReview() {
+            const region = document.getElementById('update-region').value;
+            const scopeToMpe = document.getElementById('update-scopeToMpe').checked;
+            const mpeInputs = [...document.getElementById('update-mpeList').querySelectorAll('.update-mpe-input')];
+            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+            const selectedMpes = scopeToMpe
+                ? mpeInputs.map(el => el.value.trim()).filter(v => mpeRegex.test(v))
+                : [];
+
+            let valid = true;
+
+            if (!region) {
+                document.getElementById('update-region').classList.add('error');
+                document.getElementById('update-region-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('update-region').classList.remove('error');
+                document.getElementById('update-region-error').style.display = 'none';
+            }
+
+            if (scopeToMpe) {
+                const hasInvalid = mpeInputs.some(el => el.value.trim() && !mpeRegex.test(el.value.trim()));
+                mpeInputs.forEach(el => {
+                    const bad = el.value.trim() && !mpeRegex.test(el.value.trim());
+                    el.classList.toggle('error', bad);
+                });
+                if (selectedMpes.length === 0 || hasInvalid) {
+                    document.getElementById('update-mpe-error').style.display = 'block';
+                    valid = false;
+                } else {
+                    document.getElementById('update-mpe-error').style.display = 'none';
+                }
+            } else {
+                document.getElementById('update-mpe-error').style.display = 'none';
+            }
+
+            if (!valid) return;
+
+            // Build review table
+            const table = document.getElementById('update-reviewTable');
+            const rows = [
+                [t('ui_editor_region'), region],
+                [t('ui_update_scope_review'),
+                    selectedMpes.length > 0
+                        ? selectedMpes.map(m => 'mig' + m).join(', ')
+                        : t('ui_update_all_review')],
+                [t('ui_update_target_version'), TEMPLATE_VERSION],
+            ];
+            table.innerHTML = rows.map(([k, v], i) =>
+                `<tr style="border-bottom:1px solid #eaeded;${i%2===0?'background:#fafafa;':''}">
+                    <td style="padding:8px;font-weight:600;width:40%;color:#687078;">${k}</td>
+                    <td style="padding:8px;">${v}</td>
+                </tr>`
+            ).join('');
+
+            document.getElementById('update-confirm').checked = false;
+            document.getElementById('update-confirm-error').style.display = 'none';
+
+            updateSetStep(2);
+        }
+
+        function updateGenerate() {
+            if (!document.getElementById('update-confirm').checked) {
+                document.getElementById('update-confirm-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('update-confirm-error').style.display = 'none';
+
+            const region = document.getElementById('update-region').value;
+            editorGenerateUpgrade(region);
+        }
+
+        function updateDownload() {
+            const blob = new Blob([window._editorScript], { type: 'text/x-sh' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `update-${window._editorMpe}.sh`;
+            a.click();
+        }
+
+        function updateCopyInstructions() {
+            navigator.clipboard.writeText(document.getElementById('update-instructions').textContent).then(() => {
+                const btn = document.querySelector('[onclick="updateCopyInstructions()"]');
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied';
+                setTimeout(() => { btn.textContent = orig; }, 1500);
+            });
         }
 
         function editorAddAccount(type) {
@@ -1119,6 +1497,403 @@ Note: Only resources created AFTER this update will be tagged in newly added acc
 
             document.getElementById('editor-instructions').textContent = instructions;
             editorSetStep(3);
+        }
+
+        function editorGenerateUpgrade(region) {
+            const scopeToMpe = document.getElementById('update-scopeToMpe').checked;
+            const mpeInputs = [...document.getElementById('update-mpeList').querySelectorAll('.update-mpe-input')];
+            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+            const selectedMpes = scopeToMpe
+                ? mpeInputs.map(el => 'mig' + el.value.trim()).filter(m => mpeRegex.test(m.slice(3)))
+                : [];
+
+            // Generate two baked templates (with + without backfill) using a placeholder
+            // MPE ID so the shell can sed-substitute the real MPE at runtime. Auto-detect
+            // of backfill presence in the stack picks the right variant.
+            const PLACEHOLDER = 'migUPGRADEPLACE';
+            const placeholderConfig = {
+                mpeId: PLACEHOLDER,
+                deployMode: 'single',
+                scopeMode: 'account',
+                useAccountScope: false,
+                stacksetAccounts: [],
+                scopedVpcIds: [],
+                tagNonVpcServices: true,
+                alertEmail: '',
+                customerName: '',
+                includeBackfill: false,
+                // Dates are irrelevant at upgrade time — --use-previous-parameters reuses the
+                // deployed values. Use a valid date format so the Default matches AllowedPattern.
+                agreementDate: '1900-01-01',
+                agreementEndDate: '2099-12-31',
+            };
+            const tmplNoBackfill = generateMainTemplate(placeholderConfig);
+            const tmplWithBackfill = generateMainTemplate(Object.assign({}, placeholderConfig, { includeBackfill: true }));
+
+            const mpeListShell = selectedMpes.length > 0
+                ? selectedMpes.map(m => `"${m}"`).join(' ')
+                : '';
+            const scopeNote = selectedMpes.length > 0
+                ? `specific MPE(s): ${selectedMpes.join(', ')}`
+                : 'all MAP Auto-Tagger deployments found in this account';
+
+            const script = `#!/bin/bash
+# MAP 2.0 Auto-Tagger — Upgrade Script
+# Target template version: ${TEMPLATE_VERSION}
+# Scope: ${scopeNote}
+# Region: ${region}
+#
+# Behavior:
+#   - Auto-detects single-account stacks and multi-account StackSets matching
+#     map-auto-tagger-mig*.
+#   - Reads each deployment's current version from SSM Parameter Store
+#     (/auto-map-tagger/<mpe>/version) and compares to the target.
+#   - Refuses cross-MAJOR upgrades (e.g. v19 → v21) without --force.
+#   - Warns on downgrade; requires --force to proceed.
+#   - Detects presence of the backfill Lambda in the stack and picks the
+#     matching baked template variant (backfill config is preserved).
+#   - Applies full template replacement via update-stack / update-stack-set
+#     with --use-previous-parameters.
+#   - For StackSets, uses OperationPreferences {Max=100%, Tolerance=100%,
+#     RegionConcurrency=PARALLEL} for parallel per-account rollout.
+set -e
+
+TARGET_VERSION="${TEMPLATE_VERSION}"
+REGION="${region}"
+SCOPE_MPES=(${mpeListShell})
+FORCE="\${1:-}"
+
+echo ""
+echo "  ┌──────────────────────────────────────────────────────┐"
+echo "  │   MAP 2.0 Auto-Tagger — Upgrade                       │"
+echo "  │   Target version: $TARGET_VERSION"
+echo "  │   Region: $REGION"
+echo "  │   Scope: ${selectedMpes.length > 0 ? 'specific MPE(s) — ' + selectedMpes.join(', ') : 'all MAP Auto-Tagger deployments in this account'}"
+echo "  └──────────────────────────────────────────────────────┘"
+echo ""
+
+if [ "$FORCE" = "--force" ]; then
+    echo "  ⚠️  --force flag set — version guard will not block cross-major / downgrade."
+    echo ""
+fi
+
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+BUCKET="auto-map-tagger-\${ACCOUNT}"
+
+# ── Step 1: Enumerate deployments ────────────────────────────
+echo "Step 1: Scanning for MAP Auto-Tagger deployments..."
+
+STACKSETS=()
+STACKS=()
+
+if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
+    for MPE in "\${SCOPE_MPES[@]}"; do
+        if aws cloudformation describe-stack-set --region "$REGION" --stack-set-name "map-auto-tagger-\${MPE}" > /dev/null 2>&1; then
+            STACKSETS+=("map-auto-tagger-\${MPE}")
+        elif aws cloudformation describe-stacks --region "$REGION" --stack-name "map-auto-tagger-\${MPE}" > /dev/null 2>&1; then
+            STACKS+=("map-auto-tagger-\${MPE}")
+        else
+            echo "  ⚠️  MPE '\${MPE}' — no StackSet or Stack found with name 'map-auto-tagger-\${MPE}' in $REGION. Skipping."
+        fi
+    done
+else
+    while IFS= read -r NAME; do
+        [ -n "$NAME" ] && STACKSETS+=("$NAME")
+    done < <(aws cloudformation list-stack-sets --region "$REGION" --status ACTIVE --query "Summaries[?starts_with(StackSetName, 'map-auto-tagger-mig')].StackSetName" --output text | tr '\\t' '\\n')
+    while IFS= read -r NAME; do
+        [ -n "$NAME" ] && STACKS+=("$NAME")
+    done < <(aws cloudformation list-stacks --region "$REGION" --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE --query "StackSummaries[?starts_with(StackName, 'map-auto-tagger-mig')].StackName" --output text | tr '\\t' '\\n')
+fi
+
+TOTAL=\$((\${#STACKSETS[@]} + \${#STACKS[@]}))
+if [ $TOTAL -eq 0 ]; then
+    echo "  ⚠️  No MAP Auto-Tagger deployments found matching criteria. Exiting."
+    exit 0
+fi
+
+echo "  Found \${#STACKSETS[@]} StackSet(s) and \${#STACKS[@]} Stack(s) — $TOTAL total."
+for SS in "\${STACKSETS[@]}"; do echo "    • StackSet $SS"; done
+for ST in "\${STACKS[@]}"; do echo "    • Stack    $ST"; done
+echo ""
+
+# ── Step 2: Write baked templates to disk ──────────────────────
+echo "Step 2: Preparing upgrade templates (version $TARGET_VERSION)..."
+TMPL_NB=$(mktemp /tmp/map-upgrade-nobackfill-XXXX.yaml)
+TMPL_BF=$(mktemp /tmp/map-upgrade-backfill-XXXX.yaml)
+
+cat > "$TMPL_NB" <<'MAP_UPGRADE_TEMPLATE_NO_BACKFILL_EOF'
+${tmplNoBackfill}
+MAP_UPGRADE_TEMPLATE_NO_BACKFILL_EOF
+
+cat > "$TMPL_BF" <<'MAP_UPGRADE_TEMPLATE_WITH_BACKFILL_EOF'
+${tmplWithBackfill}
+MAP_UPGRADE_TEMPLATE_WITH_BACKFILL_EOF
+
+echo "  ✅ Templates written."
+echo ""
+
+# ── Helper: compare SemVer versions ────────────────────────────
+version_parts() { echo "$1" | sed -E 's/^v//' | tr '.' ' '; }
+
+compare_versions() {
+    # Returns: "same" | "patch" | "minor" | "major" | "downgrade"
+    local FROM="$1" TO="$2"
+    local FM FN FP TM TN TP
+    read FM FN FP <<< "$(version_parts "$FROM")"
+    read TM TN TP <<< "$(version_parts "$TO")"
+    if [ "$FROM" = "$TO" ]; then echo "same"; return; fi
+    if [ "$TM" -lt "$FM" ] || { [ "$TM" -eq "$FM" ] && [ "$TN" -lt "$FN" ]; } || { [ "$TM" -eq "$FM" ] && [ "$TN" -eq "$FN" ] && [ "$TP" -lt "$FP" ]; }; then
+        echo "downgrade"; return
+    fi
+    if [ "$TM" -gt "$FM" ]; then echo "major"; return; fi
+    if [ "$TN" -gt "$FN" ]; then echo "minor"; return; fi
+    echo "patch"
+}
+
+# ── Helper: upgrade a single deployment ────────────────────────
+upgrade_one() {
+    local KIND="$1"       # "stack" or "stackset"
+    local NAME="$2"       # full name including mpe suffix
+    local MPE="\${NAME#map-auto-tagger-}"
+
+    echo "── $KIND: $NAME ──────────────────────────────"
+
+    # Read current version from SSM. Deployments from before version visibility
+    # (added in a v20 MINOR release) have no such param — treat them as pre-target
+    # and allow the upgrade without running the SemVer guard.
+    local CURRENT
+    CURRENT=$(aws ssm get-parameter --region "$REGION" --name "/auto-map-tagger/\${MPE}/version" --query Parameter.Value --output text 2>/dev/null || echo "unknown")
+
+    if [ "$CURRENT" = "unknown" ]; then
+        echo "  ⚠️  No version parameter found in SSM — deployment predates version visibility."
+        echo "     Proceeding with upgrade (SemVer guard skipped)."
+    else
+        local CMP
+        CMP=$(compare_versions "$CURRENT" "$TARGET_VERSION")
+        echo "  Current: $CURRENT → Target: $TARGET_VERSION ($CMP)"
+
+        if [ "$CMP" = "same" ]; then
+            echo "  ✅ Already on target version. Skipping."
+            return 0
+        fi
+
+        if [ "$CMP" = "downgrade" ] && [ "$FORCE" != "--force" ]; then
+            echo "  ❌ Downgrade detected ($CURRENT → $TARGET_VERSION). Refusing."
+            echo "     Re-run with --force to override."
+            return 1
+        fi
+
+        if [ "$CMP" = "major" ] && [ "$FORCE" != "--force" ]; then
+            echo "  ❌ Cross-MAJOR upgrade detected ($CURRENT → $TARGET_VERSION). Refusing."
+            echo "     MAJOR bumps per SemVer may require customer action (see CHANGELOG.md)."
+            echo "     Re-run with --force to override, or upgrade through intermediate MAJOR versions."
+            return 1
+        fi
+    fi
+
+    # Detect backfill presence in the stack to pick the matching template variant
+    local HAS_BACKFILL="false"
+    if [ "$KIND" = "stackset" ]; then
+        if aws cloudformation describe-stack-set --region "$REGION" --stack-set-name "$NAME" --query "StackSet.TemplateBody" --output text 2>/dev/null | grep -q 'BackfillFunction'; then
+            HAS_BACKFILL="true"
+        fi
+    else
+        if aws cloudformation describe-stack-resources --region "$REGION" --stack-name "$NAME" --query "StackResources[?LogicalResourceId=='BackfillFunction'].LogicalResourceId" --output text 2>/dev/null | grep -q 'BackfillFunction'; then
+            HAS_BACKFILL="true"
+        fi
+    fi
+
+    local SRC_TMPL
+    if [ "$HAS_BACKFILL" = "true" ]; then
+        SRC_TMPL="$TMPL_BF"
+        echo "  Backfill detected in existing stack → using with-backfill template variant."
+    else
+        SRC_TMPL="$TMPL_NB"
+        echo "  No backfill in existing stack → using no-backfill template variant."
+    fi
+
+    # MPE-substitute the placeholder
+    local TMPL=\$(mktemp /tmp/map-upgrade-${PLACEHOLDER}-XXXX.yaml)
+    sed "s|${PLACEHOLDER}|\${MPE}|g" "$SRC_TMPL" > "$TMPL"
+
+    # Preserve AgreementStartDate/EndDate: these are CFN parameters so
+    # --use-previous-parameters keeps them. We only need to worry about
+    # the Default values in the placeholder template — they'll be shadowed
+    # by --use-previous-parameters.
+
+    if [ "$KIND" = "stackset" ]; then
+        echo "  Pushing StackSet update (parallel rollout, 100% tolerance)..."
+        local OUT
+        OUT=$(aws cloudformation update-stack-set \\
+            --region "$REGION" \\
+            --stack-set-name "$NAME" \\
+            --template-body "file://$TMPL" \\
+            --use-previous-parameters \\
+            --capabilities CAPABILITY_NAMED_IAM \\
+            --operation-preferences "MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL" \\
+            2>&1) || true
+
+        if echo "$OUT" | grep -q "No updates"; then
+            echo "  ✅ StackSet already matches target template. SSM version will be refreshed."
+        elif echo "$OUT" | grep -q "OperationId"; then
+            echo "  StackSet update initiated. Polling (up to 30 min)..."
+            local WAIT=0
+            while [ $WAIT -lt 1800 ]; do
+                local STATUS
+                STATUS=$(aws cloudformation list-stack-set-operations --region "$REGION" --stack-set-name "$NAME" --query "Summaries[0].Status" --output text 2>/dev/null)
+                if [ "$STATUS" = "SUCCEEDED" ]; then
+                    echo "  ✅ StackSet upgrade complete."
+                    break
+                elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "STOPPED" ]; then
+                    echo "  ❌ Update failed. Per-account status:"
+                    aws cloudformation list-stack-instances --region "$REGION" --stack-set-name "$NAME" --query "Summaries[?StackInstanceStatus.DetailedStatus!=\\\`SUCCEEDED\\\`].[Account,Region,StackInstanceStatus.DetailedStatus,StatusReason]" --output table
+                    rm -f "$TMPL"
+                    return 1
+                fi
+                sleep 30
+                WAIT=$((WAIT + 30))
+                echo "  Still updating... (\${WAIT}s)"
+            done
+        elif echo "$OUT" | grep -q "OperationInProgress"; then
+            echo "  ⚠️  Another operation is in progress on this StackSet. Try again in a few minutes."
+            rm -f "$TMPL"
+            return 1
+        else
+            echo "  $OUT"
+            rm -f "$TMPL"
+            return 1
+        fi
+    else
+        echo "  Pushing Stack update..."
+        local OUT
+        OUT=$(aws cloudformation update-stack \\
+            --region "$REGION" \\
+            --stack-name "$NAME" \\
+            --template-body "file://$TMPL" \\
+            --use-previous-parameters \\
+            --capabilities CAPABILITY_NAMED_IAM \\
+            2>&1) || true
+
+        if echo "$OUT" | grep -q "No updates"; then
+            echo "  ✅ Stack already matches target template. SSM version will be refreshed."
+        elif echo "$OUT" | grep -q "StackId"; then
+            echo "  Stack update initiated. Waiting (up to 30 min)..."
+            aws cloudformation wait stack-update-complete --region "$REGION" --stack-name "$NAME" || {
+                echo "  ❌ Stack update failed."
+                aws cloudformation describe-stack-events --region "$REGION" --stack-name "$NAME" --query "StackEvents[?ResourceStatus=='UPDATE_FAILED'].[LogicalResourceId,ResourceStatusReason]" --output table | head -20
+                rm -f "$TMPL"
+                return 1
+            }
+            echo "  ✅ Stack upgrade complete."
+        else
+            echo "  $OUT"
+            rm -f "$TMPL"
+            return 1
+        fi
+    fi
+
+    rm -f "$TMPL"
+    echo ""
+    return 0
+}
+
+# ── Step 3: Process all deployments ────────────────────────────
+echo "Step 3: Upgrading \${#STACKSETS[@]} StackSet(s) and \${#STACKS[@]} Stack(s)..."
+echo ""
+
+UPGRADED=0
+SKIPPED=0
+FAILED=0
+
+for NAME in "\${STACKSETS[@]}"; do
+    if upgrade_one "stackset" "$NAME"; then
+        UPGRADED=$((UPGRADED + 1))
+    else
+        FAILED=$((FAILED + 1))
+    fi
+done
+
+for NAME in "\${STACKS[@]}"; do
+    if upgrade_one "stack" "$NAME"; then
+        UPGRADED=$((UPGRADED + 1))
+    else
+        FAILED=$((FAILED + 1))
+    fi
+done
+
+rm -f "$TMPL_NB" "$TMPL_BF"
+
+echo ""
+echo "  ┌──────────────────────────────────────────────────────┐"
+if [ $FAILED -gt 0 ]; then
+    echo "  │   ⚠️  Upgrade complete with failures                  │"
+    echo "  │   Processed: $UPGRADED succeeded, $FAILED failed       "
+    echo "  └──────────────────────────────────────────────────────┘"
+    exit 1
+else
+    echo "  │   ✅ Upgrade complete                                 │"
+    echo "  │   Processed: $UPGRADED deployment(s)                  "
+    echo "  └──────────────────────────────────────────────────────┘"
+fi
+`;
+
+            document.getElementById('update-scriptContent').textContent = script;
+            window._editorScript = script;
+            window._editorMpe = selectedMpes.length > 0 ? selectedMpes.join('-') : 'all';
+
+            const instructions = `UPGRADE INSTRUCTIONS — MAP Auto-Tagger ${TEMPLATE_VERSION}
+=========================================
+
+Target template version: ${TEMPLATE_VERSION}
+Scope: ${selectedMpes.length > 0 ? 'MPE(s) — ' + selectedMpes.join(', ') : 'all MAP Auto-Tagger deployments in this account'}
+Region: ${region}
+
+── Option 1: AWS CloudShell (Recommended) ──────────────────
+1. Log into the AWS Console for the account where the MAP Auto-Tagger is deployed.
+   (For multi-account deployments, this is the management account.)
+2. Open CloudShell (click the terminal icon in the top menu bar).
+3. Upload the file (CloudShell → Actions → Upload file):
+     update.sh
+4. Run:
+   bash update.sh
+
+   To force cross-MAJOR or downgrade:
+   bash update.sh --force
+
+── Option 2: Local AWS CLI ──────────────────────────────────
+1. Ensure AWS CLI v2 is installed and configured with admin credentials
+   for the deployment account.
+2. Download update.sh to your local machine.
+3. Run:
+   bash update.sh
+
+─────────────────────────────────────────────────
+What the script does:
+  - Enumerates single-account Stacks and multi-account StackSets matching
+    map-auto-tagger-mig*.
+  - For each deployment, reads the current template version from SSM.
+  - Compares current vs target version (SemVer):
+      • same    → skip
+      • patch   → proceed
+      • minor   → proceed
+      • major   → refuse (unless --force)
+      • downgrade → refuse (unless --force)
+  - Detects whether the stack has the backfill Lambda and picks the
+    matching template variant. Backfill setting is preserved.
+  - Applies the upgrade with --use-previous-parameters so scope, agreement
+    dates, and VPC config are unchanged.
+  - For StackSets: parallel rollout (100% tolerance, region PARALLEL) —
+    accounts update in parallel per AWS limit.
+
+Check status after the script runs:
+   aws ssm get-parameter --name /auto-map-tagger/<mpe>/version --query Parameter.Value
+   # Expected: ${TEMPLATE_VERSION}
+
+Note: the new template is bundled inside this update.sh. No outbound
+network calls are made from your environment during the upgrade.`;
+
+            document.getElementById('update-instructions').textContent = instructions;
+            updateSetStep(3);
         }
 
         function editorDownload() {
@@ -1701,6 +2476,38 @@ Note: Only resources created AFTER this update will be tagged in newly added acc
             ui_editor_remove_desc:'Selected accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive for these accounts.',
             ui_editor_remove_accounts_label:'Account IDs to remove',
             ui_editor_remove_accounts_hint:'— only accounts currently in scope',
+            ui_mode_update_title:'Update to latest template version',
+            ui_mode_update_desc:'Upgrade Lambda code, IAM policy, and EventBridge rules to the current template version. Scope configuration (accounts, VPCs, agreement date) is preserved. Auto-detects single-account and multi-account deployments.',
+            ui_ustep1:'1. Configure',
+            ui_ustep2:'2. Review',
+            ui_ustep3:'3. Download',
+            ui_update_info:'This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>update.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.',
+            ui_update_step1_title:'Deployment Details',
+            ui_update_step1_subtitle:'Enter the region and optional scope for the upgrade',
+            ui_update_info_detail:'The generated <code>update.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.',
+            ui_update_scope_title:'Update only specific MAP engagement(s)',
+            ui_update_scope_desc:'Leave unchecked to update every MAP Auto-Tagger deployment the script finds in this account (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).',
+            ui_update_mpe_label:'MPE IDs to update',
+            ui_update_mpe_hint:'— each must match a deployed MAP Auto-Tagger in this region',
+            ui_update_add_mpe:'+ Add another MPE',
+            err_update_mpe:'Please enter at least one valid 10-character MPE ID',
+            ui_update_scope_review:'Update scope',
+            ui_update_all_review:'all MAP Auto-Tagger deployments in this account',
+            ui_update_target_version:'Target template version',
+            ui_update_confirm_text:'I confirm that the listed MAP Auto-Tagger deployment(s) exist in the selected region and that upgrading them to the target template version is intended.',
+            ui_update_confirm_risk:'An upgrade replaces the Lambda code, IAM policy, and EventBridge rules in every matched stack. Scope and agreement dates are preserved via <code>--use-previous-parameters</code>, but a failed rollout may leave a stack in UPDATE_ROLLBACK_COMPLETE state requiring manual recovery.',
+            err_update_confirm:'You must confirm before generating the update script',
+            ui_update_step3_subtitle:'Run this in AWS CloudShell from the account where the deployment was made',
+            ui_version_history_title:'Version history — what changed?',
+            ui_version_released:'Released',
+            ui_version_current:'Current target',
+            ui_version_full_changelog:'Full changelog on GitHub',
+            ui_version_tag_bugfix:'Bug fix',
+            ui_version_tag_coverage:'New coverage',
+            ui_version_tag_breaking:'Breaking',
+            ui_version_tag_security:'Security',
+            ui_version_tag_perf:'Performance',
+            ui_version_tag_other:'Other',
             ui_editor_back:'← Back',
             ui_editor_review:'Review →',
             ui_editor_review_title:'Review Configuration',
@@ -1975,6 +2782,38 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             ui_editor_remove_desc:'선택한 계정은 더 이상 태깅되지 않습니다. 기존 태그는 제거되지 않습니다. Lambda는 해당 계정에서 비활성 상태로 유지됩니다.',
             ui_editor_remove_accounts_label:'제거할 계정 ID',
             ui_editor_remove_accounts_hint:'— 현재 범위에 있는 계정만',
+            ui_mode_update_title:'최신 템플릿 버전으로 업데이트',
+            ui_mode_update_desc:'Lambda 코드, IAM 정책, EventBridge 규칙을 현재 템플릿 버전으로 업그레이드합니다. 범위 구성(계정, VPC, 계약 날짜)은 유지됩니다. 단일 계정 및 다중 계정 배포를 자동 감지합니다.',
+            ui_ustep1:'1. 구성',
+            ui_ustep2:'2. 검토',
+            ui_ustep3:'3. 다운로드',
+            ui_update_info:'이 도구는 기존 MAP Auto-Tagger 배포를 최신 템플릿 버전으로 업그레이드합니다. 범위 구성을 유지하고 단일 계정 및 다중 계정 배포를 자동 감지하는 <code>update.sh</code> 스크립트를 생성합니다.',
+            ui_update_step1_title:'배포 세부 정보',
+            ui_update_step1_subtitle:'업그레이드를 위한 리전 및 선택적 범위를 입력하세요',
+            ui_update_info_detail:'생성된 <code>update.sh</code>는 SSM 파라미터 스토어(<code>/auto-map-tagger/&lt;mpe&gt;/version</code>)에서 현재 템플릿 버전을 읽고 대상 버전과 비교하며, <code>--force</code> 없이는 주요 버전 간 업그레이드(예: v19 → v21)를 거부합니다. SemVer에 따라 MAJOR 업그레이드에만 고객 조치가 필요합니다.',
+            ui_update_scope_title:'특정 MAP 참여(MPE)만 업데이트',
+            ui_update_scope_desc:'체크하지 않으면 이 계정에서 스크립트가 찾은 모든 MAP Auto-Tagger 배포(<code>map-auto-tagger-mig*</code>와 일치하는 스택 및 스택셋)를 업데이트합니다.',
+            ui_update_mpe_label:'업데이트할 MPE ID',
+            ui_update_mpe_hint:'— 각 MPE는 이 리전에 배포된 MAP Auto-Tagger와 일치해야 합니다',
+            ui_update_add_mpe:'+ 다른 MPE 추가',
+            err_update_mpe:'유효한 10자리 MPE ID를 하나 이상 입력하세요',
+            ui_update_scope_review:'업데이트 범위',
+            ui_update_all_review:'이 계정의 모든 MAP Auto-Tagger 배포',
+            ui_update_target_version:'대상 템플릿 버전',
+            ui_update_confirm_text:'나열된 MAP Auto-Tagger 배포가 선택한 리전에 존재하며, 대상 템플릿 버전으로 업그레이드하는 것이 의도한 작업임을 확인합니다.',
+            ui_update_confirm_risk:'업그레이드는 일치하는 모든 스택의 Lambda 코드, IAM 정책, EventBridge 규칙을 교체합니다. 범위 및 계약 날짜는 <code>--use-previous-parameters</code>를 통해 유지되지만, 롤아웃 실패 시 스택이 UPDATE_ROLLBACK_COMPLETE 상태로 남아 수동 복구가 필요할 수 있습니다.',
+            err_update_confirm:'업데이트 스크립트를 생성하기 전에 확인해야 합니다',
+            ui_update_step3_subtitle:'배포된 계정에서 AWS CloudShell을 통해 실행하세요',
+            ui_version_history_title:'버전 기록 — 무엇이 변경되었습니까?',
+            ui_version_released:'출시일',
+            ui_version_current:'현재 대상',
+            ui_version_full_changelog:'GitHub에서 전체 변경 로그 보기',
+            ui_version_tag_bugfix:'버그 수정',
+            ui_version_tag_coverage:'신규 지원',
+            ui_version_tag_breaking:'주요 변경',
+            ui_version_tag_security:'보안',
+            ui_version_tag_perf:'성능',
+            ui_version_tag_other:'기타',
             ui_editor_back:'← 뒤로',
             ui_editor_review:'검토 →',
             ui_editor_review_title:'구성 검토',
@@ -2227,6 +3066,38 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             ui_editor_remove_desc:'選択したアカウントはタグ付けされなくなります。既存のタグは削除されません。Lambdaはそのアカウントでは非アクティブのまま残ります。',
             ui_editor_remove_accounts_label:'削除するアカウントID',
             ui_editor_remove_accounts_hint:'— 現在スコープ内のアカウントのみ',
+            ui_mode_update_title:'最新のテンプレートバージョンに更新',
+            ui_mode_update_desc:'Lambdaコード、IAMポリシー、EventBridgeルールを現在のテンプレートバージョンにアップグレードします。スコープ設定（アカウント、VPC、契約日）は保持されます。シングルアカウントおよびマルチアカウントのデプロイを自動検出します。',
+            ui_ustep1:'1. 構成',
+            ui_ustep2:'2. 確認',
+            ui_ustep3:'3. ダウンロード',
+            ui_update_info:'このツールは既存のMAP Auto-Tagger デプロイを最新のテンプレートバージョンにアップグレードします。スコープ設定を維持し、シングルアカウントとマルチアカウントのデプロイを自動検出する <code>update.sh</code> スクリプトを生成します。',
+            ui_update_step1_title:'デプロイ詳細',
+            ui_update_step1_subtitle:'アップグレードのリージョンと任意のスコープを入力してください',
+            ui_update_info_detail:'生成された <code>update.sh</code> は SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>) から現在のテンプレートバージョンを読み取り、ターゲットバージョンと比較します。<code>--force</code> なしでは、メジャーバージョンをまたぐアップグレード（例：v19 → v21）を拒否します。SemVer に従い、MAJOR バンプのみで顧客のアクションが必要です。',
+            ui_update_scope_title:'特定の MAP エンゲージメントのみを更新',
+            ui_update_scope_desc:'チェックを外すと、このアカウントでスクリプトが見つけたすべての MAP Auto-Tagger デプロイ（<code>map-auto-tagger-mig*</code> に一致するスタックおよびスタックセット）を更新します。',
+            ui_update_mpe_label:'更新する MPE ID',
+            ui_update_mpe_hint:'— 各 MPE はこのリージョンにデプロイされた MAP Auto-Tagger と一致する必要があります',
+            ui_update_add_mpe:'+ 別の MPE を追加',
+            err_update_mpe:'有効な 10 文字の MPE ID を少なくとも 1 つ入力してください',
+            ui_update_scope_review:'更新スコープ',
+            ui_update_all_review:'このアカウントのすべての MAP Auto-Tagger デプロイ',
+            ui_update_target_version:'ターゲットテンプレートバージョン',
+            ui_update_confirm_text:'一覧に記載された MAP Auto-Tagger デプロイが選択したリージョンに存在し、ターゲットテンプレートバージョンへのアップグレードが意図したものであることを確認します。',
+            ui_update_confirm_risk:'アップグレードは、一致するすべてのスタックの Lambda コード、IAM ポリシー、EventBridge ルールを置き換えます。スコープと契約日は <code>--use-previous-parameters</code> により保持されますが、ロールアウトが失敗すると、スタックが UPDATE_ROLLBACK_COMPLETE 状態のままになり、手動回復が必要になる場合があります。',
+            err_update_confirm:'更新スクリプトを生成する前に確認してください',
+            ui_update_step3_subtitle:'デプロイが実施されたアカウントの AWS CloudShell で実行してください',
+            ui_version_history_title:'バージョン履歴 — 何が変わりましたか？',
+            ui_version_released:'リリース日',
+            ui_version_current:'現在のターゲット',
+            ui_version_full_changelog:'GitHub の完全な変更履歴',
+            ui_version_tag_bugfix:'バグ修正',
+            ui_version_tag_coverage:'新規対応',
+            ui_version_tag_breaking:'破壊的変更',
+            ui_version_tag_security:'セキュリティ',
+            ui_version_tag_perf:'パフォーマンス',
+            ui_version_tag_other:'その他',
             ui_editor_back:'← 戻る',
             ui_editor_review:'確認 →',
             ui_editor_review_title:'設定の確認',
@@ -2479,6 +3350,38 @@ ui_instr_single_title:'部署说明 — 单账户',
             ui_editor_remove_desc:'选定的账户将停止被标记。现有标签不会被删除。Lambda在这些账户中保持部署但处于非活动状态。',
             ui_editor_remove_accounts_label:'要删除的账户ID',
             ui_editor_remove_accounts_hint:'— 仅限当前在范围内的账户',
+            ui_mode_update_title:'升级到最新模板版本',
+            ui_mode_update_desc:'将 Lambda 代码、IAM 策略和 EventBridge 规则升级到当前模板版本。范围配置（账户、VPC、协议日期）将被保留。自动检测单账户和多账户部署。',
+            ui_ustep1:'1. 配置',
+            ui_ustep2:'2. 审核',
+            ui_ustep3:'3. 下载',
+            ui_update_info:'此工具将现有的 MAP Auto-Tagger 部署升级到最新模板版本。它生成一个 <code>update.sh</code> 脚本，保留范围配置并自动检测单账户和多账户部署。',
+            ui_update_step1_title:'部署详情',
+            ui_update_step1_subtitle:'输入升级的区域和可选范围',
+            ui_update_info_detail:'生成的 <code>update.sh</code> 从 SSM 参数存储（<code>/auto-map-tagger/&lt;mpe&gt;/version</code>）读取当前模板版本，与目标版本进行比较，并在没有 <code>--force</code> 的情况下拒绝跨主版本升级（例如 v19 → v21）。根据 SemVer，仅 MAJOR 升级需要客户操作。',
+            ui_update_scope_title:'仅升级特定的 MAP 项目',
+            ui_update_scope_desc:'不勾选则升级此账户中脚本找到的所有 MAP Auto-Tagger 部署（与 <code>map-auto-tagger-mig*</code> 匹配的所有堆栈和堆栈集）。',
+            ui_update_mpe_label:'要升级的 MPE ID',
+            ui_update_mpe_hint:'— 每个 MPE 必须与此区域中已部署的 MAP Auto-Tagger 匹配',
+            ui_update_add_mpe:'+ 添加另一个 MPE',
+            err_update_mpe:'请输入至少一个有效的 10 位 MPE ID',
+            ui_update_scope_review:'升级范围',
+            ui_update_all_review:'此账户中所有 MAP Auto-Tagger 部署',
+            ui_update_target_version:'目标模板版本',
+            ui_update_confirm_text:'我确认所列的 MAP Auto-Tagger 部署存在于所选区域，并且升级到目标模板版本是预期操作。',
+            ui_update_confirm_risk:'升级会替换每个匹配堆栈中的 Lambda 代码、IAM 策略和 EventBridge 规则。通过 <code>--use-previous-parameters</code> 保留范围和协议日期，但失败的部署可能会使堆栈处于 UPDATE_ROLLBACK_COMPLETE 状态，需要手动恢复。',
+            err_update_confirm:'必须在生成升级脚本之前确认',
+            ui_update_step3_subtitle:'在已部署账户的 AWS CloudShell 中运行',
+            ui_version_history_title:'版本历史 — 有何变更？',
+            ui_version_released:'发布日期',
+            ui_version_current:'当前目标',
+            ui_version_full_changelog:'GitHub 上的完整变更日志',
+            ui_version_tag_bugfix:'错误修复',
+            ui_version_tag_coverage:'新增覆盖',
+            ui_version_tag_breaking:'重大变更',
+            ui_version_tag_security:'安全',
+            ui_version_tag_perf:'性能',
+            ui_version_tag_other:'其他',
             ui_editor_back:'← 返回',
             ui_editor_review:'审核 →',
             ui_editor_review_title:'审核配置',
@@ -2731,6 +3634,38 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             ui_editor_remove_desc:'Akun yang dipilih tidak akan lagi diberi tag. Tag yang ada tidak dihapus. Lambda tetap di-deploy tetapi tidak aktif untuk akun-akun ini.',
             ui_editor_remove_accounts_label:'ID Akun yang akan dihapus',
             ui_editor_remove_accounts_hint:'— hanya akun yang saat ini ada di cakupan',
+            ui_mode_update_title:'Perbarui ke versi template terbaru',
+            ui_mode_update_desc:'Tingkatkan kode Lambda, kebijakan IAM, dan aturan EventBridge ke versi template saat ini. Konfigurasi cakupan (akun, VPC, tanggal perjanjian) dipertahankan. Mendeteksi otomatis deployment akun tunggal dan multi-akun.',
+            ui_ustep1:'1. Konfigurasi',
+            ui_ustep2:'2. Tinjau',
+            ui_ustep3:'3. Unduh',
+            ui_update_info:'Alat ini meningkatkan deployment MAP Auto-Tagger yang ada ke versi template terbaru. Menghasilkan skrip <code>update.sh</code> yang mempertahankan konfigurasi cakupan dan mendeteksi otomatis deployment akun tunggal dan multi-akun.',
+            ui_update_step1_title:'Detail Deployment',
+            ui_update_step1_subtitle:'Masukkan wilayah dan cakupan opsional untuk pembaruan',
+            ui_update_info_detail:'Skrip <code>update.sh</code> yang dihasilkan membaca versi template saat ini dari SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), membandingkannya dengan versi target, dan menolak pembaruan lintas-mayor (misalnya v19 → v21) tanpa <code>--force</code>. Tindakan pelanggan hanya diperlukan untuk peningkatan MAJOR per SemVer.',
+            ui_update_scope_title:'Perbarui hanya keterlibatan MAP tertentu',
+            ui_update_scope_desc:'Biarkan tidak dicentang untuk memperbarui setiap deployment MAP Auto-Tagger yang ditemukan skrip di akun ini (kedua stack dan stackset yang cocok dengan <code>map-auto-tagger-mig*</code>).',
+            ui_update_mpe_label:'MPE ID yang akan diperbarui',
+            ui_update_mpe_hint:'— setiap MPE harus cocok dengan MAP Auto-Tagger yang di-deploy di wilayah ini',
+            ui_update_add_mpe:'+ Tambahkan MPE lain',
+            err_update_mpe:'Masukkan setidaknya satu MPE ID 10 karakter yang valid',
+            ui_update_scope_review:'Cakupan pembaruan',
+            ui_update_all_review:'semua deployment MAP Auto-Tagger di akun ini',
+            ui_update_target_version:'Versi template target',
+            ui_update_confirm_text:'Saya mengonfirmasi bahwa deployment MAP Auto-Tagger yang tercantum ada di wilayah yang dipilih dan peningkatan ke versi template target sudah sesuai.',
+            ui_update_confirm_risk:'Peningkatan akan menggantikan kode Lambda, kebijakan IAM, dan aturan EventBridge di setiap stack yang cocok. Cakupan dan tanggal perjanjian dipertahankan melalui <code>--use-previous-parameters</code>, tetapi rollout yang gagal dapat membuat stack dalam keadaan UPDATE_ROLLBACK_COMPLETE yang memerlukan pemulihan manual.',
+            err_update_confirm:'Anda harus mengonfirmasi sebelum menghasilkan skrip pembaruan',
+            ui_update_step3_subtitle:'Jalankan di AWS CloudShell dari akun tempat deployment dibuat',
+            ui_version_history_title:'Riwayat versi — apa yang berubah?',
+            ui_version_released:'Dirilis',
+            ui_version_current:'Target saat ini',
+            ui_version_full_changelog:'Changelog lengkap di GitHub',
+            ui_version_tag_bugfix:'Perbaikan bug',
+            ui_version_tag_coverage:'Cakupan baru',
+            ui_version_tag_breaking:'Perubahan besar',
+            ui_version_tag_security:'Keamanan',
+            ui_version_tag_perf:'Performa',
+            ui_version_tag_other:'Lainnya',
             ui_editor_back:'← Kembali',
             ui_editor_review:'Tinjau →',
             ui_editor_review_title:'Tinjau Konfigurasi',
@@ -2983,6 +3918,38 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             ui_editor_remove_desc:'บัญชีที่เลือกจะหยุดถูกติด tag tag ที่มีอยู่จะไม่ถูกลบ Lambda ยังคง deploy อยู่แต่ไม่ active สำหรับบัญชีเหล่านี้',
             ui_editor_remove_accounts_label:'ID บัญชีที่จะลบ',
             ui_editor_remove_accounts_hint:'— เฉพาะบัญชีที่อยู่ในขอบเขตปัจจุบัน',
+            ui_mode_update_title:'อัปเดตเป็นเวอร์ชันเทมเพลตล่าสุด',
+            ui_mode_update_desc:'อัปเกรดโค้ด Lambda, นโยบาย IAM และกฎ EventBridge เป็นเวอร์ชันเทมเพลตปัจจุบัน การกำหนดค่าขอบเขต (บัญชี, VPC, วันที่ในข้อตกลง) จะถูกรักษาไว้ ตรวจจับการ deploy แบบบัญชีเดียวและหลายบัญชีโดยอัตโนมัติ',
+            ui_ustep1:'1. กำหนดค่า',
+            ui_ustep2:'2. ตรวจสอบ',
+            ui_ustep3:'3. ดาวน์โหลด',
+            ui_update_info:'เครื่องมือนี้อัปเกรด MAP Auto-Tagger ที่ deploy อยู่เป็นเวอร์ชันเทมเพลตล่าสุด สร้างสคริปต์ <code>update.sh</code> ที่รักษาการกำหนดค่าขอบเขตและตรวจจับการ deploy แบบบัญชีเดียวและหลายบัญชีโดยอัตโนมัติ',
+            ui_update_step1_title:'รายละเอียดการ deploy',
+            ui_update_step1_subtitle:'กรอก region และขอบเขต (ทางเลือก) สำหรับการอัปเกรด',
+            ui_update_info_detail:'สคริปต์ <code>update.sh</code> ที่สร้างขึ้นจะอ่านเวอร์ชันเทมเพลตปัจจุบันจาก SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>) เปรียบเทียบกับเวอร์ชันเป้าหมาย และปฏิเสธการอัปเกรดข้ามเมเจอร์ (เช่น v19 → v21) โดยไม่มี <code>--force</code> ตาม SemVer การดำเนินการของลูกค้าจำเป็นเฉพาะสำหรับการอัปเกรด MAJOR เท่านั้น',
+            ui_update_scope_title:'อัปเดตเฉพาะ MAP engagement ที่เลือก',
+            ui_update_scope_desc:'หากไม่เลือก จะอัปเดต MAP Auto-Tagger ทุกตัวที่สคริปต์พบในบัญชีนี้ (ทั้ง stack และ stackset ที่ตรงกับ <code>map-auto-tagger-mig*</code>)',
+            ui_update_mpe_label:'MPE ID ที่ต้องการอัปเดต',
+            ui_update_mpe_hint:'— แต่ละ MPE ต้องตรงกับ MAP Auto-Tagger ที่ deploy ใน region นี้',
+            ui_update_add_mpe:'+ เพิ่ม MPE อีก',
+            err_update_mpe:'กรุณากรอก MPE ID 10 ตัวอักษรที่ถูกต้องอย่างน้อยหนึ่งรายการ',
+            ui_update_scope_review:'ขอบเขตการอัปเดต',
+            ui_update_all_review:'MAP Auto-Tagger ทั้งหมดในบัญชีนี้',
+            ui_update_target_version:'เวอร์ชันเทมเพลตเป้าหมาย',
+            ui_update_confirm_text:'ฉันยืนยันว่า MAP Auto-Tagger ที่แสดงมีอยู่ใน region ที่เลือก และการอัปเกรดเป็นเวอร์ชันเทมเพลตเป้าหมายเป็นการดำเนินการที่ตั้งใจ',
+            ui_update_confirm_risk:'การอัปเกรดจะแทนที่โค้ด Lambda, นโยบาย IAM และกฎ EventBridge ในทุก stack ที่ตรงกัน ขอบเขตและวันที่ข้อตกลงจะถูกรักษาผ่าน <code>--use-previous-parameters</code> แต่การ rollout ที่ล้มเหลวอาจทำให้ stack อยู่ในสถานะ UPDATE_ROLLBACK_COMPLETE ซึ่งต้องกู้คืนด้วยตนเอง',
+            err_update_confirm:'คุณต้องยืนยันก่อนที่จะสร้างสคริปต์การอัปเดต',
+            ui_update_step3_subtitle:'รันใน AWS CloudShell จากบัญชีที่ deploy ไว้',
+            ui_version_history_title:'ประวัติเวอร์ชัน — มีอะไรเปลี่ยนแปลง?',
+            ui_version_released:'เผยแพร่',
+            ui_version_current:'เป้าหมายปัจจุบัน',
+            ui_version_full_changelog:'ดูบันทึกการเปลี่ยนแปลงทั้งหมดบน GitHub',
+            ui_version_tag_bugfix:'แก้ไขบั๊ก',
+            ui_version_tag_coverage:'ครอบคลุมใหม่',
+            ui_version_tag_breaking:'เปลี่ยนแปลงสำคัญ',
+            ui_version_tag_security:'ความปลอดภัย',
+            ui_version_tag_perf:'ประสิทธิภาพ',
+            ui_version_tag_other:'อื่น ๆ',
             ui_editor_back:'← กลับ',
             ui_editor_review:'ตรวจสอบ →',
             ui_editor_review_title:'ตรวจสอบการตั้งค่า',
@@ -3235,6 +4202,38 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             ui_editor_remove_desc:'Các tài khoản được chọn sẽ ngừng được gắn tag. Tag hiện có không bị xóa. Lambda vẫn được triển khai nhưng không hoạt động cho các tài khoản này.',
             ui_editor_remove_accounts_label:'ID tài khoản cần xóa',
             ui_editor_remove_accounts_hint:'— chỉ các tài khoản đang có trong phạm vi',
+            ui_mode_update_title:'Cập nhật lên phiên bản template mới nhất',
+            ui_mode_update_desc:'Nâng cấp mã Lambda, chính sách IAM và quy tắc EventBridge lên phiên bản template hiện tại. Cấu hình phạm vi (tài khoản, VPC, ngày thỏa thuận) được giữ nguyên. Tự động phát hiện triển khai đơn tài khoản và đa tài khoản.',
+            ui_ustep1:'1. Cấu hình',
+            ui_ustep2:'2. Xem lại',
+            ui_ustep3:'3. Tải xuống',
+            ui_update_info:'Công cụ này nâng cấp một triển khai MAP Auto-Tagger hiện có lên phiên bản template mới nhất. Tạo tập lệnh <code>update.sh</code> giữ nguyên cấu hình phạm vi và tự động phát hiện triển khai đơn tài khoản và đa tài khoản.',
+            ui_update_step1_title:'Chi tiết Triển khai',
+            ui_update_step1_subtitle:'Nhập region và phạm vi tùy chọn cho việc nâng cấp',
+            ui_update_info_detail:'Tập lệnh <code>update.sh</code> được tạo sẽ đọc phiên bản template hiện tại từ SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), so sánh với phiên bản mục tiêu và từ chối nâng cấp vượt phiên bản lớn (ví dụ v19 → v21) nếu không có <code>--force</code>. Theo SemVer, chỉ bản nâng cấp MAJOR mới yêu cầu thao tác của khách hàng.',
+            ui_update_scope_title:'Chỉ cập nhật MAP engagement cụ thể',
+            ui_update_scope_desc:'Bỏ chọn để cập nhật mọi triển khai MAP Auto-Tagger mà tập lệnh tìm thấy trong tài khoản này (cả stack và stackset khớp với <code>map-auto-tagger-mig*</code>).',
+            ui_update_mpe_label:'MPE ID cần cập nhật',
+            ui_update_mpe_hint:'— mỗi MPE phải khớp với một MAP Auto-Tagger đã triển khai trong region này',
+            ui_update_add_mpe:'+ Thêm MPE khác',
+            err_update_mpe:'Vui lòng nhập ít nhất một MPE ID 10 ký tự hợp lệ',
+            ui_update_scope_review:'Phạm vi cập nhật',
+            ui_update_all_review:'tất cả triển khai MAP Auto-Tagger trong tài khoản này',
+            ui_update_target_version:'Phiên bản template mục tiêu',
+            ui_update_confirm_text:'Tôi xác nhận rằng các triển khai MAP Auto-Tagger được liệt kê tồn tại trong region đã chọn và việc nâng cấp lên phiên bản template mục tiêu là chủ ý.',
+            ui_update_confirm_risk:'Nâng cấp sẽ thay thế mã Lambda, chính sách IAM và quy tắc EventBridge trong mọi stack khớp. Phạm vi và ngày thỏa thuận được giữ nguyên qua <code>--use-previous-parameters</code>, nhưng một rollout thất bại có thể khiến stack ở trạng thái UPDATE_ROLLBACK_COMPLETE và cần khôi phục thủ công.',
+            err_update_confirm:'Bạn phải xác nhận trước khi tạo tập lệnh cập nhật',
+            ui_update_step3_subtitle:'Chạy trong AWS CloudShell từ tài khoản nơi đã triển khai',
+            ui_version_history_title:'Lịch sử phiên bản — có gì thay đổi?',
+            ui_version_released:'Ngày phát hành',
+            ui_version_current:'Phiên bản mục tiêu hiện tại',
+            ui_version_full_changelog:'Nhật ký thay đổi đầy đủ trên GitHub',
+            ui_version_tag_bugfix:'Sửa lỗi',
+            ui_version_tag_coverage:'Phạm vi mới',
+            ui_version_tag_breaking:'Thay đổi lớn',
+            ui_version_tag_security:'Bảo mật',
+            ui_version_tag_perf:'Hiệu năng',
+            ui_version_tag_other:'Khác',
             ui_editor_back:'← Quay lại',
             ui_editor_review:'Xem lại →',
             ui_editor_review_title:'Xem lại Cấu hình',
@@ -3363,6 +4362,11 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
                 if (instrEl && instrEl.textContent) {
                     instrEl.textContent = generateInstructions(window._generated.config);
                 }
+            }
+            // Re-render version history with translated labels if visible
+            const vhHost = document.getElementById('update-versionHistoryContent');
+            if (vhHost && vhHost.innerHTML) {
+                vhHost.innerHTML = renderVersionHistory();
             }
         }
 
@@ -3745,7 +4749,7 @@ ${backfillEventNamesList}
               parts = arn.split(':')
               return parts[4] if len(parts) > 4 else None`;
 
-            const TEMPLATE_VERSION = 'v20.3.0';
+            // TEMPLATE_VERSION is the module-level constant declared near the top of this script.
             return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 AWSTemplateFormatVersion: '2010-09-09'
