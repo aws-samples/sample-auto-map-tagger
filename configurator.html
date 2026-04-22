@@ -3536,6 +3536,9 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'securityhub:TagResource','cassandra:Alter',
             'dax:TagResource','drs:TagResource',
             'kinesisvideo:TagStream',
+            // Tier 1 MAP services (PR #25): Keyspaces, Directory Service, CloudHSM v2.
+            // cassandra:TagResource already granted above under Database.
+            'ds:AddTagsToResource','cloudhsm:TagResource',
             // IAM role tagging (iam:TagRole not covered by tag:TagResources)
             'iam:TagRole'
         ];
@@ -3742,7 +3745,7 @@ ${backfillEventNamesList}
               parts = arn.split(':')
               return parts[4] if len(parts) > 4 else None`;
 
-            const TEMPLATE_VERSION = 'v20.2.0';
+            const TEMPLATE_VERSION = 'v20.3.0';
             return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 AWSTemplateFormatVersion: '2010-09-09'
@@ -4265,9 +4268,18 @@ ${crossAccountCode}
                       if tgs: arn = tgs[0].get('targetGroupArn')
                   elif event_name == 'CreateApplication' and 'kinesisanalytics' in detail.get('eventSource',''):
                       arn = (resp.get('applicationDetail') or {}).get('applicationARN')
-                  elif event_name == 'CreateKeyspace':
+                  elif event_name == 'CreateKeyspace' and detail.get('eventSource') == 'cassandra.amazonaws.com':
                       n = req.get('keyspaceName')
                       arn = f"arn:{p}:cassandra:{region}:{account_id}:/keyspace/{n}/" if n else None
+                  elif event_name in ('CreateDirectory', 'CreateMicrosoftAD') and detail.get('eventSource') == 'ds.amazonaws.com':
+                      dir_id = resp.get('directoryId')
+                      arn = f"arn:{p}:ds:{region}:{account_id}:directory/{dir_id}" if dir_id else None
+                  elif event_name == 'CreateCluster' and detail.get('eventSource') == 'cloudhsmv2.amazonaws.com':
+                      cluster_id = (resp.get('cluster') or {}).get('clusterId')
+                      arn = f"arn:{p}:cloudhsm:{region}:{account_id}:cluster/{cluster_id}" if cluster_id else None
+                  elif event_name == 'CreateHsm' and detail.get('eventSource') == 'cloudhsmv2.amazonaws.com':
+                      cluster_id = (resp.get('hsm') or {}).get('clusterId') or req.get('clusterId')
+                      arn = f"arn:{p}:cloudhsm:{region}:{account_id}:cluster/{cluster_id}" if cluster_id else None
                   elif event_name == 'EnableSecurityHub':
                       arn = f"arn:{p}:securityhub:{region}:{account_id}:hub/default"
                   elif event_name == 'CreateDatastore' and 'medical-imaging' in detail.get('eventSource',''):
@@ -4372,6 +4384,12 @@ ${crossAccountCode}
                       get_svc('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
                   elif ':cassandra:' in arn:
                       get_svc('keyspaces').tag_resource(resourceArn=arn, tags=[{'key': tag_key, 'value': tag_value}])
+                  elif ':cloudhsm:' in arn and ':cluster/' in arn:
+                      cluster_id = arn.split('cluster/')[-1]
+                      get_svc('cloudhsmv2').tag_resource(ResourceId=cluster_id, TagList=[{'Key': tag_key, 'Value': tag_value}])
+                  elif ':ds:' in arn and ':directory/' in arn:
+                      dir_id = arn.split('directory/')[-1]
+                      get_svc('ds').add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   elif ':vpc-lattice:' in arn:
                       get_svc('vpc-lattice').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
                   elif ':bedrock-agentcore:' in arn:

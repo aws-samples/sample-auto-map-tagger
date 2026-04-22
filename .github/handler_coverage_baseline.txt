@@ -11,8 +11,6 @@ UNCOVERED CreateAddon
 COVERED   CreateAgent|bedrock.amazonaws.com
 UNCOVERED CreateAgentActionGroup|bedrock.amazonaws.com
 UNCOVERED CreateAgentAlias|bedrock.amazonaws.com
-UNCOVERED CreateAlias
-UNCOVERED CreateAlias20150331
 UNCOVERED CreateApiKey
 COVERED   CreateApplication|codedeploy.amazonaws.com
 COVERED   CreateApplication|elasticbeanstalk.amazonaws.com
@@ -28,6 +26,7 @@ UNCOVERED CreateBuild|gamelift.amazonaws.com
 COVERED   CreateCacheCluster
 UNCOVERED CreateCarrierGateway
 UNCOVERED CreateCertificateAuthority
+COVERED   CreateCluster|cloudhsmv2.amazonaws.com
 COVERED   CreateCluster|dax.amazonaws.com
 COVERED   CreateCluster|eks.amazonaws.com
 COVERED   CreateCluster|memorydb.amazonaws.com
@@ -52,6 +51,7 @@ COVERED   CreateDeliveryStream
 COVERED   CreateDeploymentGroup|codedeploy.amazonaws.com
 COVERED   CreateDhcpOptions
 UNCOVERED CreateDirectConnectGateway|directconnect.amazonaws.com
+UNCOVERED CreateDirectory|ds.amazonaws.com
 UNCOVERED CreateDocument
 COVERED   CreateDocumentClassifier
 COVERED   CreateDomain|es.amazonaws.com
@@ -72,6 +72,7 @@ UNCOVERED CreateGateway|iotsitewise.amazonaws.com
 COVERED   CreateGraphqlApi|appsync.amazonaws.com
 COVERED   CreateHealthCheck
 COVERED   CreateHostedZone
+UNCOVERED CreateHsm|cloudhsmv2.amazonaws.com
 UNCOVERED CreateHttpNamespace
 COVERED   CreateIPSet|wafv2.amazonaws.com
 COVERED   CreateIdentityPool
@@ -81,12 +82,13 @@ COVERED   CreateInferenceProfile
 COVERED   CreateInternetGateway
 COVERED   CreateJob
 COVERED   CreateKeyPair
+UNCOVERED CreateKeyspace|cassandra.amazonaws.com
 COVERED   CreateLag|directconnect.amazonaws.com
 COVERED   CreateLaunchTemplate
-COVERED   CreateLoadBalancer
 COVERED   CreateLoadBalancer|elasticloadbalancing.amazonaws.com
 COVERED   CreateLogGroup
 UNCOVERED CreateMesh
+UNCOVERED CreateMicrosoftAD|ds.amazonaws.com
 UNCOVERED CreateNamespace
 COVERED   CreateNatGateway
 COVERED   CreateNetworkAcl
@@ -113,8 +115,10 @@ COVERED   CreateSecurityGroup
 COVERED   CreateServer|transfer.amazonaws.com
 COVERED   CreateServerlessCache|elasticache.amazonaws.com
 COVERED   CreateService|ecs.amazonaws.com
-COVERED   CreateSnapshot
+COVERED   CreateSnapshot|ec2.amazonaws.com
 COVERED   CreateSnapshot|elasticache.amazonaws.com
+COVERED   CreateSnapshot|fsx.amazonaws.com
+COVERED   CreateSnapshot|redshift-serverless.amazonaws.com
 UNCOVERED CreateSourceServer|drs.amazonaws.com
 COVERED   CreateStack
 UNCOVERED CreateStackSet
@@ -145,8 +149,6 @@ COVERED   CreateWorkGroup
 UNCOVERED CreateWorkflow
 COVERED   CreateWorkgroup
 UNCOVERED CreateWorkspaces
-UNCOVERED PublishLayerVersion
-UNCOVERED PublishLayerVersion20181031
 UNCOVERED PutDashboard
 COVERED   PutMetricAlarm
 COVERED   PutParameter
