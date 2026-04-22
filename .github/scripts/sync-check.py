@@ -154,11 +154,25 @@ if rce_config_match:
 # ── Check 6: Version parity (SemVer per VERSIONING.md) ───────────────────────
 # Version is SemVer: vMAJOR.MINOR.PATCH (e.g., v20.1.0). MAJOR bump = customer
 # must take action to upgrade. MINOR = new capability or behavior. PATCH = fix.
-# Every v20-prefixed reference in both files must match. Drift = customers get
-# mixed architecture.
+# Every v20-prefixed reference in both files must match — except historical
+# entries inside the VERSION_HISTORY array in configurator.html, which by
+# design list prior versions.
 VERSION_RE = r'v\d+\.\d+\.\d+'
 yaml_versions = set(re.findall(VERSION_RE, yaml))
-html_versions = set(re.findall(VERSION_RE, html))
+
+# Extract the VERSION_HISTORY JS array so we can (a) exclude its historical
+# versions from the drift check and (b) enforce that its newest entry matches
+# TEMPLATE_VERSION.
+vh_match = re.search(r'const\s+VERSION_HISTORY\s*=\s*\[([\s\S]+?)\n\s*\];', html)
+vh_versions: list[str] = []
+if vh_match:
+    vh_body = vh_match.group(1)
+    vh_versions = re.findall(rf"version:\s*'({VERSION_RE})'", vh_body)
+
+# HTML versions outside VERSION_HISTORY must match TEMPLATE_VERSION.
+html_excl_vh = html.replace(vh_match.group(0), '') if vh_match else html
+html_versions = set(re.findall(VERSION_RE, html_excl_vh))
+
 # The single source of truth: the TEMPLATE_VERSION constant in configurator.html.
 html_src_match = re.search(rf"TEMPLATE_VERSION\s*=\s*'({VERSION_RE})'", html)
 html_src = html_src_match.group(1) if html_src_match else None
@@ -171,13 +185,36 @@ else:
             f"VERSION: YAML has '{v}' but canonical is '{html_src}'. "
             f"Bump every reference together per VERSIONING.md."
         )
-    # All HTML version mentions must also match.
+    # All HTML version mentions (outside VERSION_HISTORY) must also match.
     for v in html_versions - {html_src}:
         fails.append(
             f"VERSION: configurator.html has '{v}' but TEMPLATE_VERSION is '{html_src}'."
         )
     if not yaml_versions:
         fails.append(f"VERSION: YAML has no vN.N.N reference (expected {html_src})")
+
+    # VERSION_HISTORY[0] must equal TEMPLATE_VERSION (the newest release shown
+    # to customers upgrading must be the version the configurator actually bakes).
+    if vh_versions:
+        if vh_versions[0] != html_src:
+            fails.append(
+                f"VERSION_HISTORY: newest entry is '{vh_versions[0]}' but TEMPLATE_VERSION is '{html_src}'. "
+                f"Add a VERSION_HISTORY entry for the new version (most recent first)."
+            )
+        # Enforce strictly descending order: customers reading the panel
+        # should see latest-first.
+        def _parse(v: str) -> tuple[int, int, int]:
+            parts = v.lstrip('v').split('.')
+            return (int(parts[0]), int(parts[1]), int(parts[2]))
+        for i in range(len(vh_versions) - 1):
+            if _parse(vh_versions[i]) <= _parse(vh_versions[i + 1]):
+                fails.append(
+                    f"VERSION_HISTORY: entries must be strictly descending. "
+                    f"'{vh_versions[i]}' is not newer than '{vh_versions[i + 1]}'."
+                )
+                break
+    else:
+        warns.append("VERSION_HISTORY: no entries found in configurator.html (customers will see an empty Version history panel).")
 
 # ── Report ────────────────────────────────────────────────────────────────────
 print()
