@@ -36,17 +36,17 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 
 ---
 
-## Day-2: Add or Remove Accounts
+## Day-2: Post-Deployment Operations
 
-1. Open `configurator.html` → **Editor** tab
-2. Enter MPE ID, choose add/remove, enter account IDs
-3. Click **Generate update.sh** → download and run:
+Open `configurator.html` → choose a mode card:
 
-```bash
-bash update.sh
-```
+| Mode | Output | When to use |
+|---|---|---|
+| ✏️ Edit existing deployment | `update.sh` | Add/remove accounts from scope. No CFN redeploy. |
+| 🔄 Update to latest template version | `upgrade.sh` | Upgrade to a new PATCH/MINOR version in place. Preserves scope, agreement dates. Refuses cross-MAJOR. |
+| 🗑️ Destroy existing deployment | `destroy.sh` | Remove a deployment cleanly. Required before MAJOR upgrades. Preserves `map-migrated` tags on resources. |
 
-No redeployment needed — updates the account scope across all existing stack instances.
+Download the generated script, upload to CloudShell from the deployment account, and run it. See [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) for full details.
 
 ---
 
@@ -66,7 +66,7 @@ bash deploy.sh
 
 | File | Description |
 |------|-------------|
-| `configurator.html` | Self-service UI. Generates `deploy.sh` for new deployments. Editor tab generates `update.sh` for day-2 account changes. |
+| `configurator.html` | Self-service UI. Four modes: Deploy (generates `deploy.sh`), Edit (generates `update.sh` for account-scope changes), Update (generates `upgrade.sh` for template-version upgrades), Destroy (generates `destroy.sh` for clean removal). |
 | `map2-auto-tagger-optimized.yaml` | CloudFormation template (140+ resource types, IAM hardened) |
 | `CHANGELOG.md` | Version history |
 
@@ -87,7 +87,7 @@ bash deploy.sh
 | Document | Description |
 |----------|-------------|
 | [OVERVIEW.md](docs/OVERVIEW.md) | How it works — architecture, deployment, auto-deployment, SSM scope, cost |
-| [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) | Deployment steps, day-2 operations (update.sh), monitoring, upgrade path, FAQ |
+| [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) | Deployment steps, day-2 operations (update.sh / upgrade.sh / destroy.sh), monitoring, upgrade path, FAQ |
 | [COVERAGE.md](docs/COVERAGE.md) | Supported services (140+ resource types) and E2E test coverage matrix |
 | [LIMITATIONS.md](docs/LIMITATIONS.md) | Hard constraints — management account, SCPs, latency, upgrade gotcha |
 | [MAP_TAGGING_GAP_ANALYSIS.md](docs/MAP_TAGGING_GAP_ANALYSIS.md) | What can't be tagged and why (AWS API limitations, customer-side config) |

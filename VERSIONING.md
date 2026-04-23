@@ -29,8 +29,20 @@ The version lives in exactly two places:
 ## Where customers see it
 
 - **CFN Output `TemplateVersion`** — surfaces in the CloudFormation console after deploy.
-- **SSM Parameter `/auto-map-tagger/${MpeId}/version`** — readable via `aws ssm get-parameter`. Used by `update.sh` (future) for version-guard checks.
+- **SSM Parameter `/auto-map-tagger/${MpeId}/version`** — readable via `aws ssm get-parameter`. Used by `upgrade.sh` for version-guard checks (SemVer comparison).
 - **CloudWatch Logs** — every Lambda cold start prints `auto-map-tagger vN.N.N cold start`.
+
+## Post-deployment tooling and the SemVer policy
+
+The configurator generates three post-deployment scripts. Each maps to a different transition:
+
+| Customer need | Script | What it does | Version behavior |
+|---|---|---|---|
+| Change account scope (add/remove accounts) | `update.sh` (Editor mode) | Rewrites SSM config + StackSet per-account template | Version-agnostic |
+| New template version available (PATCH/MINOR) | `upgrade.sh` (Update mode) | `update-stack[-set]` with `--use-previous-parameters` | Reads SSM version, refuses cross-MAJOR |
+| Engagement ended / failed deployment / preparing for MAJOR | `destroy.sh` (Destroy mode) | `delete-stack[-set]`, preserves tags | Version-agnostic |
+
+**MAJOR upgrades cannot be handled by `upgrade.sh`.** Resource names change at MAJOR boundaries (e.g. v18 → v19 added MPE-ID namespacing), and CloudFormation's `update-stack` cannot bridge those renames safely. Customers run `destroy.sh` → regenerate `deploy.sh` → `bash deploy.sh` instead.
 
 ## Release tagging
 
@@ -48,4 +60,3 @@ Customers who "Watch → Releases only" on the GitHub repository get an email wh
 
 - Lambda runtime does **not** branch on version. The version string is metadata for humans and external tooling only.
 - Per-resource versioning (Lambda versions, Lambda Layers, etc.) is never used.
-- Cross-version compatibility checks in `update.sh` are out of scope for this policy document — see `update.sh` documentation when that PR lands.

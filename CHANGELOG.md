@@ -6,6 +6,44 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.4.0 — upgrade.sh + destroy.sh configurator modes
+
+Two new self-service flows in `configurator.html` for post-deployment lifecycle operations. Both are in-place, scope-preserving where applicable, and ship as self-contained shell scripts (no outbound calls from the customer's environment).
+
+**New: Update mode → `upgrade.sh`**
+
+- Upgrades an existing deployment to the current template version without redeploying.
+- Uses `aws cloudformation update-stack` / `update-stack-set` with `--use-previous-parameters` — scope, agreement dates, VPC config all preserved.
+- Reads `/auto-map-tagger/<mpe>/version` from SSM and compares to target (SemVer).
+  - **PATCH / MINOR** → applied in place, parallel rollout for StackSets.
+  - **Cross-MAJOR** → refused with explicit delete+redeploy guidance. `--force` no longer overrides this (MAJOR bumps require customer action per versioning policy).
+  - **Downgrade** → refused unless `--force`.
+- Auto-detects single-account stacks and multi-account StackSets matching `map-auto-tagger-mig*`.
+- Detects backfill Lambda presence in the existing stack and picks the matching baked template variant.
+- Legacy (pre-v19) unnamespaced `map-auto-tagger` stacks cannot be upgraded in place — script detects and emits explicit migration steps.
+
+**New: Destroy mode → `destroy.sh`**
+
+- Clean removal of a MAP Auto-Tagger deployment. Use before MAJOR upgrades, when an engagement ends, or to recover from a failed deployment.
+- Auto-detects Stack vs StackSet. StackSet path: `delete-stack-instances` (parallel, 100% tolerance) → wait → `delete-stack-set`.
+- Typed MPE-ID confirmation required in the configurator UI (not a checkbox) — customer must type the full `mig...` ID.
+- Three opt-in destructive actions (all default-off):
+  - Delete S3 staging bucket (guarded — verifies no other MPE deployments share the bucket before deleting).
+  - Delete CloudWatch Log Groups (default: retain for audit history).
+  - Remove legacy pre-namespacing `map-auto-tagger` stack.
+- **Never** deletes the `map-migrated` tags on already-tagged AWS resources — MAP credits remain intact.
+- **Never** touches `AWSCloudFormationStackSetAdministrationRole` or `ExecutionRole` — shared org scaffolding.
+- Idempotent: missing resources reported as skipped, not failed.
+
+**Changed**
+
+- Update-mode output filename renamed from `update-<mpe>.sh` → `upgrade-<mpe>.sh` to eliminate collision with Editor-mode `update-<mpe>.sh` (account-scope changes).
+- Scoped window globals: Editor tab uses `_editorScript` / `_editorMpe`; Upgrade tab uses new `_upgradeScript` / `_upgradeMpe`; Destroy tab uses new `_destroyScript` / `_destroyMpe`. Prevents cross-tab data contamination.
+- `upgrade.sh` emits targeted guidance when a bare legacy `map-auto-tagger` stack is detected with no namespaced siblings.
+- i18n: new keys added across all 7 locales for Upgrade-mode and Destroy-mode UI.
+
+---
+
 ### v20.3.0 — Tier 1 MAP service handlers (#25)
 
 - Added auto-tagging for services on the MAP 2.0 Included Services List that previously had no handler — customers in affected verticals were silently losing credits:

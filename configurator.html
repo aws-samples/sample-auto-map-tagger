@@ -1130,8 +1130,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.3.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.3.0';
+        // Must match `TEMPLATE_VERSION = 'v20.4.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.4.0';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1139,6 +1139,15 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.4.0',
+                date: '2026-04-23',
+                changes: [
+                    { tag: 'other',    text: 'New configurator mode: Update to latest template version → generates upgrade.sh for in-place version upgrades via update-stack[-set] with --use-previous-parameters. SemVer guard refuses cross-MAJOR.' },
+                    { tag: 'other',    text: 'New configurator mode: Destroy existing deployment → generates destroy.sh for clean Stack/StackSet removal. Typed MPE-ID confirmation. Opt-in flags for S3 bucket, log groups, and legacy pre-namespacing stack. Preserves map-migrated tags on resources and StackSet admin IAM roles.' },
+                    { tag: 'breaking', text: 'Update-mode output filename changed from update-<mpe>.sh → upgrade-<mpe>.sh to eliminate collision with Editor-mode update.sh.' },
+                ],
+            },
             {
                 version: 'v20.3.0',
                 date: '2026-04-22',

@@ -161,7 +161,15 @@ Typically 60–90 seconds from resource creation to tagged. Up to 15 minutes dur
 
 ### Day-2 operations
 
-Use the **Editor** tab in `configurator.html` to add or remove accounts from scope without redeploying. It generates an `update.sh` script.
+`configurator.html` provides three post-deployment flows as additional mode cards:
+
+| Need | Mode | Output | What it does |
+|---|---|---|---|
+| Add/remove accounts from scope | Edit existing deployment | `update.sh` | Rewrites SSM config + StackSet per-account template. No CFN redeploy. |
+| Upgrade to latest template version (PATCH/MINOR) | Update to latest template version | `upgrade.sh` | In-place `update-stack[-set]` with `--use-previous-parameters`. SemVer guard refuses cross-MAJOR. |
+| Remove a deployment cleanly | Destroy existing deployment | `destroy.sh` | Auto-detects Stack vs StackSet, deletes. Preserves `map-migrated` tags on AWS resources. Typed-confirm required. |
+
+All three are self-contained shell scripts — no outbound calls from the customer's environment. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for details.
 
 ---
 
@@ -223,6 +231,8 @@ Account 333333333333 — resource created
 |------|-------------|
 | `deploy.sh` | Creates StackSet + stack instances. Sets initial SSM parameter. Deploys Lambda to all accounts. |
 | `update.sh` | Updates the SSM parameter (adds/removes accounts from scope). Does not deploy or remove Lambdas. |
+| `upgrade.sh` | Upgrades an existing deployment to the current template version via `update-stack[-set] --use-previous-parameters`. Preserves scope, agreement dates, VPC config. Refuses cross-MAJOR. |
+| `destroy.sh` | Auto-detects Stack vs StackSet and deletes cleanly. Preserves `map-migrated` tags on resources. Opt-in flags for bucket/log/legacy-stack cleanup. |
 | Auto-deployment | CloudFormation deploys the stack when a new account joins the org. Lambda defers to SSM for behavior. |
 
 A Lambda in an out-of-scope account has negligible cost — it fires, reads SSM, determines the account is out of scope, and returns in ~100ms.

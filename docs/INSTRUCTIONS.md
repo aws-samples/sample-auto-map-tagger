@@ -199,7 +199,79 @@ aws ssm put-parameter \
 
 ---
 
+## Upgrade the Template Version (upgrade.sh)
+
+When a new template version is released, upgrade an existing deployment in place without redeploying. Scope, agreement dates, and VPC config are preserved.
+
+### Generate upgrade.sh
+
+1. Open `configurator.html` → **Update to latest template version** card
+2. Select the deployment region
+3. Optionally restrict to specific MPE IDs (default: upgrade every `map-auto-tagger-mig*` deployment found in the account)
+4. Click **Generate upgrade.sh** → downloads `upgrade-<mpe>.sh` (or `upgrade-all.sh`)
+
+### Run upgrade.sh
+
+```bash
+# CloudShell (recommended) or local AWS CLI — from the deployment account:
+bash upgrade.sh
+```
+
+The script:
+- Enumerates matching Stacks and StackSets
+- Reads each deployment's `/auto-map-tagger/<mpe>/version` SSM parameter
+- Compares against the target (SemVer): PATCH/MINOR proceed in place; cross-MAJOR and downgrade are refused
+- Detects backfill Lambda presence and picks the matching template variant
+- Applies `update-stack` / `update-stack-set` with `--use-previous-parameters`
+- For StackSets: parallel rollout (100% concurrency, PARALLEL region mode)
+
+> `upgrade.sh` refuses cross-MAJOR upgrades. For MAJOR bumps, use `destroy.sh` → regenerate `deploy.sh` → redeploy. See [Upgrading Across a MAJOR Version Boundary](#upgrading-across-a-major-version-boundary).
+
+> Use `--force` only to intentionally downgrade (not recommended). Cross-MAJOR cannot be forced.
+
+---
+
+## Destroy a Deployment (destroy.sh)
+
+Use this when a MAP engagement ends, you need to recover from a failed deployment, or you're preparing for a MAJOR upgrade.
+
+### Generate destroy.sh
+
+1. Open `configurator.html` → **Destroy existing deployment** card
+2. Enter the MPE ID and region
+3. Optionally enable opt-in destructive actions (all default-off):
+   - **Delete S3 staging bucket** — only safe if no other MPE deployments share it (script verifies)
+   - **Delete CloudWatch Log Groups** — removes audit history
+   - **Also remove legacy pre-namespacing stack** — for the v18→v19 migration case
+4. Click **Review** → type the full MPE ID (including `mig` prefix) to confirm
+5. Click **Generate destroy.sh** → downloads `destroy-<mpe>.sh`
+
+### Run destroy.sh
+
+```bash
+# CloudShell (recommended) or local AWS CLI — from the deployment account:
+bash destroy.sh
+```
+
+The script:
+- Auto-detects whether `map-auto-tagger-<mpe>` is a Stack or StackSet
+- StackSet path: deletes stack instances in parallel (100% tolerance), then the StackSet
+- Stack path: `delete-stack` + wait for completion
+- Idempotent — missing resources are reported as skipped, safe to re-run
+
+### What destroy.sh does NOT delete
+
+- **`map-migrated` tags on already-tagged AWS resources** — tags are preserved so MAP credits remain intact.
+- **`AWSCloudFormationStackSetAdministrationRole` / `ExecutionRole`** — shared org scaffolding used by every StackSet in the organization. Never touch these.
+- **CloudWatch Log Groups** unless you opt in. Audit history is retained by default.
+
+---
+
 ## Remove the Auto-Tagger
+
+Prefer `destroy.sh` above — it handles single-account, multi-account, optional bucket/log cleanup, and guards against breaking sibling MPE deployments.
+
+For a manual minimal delete:
 
 **Single account:**
 
@@ -241,16 +313,20 @@ Yes — all resources are namespaced by MPE ID. Deploy separate stacks for each 
 
 ## Upgrading from a Previous Version
 
-Prior versions used fixed resource names (`map-auto-tagger`, `/auto-map-tagger/config`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`, `/auto-map-tagger/mig111/config`).
+For **PATCH and MINOR upgrades** (e.g. v20.3.0 → v20.4.0), use `upgrade.sh` — in place, no tagging gap, scope preserved. See [Upgrade the Template Version (upgrade.sh)](#upgrade-the-template-version-upgradesh).
 
-Running `deploy.sh` on an existing deployment will deploy a **second stack** alongside the old one. Delete the old stack first:
+For **MAJOR upgrades** (e.g. v18 → v19, or any future cross-MAJOR jump), resource names change and CloudFormation cannot bridge the rename. You must delete the old deployment first. `upgrade.sh` detects this and refuses with explicit guidance.
+
+**From a pre-v19 unnamespaced stack (`map-auto-tagger`):**
 
 ```bash
 aws cloudformation delete-stack --stack-name map-auto-tagger
 aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger
 ```
 
-Then run the new `deploy.sh`. There will be a ~5 minute gap. Enable backfill to catch resources created during the window.
+Then regenerate `deploy.sh` from the current configurator and run it. There will be a ~5–15 minute gap between delete and the new Lambda coming online — enable backfill in the new `deploy.sh` to catch resources created during the window.
+
+For **any** MAJOR upgrade, `destroy.sh` from the Destroy mode handles the delete step with better safety (typed confirmation, sibling-MPE bucket guard, idempotency). Run `destroy.sh` → regenerate `deploy.sh` → `bash deploy.sh`.
 
 ---
 

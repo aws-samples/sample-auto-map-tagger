@@ -34,8 +34,16 @@ Tags are always applied eventually — this is a latency variance, not a reliabi
 
 ---
 
-## Upgrading from a Previous Version
+## Upgrading Across a MAJOR Version Boundary
 
-Prior versions used fixed resource names (`map-auto-tagger`, `/auto-map-tagger/config`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`, `/auto-map-tagger/mig111/config`). CloudFormation treats these as entirely new resources — running `deploy.sh` on an existing deployment will deploy a **second stack alongside the old one**, with both Lambdas running simultaneously.
+MAJOR version bumps change resource names (for example, the v18 → v19 jump introduced MPE-ID namespacing — `map-auto-tagger` became `map-auto-tagger-mig<id>`). CloudFormation's `update-stack` cannot bridge those renames safely, so `upgrade.sh` refuses cross-MAJOR transitions.
 
-You must delete the old stack before deploying the new version. See [INSTRUCTIONS.md](INSTRUCTIONS.md#upgrading-from-a-previous-version) for steps.
+For MAJOR upgrades the customer must:
+
+1. Run `destroy.sh` (generated from the Destroy mode in `configurator.html`), **or** manually `aws cloudformation delete-stack[-set]` the old deployment.
+2. Regenerate `deploy.sh` from the current configurator.
+3. Run `bash deploy.sh`.
+
+There is a ~5–15 minute gap between destroy completion and the new Lambda coming online. Enable backfill in the fresh `deploy.sh` to retroactively tag resources created during the window.
+
+PATCH and MINOR upgrades are handled in place by `upgrade.sh` with no tagging gap — scope, agreement dates, and VPC config are preserved via `--use-previous-parameters`. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for both paths.
