@@ -6,7 +6,28 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
-### v20.4.0 — upgrade.sh + destroy.sh configurator modes
+### v20.4.1 — Delete mode UX refinements
+
+Follow-up to v20.4.0 based on review feedback. User-facing changes to the Delete mode (formerly "Destroy"); no behavioral changes to the other three modes.
+
+**Changed**
+
+- Renamed "Destroy" mode to "Delete" across the UI and generated artifacts. Filename `destroy.sh` → `delete.sh`. Function/variable/i18n-key names follow (`_destroy*` → `_delete*`, `ui_destroy_*` → `ui_delete_*`, etc.).
+- Mode card title "Update to latest template version" → "Upgrade to the latest template version" for consistency with the generated `upgrade.sh`.
+- **Default scope is now delete-all.** Previously required entering a specific MPE ID. The new UI follows the Upgrade tab pattern: unchecked = delete every `map-auto-tagger-mig*` stack and stackset in the region; check "Limit to specific MAP engagement(s)" to scope.
+- **S3 staging bucket deletion is automatic.** No more opt-in checkbox. The script deletes the bucket only when no MAP Auto-Tagger deployments remain in the account (same sibling-MPE guard as before, moved from UI to script logic).
+- **Legacy pre-v19 stack opt-in removed.** Rare one-time case that mostly confuses customers. `upgrade.sh`'s existing legacy-stack-detection message already points customers at the manual delete path when it's actually needed.
+- **Typed confirmation changed from MPE ID to the word `delete`.** Works whether the customer is deleting all deployments or a subset. Still blocks click-through.
+
+**Not changed**
+
+- CloudWatch Log Groups opt-in checkbox retained — log retention is a real customer preference either way.
+- Script still preserves: `map-migrated` tags on AWS resources, StackSet admin/execution IAM roles.
+- Script still idempotent and safe to re-run.
+
+---
+
+### v20.4.0 — upgrade.sh + delete.sh configurator modes
 
 Two new self-service flows in `configurator.html` for post-deployment lifecycle operations. Both are in-place, scope-preserving where applicable, and ship as self-contained shell scripts (no outbound calls from the customer's environment).
 
@@ -22,7 +43,7 @@ Two new self-service flows in `configurator.html` for post-deployment lifecycle 
 - Detects backfill Lambda presence in the existing stack and picks the matching baked template variant.
 - Legacy (pre-v19) unnamespaced `map-auto-tagger` stacks cannot be upgraded in place — script detects and emits explicit migration steps.
 
-**New: Destroy mode → `destroy.sh`**
+**New: Delete mode → `delete.sh`**
 
 - Clean removal of a MAP Auto-Tagger deployment. Use before MAJOR upgrades, when an engagement ends, or to recover from a failed deployment.
 - Auto-detects Stack vs StackSet. StackSet path: `delete-stack-instances` (parallel, 100% tolerance) → wait → `delete-stack-set`.
@@ -38,9 +59,9 @@ Two new self-service flows in `configurator.html` for post-deployment lifecycle 
 **Changed**
 
 - Update-mode output filename renamed from `update-<mpe>.sh` → `upgrade-<mpe>.sh` to eliminate collision with Editor-mode `update-<mpe>.sh` (account-scope changes).
-- Scoped window globals: Editor tab uses `_editorScript` / `_editorMpe`; Upgrade tab uses new `_upgradeScript` / `_upgradeMpe`; Destroy tab uses new `_destroyScript` / `_destroyMpe`. Prevents cross-tab data contamination.
+- Scoped window globals: Editor tab uses `_editorScript` / `_editorMpe`; Upgrade tab uses new `_upgradeScript` / `_upgradeMpe`; Delete tab uses new `_deleteScript` / `_deleteMpe`. Prevents cross-tab data contamination.
 - `upgrade.sh` emits targeted guidance when a bare legacy `map-auto-tagger` stack is detected with no namespaced siblings.
-- i18n: new keys added across all 7 locales for Upgrade-mode and Destroy-mode UI.
+- i18n: new keys added across all 7 locales for Upgrade-mode and Delete-mode UI.
 
 ---
 

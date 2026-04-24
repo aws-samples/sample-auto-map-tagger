@@ -166,8 +166,8 @@ Typically 60–90 seconds from resource creation to tagged. Up to 15 minutes dur
 | Need | Mode | Output | What it does |
 |---|---|---|---|
 | Add/remove accounts from scope | Edit existing deployment | `update.sh` | Rewrites SSM config + StackSet per-account template. No CFN redeploy. |
-| Upgrade to latest template version (PATCH/MINOR) | Update to latest template version | `upgrade.sh` | In-place `update-stack[-set]` with `--use-previous-parameters`. SemVer guard refuses cross-MAJOR. |
-| Remove a deployment cleanly | Destroy existing deployment | `destroy.sh` | Auto-detects Stack vs StackSet, deletes. Preserves `map-migrated` tags on AWS resources. Typed-confirm required. |
+| Upgrade to latest template version (PATCH/MINOR) | Upgrade to the latest template version | `upgrade.sh` | In-place `update-stack[-set]` with `--use-previous-parameters`. SemVer guard refuses cross-MAJOR. |
+| Remove a deployment cleanly | Delete existing deployment | `delete.sh` | Deletes all or scoped MPE deployments in a region. Auto-handles S3 staging bucket. Preserves `map-migrated` tags. Requires typing `delete` to confirm. |
 
 All three are self-contained shell scripts — no outbound calls from the customer's environment. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for details.
 
@@ -232,7 +232,7 @@ Account 333333333333 — resource created
 | `deploy.sh` | Creates StackSet + stack instances. Sets initial SSM parameter. Deploys Lambda to all accounts. |
 | `update.sh` | Updates the SSM parameter (adds/removes accounts from scope). Does not deploy or remove Lambdas. |
 | `upgrade.sh` | Upgrades an existing deployment to the current template version via `update-stack[-set] --use-previous-parameters`. Preserves scope, agreement dates, VPC config. Refuses cross-MAJOR. |
-| `destroy.sh` | Auto-detects Stack vs StackSet and deletes cleanly. Preserves `map-migrated` tags on resources. Opt-in flags for bucket/log/legacy-stack cleanup. |
+| `delete.sh` | Deletes all or specified `map-auto-tagger-mig*` Stacks/StackSets. Auto-handles S3 staging bucket (only when no deployments remain). Preserves `map-migrated` tags on resources. |
 | Auto-deployment | CloudFormation deploys the stack when a new account joins the org. Lambda defers to SSM for behavior. |
 
 A Lambda in an out-of-scope account has negligible cost — it fires, reads SSM, determines the account is out of scope, and returns in ~100ms.

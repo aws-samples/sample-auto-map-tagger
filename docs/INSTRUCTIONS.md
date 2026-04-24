@@ -205,7 +205,7 @@ When a new template version is released, upgrade an existing deployment in place
 
 ### Generate upgrade.sh
 
-1. Open `configurator.html` → **Update to latest template version** card
+1. Open `configurator.html` → **Upgrade to the latest template version** card
 2. Select the deployment region
 3. Optionally restrict to specific MPE IDs (default: upgrade every `map-auto-tagger-mig*` deployment found in the account)
 4. Click **Generate upgrade.sh** → downloads `upgrade-<mpe>.sh` (or `upgrade-all.sh`)
@@ -225,41 +225,42 @@ The script:
 - Applies `update-stack` / `update-stack-set` with `--use-previous-parameters`
 - For StackSets: parallel rollout (100% concurrency, PARALLEL region mode)
 
-> `upgrade.sh` refuses cross-MAJOR upgrades. For MAJOR bumps, use `destroy.sh` → regenerate `deploy.sh` → redeploy. See [Upgrading Across a MAJOR Version Boundary](#upgrading-across-a-major-version-boundary).
+> `upgrade.sh` refuses cross-MAJOR upgrades. For MAJOR bumps, use `delete.sh` → regenerate `deploy.sh` → redeploy. See [Upgrading Across a MAJOR Version Boundary](#upgrading-across-a-major-version-boundary).
 
 > Use `--force` only to intentionally downgrade (not recommended). Cross-MAJOR cannot be forced.
 
 ---
 
-## Destroy a Deployment (destroy.sh)
+## Delete a Deployment (delete.sh)
 
 Use this when a MAP engagement ends, you need to recover from a failed deployment, or you're preparing for a MAJOR upgrade.
 
-### Generate destroy.sh
+### Generate delete.sh
 
-1. Open `configurator.html` → **Destroy existing deployment** card
-2. Enter the MPE ID and region
-3. Optionally enable opt-in destructive actions (all default-off):
-   - **Delete S3 staging bucket** — only safe if no other MPE deployments share it (script verifies)
-   - **Delete CloudWatch Log Groups** — removes audit history
-   - **Also remove legacy pre-namespacing stack** — for the v18→v19 migration case
-4. Click **Review** → type the full MPE ID (including `mig` prefix) to confirm
-5. Click **Generate destroy.sh** → downloads `destroy-<mpe>.sh`
+1. Open `configurator.html` → **Delete existing deployment** card
+2. Select the region
+3. By default, the script deletes **every** `map-auto-tagger-mig*` stack and stackset found in the region. To limit to specific MPE(s):
+   - Check **Limit to specific MAP engagement(s)**
+   - Enter one or more 10-character MPE IDs
+4. Optionally check **Delete CloudWatch Log Groups** (default: retain for audit history)
+5. Click **Review** → type the word `delete` to confirm
+6. Click **Generate delete.sh** → downloads `delete-<mpe>.sh` (or `delete-all.sh` when unscoped)
 
-### Run destroy.sh
+### Run delete.sh
 
 ```bash
 # CloudShell (recommended) or local AWS CLI — from the deployment account:
-bash destroy.sh
+bash delete.sh
 ```
 
 The script:
-- Auto-detects whether `map-auto-tagger-<mpe>` is a Stack or StackSet
-- StackSet path: deletes stack instances in parallel (100% tolerance), then the StackSet
-- Stack path: `delete-stack` + wait for completion
+- Enumerates target deployments (all, or just the specified MPE IDs)
+- For StackSets: deletes stack instances in parallel (100% tolerance), then the StackSet
+- For Stacks: `delete-stack` + wait for completion
+- Automatically deletes the S3 staging bucket **only when no MAP Auto-Tagger deployments remain** in the account (prevents breaking sibling MPE deployments)
 - Idempotent — missing resources are reported as skipped, safe to re-run
 
-### What destroy.sh does NOT delete
+### What delete.sh does NOT delete
 
 - **`map-migrated` tags on already-tagged AWS resources** — tags are preserved so MAP credits remain intact.
 - **`AWSCloudFormationStackSetAdministrationRole` / `ExecutionRole`** — shared org scaffolding used by every StackSet in the organization. Never touch these.
@@ -269,7 +270,7 @@ The script:
 
 ## Remove the Auto-Tagger
 
-Prefer `destroy.sh` above — it handles single-account, multi-account, optional bucket/log cleanup, and guards against breaking sibling MPE deployments.
+Prefer `delete.sh` above — it handles single-account, multi-account, optional bucket/log cleanup, and guards against breaking sibling MPE deployments.
 
 For a manual minimal delete:
 
@@ -326,7 +327,7 @@ aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger
 
 Then regenerate `deploy.sh` from the current configurator and run it. There will be a ~5–15 minute gap between delete and the new Lambda coming online — enable backfill in the new `deploy.sh` to catch resources created during the window.
 
-For **any** MAJOR upgrade, `destroy.sh` from the Destroy mode handles the delete step with better safety (typed confirmation, sibling-MPE bucket guard, idempotency). Run `destroy.sh` → regenerate `deploy.sh` → `bash deploy.sh`.
+For **any** MAJOR upgrade, `delete.sh` from the Delete mode handles the delete step with better safety (typed confirmation, sibling-MPE bucket guard, idempotency). Run `delete.sh` → regenerate `deploy.sh` → `bash deploy.sh`.
 
 ---
 

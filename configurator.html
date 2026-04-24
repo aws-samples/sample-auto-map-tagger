@@ -245,16 +245,16 @@
                 <div class="mode-card" onclick="selectMode('update')">
                     <div class="mode-icon">🔄</div>
                     <div class="mode-body">
-                        <h3 data-i18n="ui_mode_update_title">Update to latest template version</h3>
+                        <h3 data-i18n="ui_mode_update_title">Upgrade to the latest template version</h3>
                         <p data-i18n="ui_mode_update_desc">Upgrade Lambda code, IAM policy, and EventBridge rules to the current template version. Scope configuration (accounts, VPCs, agreement date) is preserved. Auto-detects single-account and multi-account deployments.</p>
                     </div>
                 </div>
 
-                <div class="mode-card" onclick="selectMode('destroy')">
+                <div class="mode-card" onclick="selectMode('delete')">
                     <div class="mode-icon">🗑️</div>
                     <div class="mode-body">
-                        <h3 data-i18n="ui_mode_destroy_title">Destroy existing deployment</h3>
-                        <p data-i18n="ui_mode_destroy_desc">Remove a MAP Auto-Tagger deployment cleanly. Use before MAJOR upgrades, when an engagement ends, or to recover from a failed deployment. Does not remove <code>map-migrated</code> tags from already-tagged resources.</p>
+                        <h3 data-i18n="ui_mode_delete_title">Delete existing deployment</h3>
+                        <p data-i18n="ui_mode_delete_desc">Remove MAP Auto-Tagger deployments from the account. By default deletes every <code>map-auto-tagger-mig*</code> stack and stackset in the region; optionally scope to specific MPE(s). The <code>map-migrated</code> tag is not removed from already-tagged resources.</p>
                     </div>
                 </div>
             </div>
@@ -981,8 +981,8 @@
 
         </div>
 
-        <!-- Destroy flow — hidden until mode selected -->
-        <div id="destroy-flow" class="hidden">
+        <!-- Delete flow — hidden until mode selected -->
+        <div id="delete-flow" class="hidden">
 
             <div class="step-indicator" style="margin-top:8px;">
                 <div class="step active" id="dstep1-indicator" data-i18n="ui_dstep1">1. Configure</div>
@@ -995,26 +995,17 @@
             </div>
 
             <div class="info-box">
-                <span data-i18n="ui_destroy_info">This tool removes a MAP Auto-Tagger deployment from your account or organization. It generates a <code>destroy.sh</code> script that auto-detects single-account stacks and multi-account StackSets. The <code>map-migrated</code> tag is <strong>not</strong> removed from already-tagged resources — those tags remain so MAP credits stay intact.</span>
+                <span data-i18n="ui_delete_info">This tool removes MAP Auto-Tagger deployments from your account. It generates a <code>delete.sh</code> script that auto-detects single-account stacks and multi-account StackSets. By default, every <code>map-auto-tagger-mig*</code> deployment in the selected region is removed. The <code>map-migrated</code> tag is <strong>not</strong> removed from already-tagged resources — those tags remain so MAP credits stay intact.</span>
             </div>
 
             <div id="dstep1">
                 <div class="card">
-                    <h2 data-i18n="ui_destroy_step1_title">Deployment Details</h2>
-                    <p class="subtitle" data-i18n="ui_destroy_step1_subtitle">Identify the deployment to remove</p>
+                    <h2 data-i18n="ui_delete_step1_title">Deployment Details</h2>
+                    <p class="subtitle" data-i18n="ui_delete_step1_subtitle">Select the region to delete from</p>
 
                     <div class="form-group">
-                        <label><span data-i18n="ui_destroy_mpe_label">MPE ID</span> <span class="hint" data-i18n="ui_destroy_mpe_hint">— the engagement to remove</span></label>
-                        <div style="display:flex;align-items:center;gap:0;">
-                            <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
-                            <input type="text" id="destroy-mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
-                        </div>
-                        <div class="error-msg" id="destroy-mpe-error" data-i18n="err_destroy_mpe">Enter a valid 10-character MPE ID</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label><span data-i18n="ui_destroy_region">Deployment Region</span></label>
-                        <select id="destroy-region">
+                        <label><span data-i18n="ui_editor_region">Deployment Region</span></label>
+                        <select id="delete-region">
                             <option value="" disabled selected data-i18n="ui_editor_region_placeholder">Select a region...</option>
                             <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
                             <option value="us-east-2">US East (Ohio) — us-east-2</option>
@@ -1051,75 +1042,95 @@
                             <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
                             <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
                         </select>
-                        <div class="error-msg" id="destroy-region-error" data-i18n="err_editor_region">Please select a deployment region</div>
+                        <div class="error-msg" id="delete-region-error" data-i18n="err_editor_region">Please select a deployment region</div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:4px;margin-top:16px;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="delete-scopeToMpe" onchange="deleteToggleScope()" style="margin-top:3px;flex-shrink:0;">
+                            <div>
+                                <strong data-i18n="ui_delete_scope_title">Limit to specific MAP engagement(s)</strong>
+                                <p class="hint" style="margin-top:4px;" data-i18n="ui_delete_scope_desc">Leave unchecked to delete every MAP Auto-Tagger deployment found in this region (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div id="delete-mpeSection" class="hidden" style="margin-top:16px;">
+                        <div class="form-group">
+                            <label><span data-i18n="ui_delete_mpe_label">MPE IDs to delete</span> <span class="hint" data-i18n="ui_delete_mpe_hint">— each must match a deployed MAP Auto-Tagger in this region</span></label>
+                            <div id="delete-mpeList">
+                                <div class="entry-row" style="display:flex;align-items:center;gap:8px;">
+                                    <div style="display:flex;align-items:center;gap:0;flex:1;">
+                                        <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                                        <input type="text" class="delete-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                                    </div>
+                                    <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="deleteAddMpe()" data-i18n="ui_delete_add_mpe">+ Add another MPE</button>
+                            <div class="error-msg" id="delete-mpe-error" data-i18n="err_delete_mpe">Please enter at least one valid 10-character MPE ID</div>
+                        </div>
                     </div>
 
                     <div class="info-box" style="background:#fff8e1;border-left:4px solid #f9a825;font-size:13px;margin-top:16px;">
-                        <strong data-i18n="ui_destroy_optin_title">Optional destructive actions (opt-in)</strong>
-                        <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
+                        <strong data-i18n="ui_delete_optin_title">Optional — CloudWatch Log Groups</strong>
+                        <div style="margin-top:8px;">
                             <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-                                <input type="checkbox" id="destroy-deleteBucket" style="margin-top:3px;flex-shrink:0;">
-                                <span><strong data-i18n="ui_destroy_optin_bucket">Delete S3 staging bucket</strong> <span class="hint" data-i18n="ui_destroy_optin_bucket_hint">— only if no other MAP Auto-Tagger deployments exist in this account. Script verifies before deleting.</span></span>
-                            </label>
-                            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-                                <input type="checkbox" id="destroy-deleteLogs" style="margin-top:3px;flex-shrink:0;">
-                                <span><strong data-i18n="ui_destroy_optin_logs">Delete CloudWatch Log Groups</strong> <span class="hint" data-i18n="ui_destroy_optin_logs_hint">— removes audit history. By default logs are retained.</span></span>
-                            </label>
-                            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
-                                <input type="checkbox" id="destroy-includeLegacy" style="margin-top:3px;flex-shrink:0;">
-                                <span><strong data-i18n="ui_destroy_optin_legacy">Also remove legacy pre-namespacing stack</strong> <span class="hint" data-i18n="ui_destroy_optin_legacy_hint">— the bare <code>map-auto-tagger</code> stack (pre-v19). Use when preparing for a MAJOR upgrade.</span></span>
+                                <input type="checkbox" id="delete-deleteLogs" style="margin-top:3px;flex-shrink:0;">
+                                <span><strong data-i18n="ui_delete_optin_logs">Delete CloudWatch Log Groups</strong> <span class="hint" data-i18n="ui_delete_optin_logs_hint">— removes audit history. By default logs are retained.</span></span>
                             </label>
                         </div>
+                        <p class="hint" style="margin-top:10px;" data-i18n="ui_delete_bucket_note">The S3 staging bucket is handled automatically: deleted only when no other MAP Auto-Tagger deployments remain in the account.</p>
                     </div>
                 </div>
 
                 <div class="actions">
                     <button class="btn-secondary" onclick="selectMode(null)" data-i18n="ui_editor_back">← Back</button>
-                    <button class="btn-primary" onclick="destroyReview()" style="margin-left:auto;" data-i18n="ui_editor_review">Review →</button>
+                    <button class="btn-primary" onclick="deleteReview()" style="margin-left:auto;" data-i18n="ui_editor_review">Review →</button>
                 </div>
             </div>
 
             <div id="dstep2" class="hidden">
                 <div class="card">
                     <h2 data-i18n="ui_editor_review_title">Review Configuration</h2>
-                    <p class="subtitle" data-i18n="ui_destroy_review_subtitle">Confirm what will be deleted</p>
-                    <table style="width:100%;font-size:14px;border-collapse:collapse;" id="destroy-reviewTable"></table>
+                    <p class="subtitle" data-i18n="ui_delete_review_subtitle">Confirm what will be deleted</p>
+                    <table style="width:100%;font-size:14px;border-collapse:collapse;" id="delete-reviewTable"></table>
                 </div>
 
                 <div class="card" style="border-left:4px solid #d13212;background:#fdf3f1;">
-                    <strong data-i18n="ui_destroy_confirm_title">⚠️ Type the MPE ID to confirm destruction</strong>
-                    <p class="hint" style="margin:8px 0;" data-i18n="ui_destroy_confirm_hint">This action deletes CloudFormation resources. Existing <code>map-migrated</code> tags on AWS resources are preserved, but the Lambda will stop tagging new resources immediately.</p>
+                    <strong data-i18n="ui_delete_confirm_title">⚠️ Type <code>delete</code> to confirm</strong>
+                    <p class="hint" style="margin:8px 0;" data-i18n="ui_delete_confirm_hint">This action deletes CloudFormation resources. Existing <code>map-migrated</code> tags on AWS resources are preserved, but the Lambda will stop tagging new resources immediately.</p>
                     <div class="form-group" style="margin-bottom:0;">
-                        <label><span data-i18n="ui_destroy_confirm_label">Type the full MPE ID (including the <code>mig</code> prefix) to confirm</span></label>
-                        <input type="text" id="destroy-confirmInput" placeholder="migA1B2C3D4E5" oninput="this.value=this.value.replace(/[^a-zA-Z0-9]/g,'')">
-                        <div class="error-msg" id="destroy-confirm-error" data-i18n="err_destroy_confirm">The MPE ID you typed does not match</div>
+                        <label><span data-i18n="ui_delete_confirm_label">Type the word <code>delete</code> to confirm</span></label>
+                        <input type="text" id="delete-confirmInput" placeholder="delete" oninput="this.value=this.value.toLowerCase().replace(/[^a-z]/g,'')">
+                        <div class="error-msg" id="delete-confirm-error" data-i18n="err_delete_confirm">Type the word "delete" to proceed</div>
                     </div>
                 </div>
 
                 <div class="actions">
-                    <button class="btn-secondary" onclick="destroySetStep(1)" data-i18n="ui_btn_back">← Back</button>
-                    <button class="btn-primary" onclick="destroyGenerate()" style="margin-left:auto;" data-i18n="ui_destroy_generate">Generate destroy.sh →</button>
+                    <button class="btn-secondary" onclick="deleteSetStep(1)" data-i18n="ui_btn_back">← Back</button>
+                    <button class="btn-primary" onclick="deleteGenerate()" style="margin-left:auto;" data-i18n="ui_delete_generate">Generate delete.sh →</button>
                 </div>
             </div>
 
             <div id="dstep3" class="hidden">
                 <div class="card">
                     <h2 data-i18n="ui_editor_step3_title">Script Ready</h2>
-                    <p class="subtitle" data-i18n="ui_destroy_step3_subtitle">Run this in AWS CloudShell from the deployment account</p>
+                    <p class="subtitle" data-i18n="ui_delete_step3_subtitle">Run this in AWS CloudShell from the deployment account</p>
 
                     <div style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;">
-                        <button class="btn-primary" onclick="destroyDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_destroy_download">⬇ Download destroy.sh</button>
-                        <button class="btn-secondary" onclick="destroyCopyInstructions()" data-i18n="ui_btn_copy">📋 Copy Instructions</button>
+                        <button class="btn-primary" onclick="deleteDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_delete_download">⬇ Download delete.sh</button>
+                        <button class="btn-secondary" onclick="deleteCopyInstructions()" data-i18n="ui_btn_copy">📋 Copy Instructions</button>
                     </div>
 
                     <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Deployment Instructions</h3>
-                    <div class="preview-box" id="destroy-instructions" style="color:#d4d4d4;"></div>
+                    <div class="preview-box" id="delete-instructions" style="color:#d4d4d4;"></div>
 
                     <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_editor_script_preview">Script Preview</h3>
-                    <div class="preview-box" id="destroy-scriptContent"></div>
+                    <div class="preview-box" id="delete-scriptContent"></div>
 
                     <div class="actions" style="margin-top:20px;">
-                        <button class="btn-secondary" onclick="destroySetStep(1)" data-i18n="ui_start_over">Start Over</button>
+                        <button class="btn-secondary" onclick="deleteSetStep(1)" data-i18n="ui_start_over">Start Over</button>
                     </div>
                 </div>
             </div>
@@ -1130,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.4.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.4.0';
+        // Must match `TEMPLATE_VERSION = 'v20.4.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.4.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1140,11 +1151,19 @@
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
             {
+                version: 'v20.4.1',
+                date: '2026-04-24',
+                changes: [
+                    { tag: 'other',    text: 'Delete-mode UX refinements per review: "Destroy" renamed to "Delete"; filename destroy.sh → delete.sh; default is now delete-all (with opt-in "Limit to specific MPE(s)" matching Upgrade tab); S3 bucket deletion auto-decided (no opt-in); legacy pre-v19 option removed; typed confirmation is now the word "delete".' },
+                    { tag: 'other',    text: 'Update-mode card title: "Update to latest template version" → "Upgrade to the latest template version".' },
+                ],
+            },
+            {
                 version: 'v20.4.0',
                 date: '2026-04-23',
                 changes: [
                     { tag: 'other',    text: 'New configurator mode: Update to latest template version → generates upgrade.sh for in-place version upgrades via update-stack[-set] with --use-previous-parameters. SemVer guard refuses cross-MAJOR.' },
-                    { tag: 'other',    text: 'New configurator mode: Destroy existing deployment → generates destroy.sh for clean Stack/StackSet removal. Typed MPE-ID confirmation. Opt-in flags for S3 bucket, log groups, and legacy pre-namespacing stack. Preserves map-migrated tags on resources and StackSet admin IAM roles.' },
+                    { tag: 'other',    text: 'New configurator mode: Destroy existing deployment → generates delete.sh for clean Stack/StackSet removal. Typed MPE-ID confirmation. Opt-in flags for S3 bucket, log groups, and legacy pre-namespacing stack. Preserves map-migrated tags on resources and StackSet admin IAM roles.' },
                     { tag: 'breaking', text: 'Update-mode output filename changed from update-<mpe>.sh → upgrade-<mpe>.sh to eliminate collision with Editor-mode update.sh.' },
                 ],
             },
@@ -1225,10 +1244,10 @@
             document.getElementById('deploy-flow').classList.toggle('hidden', mode !== 'deploy');
             document.getElementById('edit-flow').classList.toggle('hidden', mode !== 'edit');
             document.getElementById('update-flow').classList.toggle('hidden', mode !== 'update');
-            document.getElementById('destroy-flow').classList.toggle('hidden', mode !== 'destroy');
+            document.getElementById('delete-flow').classList.toggle('hidden', mode !== 'delete');
             if (mode === 'edit') editorSetStep(1);
             if (mode === 'update') updateSetStep(1);
-            if (mode === 'destroy') destroySetStep(1);
+            if (mode === 'delete') deleteSetStep(1);
             window.scrollTo(0, 0);
         }
 
@@ -1464,8 +1483,8 @@
             });
         }
 
-        // --- Destroy flow ---
-        function destroySetStep(num) {
+        // --- Delete flow ---
+        function deleteSetStep(num) {
             ['dstep1','dstep2','dstep3'].forEach((id, i) => {
                 document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
                 const ind = document.getElementById(id + '-indicator');
@@ -1475,346 +1494,333 @@
             window.scrollTo(0, 0);
         }
 
-        function destroyReview() {
-            const mpeRaw = document.getElementById('destroy-mpeId').value.trim();
-            const region = document.getElementById('destroy-region').value;
-            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+        function deleteToggleScope() {
+            const enabled = document.getElementById('delete-scopeToMpe').checked;
+            document.getElementById('delete-mpeSection').classList.toggle('hidden', !enabled);
+        }
+
+        function deleteAddMpe() {
+            const list = document.getElementById('delete-mpeList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+            row.innerHTML = '<div style="display:flex;align-items:center;gap:0;flex:1;"><span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span><input type="text" class="delete-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')"></div><button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+        }
+
+        function deleteReview() {
+            const region = document.getElementById('delete-region').value;
+            const scopeToMpe = document.getElementById('delete-scopeToMpe').checked;
+            const deleteLogs = document.getElementById('delete-deleteLogs').checked;
+
             let valid = true;
-            if (!mpeRegex.test(mpeRaw)) {
-                document.getElementById('destroy-mpe-error').style.display = 'block';
-                valid = false;
-            } else {
-                document.getElementById('destroy-mpe-error').style.display = 'none';
-            }
             if (!region) {
-                document.getElementById('destroy-region-error').style.display = 'block';
+                document.getElementById('delete-region-error').style.display = 'block';
                 valid = false;
             } else {
-                document.getElementById('destroy-region-error').style.display = 'none';
+                document.getElementById('delete-region-error').style.display = 'none';
+            }
+
+            let selectedMpes = [];
+            if (scopeToMpe) {
+                const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+                const inputs = [...document.getElementById('delete-mpeList').querySelectorAll('.delete-mpe-input')];
+                selectedMpes = inputs.map(el => 'mig' + el.value.trim()).filter(m => mpeRegex.test(m.slice(3)));
+                if (selectedMpes.length === 0) {
+                    document.getElementById('delete-mpe-error').style.display = 'block';
+                    valid = false;
+                } else {
+                    document.getElementById('delete-mpe-error').style.display = 'none';
+                }
             }
             if (!valid) return;
 
-            const mpe = 'mig' + mpeRaw;
-            const deleteBucket = document.getElementById('destroy-deleteBucket').checked;
-            const deleteLogs = document.getElementById('destroy-deleteLogs').checked;
-            const includeLegacy = document.getElementById('destroy-includeLegacy').checked;
-
             const yes = t('rv_enabled') || 'Enabled';
             const no = t('rv_disabled') || 'Disabled';
+            const scopeLabel = scopeToMpe
+                ? (t('ui_delete_scope_specific') || 'Specific MPE(s)') + ': ' + selectedMpes.join(', ')
+                : (t('ui_delete_scope_all') || 'All map-auto-tagger-mig* deployments in this region');
+            const bucketLabel = scopeToMpe
+                ? (t('ui_delete_bucket_conditional') || 'Deleted only if no other deployments remain')
+                : (t('ui_delete_bucket_yes') || 'Yes — no deployments will remain');
+
             const rows = [
-                [t('ui_mpe_tag') || 'MPE ID', mpe],
                 [t('ui_editor_region') || 'Region', region],
-                [t('ui_destroy_optin_bucket') || 'Delete S3 staging bucket', deleteBucket ? yes : no],
-                [t('ui_destroy_optin_logs') || 'Delete CloudWatch Log Groups', deleteLogs ? yes : no],
-                [t('ui_destroy_optin_legacy') || 'Also remove legacy stack', includeLegacy ? yes : no],
+                [t('ui_delete_scope_title') || 'Scope', scopeLabel],
+                [t('ui_delete_optin_bucket') || 'S3 staging bucket', bucketLabel],
+                [t('ui_delete_optin_logs') || 'CloudWatch Log Groups', deleteLogs ? yes : no],
             ];
-            document.getElementById('destroy-reviewTable').innerHTML = rows.map(([k, v], i) =>
+            document.getElementById('delete-reviewTable').innerHTML = rows.map(([k, v], i) =>
                 `<tr style="border-bottom:1px solid #eaeded;${i%2===0?'background:#fafafa;':''}"><td style="padding:10px 12px;width:40%;color:#687078;">${k}</td><td style="padding:10px 12px;font-weight:600;">${v}</td></tr>`
             ).join('');
 
-            document.getElementById('destroy-confirmInput').value = '';
-            document.getElementById('destroy-confirm-error').style.display = 'none';
-            destroySetStep(2);
+            document.getElementById('delete-confirmInput').value = '';
+            document.getElementById('delete-confirm-error').style.display = 'none';
+            deleteSetStep(2);
         }
 
-        function destroyGenerate() {
-            const mpeRaw = document.getElementById('destroy-mpeId').value.trim();
-            const mpe = 'mig' + mpeRaw;
-            const typed = document.getElementById('destroy-confirmInput').value.trim();
-            if (typed !== mpe) {
-                document.getElementById('destroy-confirm-error').style.display = 'block';
+        function deleteGenerate() {
+            const typed = document.getElementById('delete-confirmInput').value.trim().toLowerCase();
+            if (typed !== 'delete') {
+                document.getElementById('delete-confirm-error').style.display = 'block';
                 return;
             }
-            document.getElementById('destroy-confirm-error').style.display = 'none';
+            document.getElementById('delete-confirm-error').style.display = 'none';
 
-            const region = document.getElementById('destroy-region').value;
-            const deleteBucket = document.getElementById('destroy-deleteBucket').checked;
-            const deleteLogs = document.getElementById('destroy-deleteLogs').checked;
-            const includeLegacy = document.getElementById('destroy-includeLegacy').checked;
-            const stackName = `map-auto-tagger-${mpe}`;
+            const region = document.getElementById('delete-region').value;
+            const scopeToMpe = document.getElementById('delete-scopeToMpe').checked;
+            const deleteLogs = document.getElementById('delete-deleteLogs').checked;
+            const mpeInputs = [...document.getElementById('delete-mpeList').querySelectorAll('.delete-mpe-input')];
+            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+            const selectedMpes = scopeToMpe
+                ? mpeInputs.map(el => 'mig' + el.value.trim()).filter(m => mpeRegex.test(m.slice(3)))
+                : [];
+
+            const mpeListShell = selectedMpes.length > 0 ? selectedMpes.map(m => `"${m}"`).join(' ') : '';
+            const scopeNote = selectedMpes.length > 0
+                ? `specific MPE(s): ${selectedMpes.join(', ')}`
+                : 'all MAP Auto-Tagger deployments in this region';
 
             const script = `#!/bin/bash
-# MAP 2.0 Auto-Tagger — Destroy Script
-# MPE: ${mpe} | Region: ${region}
+# MAP 2.0 Auto-Tagger — Delete Script
+# Scope: ${scopeNote}
+# Region: ${region}
 # Template version: ${TEMPLATE_VERSION}
 #
 # Deletes:
-#   - Stack or StackSet named ${stackName}
-${deleteBucket ? '#   - S3 staging bucket auto-map-tagger-<account> (if no other MPEs share it)\n' : ''}${deleteLogs ? '#   - CloudWatch Log Groups /aws/lambda/map-auto-tagger*-' + mpe + '\n' : ''}${includeLegacy ? '#   - Legacy pre-namespacing stack "map-auto-tagger"\n' : ''}#
+#   - All matching Stack(s) and StackSet(s) in the region
+#   - S3 staging bucket — only when no map-auto-tagger-mig* deployments remain
+${deleteLogs ? '#   - CloudWatch Log Groups for deleted deployments\n' : ''}#
 # Preserves:
 #   - map-migrated tags on already-tagged AWS resources (credits stay intact)
 #   - StackSet admin/execution IAM roles (shared org scaffolding — never deleted)
 ${deleteLogs ? '' : '#   - CloudWatch Log Groups (audit history)\n'}set -e
 
-MPE="${mpe}"
 REGION="${region}"
-STACK_NAME="${stackName}"
-DELETE_BUCKET=${deleteBucket ? 'true' : 'false'}
+SCOPE_MPES=(${mpeListShell})
 DELETE_LOGS=${deleteLogs ? 'true' : 'false'}
-INCLUDE_LEGACY=${includeLegacy ? 'true' : 'false'}
 
 echo ""
 echo "  ┌──────────────────────────────────────────────────────┐"
-echo "  │   MAP 2.0 Auto-Tagger — Destroy                       │"
-echo "  │   MPE: $MPE  Region: $REGION"
+echo "  │   MAP 2.0 Auto-Tagger — Delete                        │"
+echo "  │   Region: $REGION"
+echo "  │   Scope: ${selectedMpes.length > 0 ? 'specific MPE(s) — ' + selectedMpes.join(', ') : 'ALL map-auto-tagger-mig* in region'}"
 echo "  └──────────────────────────────────────────────────────┘"
 echo ""
 
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-
 DELETED=0
 SKIPPED=0
 FAILED=0
 
-# ── Step 1: Identify target (Stack or StackSet) ─────────────────
-echo "Step 1: Locating deployment..."
+# ── Step 1: Enumerate deployments ────────────────────────────
+echo "Step 1: Locating deployments..."
+STACKSETS=()
+STACKS=()
 
-KIND=""
-if aws cloudformation describe-stack-set --region "$REGION" --stack-set-name "$STACK_NAME" > /dev/null 2>&1; then
-    KIND="stackset"
-    echo "  Found StackSet: $STACK_NAME"
-elif aws cloudformation describe-stacks --region "$REGION" --stack-name "$STACK_NAME" > /dev/null 2>&1; then
-    KIND="stack"
-    echo "  Found Stack: $STACK_NAME"
+if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
+    for MPE in "\${SCOPE_MPES[@]}"; do
+        if aws cloudformation describe-stack-set --region "$REGION" --stack-set-name "map-auto-tagger-\${MPE}" > /dev/null 2>&1; then
+            STACKSETS+=("map-auto-tagger-\${MPE}")
+        elif aws cloudformation describe-stacks --region "$REGION" --stack-name "map-auto-tagger-\${MPE}" > /dev/null 2>&1; then
+            STACKS+=("map-auto-tagger-\${MPE}")
+        else
+            echo "  ⚠️  MPE '\${MPE}' — no Stack or StackSet found. Skipping."
+            SKIPPED=$((SKIPPED + 1))
+        fi
+    done
 else
-    echo "  ⚠️  Neither Stack nor StackSet found with name '$STACK_NAME' in $REGION."
-    echo "     Nothing to delete for MPE $MPE. (Idempotent — this is safe to re-run.)"
-    SKIPPED=$((SKIPPED + 1))
+    while IFS= read -r NAME; do
+        [ -n "$NAME" ] && STACKSETS+=("$NAME")
+    done < <(aws cloudformation list-stack-sets --region "$REGION" --status ACTIVE --query "Summaries[?starts_with(StackSetName, 'map-auto-tagger-mig')].StackSetName" --output text | tr '\\t' '\\n')
+    while IFS= read -r NAME; do
+        [ -n "$NAME" ] && STACKS+=("$NAME")
+    done < <(aws cloudformation list-stacks --region "$REGION" --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE --query "StackSummaries[?starts_with(StackName, 'map-auto-tagger-mig')].StackName" --output text | tr '\\t' '\\n')
+fi
+
+TOTAL=$((\${#STACKSETS[@]} + \${#STACKS[@]}))
+if [ $TOTAL -eq 0 ]; then
+    echo "  ⚠️  No MAP Auto-Tagger deployments found. Nothing to delete."
+    exit 0
+fi
+echo "  Found \${#STACKSETS[@]} StackSet(s) and \${#STACKS[@]} Stack(s) — $TOTAL total."
+for SS in "\${STACKSETS[@]}"; do echo "    • StackSet $SS"; done
+for ST in "\${STACKS[@]}"; do echo "    • Stack    $ST"; done
+echo ""
+
+# ── Helper: delete one deployment ───────────────────────────
+delete_one() {
+    local KIND="$1" NAME="$2"
+    echo "── $KIND: $NAME ──────────────────────────────"
+
+    if [ "$KIND" = "stackset" ]; then
+        local INSTANCES
+        INSTANCES=$(aws cloudformation list-stack-instances --region "$REGION" --stack-set-name "$NAME" --query "Summaries[].[Account,Region]" --output text 2>/dev/null)
+        if [ -n "$INSTANCES" ]; then
+            local ACCOUNTS REGIONS
+            ACCOUNTS=$(echo "$INSTANCES" | awk '{print $1}' | sort -u | tr '\\n' ' ')
+            REGIONS=$(echo "$INSTANCES" | awk '{print $2}' | sort -u | tr '\\n' ' ')
+            echo "  Deleting stack instances ($(echo $ACCOUNTS | wc -w) account(s))..."
+            local OP_ID
+            OP_ID=$(aws cloudformation delete-stack-instances --region "$REGION" --stack-set-name "$NAME" --accounts $ACCOUNTS --regions $REGIONS --no-retain-stacks --operation-preferences "MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL" --query OperationId --output text 2>&1) || { echo "  ❌ $OP_ID"; return 1; }
+            local WAIT=0
+            while [ $WAIT -lt 1800 ]; do
+                local STATUS
+                STATUS=$(aws cloudformation describe-stack-set-operation --region "$REGION" --stack-set-name "$NAME" --operation-id "$OP_ID" --query "StackSetOperation.Status" --output text 2>/dev/null)
+                if [ "$STATUS" = "SUCCEEDED" ]; then echo "  ✅ Instances deleted."; break
+                elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "STOPPED" ]; then
+                    echo "  ❌ $STATUS. Investigate: aws cloudformation describe-stack-set-operation --stack-set-name $NAME --operation-id $OP_ID --region $REGION"
+                    return 1
+                fi
+                sleep 30; WAIT=$((WAIT + 30)); echo "  Still deleting... (\${WAIT}s)"
+            done
+        fi
+        aws cloudformation delete-stack-set --region "$REGION" --stack-set-name "$NAME" && echo "  ✅ StackSet deleted." || { echo "  ❌ delete-stack-set failed."; return 1; }
+    else
+        aws cloudformation delete-stack --region "$REGION" --stack-name "$NAME"
+        echo "  Waiting for deletion..."
+        if aws cloudformation wait stack-delete-complete --region "$REGION" --stack-name "$NAME"; then
+            echo "  ✅ Stack deleted."
+        else
+            echo "  ❌ Deletion failed. Investigate: aws cloudformation describe-stack-events --stack-name $NAME --region $REGION"
+            return 1
+        fi
+    fi
+    echo ""
+    return 0
+}
+
+# ── Step 2: Delete all matching deployments ─────────────────
+echo "Step 2: Deleting \${#STACKSETS[@]} StackSet(s) and \${#STACKS[@]} Stack(s)..."
+echo ""
+for NAME in "\${STACKSETS[@]}"; do
+    if delete_one "stackset" "$NAME"; then DELETED=$((DELETED + 1)); else FAILED=$((FAILED + 1)); fi
+done
+for NAME in "\${STACKS[@]}"; do
+    if delete_one "stack" "$NAME"; then DELETED=$((DELETED + 1)); else FAILED=$((FAILED + 1)); fi
+done
+
+# ── Step 3: S3 staging bucket (auto) ────────────────────────
+echo "Step 3: Checking S3 staging bucket..."
+BUCKET="auto-map-tagger-\${ACCOUNT}"
+if ! aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
+    echo "  Bucket $BUCKET not found — nothing to delete."
+else
+    REMAINING_SS=$(aws cloudformation list-stack-sets --region "$REGION" --status ACTIVE --query "Summaries[?starts_with(StackSetName, 'map-auto-tagger-mig')].StackSetName" --output text 2>/dev/null)
+    REMAINING_ST=$(aws cloudformation list-stacks --region "$REGION" --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE --query "StackSummaries[?starts_with(StackName, 'map-auto-tagger-mig')].StackName" --output text 2>/dev/null)
+    if [ -n "$REMAINING_SS" ] || [ -n "$REMAINING_ST" ]; then
+        echo "  Other MAP Auto-Tagger deployments still use this bucket:"
+        [ -n "$REMAINING_SS" ] && echo "    StackSets: $REMAINING_SS"
+        [ -n "$REMAINING_ST" ] && echo "    Stacks:    $REMAINING_ST"
+        echo "  Bucket $BUCKET retained."
+    else
+        echo "  No MAP Auto-Tagger deployments remain. Emptying and deleting bucket..."
+        aws s3 rm "s3://$BUCKET" --recursive > /dev/null 2>&1 || true
+        if aws s3api delete-bucket --bucket "$BUCKET" --region "$REGION" 2>/dev/null || aws s3api delete-bucket --bucket "$BUCKET" 2>/dev/null; then
+            echo "  ✅ Bucket deleted."
+            DELETED=$((DELETED + 1))
+        else
+            echo "  ❌ Bucket deletion failed (may contain versioned objects)."
+            FAILED=$((FAILED + 1))
+        fi
+    fi
 fi
 echo ""
 
-# ── Step 2: Delete StackSet (multi-account) or Stack (single) ──
-if [ "$KIND" = "stackset" ]; then
-    echo "Step 2: Deleting StackSet instances..."
-
-    INSTANCES=$(aws cloudformation list-stack-instances --region "$REGION" --stack-set-name "$STACK_NAME" --query "Summaries[].[Account,Region]" --output text 2>/dev/null)
-    if [ -n "$INSTANCES" ]; then
-        ACCOUNTS=$(echo "$INSTANCES" | awk '{print $1}' | sort -u | tr '\\n' ',' | sed 's/,$//')
-        REGIONS=$(echo "$INSTANCES" | awk '{print $2}' | sort -u | tr '\\n' ',' | sed 's/,$//')
-        echo "  Accounts: $ACCOUNTS"
-        echo "  Regions:  $REGIONS"
-
-        OP_ID=$(aws cloudformation delete-stack-instances \\
-            --region "$REGION" \\
-            --stack-set-name "$STACK_NAME" \\
-            --accounts $(echo "$ACCOUNTS" | tr ',' ' ') \\
-            --regions $(echo "$REGIONS" | tr ',' ' ') \\
-            --no-retain-stacks \\
-            --operation-preferences "MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL" \\
-            --query OperationId --output text 2>&1) || {
-            echo "  ❌ delete-stack-instances failed: $OP_ID"
-            FAILED=$((FAILED + 1))
-            OP_ID=""
-        }
-
-        if [ -n "$OP_ID" ] && [ "$OP_ID" != "None" ]; then
-            echo "  Delete operation $OP_ID initiated. Polling (up to 30 min)..."
-            WAIT=0
-            while [ $WAIT -lt 1800 ]; do
-                STATUS=$(aws cloudformation describe-stack-set-operation --region "$REGION" --stack-set-name "$STACK_NAME" --operation-id "$OP_ID" --query "StackSetOperation.Status" --output text 2>/dev/null)
-                if [ "$STATUS" = "SUCCEEDED" ]; then
-                    echo "  ✅ All stack instances deleted."
-                    break
-                elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "STOPPED" ]; then
-                    echo "  ❌ Delete operation $STATUS. Investigate:"
-                    echo "     aws cloudformation describe-stack-set-operation --stack-set-name $STACK_NAME --operation-id $OP_ID --region $REGION"
-                    FAILED=$((FAILED + 1))
-                    break
-                fi
-                sleep 30
-                WAIT=$((WAIT + 30))
-                echo "  Still deleting... (\${WAIT}s)"
-            done
-        fi
-    else
-        echo "  (No stack instances found — proceeding to StackSet deletion.)"
-    fi
-
-    if [ $FAILED -eq 0 ]; then
-        echo "  Deleting StackSet..."
-        aws cloudformation delete-stack-set --region "$REGION" --stack-set-name "$STACK_NAME" && {
-            echo "  ✅ StackSet deleted."
-            DELETED=$((DELETED + 1))
-        } || {
-            echo "  ❌ delete-stack-set failed."
-            FAILED=$((FAILED + 1))
-        }
-    fi
-    echo ""
-
-elif [ "$KIND" = "stack" ]; then
-    echo "Step 2: Deleting Stack..."
-    aws cloudformation delete-stack --region "$REGION" --stack-name "$STACK_NAME"
-    echo "  Delete initiated. Waiting (up to 30 min)..."
-    if aws cloudformation wait stack-delete-complete --region "$REGION" --stack-name "$STACK_NAME"; then
-        echo "  ✅ Stack deleted."
-        DELETED=$((DELETED + 1))
-    else
-        echo "  ❌ Stack deletion failed. Investigate:"
-        echo "     aws cloudformation describe-stack-events --stack-name $STACK_NAME --region $REGION"
-        FAILED=$((FAILED + 1))
-    fi
-    echo ""
-fi
-
-# ── Step 3: Optional — S3 staging bucket ────────────────────────
-if [ "$DELETE_BUCKET" = "true" ]; then
-    BUCKET="auto-map-tagger-\${ACCOUNT}"
-    echo "Step 3: Checking S3 staging bucket $BUCKET..."
-
-    if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
-        # Guard: only delete if no other map-auto-tagger-mig* stacks/stacksets remain
-        OTHER_SS=$(aws cloudformation list-stack-sets --region "$REGION" --status ACTIVE --query "Summaries[?starts_with(StackSetName, 'map-auto-tagger-mig') && StackSetName != '$STACK_NAME'].StackSetName" --output text 2>/dev/null)
-        OTHER_ST=$(aws cloudformation list-stacks --region "$REGION" --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE --query "StackSummaries[?starts_with(StackName, 'map-auto-tagger-mig') && StackName != '$STACK_NAME'].StackName" --output text 2>/dev/null)
-
-        if [ -n "$OTHER_SS" ] || [ -n "$OTHER_ST" ]; then
-            echo "  ⚠️  Other MAP Auto-Tagger deployments still use this bucket:"
-            [ -n "$OTHER_SS" ] && echo "     StackSets: $OTHER_SS"
-            [ -n "$OTHER_ST" ] && echo "     Stacks:    $OTHER_ST"
-            echo "     Bucket retained."
-            SKIPPED=$((SKIPPED + 1))
-        else
-            echo "  No other MAP Auto-Tagger deployments found. Emptying and deleting bucket..."
-            aws s3 rm "s3://$BUCKET" --recursive > /dev/null 2>&1 || true
-            if aws s3api delete-bucket --bucket "$BUCKET" 2>/dev/null; then
-                echo "  ✅ Bucket deleted."
-                DELETED=$((DELETED + 1))
-            else
-                echo "  ❌ Bucket deletion failed (may contain versioned objects)."
-                FAILED=$((FAILED + 1))
-            fi
-        fi
-    else
-        echo "  Bucket $BUCKET not found — nothing to delete."
-    fi
-    echo ""
-fi
-
-# ── Step 4: Optional — CloudWatch Log Groups ────────────────────
+# ── Step 4: Optional — CloudWatch Log Groups ────────────────
 if [ "$DELETE_LOGS" = "true" ]; then
-    echo "Step 4: Deleting CloudWatch Log Groups for $MPE..."
-    LOG_GROUPS=$(aws logs describe-log-groups --region "$REGION" --log-group-name-prefix "/aws/lambda/map-auto-tagger" --query "logGroups[?ends_with(logGroupName, '-$MPE') || logGroupName == '/aws/lambda/map-auto-tagger-$MPE' || logGroupName == '/aws/lambda/map-auto-tagger-backfill-$MPE'].logGroupName" --output text 2>/dev/null)
-    if [ -n "$LOG_GROUPS" ]; then
-        for LG in $LOG_GROUPS; do
-            if aws logs delete-log-group --region "$REGION" --log-group-name "$LG" 2>/dev/null; then
-                echo "  ✅ Deleted $LG"
-                DELETED=$((DELETED + 1))
-            else
-                echo "  ❌ Failed to delete $LG"
-                FAILED=$((FAILED + 1))
-            fi
+    echo "Step 4: Deleting CloudWatch Log Groups..."
+    if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
+        for MPE in "\${SCOPE_MPES[@]}"; do
+            LOG_GROUPS=$(aws logs describe-log-groups --region "$REGION" --log-group-name-prefix "/aws/lambda/map-auto-tagger" --query "logGroups[?ends_with(logGroupName, '-\${MPE}')].logGroupName" --output text 2>/dev/null)
+            for LG in $LOG_GROUPS; do
+                aws logs delete-log-group --region "$REGION" --log-group-name "$LG" 2>/dev/null && { echo "  ✅ Deleted $LG"; DELETED=$((DELETED + 1)); } || { echo "  ❌ Failed: $LG"; FAILED=$((FAILED + 1)); }
+            done
         done
     else
-        echo "  No log groups found for this MPE."
+        LOG_GROUPS=$(aws logs describe-log-groups --region "$REGION" --log-group-name-prefix "/aws/lambda/map-auto-tagger" --query "logGroups[].logGroupName" --output text 2>/dev/null)
+        for LG in $LOG_GROUPS; do
+            aws logs delete-log-group --region "$REGION" --log-group-name "$LG" 2>/dev/null && { echo "  ✅ Deleted $LG"; DELETED=$((DELETED + 1)); } || { echo "  ❌ Failed: $LG"; FAILED=$((FAILED + 1)); }
+        done
     fi
     echo ""
 fi
 
-# ── Step 5: Optional — Legacy pre-namespacing stack ─────────────
-if [ "$INCLUDE_LEGACY" = "true" ]; then
-    echo "Step 5: Checking for legacy unnamespaced stack..."
-    if aws cloudformation describe-stacks --region "$REGION" --stack-name "map-auto-tagger" > /dev/null 2>&1; then
-        echo "  Found legacy stack 'map-auto-tagger'. Deleting..."
-        aws cloudformation delete-stack --region "$REGION" --stack-name "map-auto-tagger"
-        if aws cloudformation wait stack-delete-complete --region "$REGION" --stack-name "map-auto-tagger"; then
-            echo "  ✅ Legacy stack deleted."
-            DELETED=$((DELETED + 1))
-        else
-            echo "  ❌ Legacy stack deletion failed."
-            FAILED=$((FAILED + 1))
-        fi
-    else
-        echo "  No legacy stack found."
-    fi
-    echo ""
-fi
-
-# ── Summary ─────────────────────────────────────────────────────
+# ── Summary ─────────────────────────────────────────────────
 echo "  ┌──────────────────────────────────────────────────────┐"
 if [ $FAILED -gt 0 ]; then
-    echo "  │   ⚠️  Destroy completed with failures                  │"
+    echo "  │   ⚠️  Delete completed with failures                  │"
     echo "  │   Deleted: $DELETED  Skipped: $SKIPPED  Failed: $FAILED"
     echo "  └──────────────────────────────────────────────────────┘"
     echo ""
-    echo "  Preserved (not deleted by this script):"
-    echo "    • map-migrated tags on already-tagged AWS resources"
-    [ "$DELETE_LOGS" != "true" ] && echo "    • CloudWatch Log Groups — to clean up manually:"
-    [ "$DELETE_LOGS" != "true" ] && echo "        aws logs describe-log-groups --log-group-name-prefix /aws/lambda/map-auto-tagger --region $REGION"
+    echo "  Preserved: map-migrated tags, StackSet admin IAM roles"
     exit 1
 else
-    echo "  │   ✅ Destroy complete                                 │"
+    echo "  │   ✅ Delete complete                                  │"
     echo "  │   Deleted: $DELETED  Skipped: $SKIPPED"
     echo "  └──────────────────────────────────────────────────────┘"
     echo ""
-    echo "  Preserved (not deleted by this script):"
-    echo "    • map-migrated tags on already-tagged AWS resources"
-    [ "$DELETE_LOGS" != "true" ] && echo "    • CloudWatch Log Groups (audit history)"
-    echo ""
-    echo "  Next steps:"
-    echo "    - For MAJOR upgrade: regenerate deploy.sh from configurator.html, then bash deploy.sh"
-    echo "    - Enable backfill in deploy.sh to retroactively tag resources created during the gap"
+    echo "  Preserved: map-migrated tags on AWS resources, StackSet admin IAM roles"
+    [ "$DELETE_LOGS" != "true" ] && echo "             CloudWatch Log Groups (audit history)"
 fi
 `;
 
-            document.getElementById('destroy-scriptContent').textContent = script;
-            window._destroyScript = script;
-            window._destroyMpe = mpe;
+            document.getElementById('delete-scriptContent').textContent = script;
+            window._deleteScript = script;
+            window._deleteLabel = selectedMpes.length > 0 ? selectedMpes.join('-') : 'all';
 
-            const instructions = `DESTROY INSTRUCTIONS — MAP Auto-Tagger ${mpe}
+            const instructions = `DELETE INSTRUCTIONS — MAP Auto-Tagger
 =========================================
 
-MPE: ${mpe}
 Region: ${region}
+Scope: ${selectedMpes.length > 0 ? 'MPE(s) — ' + selectedMpes.join(', ') : 'all MAP Auto-Tagger deployments in this region'}
 Template version: ${TEMPLATE_VERSION}
 
 ── Option 1: AWS CloudShell (Recommended) ──────────────────
 1. Log into the AWS Console for the account where the deployment was made.
    (For multi-account deployments, this is the management account.)
 2. Open CloudShell.
-3. Upload destroy.sh and run:
-   bash destroy.sh
+3. Upload delete.sh and run:
+   bash delete.sh
 
 ── Option 2: Local AWS CLI ──────────────────────────────────
 1. Ensure AWS CLI v2 is installed and configured with admin credentials.
-2. Run:
-   bash destroy.sh
+2. Run: bash delete.sh
 
 ─────────────────────────────────────────────────
 What the script does:
-  - Auto-detects whether ${stackName} is a Stack or StackSet.
-  - For StackSet: deletes all stack instances in parallel, then the StackSet.
-  - For Stack: runs delete-stack and waits for completion.
-${deleteBucket ? `  - Deletes S3 staging bucket auto-map-tagger-<account>
-    (only if no other MPE deployments share it — verified before deleting).\n` : ''}${deleteLogs ? `  - Deletes CloudWatch Log Groups matching /aws/lambda/map-auto-tagger*-${mpe}.\n` : ''}${includeLegacy ? `  - Also removes the legacy pre-namespacing stack 'map-auto-tagger' if present.\n` : ''}
+${selectedMpes.length > 0 ? '  - Looks up each listed MPE\'s Stack or StackSet and deletes it.\n' : '  - Enumerates every map-auto-tagger-mig* Stack and StackSet in the region and deletes them.\n'}  - For StackSets: deletes stack instances in parallel (100% tolerance), then the StackSet.
+  - For Stacks: runs delete-stack and waits for completion.
+  - Deletes the S3 staging bucket only when no MAP Auto-Tagger deployments remain
+    in the region. Otherwise retained to avoid breaking sibling deployments.
+${deleteLogs ? '  - Deletes matching CloudWatch Log Groups.\n' : ''}
 Preserved (never deleted):
   - map-migrated tags on AWS resources (MAP credits remain intact).
   - StackSet admin and execution IAM roles (shared org scaffolding).
 ${deleteLogs ? '' : '  - CloudWatch Log Groups (audit history retained).\n'}
-Idempotent: safe to re-run. Missing resources are reported as skipped, not failures.
+Idempotent: safe to re-run. Missing resources reported as skipped, not failures.`;
 
-Note: all resources defined inside this destroy.sh. No outbound network
-calls are made from your environment during destruction.`;
-
-            document.getElementById('destroy-instructions').textContent = instructions;
-            destroySetStep(3);
+            document.getElementById('delete-instructions').textContent = instructions;
+            deleteSetStep(3);
         }
 
-        function destroyDownload() {
-            const blob = new Blob([window._destroyScript], { type: 'text/x-sh' });
+        function deleteDownload() {
+            const blob = new Blob([window._deleteScript], { type: 'text/x-sh' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `destroy-${window._destroyMpe}.sh`;
+            a.download = `delete-${window._deleteLabel}.sh`;
             a.click();
         }
 
-        function destroyCopyInstructions() {
-            navigator.clipboard.writeText(document.getElementById('destroy-instructions').textContent).then(() => {
-                const btn = document.querySelector('[onclick="destroyCopyInstructions()"]');
+        function deleteCopyInstructions() {
+            navigator.clipboard.writeText(document.getElementById('delete-instructions').textContent).then(() => {
+                const btn = document.querySelector('[onclick="deleteCopyInstructions()"]');
                 const orig = btn.textContent;
                 btn.textContent = '✓ Copied';
                 setTimeout(() => { btn.textContent = orig; }, 1500);
             });
         }
+
 
         function editorAddAccount(type) {
             const listId = type === 'remove' ? 'editor-remove-accountList' : 'editor-add-accountList';
@@ -3008,7 +3014,7 @@ network calls are made from your environment during the upgrade.`;
             ui_editor_remove_desc:'Selected accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive for these accounts.',
             ui_editor_remove_accounts_label:'Account IDs to remove',
             ui_editor_remove_accounts_hint:'— only accounts currently in scope',
-            ui_mode_update_title:'Update to latest template version',
+            ui_mode_update_title:'Upgrade to the latest template version',
             ui_mode_update_desc:'Upgrade Lambda code, IAM policy, and EventBridge rules to the current template version. Scope configuration (accounts, VPCs, agreement date) is preserved. Auto-detects single-account and multi-account deployments.',
             ui_ustep1:'1. Configure',
             ui_ustep2:'2. Review',
@@ -3054,33 +3060,37 @@ network calls are made from your environment during the upgrade.`;
             ui_editor_step3_subtitle:'Run this in AWS CloudShell from the management account',
             ui_editor_download:'⬇ Download update.sh',
             ui_upgrade_download:'⬇ Download upgrade.sh',
-            ui_mode_destroy_title:'Destroy existing deployment',
-            ui_mode_destroy_desc:'Remove a MAP Auto-Tagger deployment cleanly. Use before MAJOR upgrades, when an engagement ends, or to recover from a failed deployment. Does not remove <code>map-migrated</code> tags from already-tagged resources.',
+            ui_mode_delete_title:'Delete existing deployment',
+            ui_mode_delete_desc:'Remove MAP Auto-Tagger deployments from the account. By default deletes every <code>map-auto-tagger-mig*</code> stack and stackset in the region; optionally scope to specific MPE(s). The <code>map-migrated</code> tag is not removed from already-tagged resources.',
             ui_dstep1:'1. Configure',
             ui_dstep2:'2. Review',
             ui_dstep3:'3. Download',
-            ui_destroy_info:'This tool removes a MAP Auto-Tagger deployment from your account or organization. It generates a <code>destroy.sh</code> script that auto-detects single-account stacks and multi-account StackSets. The <code>map-migrated</code> tag is <strong>not</strong> removed from already-tagged resources — those tags remain so MAP credits stay intact.',
-            ui_destroy_step1_title:'Deployment Details',
-            ui_destroy_step1_subtitle:'Identify the deployment to remove',
-            ui_destroy_mpe_label:'MPE ID',
-            ui_destroy_mpe_hint:'— the engagement to remove',
-            ui_destroy_region:'Deployment Region',
-            ui_destroy_optin_title:'Optional destructive actions (opt-in)',
-            ui_destroy_optin_bucket:'Delete S3 staging bucket',
-            ui_destroy_optin_bucket_hint:'— only if no other MAP Auto-Tagger deployments exist in this account. Script verifies before deleting.',
-            ui_destroy_optin_logs:'Delete CloudWatch Log Groups',
-            ui_destroy_optin_logs_hint:'— removes audit history. By default logs are retained.',
-            ui_destroy_optin_legacy:'Also remove legacy pre-namespacing stack',
-            ui_destroy_optin_legacy_hint:'— the bare <code>map-auto-tagger</code> stack (pre-v19). Use when preparing for a MAJOR upgrade.',
-            ui_destroy_review_subtitle:'Confirm what will be deleted',
-            ui_destroy_confirm_title:'⚠️ Type the MPE ID to confirm destruction',
-            ui_destroy_confirm_hint:'This action deletes CloudFormation resources. Existing <code>map-migrated</code> tags on AWS resources are preserved, but the Lambda will stop tagging new resources immediately.',
-            ui_destroy_confirm_label:'Type the full MPE ID (including the <code>mig</code> prefix) to confirm',
-            ui_destroy_generate:'Generate destroy.sh →',
-            ui_destroy_step3_subtitle:'Run this in AWS CloudShell from the deployment account',
-            ui_destroy_download:'⬇ Download destroy.sh',
-            err_destroy_mpe:'Enter a valid 10-character MPE ID',
-            err_destroy_confirm:'The MPE ID you typed does not match',
+            ui_delete_info:'This tool removes MAP Auto-Tagger deployments from your account. It generates a <code>delete.sh</code> script that auto-detects single-account stacks and multi-account StackSets. By default, every <code>map-auto-tagger-mig*</code> deployment in the selected region is removed. The <code>map-migrated</code> tag is <strong>not</strong> removed from already-tagged resources — those tags remain so MAP credits stay intact.',
+            ui_delete_step1_title:'Deployment Details',
+            ui_delete_step1_subtitle:'Select the region to delete from',
+            ui_delete_scope_title:'Limit to specific MAP engagement(s)',
+            ui_delete_scope_desc:'Leave unchecked to delete every MAP Auto-Tagger deployment found in this region (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).',
+            ui_delete_scope_all:'All map-auto-tagger-mig* deployments in this region',
+            ui_delete_scope_specific:'Specific MPE(s)',
+            ui_delete_mpe_label:'MPE IDs to delete',
+            ui_delete_mpe_hint:'— each must match a deployed MAP Auto-Tagger in this region',
+            ui_delete_add_mpe:'+ Add another MPE',
+            ui_delete_optin_title:'Optional — CloudWatch Log Groups',
+            ui_delete_optin_logs:'Delete CloudWatch Log Groups',
+            ui_delete_optin_logs_hint:'— removes audit history. By default logs are retained.',
+            ui_delete_optin_bucket:'S3 staging bucket',
+            ui_delete_bucket_note:'The S3 staging bucket is handled automatically: deleted only when no other MAP Auto-Tagger deployments remain in the account.',
+            ui_delete_bucket_conditional:'Deleted only if no other deployments remain',
+            ui_delete_bucket_yes:'Yes — no deployments will remain',
+            ui_delete_review_subtitle:'Confirm what will be deleted',
+            ui_delete_confirm_title:'⚠️ Type <code>delete</code> to confirm',
+            ui_delete_confirm_hint:'This action deletes CloudFormation resources. Existing <code>map-migrated</code> tags on AWS resources are preserved, but the Lambda will stop tagging new resources immediately.',
+            ui_delete_confirm_label:'Type the word <code>delete</code> to confirm',
+            ui_delete_generate:'Generate delete.sh →',
+            ui_delete_step3_subtitle:'Run this in AWS CloudShell from the deployment account',
+            ui_delete_download:'⬇ Download delete.sh',
+            err_delete_mpe:'Please enter at least one valid 10-character MPE ID',
+            err_delete_confirm:'Type the word "delete" to proceed',
             ui_editor_script_preview:'Script Preview',
             err_date_required:'Agreement start date is required',
             err_date_end:'Agreement end date is required and must be after start date',
@@ -3343,7 +3353,7 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             ui_editor_remove_desc:'선택한 계정은 더 이상 태깅되지 않습니다. 기존 태그는 제거되지 않습니다. Lambda는 해당 계정에서 비활성 상태로 유지됩니다.',
             ui_editor_remove_accounts_label:'제거할 계정 ID',
             ui_editor_remove_accounts_hint:'— 현재 범위에 있는 계정만',
-            ui_mode_update_title:'최신 템플릿 버전으로 업데이트',
+            ui_mode_update_title:'최신 템플릿 버전으로 업그레이드',
             ui_mode_update_desc:'Lambda 코드, IAM 정책, EventBridge 규칙을 현재 템플릿 버전으로 업그레이드합니다. 범위 구성(계정, VPC, 계약 날짜)은 유지됩니다. 단일 계정 및 다중 계정 배포를 자동 감지합니다.',
             ui_ustep1:'1. 구성',
             ui_ustep2:'2. 검토',
@@ -3389,26 +3399,37 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             ui_editor_step3_subtitle:'관리 계정의 AWS CloudShell에서 실행하세요',
             ui_editor_download:'⬇ update.sh 다운로드',
             ui_upgrade_download:'⬇ upgrade.sh 다운로드',
-            ui_mode_destroy_title:'기존 배포 제거',
-            ui_mode_destroy_desc:'MAP Auto-Tagger 배포를 깨끗하게 제거합니다. MAJOR 업그레이드 전, 참여가 종료되었을 때, 또는 실패한 배포를 복구할 때 사용하세요. 이미 태깅된 리소스의 <code>map-migrated</code> 태그는 제거하지 않습니다.',
+            ui_mode_delete_title:'기존 배포 삭제',
+            ui_mode_delete_desc:'계정에서 MAP Auto-Tagger 배포를 제거합니다. 기본적으로 선택한 리전의 모든 <code>map-auto-tagger-mig*</code> 스택 및 스택셋을 삭제합니다. 특정 MPE로 범위를 지정할 수 있습니다. 이미 태깅된 리소스의 <code>map-migrated</code> 태그는 제거하지 않습니다.',
             ui_dstep1:'1. 구성',
             ui_dstep2:'2. 검토',
             ui_dstep3:'3. 다운로드',
-            ui_destroy_info:'이 도구는 계정 또는 조직에서 MAP Auto-Tagger 배포를 제거합니다. 단일 계정 스택과 다중 계정 StackSet을 자동 감지하는 <code>destroy.sh</code> 스크립트를 생성합니다. 이미 태깅된 리소스의 <code>map-migrated</code> 태그는 <strong>제거되지 않습니다</strong> — MAP 크레딧이 그대로 유지되도록 태그가 보존됩니다.',
-            ui_destroy_step1_title:'배포 세부 정보',
-            ui_destroy_step1_subtitle:'제거할 배포 식별',
-            ui_destroy_mpe_label:'MPE ID',
-            ui_destroy_region:'배포 리전',
-            ui_destroy_optin_title:'선택적 파괴적 작업 (옵트인)',
-            ui_destroy_optin_bucket:'S3 스테이징 버킷 삭제',
-            ui_destroy_optin_logs:'CloudWatch 로그 그룹 삭제',
-            ui_destroy_optin_legacy:'레거시 네임스페이스 이전 스택도 제거',
-            ui_destroy_review_subtitle:'삭제될 항목 확인',
-            ui_destroy_confirm_title:'⚠️ 파괴를 확인하려면 MPE ID를 입력하세요',
-            ui_destroy_generate:'destroy.sh 생성 →',
-            ui_destroy_download:'⬇ destroy.sh 다운로드',
-            err_destroy_mpe:'유효한 10자리 MPE ID를 입력하세요',
-            err_destroy_confirm:'입력한 MPE ID가 일치하지 않습니다',
+            ui_delete_info:'이 도구는 계정에서 MAP Auto-Tagger 배포를 제거합니다. 단일 계정 스택과 다중 계정 StackSet을 자동 감지하는 <code>delete.sh</code> 스크립트를 생성합니다. 기본적으로 선택한 리전의 모든 <code>map-auto-tagger-mig*</code> 배포가 제거됩니다. 이미 태깅된 리소스의 <code>map-migrated</code> 태그는 <strong>제거되지 않습니다</strong>.',
+            ui_delete_step1_title:'배포 세부 정보',
+            ui_delete_step1_subtitle:'삭제할 리전을 선택하세요',
+            ui_delete_scope_title:'특정 MAP 참여로 제한',
+            ui_delete_scope_desc:'체크하지 않으면 이 리전에서 찾은 모든 MAP Auto-Tagger 배포를 삭제합니다.',
+            ui_delete_scope_all:'이 리전의 모든 map-auto-tagger-mig* 배포',
+            ui_delete_scope_specific:'특정 MPE',
+            ui_delete_mpe_label:'삭제할 MPE ID',
+            ui_delete_mpe_hint:'— 각각 이 리전에 배포된 MAP Auto-Tagger와 일치해야 합니다',
+            ui_delete_add_mpe:'+ MPE 추가',
+            ui_delete_optin_title:'선택 사항 — CloudWatch 로그 그룹',
+            ui_delete_optin_logs:'CloudWatch 로그 그룹 삭제',
+            ui_delete_optin_logs_hint:'— 감사 기록을 제거합니다. 기본적으로 로그는 보존됩니다.',
+            ui_delete_optin_bucket:'S3 스테이징 버킷',
+            ui_delete_bucket_note:'S3 스테이징 버킷은 자동으로 처리됩니다: 계정에 다른 MAP Auto-Tagger 배포가 없을 때만 삭제됩니다.',
+            ui_delete_bucket_conditional:'다른 배포가 없는 경우에만 삭제됩니다',
+            ui_delete_bucket_yes:'예 — 남은 배포가 없습니다',
+            ui_delete_review_subtitle:'삭제할 항목 확인',
+            ui_delete_confirm_title:'⚠️ <code>delete</code>를 입력하여 확인',
+            ui_delete_confirm_hint:'이 작업은 CloudFormation 리소스를 삭제합니다. 기존 <code>map-migrated</code> 태그는 보존되지만 Lambda는 즉시 새 리소스 태깅을 중지합니다.',
+            ui_delete_confirm_label:'확인하려면 <code>delete</code>를 입력하세요',
+            ui_delete_generate:'delete.sh 생성 →',
+            ui_delete_step3_subtitle:'배포 계정의 AWS CloudShell에서 실행하세요',
+            ui_delete_download:'⬇ delete.sh 다운로드',
+            err_delete_mpe:'유효한 10자리 MPE ID를 하나 이상 입력하세요',
+            err_delete_confirm:'계속하려면 "delete"를 입력하세요',
             ui_editor_script_preview:'스크립트 미리보기',
             err_date_required:'협약 시작일을 입력해 주세요',
             err_date_end:'협약 종료일은 시작일 이후여야 합니다',
@@ -3649,7 +3670,7 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             ui_editor_remove_desc:'選択したアカウントはタグ付けされなくなります。既存のタグは削除されません。Lambdaはそのアカウントでは非アクティブのまま残ります。',
             ui_editor_remove_accounts_label:'削除するアカウントID',
             ui_editor_remove_accounts_hint:'— 現在スコープ内のアカウントのみ',
-            ui_mode_update_title:'最新のテンプレートバージョンに更新',
+            ui_mode_update_title:'最新のテンプレートバージョンにアップグレード',
             ui_mode_update_desc:'Lambdaコード、IAMポリシー、EventBridgeルールを現在のテンプレートバージョンにアップグレードします。スコープ設定（アカウント、VPC、契約日）は保持されます。シングルアカウントおよびマルチアカウントのデプロイを自動検出します。',
             ui_ustep1:'1. 構成',
             ui_ustep2:'2. 確認',
@@ -3695,26 +3716,37 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             ui_editor_step3_subtitle:'管理アカウントのAWS CloudShellで実行してください',
             ui_editor_download:'⬇ update.shをダウンロード',
             ui_upgrade_download:'⬇ upgrade.shをダウンロード',
-            ui_mode_destroy_title:'既存のデプロイを削除',
-            ui_mode_destroy_desc:'MAP Auto-Taggerデプロイをクリーンに削除します。MAJORアップグレード前、エンゲージメント終了時、または失敗したデプロイの復旧に使用します。既にタグ付けされたリソースの<code>map-migrated</code>タグは削除しません。',
+            ui_mode_delete_title:'既存のデプロイを削除',
+            ui_mode_delete_desc:'アカウントからMAP Auto-Taggerデプロイを削除します。デフォルトでは選択したリージョン内のすべての<code>map-auto-tagger-mig*</code>スタックとスタックセットを削除します。特定のMPEにスコープを絞ることもできます。既にタグ付けされたリソースの<code>map-migrated</code>タグは削除されません。',
             ui_dstep1:'1. 構成',
             ui_dstep2:'2. レビュー',
             ui_dstep3:'3. ダウンロード',
-            ui_destroy_info:'このツールはアカウントまたは組織からMAP Auto-Taggerデプロイを削除します。シングルアカウントスタックとマルチアカウントStackSetを自動検出する<code>destroy.sh</code>スクリプトを生成します。既にタグ付けされたリソースの<code>map-migrated</code>タグは<strong>削除されません</strong> — MAPクレジットを維持するためにタグは保持されます。',
-            ui_destroy_step1_title:'デプロイ詳細',
-            ui_destroy_step1_subtitle:'削除するデプロイを特定',
-            ui_destroy_mpe_label:'MPE ID',
-            ui_destroy_region:'デプロイリージョン',
-            ui_destroy_optin_title:'オプションの破壊的アクション (オプトイン)',
-            ui_destroy_optin_bucket:'S3ステージングバケットを削除',
-            ui_destroy_optin_logs:'CloudWatchロググループを削除',
-            ui_destroy_optin_legacy:'レガシーな名前空間以前のスタックも削除',
-            ui_destroy_review_subtitle:'削除される内容を確認',
-            ui_destroy_confirm_title:'⚠️ 破壊を確認するためにMPE IDを入力してください',
-            ui_destroy_generate:'destroy.shを生成 →',
-            ui_destroy_download:'⬇ destroy.shをダウンロード',
-            err_destroy_mpe:'有効な10文字のMPE IDを入力してください',
-            err_destroy_confirm:'入力されたMPE IDが一致しません',
+            ui_delete_info:'このツールはアカウントからMAP Auto-Taggerデプロイを削除します。シングルアカウントスタックとマルチアカウントStackSetを自動検出する<code>delete.sh</code>スクリプトを生成します。デフォルトでは選択したリージョン内のすべての<code>map-auto-tagger-mig*</code>デプロイが削除されます。既にタグ付けされたリソースの<code>map-migrated</code>タグは<strong>削除されません</strong>。',
+            ui_delete_step1_title:'デプロイ詳細',
+            ui_delete_step1_subtitle:'削除するリージョンを選択',
+            ui_delete_scope_title:'特定のMAP エンゲージメントに限定',
+            ui_delete_scope_desc:'チェックしない場合、このリージョン内のすべてのMAP Auto-Taggerデプロイが削除されます。',
+            ui_delete_scope_all:'このリージョン内のすべてのmap-auto-tagger-mig*デプロイ',
+            ui_delete_scope_specific:'特定のMPE',
+            ui_delete_mpe_label:'削除するMPE ID',
+            ui_delete_mpe_hint:'— 各MPEはこのリージョンにデプロイ済みのMAP Auto-Taggerと一致する必要があります',
+            ui_delete_add_mpe:'+ MPEを追加',
+            ui_delete_optin_title:'オプション — CloudWatchロググループ',
+            ui_delete_optin_logs:'CloudWatchロググループを削除',
+            ui_delete_optin_logs_hint:'— 監査履歴を削除します。デフォルトではログは保持されます。',
+            ui_delete_optin_bucket:'S3ステージングバケット',
+            ui_delete_bucket_note:'S3ステージングバケットは自動的に処理されます: アカウントに他のMAP Auto-Taggerデプロイが残っていない場合のみ削除されます。',
+            ui_delete_bucket_conditional:'他のデプロイが残っていない場合のみ削除',
+            ui_delete_bucket_yes:'はい — デプロイは残りません',
+            ui_delete_review_subtitle:'削除内容を確認',
+            ui_delete_confirm_title:'⚠️ <code>delete</code>と入力して確認',
+            ui_delete_confirm_hint:'このアクションはCloudFormationリソースを削除します。既存の<code>map-migrated</code>タグは保持されますが、Lambdaは直ちに新しいリソースのタグ付けを停止します。',
+            ui_delete_confirm_label:'確認するには<code>delete</code>と入力してください',
+            ui_delete_generate:'delete.shを生成 →',
+            ui_delete_step3_subtitle:'デプロイアカウントのAWS CloudShellで実行',
+            ui_delete_download:'⬇ delete.shをダウンロード',
+            err_delete_mpe:'有効な10文字のMPE IDを少なくとも1つ入力してください',
+            err_delete_confirm:'続行するには "delete" と入力してください',
             ui_editor_script_preview:'スクリプトプレビュー',
             err_date_required:'契約開始日を入力してください',
             err_date_end:'契約終了日は開始日より後である必要があります',
@@ -4001,26 +4033,37 @@ ui_instr_single_title:'部署说明 — 单账户',
             ui_editor_step3_subtitle:'在管理账户的AWS CloudShell中运行',
             ui_editor_download:'⬇ 下载update.sh',
             ui_upgrade_download:'⬇ 下载upgrade.sh',
-            ui_mode_destroy_title:'销毁现有部署',
-            ui_mode_destroy_desc:'干净地移除MAP Auto-Tagger部署。在MAJOR升级前、参与结束时或恢复失败部署时使用。不会从已标记的资源中移除<code>map-migrated</code>标签。',
+            ui_mode_delete_title:'删除现有部署',
+            ui_mode_delete_desc:'从账户中删除 MAP Auto-Tagger 部署。默认删除所选区域中所有 <code>map-auto-tagger-mig*</code> 堆栈和堆栈集；可选择限定到特定的 MPE。已标记资源的 <code>map-migrated</code> 标签不会被移除。',
             ui_dstep1:'1. 配置',
             ui_dstep2:'2. 审核',
             ui_dstep3:'3. 下载',
-            ui_destroy_info:'此工具从您的账户或组织中移除MAP Auto-Tagger部署。它生成一个<code>destroy.sh</code>脚本，自动检测单账户堆栈和多账户StackSet。已标记资源的<code>map-migrated</code>标签<strong>不会</strong>被移除 — 这些标签将被保留以保持MAP积分完好。',
-            ui_destroy_step1_title:'部署详细信息',
-            ui_destroy_step1_subtitle:'识别要移除的部署',
-            ui_destroy_mpe_label:'MPE ID',
-            ui_destroy_region:'部署区域',
-            ui_destroy_optin_title:'可选的破坏性操作 (选择加入)',
-            ui_destroy_optin_bucket:'删除S3暂存存储桶',
-            ui_destroy_optin_logs:'删除CloudWatch日志组',
-            ui_destroy_optin_legacy:'同时移除旧版命名空间之前的堆栈',
-            ui_destroy_review_subtitle:'确认将被删除的内容',
-            ui_destroy_confirm_title:'⚠️ 输入MPE ID以确认销毁',
-            ui_destroy_generate:'生成destroy.sh →',
-            ui_destroy_download:'⬇ 下载destroy.sh',
-            err_destroy_mpe:'请输入有效的10位MPE ID',
-            err_destroy_confirm:'输入的MPE ID不匹配',
+            ui_delete_info:'此工具从您的账户中删除 MAP Auto-Tagger 部署。它生成一个 <code>delete.sh</code> 脚本，自动检测单账户堆栈和多账户 StackSet。默认情况下，所选区域中所有 <code>map-auto-tagger-mig*</code> 部署都将被删除。已标记资源的 <code>map-migrated</code> 标签<strong>不会</strong>被移除。',
+            ui_delete_step1_title:'部署详细信息',
+            ui_delete_step1_subtitle:'选择要删除的区域',
+            ui_delete_scope_title:'限定到特定 MAP 参与',
+            ui_delete_scope_desc:'不勾选则删除此区域中找到的所有 MAP Auto-Tagger 部署。',
+            ui_delete_scope_all:'此区域中所有 map-auto-tagger-mig* 部署',
+            ui_delete_scope_specific:'特定 MPE',
+            ui_delete_mpe_label:'要删除的 MPE ID',
+            ui_delete_mpe_hint:'— 每个必须与此区域中已部署的 MAP Auto-Tagger 匹配',
+            ui_delete_add_mpe:'+ 添加 MPE',
+            ui_delete_optin_title:'可选 — CloudWatch 日志组',
+            ui_delete_optin_logs:'删除 CloudWatch 日志组',
+            ui_delete_optin_logs_hint:'— 移除审计历史。默认情况下日志会保留。',
+            ui_delete_optin_bucket:'S3 暂存存储桶',
+            ui_delete_bucket_note:'S3 暂存存储桶会自动处理：仅当账户中没有其他 MAP Auto-Tagger 部署时才会删除。',
+            ui_delete_bucket_conditional:'仅在没有其他部署时删除',
+            ui_delete_bucket_yes:'是 — 没有部署将保留',
+            ui_delete_review_subtitle:'确认要删除的内容',
+            ui_delete_confirm_title:'⚠️ 输入 <code>delete</code> 以确认',
+            ui_delete_confirm_hint:'此操作将删除 CloudFormation 资源。现有 <code>map-migrated</code> 标签将被保留，但 Lambda 将立即停止标记新资源。',
+            ui_delete_confirm_label:'输入 <code>delete</code> 以确认',
+            ui_delete_generate:'生成 delete.sh →',
+            ui_delete_step3_subtitle:'在部署账户的 AWS CloudShell 中运行',
+            ui_delete_download:'⬇ 下载 delete.sh',
+            err_delete_mpe:'请至少输入一个有效的 10 位 MPE ID',
+            err_delete_confirm:'请输入 "delete" 以继续',
             ui_editor_script_preview:'脚本预览',
             err_date_required:'请填写协议开始日期',
             err_date_end:'协议结束日期必须晚于开始日期',
@@ -4261,7 +4304,7 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             ui_editor_remove_desc:'Akun yang dipilih tidak akan lagi diberi tag. Tag yang ada tidak dihapus. Lambda tetap di-deploy tetapi tidak aktif untuk akun-akun ini.',
             ui_editor_remove_accounts_label:'ID Akun yang akan dihapus',
             ui_editor_remove_accounts_hint:'— hanya akun yang saat ini ada di cakupan',
-            ui_mode_update_title:'Perbarui ke versi template terbaru',
+            ui_mode_update_title:'Tingkatkan ke versi template terbaru',
             ui_mode_update_desc:'Tingkatkan kode Lambda, kebijakan IAM, dan aturan EventBridge ke versi template saat ini. Konfigurasi cakupan (akun, VPC, tanggal perjanjian) dipertahankan. Mendeteksi otomatis deployment akun tunggal dan multi-akun.',
             ui_ustep1:'1. Konfigurasi',
             ui_ustep2:'2. Tinjau',
@@ -4307,26 +4350,37 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             ui_editor_step3_subtitle:'Jalankan ini di AWS CloudShell dari akun manajemen',
             ui_editor_download:'⬇ Unduh update.sh',
             ui_upgrade_download:'⬇ Unduh upgrade.sh',
-            ui_mode_destroy_title:'Hancurkan deployment yang ada',
-            ui_mode_destroy_desc:'Menghapus deployment MAP Auto-Tagger dengan bersih. Gunakan sebelum peningkatan MAJOR, saat engagement berakhir, atau untuk memulihkan dari deployment yang gagal. Tidak menghapus tag <code>map-migrated</code> dari sumber daya yang sudah diberi tag.',
+            ui_mode_delete_title:'Hapus deployment yang ada',
+            ui_mode_delete_desc:'Menghapus deployment MAP Auto-Tagger dari akun. Secara default menghapus setiap stack dan stackset <code>map-auto-tagger-mig*</code> di region yang dipilih; opsional batasi ke MPE tertentu. Tag <code>map-migrated</code> pada sumber daya yang sudah diberi tag tidak dihapus.',
             ui_dstep1:'1. Konfigurasi',
             ui_dstep2:'2. Tinjau',
             ui_dstep3:'3. Unduh',
-            ui_destroy_info:'Alat ini menghapus deployment MAP Auto-Tagger dari akun atau organisasi Anda. Menghasilkan skrip <code>destroy.sh</code> yang mendeteksi otomatis stack akun tunggal dan StackSet multi-akun. Tag <code>map-migrated</code> pada sumber daya yang sudah diberi tag <strong>tidak</strong> dihapus — tag dipertahankan agar kredit MAP tetap utuh.',
-            ui_destroy_step1_title:'Detail Deployment',
-            ui_destroy_step1_subtitle:'Identifikasi deployment yang akan dihapus',
-            ui_destroy_mpe_label:'MPE ID',
-            ui_destroy_region:'Wilayah Deployment',
-            ui_destroy_optin_title:'Tindakan destruktif opsional (opt-in)',
-            ui_destroy_optin_bucket:'Hapus bucket S3 staging',
-            ui_destroy_optin_logs:'Hapus CloudWatch Log Groups',
-            ui_destroy_optin_legacy:'Juga hapus stack pra-penamaan ruang nama',
-            ui_destroy_review_subtitle:'Konfirmasi apa yang akan dihapus',
-            ui_destroy_confirm_title:'⚠️ Ketik MPE ID untuk mengonfirmasi penghancuran',
-            ui_destroy_generate:'Buat destroy.sh →',
-            ui_destroy_download:'⬇ Unduh destroy.sh',
-            err_destroy_mpe:'Masukkan MPE ID 10 karakter yang valid',
-            err_destroy_confirm:'MPE ID yang Anda ketik tidak cocok',
+            ui_delete_info:'Alat ini menghapus deployment MAP Auto-Tagger dari akun Anda. Menghasilkan skrip <code>delete.sh</code> yang mendeteksi otomatis stack akun tunggal dan StackSet multi-akun. Secara default, setiap deployment <code>map-auto-tagger-mig*</code> di region yang dipilih akan dihapus. Tag <code>map-migrated</code> pada sumber daya yang sudah diberi tag <strong>tidak</strong> dihapus.',
+            ui_delete_step1_title:'Detail Deployment',
+            ui_delete_step1_subtitle:'Pilih region untuk dihapus',
+            ui_delete_scope_title:'Batasi ke engagement MAP tertentu',
+            ui_delete_scope_desc:'Jangan dicentang untuk menghapus semua deployment MAP Auto-Tagger yang ditemukan di region ini.',
+            ui_delete_scope_all:'Semua deployment map-auto-tagger-mig* di region ini',
+            ui_delete_scope_specific:'MPE tertentu',
+            ui_delete_mpe_label:'MPE ID yang akan dihapus',
+            ui_delete_mpe_hint:'— masing-masing harus sesuai dengan MAP Auto-Tagger yang di-deploy di region ini',
+            ui_delete_add_mpe:'+ Tambah MPE',
+            ui_delete_optin_title:'Opsional — CloudWatch Log Groups',
+            ui_delete_optin_logs:'Hapus CloudWatch Log Groups',
+            ui_delete_optin_logs_hint:'— menghapus riwayat audit. Secara default log dipertahankan.',
+            ui_delete_optin_bucket:'Bucket S3 staging',
+            ui_delete_bucket_note:'Bucket S3 staging ditangani otomatis: dihapus hanya jika tidak ada deployment MAP Auto-Tagger lain yang tersisa di akun.',
+            ui_delete_bucket_conditional:'Dihapus hanya jika tidak ada deployment tersisa',
+            ui_delete_bucket_yes:'Ya — tidak ada deployment tersisa',
+            ui_delete_review_subtitle:'Konfirmasi apa yang akan dihapus',
+            ui_delete_confirm_title:'⚠️ Ketik <code>delete</code> untuk mengonfirmasi',
+            ui_delete_confirm_hint:'Tindakan ini menghapus sumber daya CloudFormation. Tag <code>map-migrated</code> yang ada dipertahankan, tetapi Lambda akan segera berhenti menandai sumber daya baru.',
+            ui_delete_confirm_label:'Ketik kata <code>delete</code> untuk mengonfirmasi',
+            ui_delete_generate:'Buat delete.sh →',
+            ui_delete_step3_subtitle:'Jalankan di AWS CloudShell dari akun deployment',
+            ui_delete_download:'⬇ Unduh delete.sh',
+            err_delete_mpe:'Harap masukkan setidaknya satu MPE ID 10 karakter yang valid',
+            err_delete_confirm:'Ketik "delete" untuk melanjutkan',
             ui_editor_script_preview:'Pratinjau Skrip',
             err_date_required:'Tanggal mulai perjanjian wajib diisi',
             err_date_end:'Tanggal berakhir harus setelah tanggal mulai',
@@ -4567,7 +4621,7 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             ui_editor_remove_desc:'บัญชีที่เลือกจะหยุดถูกติด tag tag ที่มีอยู่จะไม่ถูกลบ Lambda ยังคง deploy อยู่แต่ไม่ active สำหรับบัญชีเหล่านี้',
             ui_editor_remove_accounts_label:'ID บัญชีที่จะลบ',
             ui_editor_remove_accounts_hint:'— เฉพาะบัญชีที่อยู่ในขอบเขตปัจจุบัน',
-            ui_mode_update_title:'อัปเดตเป็นเวอร์ชันเทมเพลตล่าสุด',
+            ui_mode_update_title:'อัปเกรดเป็นเวอร์ชันเทมเพลตล่าสุด',
             ui_mode_update_desc:'อัปเกรดโค้ด Lambda, นโยบาย IAM และกฎ EventBridge เป็นเวอร์ชันเทมเพลตปัจจุบัน การกำหนดค่าขอบเขต (บัญชี, VPC, วันที่ในข้อตกลง) จะถูกรักษาไว้ ตรวจจับการ deploy แบบบัญชีเดียวและหลายบัญชีโดยอัตโนมัติ',
             ui_ustep1:'1. กำหนดค่า',
             ui_ustep2:'2. ตรวจสอบ',
@@ -4613,26 +4667,37 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             ui_editor_step3_subtitle:'รันในAWS CloudShell จาก management account',
             ui_editor_download:'⬇ ดาวน์โหลด update.sh',
             ui_upgrade_download:'⬇ ดาวน์โหลด upgrade.sh',
-            ui_mode_destroy_title:'ทำลายการ deploy ที่มีอยู่',
-            ui_mode_destroy_desc:'ลบการ deploy MAP Auto-Tagger อย่างสะอาด ใช้ก่อนอัปเกรด MAJOR เมื่อ engagement สิ้นสุด หรือเพื่อกู้คืนจากการ deploy ที่ล้มเหลว จะไม่ลบแท็ก <code>map-migrated</code> จากทรัพยากรที่ติดแท็กแล้ว',
+            ui_mode_delete_title:'ลบการ deploy ที่มีอยู่',
+            ui_mode_delete_desc:'ลบการ deploy MAP Auto-Tagger ออกจากบัญชี โดยค่าเริ่มต้นจะลบทุก <code>map-auto-tagger-mig*</code> stack และ stackset ในภูมิภาคที่เลือก สามารถจำกัดเฉพาะ MPE ได้ แท็ก <code>map-migrated</code> บนทรัพยากรที่ติดแท็กแล้วจะไม่ถูกลบ',
             ui_dstep1:'1. กำหนดค่า',
             ui_dstep2:'2. ตรวจสอบ',
             ui_dstep3:'3. ดาวน์โหลด',
-            ui_destroy_info:'เครื่องมือนี้ลบการ deploy MAP Auto-Tagger จากบัญชีหรือองค์กรของคุณ สร้างสคริปต์ <code>destroy.sh</code> ที่ตรวจจับ stack บัญชีเดียวและ StackSet หลายบัญชีโดยอัตโนมัติ แท็ก <code>map-migrated</code> บนทรัพยากรที่ติดแท็กแล้ว<strong>จะไม่</strong>ถูกลบ — แท็กจะยังคงอยู่เพื่อรักษาเครดิต MAP',
-            ui_destroy_step1_title:'รายละเอียดการ Deploy',
-            ui_destroy_step1_subtitle:'ระบุการ deploy ที่จะลบ',
-            ui_destroy_mpe_label:'MPE ID',
-            ui_destroy_region:'ภูมิภาคการ Deploy',
-            ui_destroy_optin_title:'การดำเนินการทำลายแบบเลือก (opt-in)',
-            ui_destroy_optin_bucket:'ลบบัคเก็ต S3 staging',
-            ui_destroy_optin_logs:'ลบ CloudWatch Log Groups',
-            ui_destroy_optin_legacy:'ลบ stack ก่อน namespacing ด้วย',
-            ui_destroy_review_subtitle:'ยืนยันสิ่งที่จะถูกลบ',
-            ui_destroy_confirm_title:'⚠️ พิมพ์ MPE ID เพื่อยืนยันการทำลาย',
-            ui_destroy_generate:'สร้าง destroy.sh →',
-            ui_destroy_download:'⬇ ดาวน์โหลด destroy.sh',
-            err_destroy_mpe:'กรุณาใส่ MPE ID 10 ตัวอักษรที่ถูกต้อง',
-            err_destroy_confirm:'MPE ID ที่คุณพิมพ์ไม่ตรงกัน',
+            ui_delete_info:'เครื่องมือนี้ลบการ deploy MAP Auto-Tagger ออกจากบัญชีของคุณ สร้างสคริปต์ <code>delete.sh</code> ที่ตรวจจับ stack บัญชีเดียวและ StackSet หลายบัญชีโดยอัตโนมัติ โดยค่าเริ่มต้นจะลบทุกการ deploy <code>map-auto-tagger-mig*</code> ในภูมิภาคที่เลือก แท็ก <code>map-migrated</code> บนทรัพยากรที่ติดแท็กแล้ว<strong>จะไม่</strong>ถูกลบ',
+            ui_delete_step1_title:'รายละเอียดการ Deploy',
+            ui_delete_step1_subtitle:'เลือกภูมิภาคที่จะลบ',
+            ui_delete_scope_title:'จำกัดเฉพาะ MAP engagement',
+            ui_delete_scope_desc:'ไม่ติ๊กเพื่อลบทุกการ deploy MAP Auto-Tagger ที่พบในภูมิภาคนี้',
+            ui_delete_scope_all:'การ deploy map-auto-tagger-mig* ทั้งหมดในภูมิภาคนี้',
+            ui_delete_scope_specific:'MPE เฉพาะ',
+            ui_delete_mpe_label:'MPE ID ที่จะลบ',
+            ui_delete_mpe_hint:'— แต่ละรายการต้องตรงกับ MAP Auto-Tagger ที่ deploy ในภูมิภาคนี้',
+            ui_delete_add_mpe:'+ เพิ่ม MPE',
+            ui_delete_optin_title:'ตัวเลือก — CloudWatch Log Groups',
+            ui_delete_optin_logs:'ลบ CloudWatch Log Groups',
+            ui_delete_optin_logs_hint:'— ลบประวัติการตรวจสอบ โดยค่าเริ่มต้นจะเก็บ log ไว้',
+            ui_delete_optin_bucket:'บัคเก็ต S3 staging',
+            ui_delete_bucket_note:'บัคเก็ต S3 staging จัดการโดยอัตโนมัติ: ลบเฉพาะเมื่อไม่มีการ deploy MAP Auto-Tagger อื่นเหลืออยู่ในบัญชี',
+            ui_delete_bucket_conditional:'ลบเฉพาะเมื่อไม่มีการ deploy อื่นเหลืออยู่',
+            ui_delete_bucket_yes:'ใช่ — ไม่มีการ deploy เหลืออยู่',
+            ui_delete_review_subtitle:'ยืนยันสิ่งที่จะถูกลบ',
+            ui_delete_confirm_title:'⚠️ พิมพ์ <code>delete</code> เพื่อยืนยัน',
+            ui_delete_confirm_hint:'การดำเนินการนี้ลบทรัพยากร CloudFormation แท็ก <code>map-migrated</code> ที่มีอยู่จะถูกเก็บไว้ แต่ Lambda จะหยุดติดแท็กทรัพยากรใหม่ทันที',
+            ui_delete_confirm_label:'พิมพ์คำว่า <code>delete</code> เพื่อยืนยัน',
+            ui_delete_generate:'สร้าง delete.sh →',
+            ui_delete_step3_subtitle:'รันใน AWS CloudShell จากบัญชีที่ deploy',
+            ui_delete_download:'⬇ ดาวน์โหลด delete.sh',
+            err_delete_mpe:'กรุณากรอก MPE ID 10 ตัวอักษรที่ถูกต้องอย่างน้อยหนึ่งรายการ',
+            err_delete_confirm:'พิมพ์ "delete" เพื่อดำเนินการต่อ',
             ui_editor_script_preview:'ตัวอย่างสคริปต์',
             err_date_required:'กรุณากรอกวันที่เริ่มต้นข้อตกลง',
             err_date_end:'วันที่สิ้นสุดต้องอยู่หลังวันที่เริ่มต้น',
@@ -4873,7 +4938,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             ui_editor_remove_desc:'Các tài khoản được chọn sẽ ngừng được gắn tag. Tag hiện có không bị xóa. Lambda vẫn được triển khai nhưng không hoạt động cho các tài khoản này.',
             ui_editor_remove_accounts_label:'ID tài khoản cần xóa',
             ui_editor_remove_accounts_hint:'— chỉ các tài khoản đang có trong phạm vi',
-            ui_mode_update_title:'Cập nhật lên phiên bản template mới nhất',
+            ui_mode_update_title:'Nâng cấp lên phiên bản template mới nhất',
             ui_mode_update_desc:'Nâng cấp mã Lambda, chính sách IAM và quy tắc EventBridge lên phiên bản template hiện tại. Cấu hình phạm vi (tài khoản, VPC, ngày thỏa thuận) được giữ nguyên. Tự động phát hiện triển khai đơn tài khoản và đa tài khoản.',
             ui_ustep1:'1. Cấu hình',
             ui_ustep2:'2. Xem lại',
@@ -4919,26 +4984,37 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             ui_editor_step3_subtitle:'Chạy trong AWS CloudShell từ tài khoản quản lý',
             ui_editor_download:'⬇ Tải xuống update.sh',
             ui_upgrade_download:'⬇ Tải xuống upgrade.sh',
-            ui_mode_destroy_title:'Hủy triển khai hiện có',
-            ui_mode_destroy_desc:'Xóa sạch triển khai MAP Auto-Tagger. Sử dụng trước khi nâng cấp MAJOR, khi kết thúc engagement, hoặc để khôi phục từ triển khai thất bại. Không xóa thẻ <code>map-migrated</code> khỏi các tài nguyên đã được gắn thẻ.',
+            ui_mode_delete_title:'Xóa triển khai hiện có',
+            ui_mode_delete_desc:'Xóa các triển khai MAP Auto-Tagger khỏi tài khoản. Theo mặc định xóa mọi stack và stackset <code>map-auto-tagger-mig*</code> trong khu vực đã chọn; tùy chọn giới hạn theo MPE cụ thể. Thẻ <code>map-migrated</code> trên các tài nguyên đã được gắn thẻ không bị xóa.',
             ui_dstep1:'1. Cấu hình',
             ui_dstep2:'2. Xem lại',
             ui_dstep3:'3. Tải xuống',
-            ui_destroy_info:'Công cụ này xóa triển khai MAP Auto-Tagger khỏi tài khoản hoặc tổ chức của bạn. Tạo tập lệnh <code>destroy.sh</code> tự động phát hiện stack đơn tài khoản và StackSet đa tài khoản. Thẻ <code>map-migrated</code> trên các tài nguyên đã được gắn thẻ <strong>không</strong> bị xóa — các thẻ được giữ lại để đảm bảo tín dụng MAP còn nguyên.',
-            ui_destroy_step1_title:'Chi tiết Triển khai',
-            ui_destroy_step1_subtitle:'Xác định triển khai cần xóa',
-            ui_destroy_mpe_label:'MPE ID',
-            ui_destroy_region:'Khu vực Triển khai',
-            ui_destroy_optin_title:'Hành động hủy tùy chọn (opt-in)',
-            ui_destroy_optin_bucket:'Xóa bucket S3 staging',
-            ui_destroy_optin_logs:'Xóa CloudWatch Log Groups',
-            ui_destroy_optin_legacy:'Cũng xóa stack trước khi namespace',
-            ui_destroy_review_subtitle:'Xác nhận những gì sẽ bị xóa',
-            ui_destroy_confirm_title:'⚠️ Nhập MPE ID để xác nhận hủy',
-            ui_destroy_generate:'Tạo destroy.sh →',
-            ui_destroy_download:'⬇ Tải xuống destroy.sh',
-            err_destroy_mpe:'Vui lòng nhập MPE ID 10 ký tự hợp lệ',
-            err_destroy_confirm:'MPE ID bạn đã nhập không khớp',
+            ui_delete_info:'Công cụ này xóa các triển khai MAP Auto-Tagger khỏi tài khoản của bạn. Tạo tập lệnh <code>delete.sh</code> tự động phát hiện stack đơn tài khoản và StackSet đa tài khoản. Theo mặc định, mọi triển khai <code>map-auto-tagger-mig*</code> trong khu vực đã chọn sẽ bị xóa. Thẻ <code>map-migrated</code> trên các tài nguyên đã được gắn thẻ <strong>không</strong> bị xóa.',
+            ui_delete_step1_title:'Chi tiết Triển khai',
+            ui_delete_step1_subtitle:'Chọn khu vực để xóa',
+            ui_delete_scope_title:'Giới hạn theo engagement MAP cụ thể',
+            ui_delete_scope_desc:'Bỏ chọn để xóa mọi triển khai MAP Auto-Tagger được tìm thấy trong khu vực này.',
+            ui_delete_scope_all:'Tất cả triển khai map-auto-tagger-mig* trong khu vực này',
+            ui_delete_scope_specific:'MPE cụ thể',
+            ui_delete_mpe_label:'MPE ID cần xóa',
+            ui_delete_mpe_hint:'— mỗi cái phải khớp với MAP Auto-Tagger đã triển khai trong khu vực này',
+            ui_delete_add_mpe:'+ Thêm MPE',
+            ui_delete_optin_title:'Tùy chọn — CloudWatch Log Groups',
+            ui_delete_optin_logs:'Xóa CloudWatch Log Groups',
+            ui_delete_optin_logs_hint:'— xóa lịch sử kiểm tra. Theo mặc định log được giữ lại.',
+            ui_delete_optin_bucket:'Bucket S3 staging',
+            ui_delete_bucket_note:'Bucket S3 staging được xử lý tự động: chỉ bị xóa khi không còn triển khai MAP Auto-Tagger nào khác trong tài khoản.',
+            ui_delete_bucket_conditional:'Chỉ xóa nếu không còn triển khai nào',
+            ui_delete_bucket_yes:'Có — không có triển khai nào còn lại',
+            ui_delete_review_subtitle:'Xác nhận những gì sẽ bị xóa',
+            ui_delete_confirm_title:'⚠️ Nhập <code>delete</code> để xác nhận',
+            ui_delete_confirm_hint:'Hành động này xóa tài nguyên CloudFormation. Các thẻ <code>map-migrated</code> hiện có được giữ lại, nhưng Lambda sẽ ngay lập tức ngừng gắn thẻ tài nguyên mới.',
+            ui_delete_confirm_label:'Nhập từ <code>delete</code> để xác nhận',
+            ui_delete_generate:'Tạo delete.sh →',
+            ui_delete_step3_subtitle:'Chạy trong AWS CloudShell từ tài khoản triển khai',
+            ui_delete_download:'⬇ Tải xuống delete.sh',
+            err_delete_mpe:'Vui lòng nhập ít nhất một MPE ID 10 ký tự hợp lệ',
+            err_delete_confirm:'Nhập "delete" để tiếp tục',
             ui_editor_script_preview:'Xem trước Script',
             err_date_required:'Vui lòng nhập ngày bắt đầu thỏa thuận',
             err_date_end:'Ngày kết thúc phải sau ngày bắt đầu',

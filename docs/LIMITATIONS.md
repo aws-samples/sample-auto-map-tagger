@@ -40,10 +40,10 @@ MAJOR version bumps change resource names (for example, the v18 → v19 jump int
 
 For MAJOR upgrades the customer must:
 
-1. Run `destroy.sh` (generated from the Destroy mode in `configurator.html`), **or** manually `aws cloudformation delete-stack[-set]` the old deployment.
+1. Run `delete.sh` (generated from the Delete mode in `configurator.html`), **or** manually `aws cloudformation delete-stack[-set]` the old deployment.
 2. Regenerate `deploy.sh` from the current configurator.
 3. Run `bash deploy.sh`.
 
-There is a ~5–15 minute gap between destroy completion and the new Lambda coming online. Enable backfill in the fresh `deploy.sh` to retroactively tag resources created during the window.
+There is a ~5–15 minute gap between delete completion and the new Lambda coming online. Enable backfill in the fresh `deploy.sh` to retroactively tag resources created during the window.
 
 PATCH and MINOR upgrades are handled in place by `upgrade.sh` with no tagging gap — scope, agreement dates, and VPC config are preserved via `--use-previous-parameters`. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for both paths.
