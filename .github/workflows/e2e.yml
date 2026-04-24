@@ -1,19 +1,19 @@
 name: E2E Integration Tests
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'map2-auto-tagger-optimized.yaml'
-      - 'configurator.html'
-      - '.github/scripts/**'
-      - '.github/workflows/e2e.yml'
+  # Manual-only trigger. Pre-GA the repo isn't customer-facing yet,
+  # so authors run E2E on demand at the end of a sprint or when a PR
+  # touches the Lambda/CFN. Layer 1 (sync-check, handler coverage,
+  # cfn-lint) stays as the per-PR gate.
   workflow_dispatch:
 
-# Cancel in-progress runs for the same PR
+# Serialize all E2E runs — the linked-account pool (linked2–5) is shared
+# across every run, so two concurrent runs race to tag each other's
+# resources. Queue instead of cancel: an interrupted run would skip
+# teardown and leave StackSets + Lambdas behind.
 concurrency:
-  group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+  group: e2e-linked-accounts-pool
+  cancel-in-progress: false
 
 # Default settings inherited by all jobs
 defaults:
@@ -21,7 +21,9 @@ defaults:
     working-directory: .github/scripts
 
 env:
-  PR_NUMBER: ${{ github.event.pull_request.number }}
+  # Falls back to run_id for schedule/workflow_dispatch runs (no PR).
+  # Keeps resource names unique across runs so nothing collides.
+  PR_NUMBER: ${{ github.event.pull_request.number || github.run_id }}
   # MPE_ID drives the expected tag value. Keeps the `migTEST` prefix so the
   # scope-vpc-positive verify step (which filters tags by `migTEST*`) keeps
   # working — scope tests run in the same account as the main stack and both
@@ -42,7 +44,7 @@ env:
   SCOPE_VPC_MPE: migTEST${{ github.run_id }}B
   SCOPE_DATE_MPE: migTEST${{ github.run_id }}C
   SCOPE_ACCT_OUT_MPE: migTEST${{ github.run_id }}D
-  STACK_NAME: map-auto-tagger-e2e-pr${{ github.event.pull_request.number }}
+  STACK_NAME: map-auto-tagger-e2e-pr${{ github.event.pull_request.number || github.run_id }}
 
 # ---------------------------------------------------------------------------
 # Reusable step fragments — referenced by name in jobs below
