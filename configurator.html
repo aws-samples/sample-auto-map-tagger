@@ -6124,6 +6124,7 @@ IAM_CHECK_ACTIONS=( \\
   "cloudformation:UpdateStack" \\
   "cloudformation:DescribeStacks" \\
   "cloudformation:GetTemplateSummary" \\
+  "cloudformation:ListStacks" \\
   "iam:CreateRole" \\
   "iam:PutRolePolicy" \\
   "iam:AttachRolePolicy" \\
@@ -6135,6 +6136,7 @@ IAM_CHECK_ACTIONS=( \\
   "sqs:CreateQueue" \\
   "sqs:SetQueueAttributes" \\
   "ssm:PutParameter" \\
+  "ssm:GetParameter" \\
   "logs:CreateLogGroup" \\
   "logs:PutRetentionPolicy" \\
   "sns:CreateTopic" \\
@@ -6200,16 +6202,24 @@ for CHECK_REGION in \$REGIONS; do
     esac
 done
 
-# ── Same-account multi-Lambda conflict (Class 2: single-account mode) ────
+# ── Same-account multi-Lambda conflict (Class 2: single-account, Q3 Option D) ────
 # If another map-auto-tagger-* stack exists in this account with a different
-# MPE, both Lambdas receive the same CloudTrail events. Last-writer-wins on
-# the map-migrated tag value. Read the existing stack's SSM config and:
-#   - either deploy uses scope=all → full conflict, fail with account
-#   - both use scope=vpc → compute VPC overlap, fail only if VPCs overlap
-# If both are VPC-scoped with non-overlapping VPC lists, allow deploy to
-# continue — runtime is_in_scope filtering prevents double-tagging.
+# MPE, both Lambdas receive the same CloudTrail events. Whoever tags last wins.
+# Q3 Option D intersects scopes per pair and hard-fails only on actual overlap:
+#
+#   account/ALL     vs anything in same account → conflict (ALL dominates)
+#   account/[X,Y,…] vs account/[Z,Y,…]          → conflict iff shared account ID
+#   account/[X,Y,…] vs vpc/[V,…]                → conflict iff this deploy-account is in [X,Y,…]
+#                                                  (the account-scoped peer claims all of account,
+#                                                   including the VPC-scoped peer's VPCs)
+#   vpc/[V1,V2]     vs vpc/[V2,V3]              → conflict iff shared VPC ID
+#   vpc/[V1,…]      vs vpc/[Vn,…] (disjoint)    → safe coexistence
 NEW_SCOPE_MODE="${config.scopeMode || 'account'}"
 NEW_VPC_LIST="${(config.scopedVpcIds && config.scopedVpcIds[0] !== 'NONE') ? config.scopedVpcIds.join(' ') : ''}"
+# For single-account deploys, the new scope's "account list" is always just \$ACCOUNT.
+# (The ScopedAccountIds CFN parameter is a multi-account convenience filter evaluated
+# by the Lambda at runtime; single-account deploys set it to ALL and rely on the
+# Lambda's per-account identity at tag time.)
 for CHECK_REGION in \$REGIONS; do
     EXISTING_STACKS=\$(aws cloudformation list-stacks --region "\$CHECK_REGION" \\
         --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE \\
@@ -6219,50 +6229,74 @@ for CHECK_REGION in \$REGIONS; do
     for EXISTING in \$EXISTING_STACKS; do
         EXISTING_MPE="\${EXISTING#map-auto-tagger-}"
         # Only treat as a peer deploy if the suffix matches the MpeId pattern
-        # (AllowedPattern: ^mig[a-zA-Z0-9]+\$). Skips test harness / E2E stacks
-        # that happen to start with our prefix but aren't real MAP deploys.
+        # (AllowedPattern: ^mig[a-zA-Z0-9]+\$). Skips test harness / E2E stacks.
         case "\$EXISTING_MPE" in mig*) ;; *) continue ;; esac
         if [ "\$EXISTING_MPE" = "\$MPE" ]; then continue; fi
-        # Read the existing deploy's SSM config to understand its scope
+        # Read peer's SSM config. Unreadable config = missing ssm:GetParameter
+        # on /auto-map-tagger/* — hard-fail with that specific remediation. The
+        # IAM preflight above should catch this first, but retain as defence.
         EXISTING_CFG=\$(aws ssm get-parameter --name "/auto-map-tagger/\$EXISTING_MPE/config" \\
             --region "\$CHECK_REGION" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
         if [ -z "\$EXISTING_CFG" ]; then
-            echo "  ⚠️  Found existing stack \$EXISTING but could not read its config (missing ssm:GetParameter?). Treating as full conflict."
-            echo "     Resources created in this account will be double-tagged (last-writer-wins on map-migrated)."
-            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} \$EXISTING config unreadable — assumed full conflict\\n"
+            echo "  ❌ Peer stack \$EXISTING exists but /auto-map-tagger/\$EXISTING_MPE/config is unreadable."
+            echo "     Grant ssm:GetParameter on arn:aws:ssm:\$CHECK_REGION:*:parameter/auto-map-tagger/* and retry."
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} \$EXISTING config unreadable (missing ssm:GetParameter)\\n"
             LAMBDA_CONFLICT=1
             continue
         fi
         EXISTING_SCOPE_MODE=\$(echo "\$EXISTING_CFG" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("scope_mode","account"))' 2>/dev/null || echo "account")
-        # Full conflict if either is not VPC-scoped
-        if [ "\$EXISTING_SCOPE_MODE" != "vpc" ] || [ "\$NEW_SCOPE_MODE" != "vpc" ]; then
-            echo "  ❌ ${t('d_fail_account_lambda_full')}"
-            echo "     - \$EXISTING (MPE \$EXISTING_MPE, scope=\$EXISTING_SCOPE_MODE) vs new (MPE \$MPE, scope=\$NEW_SCOPE_MODE)"
-            echo "     ${t('d_fix_label')} ${t('d_fix_account_lambda')}"
-            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} full-scope conflict with \$EXISTING\\n"
-            LAMBDA_CONFLICT=1
-            continue
-        fi
-        # Both VPC-scoped — compute VPC overlap
+        EXISTING_ACCOUNTS=\$(echo "\$EXISTING_CFG" | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("scoped_account_ids",["ALL"])))' 2>/dev/null || echo "ALL")
         EXISTING_VPCS=\$(echo "\$EXISTING_CFG" | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("scoped_vpc_ids",[])))' 2>/dev/null || echo "")
-        OVERLAP_VPCS=""
-        for NEW_VPC in \$NEW_VPC_LIST; do
-            for EXISTING_VPC in \$EXISTING_VPCS; do
-                if [ "\$NEW_VPC" = "\$EXISTING_VPC" ]; then
-                    OVERLAP_VPCS="\$OVERLAP_VPCS \$NEW_VPC"
-                fi
-            done
-        done
-        if [ -n "\$OVERLAP_VPCS" ]; then
-            echo "  ❌ ${t('d_fail_account_lambda_vpc')}"
-            echo "     Existing stack \$EXISTING (MPE \$EXISTING_MPE) shares VPCs with your new deploy:"
-            for V in \$OVERLAP_VPCS; do echo "       - \$V"; done
-            echo "     ${t('d_fix_label')} ${t('d_fix_account_lambda')}"
-            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} VPC-scope conflict with \$EXISTING\\n"
-            LAMBDA_CONFLICT=1
+        CONFLICT_REASON=""
+        if [ "\$NEW_SCOPE_MODE" = "account" ] && [ "\$EXISTING_SCOPE_MODE" = "account" ]; then
+            # Both account-scoped, same account → \$ACCOUNT is claimed by both.
+            # Runtime is_in_scope with ALL on either side dominates.
+            case " \$EXISTING_ACCOUNTS " in
+                *" ALL "*) CONFLICT_REASON="peer scope=account/ALL dominates \$ACCOUNT";;
+                *" \$ACCOUNT "*) CONFLICT_REASON="peer scope includes \$ACCOUNT";;
+            esac
+            if [ -z "\$CONFLICT_REASON" ]; then
+                # Peer targets different specific accounts — our deploy-account isn't in peer scope.
+                echo "  ✅ Peer \$EXISTING (MPE \$EXISTING_MPE, scope=account/[\$EXISTING_ACCOUNTS]) does not target \$ACCOUNT — safe"
+                continue
+            fi
+        elif [ "\$NEW_SCOPE_MODE" = "account" ] && [ "\$EXISTING_SCOPE_MODE" = "vpc" ]; then
+            # Our side claims the whole account; peer claims specific VPCs in same account.
+            # We'd tag the peer's VPC resources too. Conflict.
+            CONFLICT_REASON="our account-mode dominates peer VPC-scope on shared VPCs"
+        elif [ "\$NEW_SCOPE_MODE" = "vpc" ] && [ "\$EXISTING_SCOPE_MODE" = "account" ]; then
+            # Inverse: peer claims whole account (or our account is in their list), we claim VPCs within.
+            case " \$EXISTING_ACCOUNTS " in
+                *" ALL "*|*" \$ACCOUNT "*) CONFLICT_REASON="peer account-mode dominates our VPC-scope (\$EXISTING_ACCOUNTS)";;
+            esac
+            if [ -z "\$CONFLICT_REASON" ]; then
+                # Peer does NOT target our deploy-account → safe.
+                echo "  ✅ Peer \$EXISTING (MPE \$EXISTING_MPE, scope=account/[\$EXISTING_ACCOUNTS]) does not target \$ACCOUNT — safe"
+                continue
+            fi
         else
-            echo "  ✅ Existing stack \$EXISTING (MPE \$EXISTING_MPE) has non-overlapping VPC scope — safe to coexist"
+            # Both VPC-scoped — compute VPC overlap.
+            OVERLAP_VPCS=""
+            for NEW_VPC in \$NEW_VPC_LIST; do
+                for EXISTING_VPC in \$EXISTING_VPCS; do
+                    if [ "\$NEW_VPC" = "\$EXISTING_VPC" ]; then
+                        OVERLAP_VPCS="\$OVERLAP_VPCS \$NEW_VPC"
+                    fi
+                done
+            done
+            if [ -z "\$OVERLAP_VPCS" ]; then
+                echo "  ✅ Peer \$EXISTING (MPE \$EXISTING_MPE, scope=vpc/[\$EXISTING_VPCS]) disjoint from our VPC list — safe"
+                continue
+            fi
+            CONFLICT_REASON="shared VPC(s):\$OVERLAP_VPCS"
         fi
+        echo "  ❌ ${t('d_fail_account_lambda_full')}"
+        echo "     Peer: \$EXISTING (MPE \$EXISTING_MPE, scope=\$EXISTING_SCOPE_MODE)"
+        echo "     New:  MPE \$MPE, scope=\$NEW_SCOPE_MODE"
+        echo "     Reason: \$CONFLICT_REASON"
+        echo "     ${t('d_fix_label')} ${t('d_fix_account_lambda')}"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} scope conflict with \$EXISTING: \$CONFLICT_REASON\\n"
+        LAMBDA_CONFLICT=1
     done
     if [ \$LAMBDA_CONFLICT -eq 1 ]; then
         ERRORS=\$((ERRORS + 1))
@@ -6621,8 +6655,12 @@ IAM_CHECK_ACTIONS=( \\
   "cloudformation:CreateStackSet" \\
   "cloudformation:CreateStackInstances" \\
   "cloudformation:DescribeStackSet" \\
+  "cloudformation:ListStacks" \\
+  "cloudformation:ListStackSets" \\
+  "cloudformation:ListStackInstances" \\
   "organizations:ListRoots" \\
   "organizations:DescribeOrganization" \\
+  "organizations:ListAccounts" \\
   "iam:CreateRole" \\
   "iam:PutRolePolicy" \\
   "iam:AttachRolePolicy" \\
@@ -6634,6 +6672,7 @@ IAM_CHECK_ACTIONS=( \\
   "sqs:CreateQueue" \\
   "sqs:SetQueueAttributes" \\
   "ssm:PutParameter" \\
+  "ssm:GetParameter" \\
   "logs:CreateLogGroup" \\
   "logs:PutRetentionPolicy" \\
   "sns:CreateTopic" \\
