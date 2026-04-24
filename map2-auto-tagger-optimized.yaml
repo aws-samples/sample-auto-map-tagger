@@ -29,21 +29,21 @@ Parameters:
       - account
       - vpc
   ScopedAccountIds:
-    Type: String
+    Type: CommaDelimitedList
     Description: >
       Comma-separated AWS account IDs in MAP scope (used when ScopeMode=account).
       Leave as 'ALL' to tag all resources in this account.
     Default: ALL
   ScopedVpcIds:
-    Type: String
+    Type: CommaDelimitedList
     Description: >
       Comma-separated VPC IDs in MAP scope (used when ScopeMode=vpc).
       Only resources in these VPCs will be tagged.
     Default: NONE
 
 Conditions:
-  IsAccountAll: !Equals [!Ref ScopedAccountIds, 'ALL']
-  IsVpcNone: !Equals [!Ref ScopedVpcIds, 'NONE']
+  IsAccountAll: !Equals [!Join [',', !Ref ScopedAccountIds], 'ALL']
+  IsVpcNone: !Equals [!Join [',', !Ref ScopedVpcIds], 'NONE']
 
 Resources:
 
@@ -77,11 +77,15 @@ Resources:
         - AccountIdsArray: !If
             - IsAccountAll
             - '["ALL"]'
-            - !Sub '["${ScopedAccountIds}"]'
+            - !Sub
+                - '["${Joined}"]'
+                - Joined: !Join ['","', !Ref ScopedAccountIds]
           VpcIdsArray: !If
             - IsVpcNone
             - '[]'
-            - !Sub '["${ScopedVpcIds}"]'
+            - !Sub
+                - '["${Joined}"]'
+                - Joined: !Join ['","', !Ref ScopedVpcIds]
 
   # Lambda execution role
   AutoTaggerRole:
@@ -453,13 +457,12 @@ Resources:
                       except: pass
                   if vpc_id and vpc_id in scoped_vpcs:
                       return True
-                  if vpc_id is None:
-                      scoped_accts = config.get('scoped_account_ids', [])
-                      if isinstance(scoped_accts, str):
-                          scoped_accts = [s.strip() for s in scoped_accts.split(',')]
-                      if 'ALL' in scoped_accts:
-                          return True
-                      return account_id in scoped_accts
+                  # §1.3 / U5: when scope_mode == 'vpc' and the resource has no
+                  # VPC (S3, DDB, Lambda, SQS, IAM, …), DO NOT fall through to
+                  # account-scope. The customer explicitly chose VPC scoping;
+                  # silently including non-VPC resources defeats that intent
+                  # (e.g. data-residency exclusion). Return False — the resource
+                  # is out of scope.
                   return False
               return False
 
@@ -1657,7 +1660,16 @@ Resources:
                   existing = []
                   try:
                       existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
-                  except: pass
+                  except ClientError as e:
+                      # `NoSuchTagSet` is the expected "bucket has no tags yet" response.
+                      # Any other error (throttle, SCP deny, bucket-policy deny, transient
+                      # 5xx) means we do NOT know the existing tag state — re-raise so
+                      # SQS redrives rather than overwriting the customer's TagSet with
+                      # just map-migrated. S3 TagSet replacement is destructive (full
+                      # replace, not merge) — swallowing errors here deletes customer
+                      # tags (Owner, CostCenter, etc.). See §1.2 / U3.
+                      if e.response['Error']['Code'] != 'NoSuchTagSet':
+                          raise
                   existing = [t for t in existing if t['Key'] != tag_key]
                   existing.append({'Key': tag_key, 'Value': tag_value})
                   s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing})

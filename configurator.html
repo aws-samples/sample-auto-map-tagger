@@ -5000,8 +5000,16 @@ ${crossAccountCode}
                   if ':s3:::' in arn:
                       s3 = get_svc('s3'); bucket = arn.split(':::')[1]
                       existing = []
-                      try: existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
-                      except: pass
+                      try:
+                          existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
+                      except ClientError as e:
+                          # S3 TagSet replace is destructive (full replace, not
+                          # merge). Only swallow NoSuchTagSet (bucket has no
+                          # tags yet). Any other error means existing state is
+                          # unknown; re-raise so SQS redrives rather than
+                          # overwriting the customer's tags. See §1.2 / U3.
+                          if e.response['Error']['Code'] != 'NoSuchTagSet':
+                              raise
                       existing = [t for t in existing if t['Key'] != tag_key]
                       existing.append({'Key': tag_key, 'Value': tag_value})
                       s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing})
@@ -5368,8 +5376,16 @@ ${crossAccountCode}
                   if ':s3:::' in arn:
                       s3 = get_svc('s3'); bucket = arn.split(':::')[1]
                       existing = []
-                      try: existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
-                      except: pass
+                      try:
+                          existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
+                      except ClientError as e:
+                          # S3 TagSet replace is destructive (full replace, not
+                          # merge). Only swallow NoSuchTagSet (bucket has no
+                          # tags yet). Any other error means existing state is
+                          # unknown; re-raise so SQS redrives rather than
+                          # overwriting the customer's tags. See §1.2 / U3.
+                          if e.response['Error']['Code'] != 'NoSuchTagSet':
+                              raise
                       existing = [t for t in existing if t['Key'] != tag_key]
                       existing.append({'Key': tag_key, 'Value': tag_value})
                       s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing})
