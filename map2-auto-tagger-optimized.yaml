@@ -345,8 +345,6 @@ Resources:
           import json, os, boto3, re, time, random
           from datetime import datetime, timezone
           from botocore.exceptions import ClientError
-          from botocore.credentials import RefreshableCredentials
-          from botocore.session import Session as BotocoreSession
 
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
@@ -358,45 +356,6 @@ Resources:
           ec2 = boto3.client('ec2')
           tagging = boto3.client('resourcegroupstaggingapi')
           _config = None
-          _cross_account_sessions = {}
-
-          def get_cross_account_client(service, target_account_id, region):
-              """Return a boto3 client for the target account using auto-refreshing
-              assumed-role credentials. Cached per (account, region) at the session
-              level so credentials refresh in place; boto3 calls assume_role again
-              automatically when the previous creds are within 15 min of expiry.
-              Without this, STS's 1-hour token TTL would strand long-lived warm
-              Lambda containers with ExpiredTokenException on cross-account calls.
-              """
-              session_key = f"{target_account_id}:{region}"
-              if session_key not in _cross_account_sessions:
-                  role_arn = f"arn:aws:iam::{target_account_id}:role/MapAutoTaggerCrossAccount"
-                  try:
-                      def _refresh():
-                          creds = boto3.client('sts').assume_role(
-                              RoleArn=role_arn,
-                              RoleSessionName="map-auto-tagger-cross-account"
-                          )['Credentials']
-                          return {
-                              'access_key': creds['AccessKeyId'],
-                              'secret_key': creds['SecretAccessKey'],
-                              'token': creds['SessionToken'],
-                              'expiry_time': creds['Expiration'].isoformat(),
-                          }
-                      refreshable = RefreshableCredentials.create_from_metadata(
-                          metadata=_refresh(),
-                          refresh_using=_refresh,
-                          method='sts-assume-role',
-                      )
-                      botocore_session = BotocoreSession()
-                      botocore_session._credentials = refreshable
-                      _cross_account_sessions[session_key] = boto3.Session(
-                          botocore_session=botocore_session, region_name=region
-                      )
-                  except Exception as e:
-                      print(f'Cannot assume cross-account role in {target_account_id}: {e}')
-                      return None
-              return _cross_account_sessions[session_key].client(service, region_name=region)
 
           def get_account_from_arn(arn):
               """Extract account ID from ARN."""
@@ -503,16 +462,12 @@ Resources:
               # Look up attached volume IDs via describe_instances. CloudTrail
               # fires RunInstances milliseconds after the API call returns;
               # volumes may not yet be attached. Poll briefly (up to 30s) for
-              # BlockDeviceMappings to populate. If this Lambda runs in a
-              # different account than the target (StackSet case), use the
-              # cross-account EC2 client.
+              # BlockDeviceMappings to populate. Every account has its own
+              # Lambda (StackSet architecture), so events are always processed
+              # in-account — no cross-account client needed.
               if inst_ids:
                   try:
-                      local_account = boto3.client('sts').get_caller_identity()['Account']
-                      if account_id != local_account:
-                          ec2_lookup = get_cross_account_client('ec2', account_id, region)
-                      else:
-                          ec2_lookup = boto3.client('ec2', region_name=region)
+                      ec2_lookup = boto3.client('ec2', region_name=region)
                       if ec2_lookup:
                           deadline = time.time() + 30
                           volume_ids = set()
@@ -1640,17 +1595,12 @@ Resources:
 
               return None
 
-          def tag_resource(arn, tag_key, tag_value, tagging_client=None, ec2_client=None, target_account=None, target_region=None):
+          def tag_resource(arn, tag_key, tag_value, tagging_client=None, ec2_client=None, target_region=None):
               _tagging = tagging_client or tagging
               _ec2 = ec2_client or ec2
               _region = target_region or boto3.session.Session().region_name
 
               def get_service_client(service):
-                  """Get the right client — cross-account if needed, local otherwise."""
-                  if target_account:
-                      c = get_cross_account_client(service, target_account, _region)
-                      if c:
-                          return c
                   return boto3.client(service, region_name=_region)
 
               # Handle special cases that don't support Resource Groups Tagging API
@@ -1866,23 +1816,11 @@ Resources:
               tag_key = 'map-migrated'
               tag_value = config['mpe_id']
 
-              local_account = boto3.client('sts').get_caller_identity()['Account']
               tagged, failed = [], []
 
               for arn in arns:
-                  target_account = get_account_from_arn(arn) or account_id
                   try:
-                      if target_account and target_account != local_account:
-                          cross_tagging = get_cross_account_client('resourcegroupstaggingapi', target_account, region)
-                          cross_ec2 = get_cross_account_client('ec2', target_account, region)
-                          if cross_tagging:
-                              tag_resource(arn, tag_key, tag_value,
-                                           tagging_client=cross_tagging, ec2_client=cross_ec2,
-                                           target_account=target_account, target_region=region)
-                          else:
-                              tag_resource(arn, tag_key, tag_value)
-                      else:
-                          tag_resource(arn, tag_key, tag_value)
+                      tag_resource(arn, tag_key, tag_value, target_region=region)
                       print(f'Tagged {arn} with {tag_key}={tag_value}')
                       tagged.append(arn)
                       continue
