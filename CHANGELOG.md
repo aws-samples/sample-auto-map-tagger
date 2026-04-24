@@ -6,6 +6,44 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.4.0 — Three-path error classifier + scope-intersection preflight (#37, #38)
+
+**Runtime: three-path error classifier (#37)**
+
+- Replaced the binary transient/permanent error handler with three paths:
+  - **TRANSIENT**: re-raise → SQS redelivery (up to 5× × 180s). Unchanged from v20.3.0.
+  - **PERMANENT_IGNORABLE**: silent ack + CloudWatch metric. Resources genuinely deleted between create and tag (Terraform rollback, test-infra churn) no longer generate SNS noise. New markers: `NoSuchBucket`, `InvalidInstanceID.NotFound`, `DBInstanceNotFound`, `DBClusterNotFoundFault`, `InvalidVolume.NotFound`.
+  - **PERMANENT_ACTIONABLE**: SNS alert + CloudWatch metric + re-raise → `EventDLQ`. Tag-quota exhaustion, IAM drift, unknown-permanent conditions (B.7 class). Customer ops must triage.
+- Closes §1.115 (SQS `TagQueue` quota), §1.116 (RGTA tag-quota), §1.117 runtime side, §1.119 (SCP `AccessDenied` runtime drift), §1.120 (noisy alerts for benign resource-deleted).
+- New CloudWatch metric `MapAutoTagger/TagFailureByClass` with `ErrorClass` + `MpeId` dimensions — triage class without log-grepping.
+- New IAM: `cloudwatch:PutMetricData` scoped via `cloudwatch:namespace` Condition to `MapAutoTagger`.
+- Configurator UI: blank Alert Email now surfaces a loud warning with "Deploy anyway" confirmation (7-language i18n). Soft-breaking — customers with alternative alerting (SIEM, cross-account CloudWatch) can proceed. Subscriber can be added later via `scripts/add_subscriber.sh` (shipped in #34) without redeploy.
+
+**Deploy-time: Q3 Option D scope-intersection preflight (#38)**
+
+- Prevents cross-Lambda MPE contamination (§1.108) at deploy time. Every new deploy checks scope overlap against existing `map-auto-tagger-*` stacks in the target account and hard-fails with the specific peer + overlap element if overlap exists.
+- Rules: `account/ALL` dominates; same-mode → set intersection on shared account IDs or shared VPC IDs; cross-mode → deploy-account-in-peer-list check.
+- Extends PR #23 batched `SimulatePrincipalPolicy` with `cloudformation:ListStacks` + `ssm:GetParameter` so missing IAM fails fast with precise remediation instead of masquerading as a scope conflict.
+- Unreadable peer SSM config now hard-fails with specific remediation instead of "treat as full conflict" fallback.
+- Out of scope per design: TOCTOU on simultaneous deploys, manual `ssm put-parameter` edits post-deploy, bypass-configurator deploy paths.
+- Makes the reconciliation Lambda (planned for v20.5.0) able to safely overwrite wrong-MPE values without risking tag flap against a live peer.
+
+**Design docs (#36)**
+
+- Added `docs/design-reconciliation.md` — locked design for the reconciliation Lambda that will ship as v20.5.0. Captures the "ship alongside BackfillFunction, not instead of" decision, the wrong-MPE always-overwrite semantics, and the post-Q3 architectural guarantees that make overwrite safe.
+
+---
+
+### v20.3.1 — Bug-fix sweep (#29, #30, #33, #34, #35)
+
+Multiple small fixes that did not warrant individual MINOR bumps. Grouped here retroactively for readability; each shipped as its own PR against v20.3.0.
+
+- **#29 Log group retention**: `AutoTaggerLogGroup` now has `DeletionPolicy: Delete` + `UpdateReplacePolicy: Delete` + `RetentionInDays: 14` (previously `90`). Fixes the "redeploy fails with ResourceExistenceCheck because the orphaned log group outlived stack delete" footgun. Closes §1.74.
+- **#30 Date pattern**: `AgreementStartDate` CFN `AllowedPattern` tightened from `^\d{4}-\d{2}-\d{2}$` to `^(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$`. Rejects impossible months/days at CFN parameter validation. Lambda `is_after_agreement` + `is_within_agreement` + BackfillFunction now wrap `strptime` in try/except returning `False` on `ValueError` rather than propagating. Closes §1.129, §1.130.
+- **#33 Scope fixes (CRITICAL)**: `ScopedAccountIds` and `ScopedVpcIds` CFN `Type: String` → `Type: CommaDelimitedList`. JSON-array rendering fixed to produce true N-element arrays from `"111,222,333"` input. S3 `get_bucket_tagging` bare-except narrowed to `NoSuchTagSet` only — prevents overwriting the customer's existing `TagSet` on throttle / SCP-deny / transient 5xx. `is_in_scope` VPC mode now returns `False` when `vpc_id is None` instead of falling through to account-scope (respects the customer's explicit VPC-scope intent). Closes §1.1/U2, §1.2/U3, §1.3/U5.
+- **#34 SNS backfill helper**: new `scripts/add_subscriber.sh <MpeId> <email>` for existing customers who deployed with the SNS topic but no subscriber. INSTRUCTIONS.md monitoring section leads with "Alerts don't fire unless you subscribe." Existing-customer half of §1.117.
+- **#35 Cross-account rip-out**: deleted ~62 LOC of unused cross-account boto3 machinery in the Lambda. Cross-account assume was always dead code; the per-account StackSet architecture is the only supported deployment path. Also removes an unbounded-growth cache and a silent `get_service_client` failure mode that caused permanent tag drops on assume-role failure. Resolves H1.
+
 ### v20.3.0 — Tier 1 MAP service handlers (#25)
 
 - Added auto-tagging for services on the MAP 2.0 Included Services List that previously had no handler — customers in affected verticals were silently losing credits:

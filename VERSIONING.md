@@ -12,8 +12,8 @@
 
 ### Examples from recent history
 
-- PR #17 (RGTA throttle fix), PR #19 (SSM slash), PR #20 (4 audit fixes), PR #21 (advisory scanners) — all PATCH
-- PR #14 (E2E expansion), PR #15 (WAFv2 + CodeDeploy handlers), PR #22 (AutoDeployment flip + services grid) — all MINOR
+- PR #17 (RGTA throttle fix), PR #19 (SSM slash), PR #20 (4 audit fixes), PR #21 (advisory scanners), #29 (log-group retention), #30 (date pattern), #33 (scope fixes — CRITICAL bug-fixes, still PATCH per policy), #34 (SNS backfill helper), #35 (cross-account rip-out), #38 (scope-intersection preflight) — all PATCH
+- PR #14 (E2E expansion), PR #15 (WAFv2 + CodeDeploy handlers), PR #22 (AutoDeployment flip + services grid), PR #37 (three-path error classifier — new runtime behavior, new CloudWatch metric, new IAM, safe in-place update) — all MINOR
 - PR #24 (version visibility + preflight) — MINOR (new SSM param and CFN Output are new capabilities, safe in-place update)
 - Pre-namespacing → namespaced (v-old → v19) — would be MAJOR (customer must delete old stack first)
 
@@ -21,7 +21,7 @@
 
 The version lives in exactly two places:
 
-1. **`configurator.html`** — `const TEMPLATE_VERSION = 'v20.1.0';` (one occurrence)
+1. **`configurator.html`** — `const TEMPLATE_VERSION = 'v20.4.0';` (one occurrence)
 2. **`map2-auto-tagger-optimized.yaml`** — Description header, `MapVersion` SSM parameter default, Lambda `TEMPLATE_VERSION` constant, `TemplateVersion` CFN output (all four must equal the configurator constant)
 
 `.github/scripts/sync-check.py` enforces this invariant. Any drift between references is a sync-check failure.
