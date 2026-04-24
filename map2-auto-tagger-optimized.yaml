@@ -3,10 +3,10 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.3.0 - Automatically tags newly created AWS resources with the
+  MAP 2.0 Auto-Tagger v20.4.0 - Automatically tags newly created AWS resources with the
   map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
   across all major AWS services. Deploy once; tagging happens automatically within
-  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.3.0: Tier 1 MAP service handlers — Keyspaces (CreateKeyspace), Directory Service (CreateDirectory + CreateMicrosoftAD), CloudHSM v2 (CreateCluster + CreateHsm). Closes silent credit loss for AD/LDAP migrations, Cassandra workloads, and HSM-backed compliance environments. See CHANGELOG.md for prior minor releases. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
+  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.4.0: Three-path error classifier (transient / permanent-ignorable / permanent-actionable) routes actionable failures to EventDLQ + SNS alert while silently acking benign "resource already deleted" cases. Emits TagFailureByClass CloudWatch metric. See CHANGELOG.md for prior minor releases. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
   vs EventBridge 24h limit); removed ReservedConcurrentExecutions to prevent deployment
   failures on accounts near Lambda concurrency quota; added DLQ alarm with SNS email
   notification; Lambda now publishes specific failed resource ARN to SNS on tagging failure.
@@ -56,7 +56,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.3.0
+      Value: v20.4.0
 
   # SSM Parameter Store - single source of truth for config
   MapConfig:
@@ -296,6 +296,17 @@ Resources:
                 Action:
                   - sns:Publish
                 Resource: !Ref AlertTopic
+              - Sid: EmitClassifierMetrics
+                Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                # PutMetricData does not support resource-level IAM; '*' is
+                # standard. Constrained to the MapAutoTagger namespace via
+                # IAM Condition below.
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: MapAutoTagger
               - Sid: ReadConfig
                 Effect: Allow
                 Action:
@@ -349,7 +360,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.3.0'
+          TEMPLATE_VERSION = 'v20.4.0'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -1818,6 +1829,84 @@ Resources:
 
               tagged, failed = [], []
 
+              # Three-path error classifier (v20.4.0 / §1.115–§1.120):
+              #
+              #   TRANSIENT            → re-raise; SQS redelivers up to
+              #                          maxReceiveCount=5 (~15 min budget); if
+              #                          still failing, falls into EventDLQ via
+              #                          the redelivery-exhaustion path.
+              #   PERMANENT_IGNORABLE  → silent ack + CW metric. The resource
+              #                          genuinely no longer exists (deleted
+              #                          between create and tag). Retrying
+              #                          forever just wastes quota and floods
+              #                          alerts. Terraform-rollback / test-infra
+              #                          churn is the typical source.
+              #   PERMANENT_ACTIONABLE → SNS publish + CW metric + send to
+              #                          EventDLQ (via explicit re-raise so the
+              #                          event ends up in DLQ after the remaining
+              #                          redelivery budget; treated as
+              #                          actionable by humans).
+              #
+              # SCP AccessDenied at tag time is NOT classified here — Q3's
+              # deploy-time preflight (simulate-principal-policy, backlog)
+              # owns preventing SCP-denied deploys. If a runtime SCP drift
+              # slips past preflight, it falls into PERMANENT_ACTIONABLE with
+              # everything else this classifier can't anticipate (B.7 class).
+              TRANSIENT_MARKERS = (
+                  'not in an available state',
+                  'not in available state',
+                  'is not currently available',
+                  'InvalidClusterState',
+                  'InvalidServerlessCacheStateFault',
+                  'InvalidDBClusterStateFault',
+                  'InvalidDBInstanceState',
+                  'CREATE_IN_PROGRESS',
+                  'UPDATE_IN_PROGRESS',
+                  'can not be updated',
+                  'rate of control plane requests',
+                  'ThrottlingException',
+                  'ThrottledException',
+                  'Throttling',
+                  'RequestLimitExceeded',
+                  'TooManyRequestsException',
+                  'LimitExceededException',
+              )
+              PERMANENT_IGNORABLE_MARKERS = (
+                  # Resource genuinely deleted between create and tag event.
+                  # Retrying will not find it; alerting is noise.
+                  'ResourceNotFoundException',
+                  'Requested resource not found',
+                  'NoSuchBucket',
+                  'InvalidInstanceID.NotFound',
+                  'DBInstanceNotFound',
+                  'DBClusterNotFoundFault',
+                  'InvalidVolume.NotFound',
+              )
+
+              def _classify_error(msg):
+                  if any(m in msg for m in TRANSIENT_MARKERS):
+                      return 'transient'
+                  if any(m in msg for m in PERMANENT_IGNORABLE_MARKERS):
+                      return 'permanent_ignorable'
+                  return 'permanent_actionable'
+
+              def _emit_class_metric(error_class):
+                  try:
+                      boto3.client('cloudwatch').put_metric_data(
+                          Namespace='MapAutoTagger',
+                          MetricData=[{
+                              'MetricName': 'TagFailureByClass',
+                              'Dimensions': [
+                                  {'Name': 'ErrorClass', 'Value': error_class},
+                                  {'Name': 'MpeId', 'Value': tag_value},
+                              ],
+                              'Value': 1,
+                              'Unit': 'Count',
+                          }],
+                      )
+                  except Exception as mx:
+                      print(f'Could not emit TagFailureByClass metric ({error_class}): {mx}')
+
               for arn in arns:
                   try:
                       tag_resource(arn, tag_key, tag_value, target_region=region)
@@ -1826,53 +1915,49 @@ Resources:
                       continue
                   except Exception as e:
                       err_msg = str(e)
-                      # Transient "resource not yet available" errors: re-raise
-                      # so SQS redelivers (up to maxReceiveCount=5, then DLQ).
-                      # We re-raise the WHOLE event — SQS has no per-ARN retry,
-                      # so all ARNs in this event will be re-processed together.
-                      # Already-tagged ARNs will no-op (tagging is idempotent).
-                      TRANSIENT_MARKERS = (
-                          'not in an available state',
-                          'not in available state',
-                          'is not currently available',
-                          'InvalidClusterState',
-                          'InvalidServerlessCacheStateFault',
-                          'InvalidDBClusterStateFault',
-                          'InvalidDBInstanceState',
-                          'ResourceNotFoundException',
-                          'Requested resource not found',
-                          'CREATE_IN_PROGRESS',
-                          'UPDATE_IN_PROGRESS',
-                          'can not be updated',
-                          'rate of control plane requests',
-                          'ThrottlingException',
-                          'ThrottledException',
-                          'Throttling',
-                          'RequestLimitExceeded',
-                          'TooManyRequestsException',
-                          'LimitExceededException',
-                      )
-                      if any(m in err_msg for m in TRANSIENT_MARKERS):
-                          print(f'Transient failure tagging {arn}: {err_msg} — re-raising for SQS redelivery')
+                      cls = _classify_error(err_msg)
+                      _emit_class_metric(cls)
+
+                      if cls == 'transient':
+                          # Let SQS redeliver. Already-tagged ARNs in this batch
+                          # will no-op on re-run (tagging is idempotent).
+                          print(f'Transient [{arn}] {err_msg} — re-raising for SQS redelivery')
                           raise
-                      print(f'Failed to tag {arn}: {err_msg}')
+
+                      if cls == 'permanent_ignorable':
+                          # Resource is gone. Silent ack; already counted via metric.
+                          print(f'Permanent-ignorable [{arn}] {err_msg} — resource no longer exists, skipping')
+                          failed.append({'arn': arn, 'error': err_msg, 'class': 'permanent_ignorable'})
+                          continue
+
+                      # PERMANENT_ACTIONABLE: alert + re-raise so the event ends
+                      # up in EventDLQ via redelivery-exhaustion. DLQAlarm will
+                      # also fire once the message lands in the DLQ.
+                      print(f'Permanent-actionable [{arn}] {err_msg} — alerting + routing to DLQ')
                       alert_arn = os.environ.get('ALERT_TOPIC_ARN')
                       if alert_arn:
                           try:
                               boto3.client('sns').publish(
                                   TopicArn=alert_arn,
-                                  Subject='MAP Auto-Tagger: Tagging failure',
+                                  Subject='MAP Auto-Tagger: Permanent tagging failure',
                                   Message=(
-                                      f'Failed to apply map-migrated tag.\n\n'
+                                      f'Failed to apply map-migrated tag (permanent-actionable class).\n\n'
                                       f'Resource ARN: {arn}\n'
                                       f'MPE ID: {tag_value}\n'
-                                      f'Error: {err_msg}\n'
+                                      f'Error: {err_msg}\n\n'
+                                      f'This error is not a known transient condition and is not a '
+                                      f'benign resource-deleted case. Investigate IAM policy, SCP '
+                                      f'drift, or tag-quota exhaustion. Event will land in EventDLQ.\n'
                                   )
                               )
                           except Exception as sns_e:
                               print(f'Could not publish SNS alert: {sns_e}')
-                      failed.append({'arn': arn, 'error': err_msg})
-                      continue
+                      failed.append({'arn': arn, 'error': err_msg, 'class': 'permanent_actionable'})
+                      # Re-raise so SQS retries and eventually DLQs. The next
+                      # redelivery will re-classify; if the underlying condition
+                      # (e.g. SCP drift) is fixed mid-retry, the event tags
+                      # successfully. If not, DLQ captures it for human triage.
+                      raise
 
               if tagged and not failed:
                   return {'status': 'tagged', 'resources': tagged}
@@ -2023,7 +2108,7 @@ Outputs:
     Value: /auto-map-tagger/config
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.3.0
+    Value: v20.4.0
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
