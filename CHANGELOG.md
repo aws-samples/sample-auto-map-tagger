@@ -6,6 +6,21 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.4.2 — Fix broken --use-previous-parameters flag in upgrade.sh
+
+`upgrade.sh` as shipped in v20.4.0 passed `--use-previous-parameters` to `aws cloudformation update-stack` and `update-stack-set`. **That flag does not exist in AWS CLI v2.** Customers running `upgrade.sh` would have received `Unknown option: --use-previous-parameters` and the upgrade would fail before the API call was sent.
+
+**Fix**
+
+- Query existing parameter keys via `describe-stack-set` (StackSet path) or `describe-stacks` (single-stack path), transform each into `ParameterKey=<key>,UsePreviousValue=true`, and pass them via `--parameters`. The `UsePreviousValue=true` form is the documented per-parameter equivalent and is robust against future template parameter additions.
+- Guarded against the no-parameter case via `${PARAM_ARGS:+--parameters $PARAM_ARGS}` — if a stack has no parameters, the flag is omitted entirely.
+
+**Other changes**
+
+- Updated all docs, CHANGELOG, and i18n strings that referenced `--use-previous-parameters` to describe the actual mechanism.
+
+---
+
 ### v20.4.1 — Delete mode UX refinements
 
 Follow-up to v20.4.0 based on review feedback. User-facing changes to the Delete mode (formerly "Destroy"); no behavioral changes to the other three modes.
@@ -34,7 +49,7 @@ Two new self-service flows in `configurator.html` for post-deployment lifecycle 
 **New: Update mode → `upgrade.sh`**
 
 - Upgrades an existing deployment to the current template version without redeploying.
-- Uses `aws cloudformation update-stack` / `update-stack-set` with `--use-previous-parameters` — scope, agreement dates, VPC config all preserved.
+- Uses `aws cloudformation update-stack` / `update-stack-set`, reading existing parameter keys from the deployed stack and passing `UsePreviousValue=true` for each — scope, agreement dates, VPC config all preserved.
 - Reads `/auto-map-tagger/<mpe>/version` from SSM and compares to target (SemVer).
   - **PATCH / MINOR** → applied in place, parallel rollout for StackSets.
   - **Cross-MAJOR** → refused with explicit delete+redeploy guidance. `--force` no longer overrides this (MAJOR bumps require customer action per versioning policy).

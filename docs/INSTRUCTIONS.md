@@ -222,7 +222,7 @@ The script:
 - Reads each deployment's `/auto-map-tagger/<mpe>/version` SSM parameter
 - Compares against the target (SemVer): PATCH/MINOR proceed in place; cross-MAJOR and downgrade are refused
 - Detects backfill Lambda presence and picks the matching template variant
-- Applies `update-stack` / `update-stack-set` with `--use-previous-parameters`
+- Applies `update-stack` / `update-stack-set`, reading existing parameter keys from the deployed stack and passing `UsePreviousValue=true` for each (CLI v2 has no `--use-previous-parameters` flag — per-key `UsePreviousValue=true` is the equivalent)
 - For StackSets: parallel rollout (100% concurrency, PARALLEL region mode)
 
 > `upgrade.sh` refuses cross-MAJOR upgrades. For MAJOR bumps, use `delete.sh` → regenerate `deploy.sh` → redeploy. See [Upgrading Across a MAJOR Version Boundary](#upgrading-across-a-major-version-boundary).

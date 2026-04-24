@@ -39,7 +39,7 @@ The configurator generates three post-deployment scripts. Each maps to a differe
 | Customer need | Script | What it does | Version behavior |
 |---|---|---|---|
 | Change account scope (add/remove accounts) | `update.sh` (Editor mode) | Rewrites SSM config + StackSet per-account template | Version-agnostic |
-| New template version available (PATCH/MINOR) | `upgrade.sh` (Update mode) | `update-stack[-set]` with `--use-previous-parameters` | Reads SSM version, refuses cross-MAJOR |
+| New template version available (PATCH/MINOR) | `upgrade.sh` (Update mode) | `update-stack[-set]` with per-key `UsePreviousValue=true` | Reads SSM version, refuses cross-MAJOR |
 | Engagement ended / failed deployment / preparing for MAJOR | `delete.sh` (Delete mode) | `delete-stack[-set]`, preserves tags | Version-agnostic |
 
 **MAJOR upgrades cannot be handled by `upgrade.sh`.** Resource names change at MAJOR boundaries (e.g. v18 → v19 added MPE-ID namespacing), and CloudFormation's `update-stack` cannot bridge those renames safely. Customers run `delete.sh` → regenerate `deploy.sh` → `bash deploy.sh` instead.

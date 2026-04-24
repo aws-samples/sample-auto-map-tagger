@@ -46,4 +46,4 @@ For MAJOR upgrades the customer must:
 
 There is a ~5–15 minute gap between delete completion and the new Lambda coming online. Enable backfill in the fresh `deploy.sh` to retroactively tag resources created during the window.
 
-PATCH and MINOR upgrades are handled in place by `upgrade.sh` with no tagging gap — scope, agreement dates, and VPC config are preserved via `--use-previous-parameters`. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for both paths.
+PATCH and MINOR upgrades are handled in place by `upgrade.sh` with no tagging gap — scope, agreement dates, and VPC config are preserved by reading existing parameter values from the deployed stack and passing `UsePreviousValue=true` for each. See [INSTRUCTIONS.md](INSTRUCTIONS.md) for both paths.
