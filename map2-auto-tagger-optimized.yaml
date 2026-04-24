@@ -3,13 +3,13 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.4.0 - Automatically tags newly created AWS resources with the
-  map-migrated tag for MAP 2.0 credit eligibility. Supports 190+ resource types
-  across all major AWS services. Deploy once; tagging happens automatically within
-  typically 60–90 seconds (up to 15 minutes during high-volume activity) of resource creation. v20.4.0: Three-path error classifier (transient / permanent-ignorable / permanent-actionable) routes actionable failures to EventDLQ + SNS alert while silently acking benign "resource already deleted" cases. Emits TagFailureByClass CloudWatch metric. See CHANGELOG.md for prior minor releases. v20 baseline: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
-  vs EventBridge 24h limit); removed ReservedConcurrentExecutions to prevent deployment
-  failures on accounts near Lambda concurrency quota; added DLQ alarm with SNS email
-  notification; Lambda now publishes specific failed resource ARN to SNS on tagging failure.
+  MAP 2.0 Auto-Tagger v20.5.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
+  of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
+  live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
+  distinguishes transient / permanent-ignorable / permanent-actionable failures.
+  Pipeline: EventBridge -> SQS (14-day retention) -> Lambda with DLQ + SNS alarm.
+  See CHANGELOG.md for full history.
 
 Parameters:
   MpeId:
@@ -40,6 +40,14 @@ Parameters:
       Comma-separated VPC IDs in MAP scope (used when ScopeMode=vpc).
       Only resources in these VPCs will be tagged.
     Default: NONE
+  ReconciliationInterval:
+    Type: String
+    Description: >
+      Schedule for the reconciliation Lambda (daily safety-net that enumerates
+      in-scope resources via RGTA GetResources and re-enqueues any whose
+      map-migrated tag is missing or wrong). EventBridge schedule expression.
+    Default: 'rate(24 hours)'
+    AllowedPattern: '^(rate\(\d+ (hour|hours|day|days)\)|cron\(.+\))$'
 
 Conditions:
   IsAccountAll: !Equals [!Join [',', !Ref ScopedAccountIds], 'ALL']
@@ -56,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.4.0
+      Value: v20.5.0
 
   # SSM Parameter Store - single source of truth for config
   MapConfig:
@@ -360,7 +368,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.4.0'
+          TEMPLATE_VERSION = 'v20.5.0'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -1829,7 +1837,7 @@ Resources:
 
               tagged, failed = [], []
 
-              # Three-path error classifier (v20.4.0 / §1.115–§1.120):
+              # Three-path error classifier (v20.5.0 / §1.115–§1.120):
               #
               #   TRANSIENT            → re-raise; SQS redelivers up to
               #                          maxReceiveCount=5 (~15 min budget); if
@@ -2099,6 +2107,280 @@ Resources:
         - !Ref AlertTopic
       TreatMissingData: notBreaching
 
+  # ── Reconciliation Lambda (v20.5.0) ──────────────────────────────────────
+  # Daily safety-net that enumerates in-scope resources via RGTA GetResources,
+  # diffs against map-migrated tag, and re-enqueues missing or wrong-MPE
+  # resources through EventQueue so the live Lambda's classifier (PR #37)
+  # handles the tag write via its normal path. Single tagging codepath.
+  #
+  # Design: docs/design-reconciliation.md (PR #36).
+  # Closes the long-tail silent-failure classes the live path misses.
+
+  ReconciliationLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/map-auto-tagger-reconciliation-${MpeId}'
+      RetentionInDays: 14
+
+  ReconciliationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'map-auto-tagger-reconciliation-role-${MpeId}-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: map-auto-tagger-reconciliation-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadScopeConfig
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/auto-map-tagger/${MpeId}/config'
+              - Sid: EnumerateResources
+                Effect: Allow
+                Action:
+                  # RGTA GetResources does not support resource-level IAM.
+                  - tag:GetResources
+                Resource: '*'
+              - Sid: DescribeVpcMembership
+                Effect: Allow
+                Action:
+                  # VPC-scope mode needs live VPC membership lookup for
+                  # resources where RGTA omits VPC context.
+                  - ec2:DescribeInstances
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeNetworkInterfaces
+                Resource: '*'
+              - Sid: EnqueueToEventQueue
+                Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt EventQueue.Arn
+              - Sid: EmitReconciliationMetrics
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: MapAutoTagger
+              - Sid: LambdaLogging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub '${ReconciliationLogGroup.Arn}:*'
+
+  ReconciliationFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: ReconciliationLogGroup
+    Properties:
+      FunctionName: !Sub 'map-auto-tagger-reconciliation-${MpeId}'
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt ReconciliationRole.Arn
+      Timeout: 900
+      MemorySize: 512
+      Environment:
+        Variables:
+          CONFIG_PARAM: !Sub '/auto-map-tagger/${MpeId}/config'
+          EVENT_QUEUE_URL: !Ref EventQueue
+          MPE_ID: !Ref MpeId
+      Code:
+        ZipFile: |
+          import json, os, time, boto3
+          from datetime import datetime, timezone
+          from botocore.exceptions import ClientError
+
+          # Reconciliation Lambda — v20.5.0.
+          # Runs once per ReconciliationInterval (default daily). Enumerates
+          # every taggable resource in this account via RGTA GetResources,
+          # checks the map-migrated tag, and re-enqueues missing or wrong-MPE
+          # resources through EventQueue so the live Lambda's Q1 classifier
+          # (PR #37) handles the tag write. Reuses one tagging codepath.
+          #
+          # Wrong-MPE overwrite is safe-by-construction because Q3 Option D
+          # preflight (PR #38) prevents overlapping-scope deploys. See
+          # docs/design-reconciliation.md §3 for the safety argument.
+
+          CONFIG_PARAM = os.environ['CONFIG_PARAM']
+          EVENT_QUEUE_URL = os.environ['EVENT_QUEUE_URL']
+          MPE_ID = os.environ['MPE_ID']
+          TAG_KEY = 'map-migrated'
+          # Run-time budget: Lambda hard ceiling is 900s. Emit the canary
+          # metric at 13 min so operators see runs trending toward the cliff
+          # before they actually hit it. Deferred checkpoint / pagination-
+          # resume work per Q2-1 decision (see design doc §9).
+          CANARY_THRESHOLD_SECS = 780
+
+          ssm = boto3.client('ssm')
+          sqs = boto3.client('sqs')
+          cw = boto3.client('cloudwatch')
+          tagging = boto3.client('resourcegroupstaggingapi')
+
+          def _emit(name, value=1, **dims):
+              try:
+                  cw.put_metric_data(
+                      Namespace='MapAutoTagger',
+                      MetricData=[{
+                          'MetricName': name,
+                          'Dimensions': [{'Name': k, 'Value': str(v)} for k, v in dims.items()],
+                          'Value': value,
+                          'Unit': 'Count',
+                      }],
+                  )
+              except Exception as e:
+                  print(f'metric emit failed ({name}): {e}')
+
+          def _load_config():
+              resp = ssm.get_parameter(Name=CONFIG_PARAM)
+              return json.loads(resp['Parameter']['Value'])
+
+          def _in_agreement(cfg, creation_time):
+              # Compare creation_time (datetime from RGTA) against agreement_start_date.
+              # Out-of-agreement resources are NOT MAP-eligible and must NOT be tagged.
+              try:
+                  start = datetime.strptime(cfg['agreement_start_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              except (KeyError, ValueError) as e:
+                  print(f'agreement_start_date invalid ({e}) — treating all resources as out-of-agreement')
+                  _emit('ReconciliationConfigInvalid')
+                  return False
+              if creation_time is None:
+                  # RGTA didn't provide CreationTime for this resource. Conservative
+                  # default: skip it. Follow-up: per-service native fallback.
+                  _emit('ReconciliationSkippedNoCreationTime')
+                  return False
+              if creation_time.tzinfo is None:
+                  creation_time = creation_time.replace(tzinfo=timezone.utc)
+              return creation_time >= start
+
+          def _current_map_tag_value(tag_list):
+              for t in tag_list or []:
+                  if t.get('Key') == TAG_KEY:
+                      return t.get('Value')
+              return None
+
+          def _synth_event(arn, account_id, region):
+              # Build a minimal CloudTrail-shaped envelope the live Lambda will
+              # accept. The live Lambda's extract_arn supports resource-arn
+              # passthrough; keep the detail focused.
+              event_name = 'ReconciliationEnqueue'
+              return {
+                  'version': '0',
+                  'source': 'map-auto-tagger.reconciliation',
+                  'account': account_id,
+                  'region': region,
+                  'detail-type': 'AWS API Call via CloudTrail',
+                  'detail': {
+                      'eventName': event_name,
+                      'recipientAccountId': account_id,
+                      'awsRegion': region,
+                      'responseElements': {'arn': arn},
+                      'requestParameters': {},
+                      'sourceIPAddress': 'map-auto-tagger.reconciliation',
+                  },
+              }
+
+          def _parse_arn(arn):
+              # arn:<partition>:<service>:<region>:<account>:<resource>
+              parts = arn.split(':', 5)
+              if len(parts) < 6:
+                  return None, None
+              return parts[4] or None, parts[3] or None
+
+          def handler(event, context):
+              start = time.time()
+              cfg = _load_config()
+              scanned = missing = wrong = already_ok = out_of_agree = 0
+              canary_emitted = False
+              # RGTA pagination. Default page size 100 (max).
+              kwargs = {'ResourcesPerPage': 100, 'IncludeComplianceDetails': False}
+              while True:
+                  try:
+                      page = tagging.get_resources(**kwargs)
+                  except ClientError as e:
+                      err = e.response.get('Error', {}).get('Code', '')
+                      if err in ('ThrottledException', 'ThrottlingException'):
+                          print(f'RGTA throttle: {e}, backing off 2s')
+                          time.sleep(2)
+                          continue
+                      print(f'RGTA GetResources hard-failed: {e}')
+                      _emit('ReconciliationRunAborted', reason='RgtaError')
+                      raise
+                  for r in page.get('ResourceTagMappingList', []):
+                      scanned += 1
+                      arn = r.get('ResourceARN', '')
+                      if not arn:
+                          continue
+                      account_id, region = _parse_arn(arn)
+                      if not account_id or not region:
+                          continue
+                      # Best-effort agreement-window filter. RGTA doesn't return
+                      # CreationTime directly — we trust the agreement-check on
+                      # the live Lambda side when the event enqueues. Reconciliation
+                      # does not block on CreationTime; design doc §8.5 accepts
+                      # 24h-lag semantics.
+                      current = _current_map_tag_value(r.get('Tags'))
+                      if current == MPE_ID:
+                          already_ok += 1
+                          continue
+                      if current and current != MPE_ID:
+                          wrong += 1
+                          _emit('WrongMpeCorrected', ExpectedMpe=MPE_ID, FoundMpe=current)
+                      else:
+                          missing += 1
+                          _emit('ReconciliationMissingTag')
+                      try:
+                          sqs.send_message(
+                              QueueUrl=EVENT_QUEUE_URL,
+                              MessageBody=json.dumps(_synth_event(arn, account_id, region)),
+                          )
+                      except ClientError as e:
+                          print(f'SQS SendMessage failed for {arn}: {e}')
+                          _emit('ReconciliationEnqueueFailed')
+                  # Canary check between pages — cheap, avoids one-last-page overruns.
+                  if not canary_emitted and (time.time() - start) > CANARY_THRESHOLD_SECS:
+                      _emit('ReconciliationTimeoutCanary', MpeId=MPE_ID)
+                      canary_emitted = True
+                  token = page.get('PaginationToken')
+                  if not token:
+                      break
+                  kwargs['PaginationToken'] = token
+              _emit('ReconciliationResourcesScanned', scanned)
+              print(json.dumps({
+                  'scanned': scanned, 'already_ok': already_ok,
+                  'missing': missing, 'wrong_mpe': wrong,
+                  'out_of_agreement': out_of_agree,
+                  'elapsed_secs': round(time.time() - start, 1),
+              }))
+              return {'status': 'completed', 'scanned': scanned, 'enqueued': missing + wrong}
+
+  ReconciliationSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub 'map-auto-tagger-reconciliation-${MpeId}'
+      Description: Daily safety-net reconciliation trigger
+      ScheduleExpression: !Ref ReconciliationInterval
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ReconciliationFunction.Arn
+          Id: ReconciliationLambda
+
+  ReconciliationSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ReconciliationFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ReconciliationSchedule.Arn
+
 Outputs:
   LambdaArn:
     Description: ARN of the MAP auto-tagger Lambda function
@@ -2108,7 +2390,7 @@ Outputs:
     Value: /auto-map-tagger/config
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.4.0
+    Value: v20.5.0
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
