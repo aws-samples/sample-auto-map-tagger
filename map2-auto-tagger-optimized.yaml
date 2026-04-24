@@ -20,7 +20,7 @@ Parameters:
   AgreementStartDate:
     Type: String
     Description: MAP 2.0 agreement start date (YYYY-MM-DD)
-    AllowedPattern: ^\d{4}-\d{2}-\d{2}$
+    AllowedPattern: ^(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$
   ScopeMode:
     Type: String
     Description: How to determine which resources to tag
@@ -407,7 +407,11 @@ Resources:
               return _config
 
           def is_after_agreement(config):
-              start = datetime.strptime(config['agreement_start_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              try:
+                  start = datetime.strptime(config['agreement_start_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              except ValueError:
+                  print(f"Invalid agreement_start_date '{config['agreement_start_date']}', skipping event.")
+                  return False
               return datetime.now(timezone.utc) >= start
 
           def is_in_scope(config, account_id, detail):
