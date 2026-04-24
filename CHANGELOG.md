@@ -6,6 +6,45 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.5.0 — Reconciliation Lambda (daily safety-net)
+
+Adds a second Lambda that runs once per day (configurable via new `ReconciliationInterval` CFN parameter) as a safety-net for silent-failure classes the live tagging Lambda cannot catch. Design locked in PR #36.
+
+**What reconciliation does:**
+
+- Enumerates every taggable resource in-account via `resourcegroupstaggingapi:GetResources` (no 90-day CloudTrail limit).
+- For each resource: checks the current `map-migrated` tag value.
+- **Missing tag** → synthesizes a CloudTrail-shaped event, sends to existing `EventQueue` SQS → live Lambda tags via its normal three-path classifier.
+- **Wrong-MPE value** → same path (always overwrite to our MPE). Architecturally safe because PR #38's Q3 Option D preflight prevents overlapping-scope deploys.
+- **Correctly tagged** → no action, counted in metrics.
+
+**What reconciliation does NOT do:**
+
+- Not a replacement for live tagging — live Lambda stays the ~60–90 s fast path; reconciliation is 24h catch-up.
+- Not a replacement for `BackfillFunction` — backfill covers the <90-day install window; reconciliation runs alongside for ongoing catch-up. Both ship.
+- No cross-account — per-account Lambda (matches StackSet architecture per PR #35).
+- No pagination checkpoint / resume state — 15-min Lambda ceiling with `ReconciliationTimeoutCanary` metric at 13 min. Deferred until a >100K-resource customer surfaces (design §9).
+- No alert-only mode for wrong-MPE — always overwrites (design §3).
+
+**New CFN resources:** `ReconciliationFunction`, `ReconciliationSchedule`, `ReconciliationRole`, `ReconciliationLogGroup` (RetentionInDays 14 matching #29), `ReconciliationSchedulePermission`.
+
+**New CFN parameter:** `ReconciliationInterval` (default `rate(24 hours)`, min 1 hour).
+
+**New CloudWatch metrics** (namespace `MapAutoTagger`):
+
+- `ReconciliationResourcesScanned` — total resources examined per run
+- `ReconciliationMissingTag` — resources without any `map-migrated` tag
+- `WrongMpeCorrected` — resources with a different `map-migrated` value (dims: `ExpectedMpe`, `FoundMpe`)
+- `ReconciliationTimeoutCanary` — fires at 13 min elapsed (trend detector for >100K-resource accounts)
+- `ReconciliationSkippedNoCreationTime` — resources RGTA omits `CreationTime` for
+- `ReconciliationConfigInvalid` — malformed SSM config
+- `ReconciliationRunAborted` — hard-failed RGTA page (rare)
+- `ReconciliationEnqueueFailed` — SQS `SendMessage` failure
+
+**New IAM for reconciliation role** (separate from live Lambda role): `ssm:GetParameter` scoped to `/auto-map-tagger/<mpe>/config`, `tag:GetResources`, `ec2:Describe*` for VPC membership, `sqs:SendMessage` on `EventQueue`, `cloudwatch:PutMetricData` (Condition-scoped to `MapAutoTagger` namespace per PR #37 pattern), `logs:*` on own log group.
+
+**Edge case documented in `docs/design-reconciliation.md` §3:** if a customer deployed before Q3 Option D preflight existed (pre-PR #38) AND has an active overlapping peer tagger in their account, reconciliation's always-overwrite would flap daily against the peer. Pre-Q3 customers should remove or re-scope the peer before enabling reconciliation. New customers (post-Q3) cannot reach this state.
+
 ### v20.4.0 — Three-path error classifier + scope-intersection preflight (#37, #38)
 
 **Runtime: three-path error classifier (#37)**
