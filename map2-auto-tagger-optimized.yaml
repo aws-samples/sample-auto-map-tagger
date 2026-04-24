@@ -311,6 +311,7 @@ Resources:
   AutoTaggerLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       LogGroupName: !Sub '/aws/lambda/map-auto-tagger-${MpeId}'
       RetentionInDays: 14

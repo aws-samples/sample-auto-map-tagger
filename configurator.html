@@ -4889,6 +4889,7 @@ ${permissionsList}
   AutoTaggerLogGroup:
     Type: AWS::Logs::LogGroup
     DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Properties:
       LogGroupName: /aws/lambda/map-auto-tagger-${mpe}
       RetentionInDays: 14
