@@ -305,13 +305,15 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
 
-  # CloudWatch Log Group — explicit declaration sets retention and ensures logs are
-  # cleaned up when the stack is deleted. Lambda uses this group automatically.
+  # CloudWatch Log Group — explicit declaration sets retention. Lambda uses this
+  # group automatically. DeletionPolicy: Retain preserves logs for audit trail when
+  # stack is deleted; see INSTRUCTIONS.md for cleanup steps.
   AutoTaggerLogGroup:
     Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
     Properties:
       LogGroupName: !Sub '/aws/lambda/map-auto-tagger-${MpeId}'
-      RetentionInDays: 90
+      RetentionInDays: 14
 
   # Lambda function
   AutoTaggerFunction:
