@@ -154,11 +154,24 @@ The script:
 
 ## Monitoring
 
-To receive email alerts on tagging errors:
+> **Alerts don't fire unless you subscribe.** The template creates an SNS alert
+> topic but leaves it with zero subscribers — unconfirmed or absent subscriptions
+> silently drop every Lambda-error / DLQ notification. Do this once per stack;
+> otherwise tagging failures go unnoticed.
+
+To receive email alerts on tagging errors, either use the one-liner script:
+
+```bash
+./scripts/add_subscriber.sh <MpeId> <email>
+# example:
+./scripts/add_subscriber.sh mig1234567890 ops@example.com
+```
+
+…or do it by hand in the console:
 
 1. Go to **SNS → Topics → `map-auto-tagger-alerts-mig1234567890`**
 2. **Create subscription** → Protocol: Email → enter your address
-3. Confirm from your inbox
+3. Confirm from your inbox (link is valid for 3 days)
 
 To view tagging activity:
 
