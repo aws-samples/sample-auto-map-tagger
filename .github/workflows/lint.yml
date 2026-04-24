@@ -442,3 +442,17 @@ jobs:
       - name: Print full coverage report (for PR review)
         if: always()
         run: python3 .github/scripts/audit_handler_coverage.py --report
+
+  # ── 8. EventBridge prefix parity ─────────────────────────────────────────
+  # Every `event_name == 'Verb...'` handler in the Lambda must have its
+  # leading verb in the EventBridge rule's `- prefix:` list. Otherwise
+  # EventBridge drops the event before it reaches SQS — silent failure
+  # (no DLQ, no alarm). Enforced in both YAML and configurator.html.
+  eventbridge-prefix-parity:
+    name: EventBridge Prefix Parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enforce every handler verb is in the EventBridge prefix list
+        run: python3 .github/scripts/lint_event_prefixes.py
