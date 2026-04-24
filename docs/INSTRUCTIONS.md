@@ -215,6 +215,25 @@ aws cloudformation delete-stack-set --stack-set-name map-auto-tagger-mig12345678
 
 Tags already applied to existing resources are not removed.
 
+### Clean Up Log Groups (Optional)
+
+CloudWatch Log Groups are retained when you delete the stack to preserve audit history. To fully remove all resources and stop incurring log storage costs, delete the log groups manually:
+
+**Single account:**
+
+```bash
+# Replace mig1234567890 with your MPE ID
+aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-mig1234567890" --region <region>
+```
+
+**Multi-account:**
+
+Run the above command in each region where the stack was deployed. If you enabled backfill, also delete:
+
+```bash
+aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-backfill-mig1234567890" --region <region>
+```
+
 ---
 
 ## FAQ
