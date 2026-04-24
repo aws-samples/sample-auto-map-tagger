@@ -4886,8 +4886,17 @@ ${permissionsList}
                   - logs:PutLogEvents
                 Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*
 
+  AutoTaggerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: /aws/lambda/map-auto-tagger-${mpe}
+      RetentionInDays: 14
+
   AutoTaggerFunction:
     Type: AWS::Lambda::Function
+    DependsOn: AutoTaggerLogGroup
     Properties:
       FunctionName: map-auto-tagger-${mpe}
       Runtime: python3.12
