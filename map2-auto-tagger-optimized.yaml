@@ -2127,7 +2127,11 @@ Resources:
   ReconciliationRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: !Sub 'map-auto-tagger-reconciliation-role-${MpeId}-${AWS::Region}'
+      # IAM RoleName max 64 chars. Shortened "reconciliation" → "recon" so
+      # `map-auto-tagger-recon-role-<MpeId>-<region>` fits (~60 chars for typical
+      # 15-char MpeId + ap-northeast-2). The full-word name overran at 69 chars
+      # and failed StackSet deploys (E2E run 24900531765, v20.5.0 initial ship).
+      RoleName: !Sub 'map-auto-tagger-recon-role-${MpeId}-${AWS::Region}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
