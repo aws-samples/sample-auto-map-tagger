@@ -456,3 +456,22 @@ jobs:
 
       - name: Enforce every handler verb is in the EventBridge prefix list
         run: python3 .github/scripts/lint_event_prefixes.py
+
+  # ── 9. CFN correctness (catches PR #41 and PR #42 classes) ─────────────
+  # cfn-lint is silent on AWS service-side constraints (resource-name
+  # length limits, IAM RoleName character class, unsubbed pseudo-params
+  # outside !Sub). Those errors only surface at stack-create time. This
+  # check catches them at merge time.
+  #
+  # Five checks: unsubbed ${AWS::...}, name-length overruns, IAM
+  # RoleName character class, dangling !Ref/!GetAtt, undefined !Sub
+  # template variables. Covers both map2-auto-tagger-optimized.yaml
+  # and configurator.html's inline CFN template.
+  cfn-correctness:
+    name: CFN Correctness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enforce CFN correctness (name lengths, !Sub coverage, ref targets)
+        run: python3 .github/scripts/lint_cfn_correctness.py
