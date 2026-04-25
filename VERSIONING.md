@@ -21,7 +21,7 @@
 
 The version lives in exactly two places:
 
-1. **`configurator.html`** — `const TEMPLATE_VERSION = 'v20.5.3';` (one occurrence)
+1. **`configurator.html`** — `const TEMPLATE_VERSION = 'v20.5.4';` (one occurrence)
 2. **`map2-auto-tagger-optimized.yaml`** — Description header, `MapVersion` SSM parameter default, Lambda `TEMPLATE_VERSION` constant, `TemplateVersion` CFN output (all four must equal the configurator constant)
 
 `.github/scripts/sync-check.py` enforces this invariant. Any drift between references is a sync-check failure.
@@ -29,7 +29,7 @@ The version lives in exactly two places:
 ## Where customers see it
 
 - **CFN Output `TemplateVersion`** — surfaces in the CloudFormation console after deploy.
-- **SSM Parameter `/auto-map-tagger/${MpeId}/version`** — readable via `aws ssm get-parameter`. Used by `update.sh` (future) for version-guard checks.
+- **SSM Parameter `/auto-map-tagger/${MpeId}/version`** — readable via `aws ssm get-parameter`. Used by `upgrade.sh` for version-guard checks.
 - **CloudWatch Logs** — every Lambda cold start prints `auto-map-tagger vN.N.N cold start`.
 
 ## Release tagging
@@ -48,4 +48,4 @@ Customers who "Watch → Releases only" on the GitHub repository get an email wh
 
 - Lambda runtime does **not** branch on version. The version string is metadata for humans and external tooling only.
 - Per-resource versioning (Lambda versions, Lambda Layers, etc.) is never used.
-- Cross-version compatibility checks in `update.sh` are out of scope for this policy document — see `update.sh` documentation when that PR lands.
+- Cross-version compatibility checks in `upgrade.sh` are out of scope for this policy document — see `upgrade.sh` documentation when that PR lands.
