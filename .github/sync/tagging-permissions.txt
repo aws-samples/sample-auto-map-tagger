@@ -41,6 +41,7 @@ elasticfilesystem:TagResource
 elasticloadbalancing:AddTags
 elasticmapreduce:AddTags
 es:AddTags
+events:TagResource
 firehose:TagDeliveryStream
 fsx:TagResource
 gamelift:TagResource

@@ -977,8 +977,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.5.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.5.0';
+        // Must match `TEMPLATE_VERSION = 'v20.5.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.5.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -986,6 +986,15 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.5.1',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'bugfix',   text: 'Config SSM cache now has a 60-second TTL — warm containers no longer misattribute credit for up to 15 minutes after an MPE rotation.' },
+                    { tag: 'bugfix',   text: 'Added events:TagResource IAM permission. Previously EventBridge rules / buses / schedules / connections AccessDenied on tag (IoT Events\' iotevents:TagResource is a different service).' },
+                    { tag: 'bugfix',   text: 'CFN Output ConfigParameter now returns the real SSM parameter path (/auto-map-tagger/<mpe>/config) instead of the literal string /auto-map-tagger/config.' },
+                ],
+            },
             {
                 version: 'v20.5.0',
                 date: '2026-04-24',
@@ -4535,6 +4544,9 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             // IoT
             'iot:TagResource','iotanalytics:TagResource','iotevents:TagResource',
             'iotsitewise:TagResource',
+            // EventBridge (events:*) — distinct service from IoT Events (iotevents:*).
+            // Needed to tag newly-created Event rules / buses / schedules / connections.
+            'events:TagResource',
             'kinesisvideo:TagStream','dsql:TagResource','vpc-lattice:TagResource',
             'bedrock-agentcore:TagResource','payment-cryptography:TagResource',
             'networkmanager:TagResource',
@@ -4949,12 +4961,19 @@ ${permissionsList}
           ec2 = boto3.client('ec2')
           tagging = boto3.client('resourcegroupstaggingapi')
           _config = None
+          _config_ts = 0.0
+          # Warm containers live ~15 min; an MPE rotation via SSM wouldn't be
+          # seen until the container recycled, silently misattributing credit.
+          # 60s TTL bounds the window without adding meaningful SSM load.
+          _CONFIG_TTL_SECONDS = 60
 ${crossAccountCode}
           def get_config():
-              global _config
-              if _config is None:
+              global _config, _config_ts
+              now = time.time()
+              if _config is None or (now - _config_ts) > _CONFIG_TTL_SECONDS:
                   resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
                   _config = json.loads(resp['Parameter']['Value'])
+                  _config_ts = now
               return _config
 
           def is_within_agreement(config):
@@ -5685,7 +5704,7 @@ ${crossAccountCode}
         - !Ref AlertTopic
       TreatMissingData: notBreaching
 
-  # Reconciliation Lambda (v20.5.0) — daily safety-net that enumerates in-scope
+  # Reconciliation Lambda — daily safety-net that enumerates in-scope
   # resources via RGTA GetResources and re-enqueues any whose map-migrated tag
   # is missing or wrong-MPE through EventQueue. Live Lambda's classifier handles
   # the actual tag writes. See docs/design-reconciliation.md for architecture.
