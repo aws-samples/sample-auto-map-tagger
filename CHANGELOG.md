@@ -6,6 +6,19 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### Docs pass — D1–D6 corrections (plan-PR #40, 2026-04-25)
+
+No template version bump — documentation-only corrections against v20.6.2. Closes audit items D1–D6 from the remediation plan's docx series.
+
+- **D1 — Resource-type count aligned to actual.** README, OVERVIEW.md, and COVERAGE.md previously said `140` / `140+` resource types. Actual Lambda handler count is 154 (audit_handler_coverage.py). Updated all five sites to `150+`.
+- **D2 — SNS topic name corrected.** INSTRUCTIONS.md step "SNS → Topics → `map-auto-tagger-alerts-…`" was missing the `auto-` prefix; actual topic name is `auto-map-tagger-alerts-${MpeId}` (template line 2074). Customers following the manual-subscribe steps landed on a nonexistent topic.
+- **D3 — `tag_non_vpc_services` removed from runtime SSM example.** The INSTRUCTIONS.md SSM `put-parameter` example included `"tag_non_vpc_services": true`, implying customers could tune this at runtime. It is a configurator-only UI control that shapes the generated `scoped_vpc_ids` at deploy time; the runtime Lambda never reads it. Removed from the example and added an explicit field-by-field description of which keys `is_in_scope` actually reads.
+- **D4 — Multi-account delete instructions include `delete-stack-instances`.** Prior INSTRUCTIONS.md told customers to run `delete-stack-set` directly, which fails with `StackSetNotEmpty` whenever stack instances exist. Replaced with the correct sequence (delete-stack-instances → wait for SUCCEEDED → delete-stack-set) including `OperationPreferences` for parallel rollout. Also pointed customers at the new v20.6.0 `delete.sh` generator as the recommended path.
+- **D5 — COVERAGE.md adds Directory Service, CloudHSM v2, Keyspaces.** PR #25 shipped handlers for Simple AD + Microsoft AD (`ds:AddTagsToResource`), CloudHSM v2 clusters and HSMs (`cloudhsm:TagResource`), and Keyspaces namespaces (`keyspaces:TagResource`), but COVERAGE.md's "Supported Services" table never got updated. Added one row each under Security & Identity / Database.
+- **D6 — IAM-without-handler audit verified current.** Spot-checked the COVERAGE.md "Supported Services" table against the Lambda handler list; no ghost claims were found that don't have a corresponding handler or RGTA catch-all. (The deeper handler-gap sweep is tracked separately as plan-PR #53.)
+
+---
+
 ### v20.6.2 — Backfill robustness (plan-PR #38)
 
 Tooling-only PATCH; YAML runtime is byte-identical to v20.6.1 except the four version stamps. Closes audit items §1.52 and §1.53. §1.54 verified not applicable — the configurator-generated `BackfillTrigger.ScopedAccounts` is a JSON-encoded Custom Resource property, not a CFN `Type: String` parameter; `json.loads` in the handler correctly parses it (no CSV collapse possible).
