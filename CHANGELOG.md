@@ -6,6 +6,16 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.5.4 — Rename Upgrade-mode output `update.sh` → `upgrade.sh` (PR #48a)
+
+Tooling-only; YAML byte-identical to v20.5.3 except for the four version stamps. No runtime Lambda change. Customers who have already deployed are not affected. Customers running `upgrade.sh` next should re-download from the configurator.
+
+**The collision:** the configurator's Upgrade-mode flow (which replaces Lambda code / IAM / EventBridge to the latest template version) and its Editor-mode flow (which adds or removes accounts from scope without redeploying) both generated a file named `update.sh`. A customer running both flows would get two downloads with the same filename and no way to distinguish "upgrade version" from "change account scope" by name. Renames the Upgrade-mode output to `upgrade.sh`; Editor-mode continues to emit `update.sh`.
+
+Renames are cosmetic — the script body is unchanged, SSM paths are unchanged, CFN resource names are unchanged. A customer with an `update.sh` on disk from v20.5.3 can still run it; it will work identically to v20.5.4's `upgrade.sh`.
+
+Co-authored-by: Jin Shan Ng (aws-samples PR #27 proposal).
+
 ### v20.5.3 — Generated update.sh — fix `--use-previous-parameters` (PR #47)
 
 **Severity: high** (every customer upgrade attempt failed on first run). No runtime Lambda change; YAML is byte-identical to v20.5.2 except for the four version stamps.

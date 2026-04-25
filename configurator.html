@@ -825,7 +825,7 @@
             </div>
 
             <div class="info-box">
-                <span data-i18n="ui_update_info">This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>update.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.</span>
+                <span data-i18n="ui_update_info">This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>upgrade.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.</span>
             </div>
 
             <!-- Update Step 1: Configure -->
@@ -877,7 +877,7 @@
                     </div>
 
                     <div class="info-box" style="background:#f0f7fc;border-left:4px solid #0073bb;font-size:13px;margin-top:16px;">
-                        <span data-i18n="ui_update_info_detail">The generated <code>update.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.</span>
+                        <span data-i18n="ui_update_info_detail">The generated <code>upgrade.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.</span>
                     </div>
 
                     <details id="update-versionHistory" style="margin-top:16px;border:1px solid #eaeded;border-radius:4px;padding:12px 14px;background:#fafafa;">
@@ -944,7 +944,7 @@
 
                 <div class="actions">
                     <button class="btn-secondary" onclick="updateSetStep(1)" data-i18n="ui_btn_back">← Back</button>
-                    <button class="btn-primary" onclick="updateGenerate()" style="margin-left:auto;" data-i18n="ui_editor_generate">Generate update.sh →</button>
+                    <button class="btn-primary" onclick="updateGenerate()" style="margin-left:auto;" data-i18n="ui_upgrade_generate">Generate upgrade.sh →</button>
                 </div>
             </div>
 
@@ -955,7 +955,7 @@
                     <p class="subtitle" data-i18n="ui_update_step3_subtitle">Run this in AWS CloudShell from the account where the deployment was made</p>
 
                     <div style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;">
-                        <button class="btn-primary" onclick="updateDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_editor_download">⬇ Download update.sh</button>
+                        <button class="btn-primary" onclick="updateDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_upgrade_download">⬇ Download upgrade.sh</button>
                         <button class="btn-secondary" onclick="updateCopyInstructions()" data-i18n="ui_btn_copy">📋 Copy Instructions</button>
                     </div>
 
@@ -977,8 +977,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.5.3'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.5.3';
+        // Must match `TEMPLATE_VERSION = 'v20.5.4'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.5.4';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -987,10 +987,17 @@
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
             {
+                version: 'v20.5.4',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'other', text: 'Configurator Upgrade-mode generator now outputs upgrade.sh (was update.sh). The Editor-mode day-2 account-scope flow continues to output update.sh. The two scripts had the same filename; customers running both flows got colliding downloads with no way to tell which was which.' },
+                ],
+            },
+            {
                 version: 'v20.5.3',
                 date: '2026-04-25',
                 changes: [
-                    { tag: 'bugfix', text: 'Fix generated update.sh — previously used --use-previous-parameters, a flag that does not exist on AWS CLI v2 update-stack or update-stack-set. Every customer upgrade attempt failed with "Unknown options: --use-previous-parameters". Replaced with per-parameter UsePreviousValue=true list built dynamically from each stack\'s existing parameters so newly-added template parameters (e.g. ReconciliationInterval) pick up the new template\'s Default. Re-download update.sh from the configurator before upgrading.' },
+                    { tag: 'bugfix', text: 'Fix generated upgrade-flow script — previously used --use-previous-parameters, a flag that does not exist on AWS CLI v2 update-stack or update-stack-set. Every customer upgrade attempt failed with "Unknown options: --use-previous-parameters". Replaced with per-parameter UsePreviousValue=true list built dynamically from each stack\'s existing parameters so newly-added template parameters (e.g. ReconciliationInterval) pick up the new template\'s Default. (Upgrade-flow output was renamed to upgrade.sh in v20.5.4.)' },
                 ],
             },
             {
@@ -1326,10 +1333,10 @@
         }
 
         function updateDownload() {
-            const blob = new Blob([window._editorScript], { type: 'text/x-sh' });
+            const blob = new Blob([window._upgradeScript], { type: 'text/x-sh' });
             const a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = `update-${window._editorMpe}.sh`;
+            a.download = `upgrade-${window._upgradeMpe}.sh`;
             a.click();
         }
 
@@ -1906,8 +1913,8 @@ fi
 `;
 
             document.getElementById('update-scriptContent').textContent = script;
-            window._editorScript = script;
-            window._editorMpe = selectedMpes.length > 0 ? selectedMpes.join('-') : 'all';
+            window._upgradeScript = script;
+            window._upgradeMpe = selectedMpes.length > 0 ? selectedMpes.join('-') : 'all';
 
             const instructions = `UPGRADE INSTRUCTIONS — MAP Auto-Tagger ${TEMPLATE_VERSION}
 =========================================
@@ -1921,19 +1928,19 @@ Region: ${region}
    (For multi-account deployments, this is the management account.)
 2. Open CloudShell (click the terminal icon in the top menu bar).
 3. Upload the file (CloudShell → Actions → Upload file):
-     update.sh
+     upgrade.sh
 4. Run:
-   bash update.sh
+   bash upgrade.sh
 
    To force cross-MAJOR or downgrade:
-   bash update.sh --force
+   bash upgrade.sh --force
 
 ── Option 2: Local AWS CLI ──────────────────────────────────
 1. Ensure AWS CLI v2 is installed and configured with admin credentials
    for the deployment account.
-2. Download update.sh to your local machine.
+2. Download upgrade.sh to your local machine.
 3. Run:
-   bash update.sh
+   bash upgrade.sh
 
 ─────────────────────────────────────────────────
 What the script does:
@@ -1957,7 +1964,7 @@ Check status after the script runs:
    aws ssm get-parameter --name /auto-map-tagger/<mpe>/version --query Parameter.Value
    # Expected: ${TEMPLATE_VERSION}
 
-Note: the new template is bundled inside this update.sh. No outbound
+Note: the new template is bundled inside this upgrade.sh. No outbound
 network calls are made from your environment during the upgrade.`;
 
             document.getElementById('update-instructions').textContent = instructions;
@@ -2548,10 +2555,10 @@ network calls are made from your environment during the upgrade.`;
             ui_ustep1:'1. Configure',
             ui_ustep2:'2. Review',
             ui_ustep3:'3. Download',
-            ui_update_info:'This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>update.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.',
+            ui_update_info:'This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>upgrade.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.',
             ui_update_step1_title:'Deployment Details',
             ui_update_step1_subtitle:'Enter the region and optional scope for the upgrade',
-            ui_update_info_detail:'The generated <code>update.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.',
+            ui_update_info_detail:'The generated <code>upgrade.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.',
             ui_update_scope_title:'Update only specific MAP engagement(s)',
             ui_update_scope_desc:'Leave unchecked to update every MAP Auto-Tagger deployment the script finds in this account (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).',
             ui_update_mpe_label:'MPE IDs to update',
@@ -2587,6 +2594,8 @@ network calls are made from your environment during the upgrade.`;
             ui_editor_step3_title:'Script Ready',
             ui_editor_step3_subtitle:'Run this in AWS CloudShell from the management account',
             ui_editor_download:'⬇ Download update.sh',
+            ui_upgrade_generate:'Generate upgrade.sh →',
+            ui_upgrade_download:'⬇ Download upgrade.sh',
             ui_editor_script_preview:'Script Preview',
             err_date_required:'Agreement start date is required',
             err_date_end:'Agreement end date is required and must be after start date',
@@ -4861,7 +4870,7 @@ Conditions:
 
 Resources:
 
-  # Template version pinned at deploy time — read by ops, update.sh, and
+  # Template version pinned at deploy time — read by ops, upgrade.sh, and
   # external tooling. No outbound network calls; discovered locally via SSM.
   MapVersion:
     Type: AWS::SSM::Parameter
