@@ -169,7 +169,7 @@ To receive email alerts on tagging errors, either use the one-liner script:
 
 …or do it by hand in the console:
 
-1. Go to **SNS → Topics → `map-auto-tagger-alerts-mig1234567890`**
+1. Go to **SNS → Topics → `auto-map-tagger-alerts-mig1234567890`**
 2. **Create subscription** → Protocol: Email → enter your address
 3. Confirm from your inbox (link is valid for 3 days)
 
@@ -203,30 +203,62 @@ aws ssm put-parameter \
     "agreement_start_date": "2024-06-01",
     "scope_mode": "account",
     "scoped_account_ids": ["ALL"],
-    "scoped_vpc_ids": [],
-    "tag_non_vpc_services": true
+    "scoped_vpc_ids": []
   }'
 ```
 
 > Replace `mig1234567890` with your actual MPE ID throughout.
 
+**Fields read by the runtime Lambda:**
+>
+> - `mpe_id` — the MAP Engagement ID applied as the tag value.
+> - `agreement_start_date` — `YYYY-MM-DD`; events with `eventTime` before this date are skipped (also used by the backfill CustomResource as the CloudTrail lookup start).
+> - `scope_mode` — `account` or `vpc`. Determines which field below is authoritative.
+> - `scoped_account_ids` — list of 12-digit account IDs, or `["ALL"]`. In `account` mode, only tags resources whose creation event came from a listed account. Ignored in `vpc` mode.
+> - `scoped_vpc_ids` — list of `vpc-…` IDs. In `vpc` mode, only tags resources whose VPC membership resolves to a listed VPC; resources with no VPC association (S3, DynamoDB, Lambda, SNS, SQS, etc.) are **skipped** in `vpc` mode by design. Ignored in `account` mode.
+>
+> Fields shown in the configurator UI like `tag_non_vpc_services` are UI-only
+> controls that shape how `scoped_vpc_ids` is populated at deploy time; they
+> are not read by the runtime Lambda and have no effect if added here.
+
 ---
 
 ## Remove the Auto-Tagger
 
-**Single account:**
+**Recommended: use the configurator's Delete mode.** Open `configurator.html` → **🗑️ Delete existing deployment**, select the region, optionally scope to specific MPE(s), type `DELETE` to confirm, and download `delete.sh`. The generated script auto-detects single-account stacks and multi-account StackSets, deletes stack instances in parallel (100% tolerance), and conditionally removes the S3 staging bucket. See the [configurator delete flow](../configurator.html) for details.
+
+**Manual path (single account):**
 
 ```bash
-aws cloudformation delete-stack --stack-name map-auto-tagger-mig1234567890
+aws cloudformation delete-stack --stack-name map-auto-tagger-mig1234567890 --region <REGION>
+aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger-mig1234567890 --region <REGION>
 ```
 
-**Multi-account:**
+**Manual path (multi-account StackSet):** you MUST delete the stack instances before deleting the StackSet itself, otherwise `delete-stack-set` fails with `StackSetNotEmpty`.
 
 ```bash
-aws cloudformation delete-stack-set --stack-set-name map-auto-tagger-mig1234567890
+# 1. Delete stack instances from all accounts in the org (parallel, 100% tolerance)
+aws cloudformation delete-stack-instances \
+  --stack-set-name map-auto-tagger-mig1234567890 \
+  --deployment-targets OrganizationalUnitIds=<OU_ID> \
+  --regions <REGION> \
+  --operation-preferences MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL \
+  --no-retain-stacks \
+  --region <REGION>
+
+# 2. Wait for the operation to reach SUCCEEDED
+aws cloudformation list-stack-set-operations \
+  --stack-set-name map-auto-tagger-mig1234567890 \
+  --region <REGION> \
+  --query "Summaries[0].Status"
+
+# 3. Once empty, delete the StackSet itself
+aws cloudformation delete-stack-set \
+  --stack-set-name map-auto-tagger-mig1234567890 \
+  --region <REGION>
 ```
 
-Tags already applied to existing resources are not removed.
+Tags already applied to existing resources are not removed — MAP credits stay intact. StackSet admin/execution IAM roles (shared org scaffolding) are never touched.
 
 ---
 

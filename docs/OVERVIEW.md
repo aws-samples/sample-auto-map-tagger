@@ -84,7 +84,7 @@ EventBridge → Lambda direct invocation has a 24-hour retry limit. Some resourc
 
 ## What Gets Tagged
 
-The auto-tagger covers **140 AWS resource types** across every major service category — all confirmed through real-world testing across 9 AWS accounts.
+The auto-tagger covers **150+ AWS resource types** across every major service category — all confirmed through real-world testing across 9 AWS accounts.
 
 | Category | Examples |
 |----------|---------|
@@ -248,7 +248,7 @@ For a 50-account organization: **< $100/month** to protect potentially **million
 | What | Detail |
 |------|--------|
 | **Purpose** | Auto-tag AWS resources for MAP 2.0 credits |
-| **Coverage** | 140 resource types, all 88 MAP-eligible services |
+| **Coverage** | 150+ resource types, all 88 MAP-eligible services |
 | **Latency** | Typically 60–90 seconds from creation to tagged |
 | **Deployment** | 1 file, 1 command in CloudShell |
 | **Cost** | < $2/month per account |

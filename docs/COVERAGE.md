@@ -48,6 +48,7 @@ All services below have explicit handlers in the Lambda function. Resources are 
 | Redshift | Clusters, workgroups (Serverless) | RGTA |
 | OpenSearch | Domains | RGTA |
 | Timestream | Databases, tables | RGTA |
+| Keyspaces (Cassandra) | Keyspaces | Native `keyspaces:TagResource` |
 
 ### Analytics
 
@@ -116,6 +117,8 @@ All services below have explicit handlers in the Lambda function. Resources are 
 | Secrets Manager | Secrets | RGTA |
 | Security Hub | Hub (EnableSecurityHub) | RGTA |
 | WAFv2 | Web ACLs, IP sets | RGTA |
+| Directory Service | Simple AD, Microsoft AD directories | Native `ds:AddTagsToResource` |
+| CloudHSM v2 | Clusters, HSMs | Native `cloudhsm:TagResource` |
 
 ### Management & Governance
 
@@ -365,6 +368,6 @@ The following matrix shows which services have end-to-end test coverage (resourc
 |--------|--------|
 | Services with E2E coverage | ~65 |
 | Services with handler but no E2E | ~15 |
-| Total resource types in handler | 140+ |
+| Total resource types in handler | 150+ |
 | Accounts tested | 9 |
 | Lambda errors across all tests | 0 |
