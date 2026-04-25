@@ -475,3 +475,20 @@ jobs:
 
       - name: Enforce CFN correctness (name lengths, !Sub coverage, ref targets)
         run: python3 .github/scripts/lint_cfn_correctness.py
+
+  # ── 10. Shell injection guard (catches the U4 RCE shape) ─────────────────
+  # configurator.html emits a bash script at runtime. A partner-controlled
+  # `customerName` field previously flowed into a double-quoted shell
+  # variable, where `$(...)`, backticks, `\`, and `$VAR` still expand —
+  # a single-line RCE against any customer who pastes the generated
+  # deploy.sh into their CloudShell. This check enforces that customer-
+  # derived values are emitted only inside single-quoted shell strings
+  # via the shellSingleQuote helper.
+  shell-injection-guard:
+    name: Shell Injection Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enforce single-quoted containment for customer-controlled shell values
+        run: python3 .github/scripts/lint_shell_injection.py
