@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.6.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.6.1';
+        // Must match `TEMPLATE_VERSION = 'v20.6.2'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.6.2';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,14 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.6.2',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'bugfix', text: 'Backfill Lambda lookup_events retry now also matches the "ThrottledException" variant (with "ed"), not just "ThrottlingException" (with "ing"). CloudTrail normally throws the "ing" form but the "ed" variant has been observed in this path — same class as PR #17 fix for the main Lambda. Defensive symmetry across both variants.' },
+                    { tag: 'bugfix', text: 'Backfill CFN Custom Resource now reports the real outcome in the Reason field. Prior behavior: always "Backfill: N sent, 0 errors" even when half the ~140 event types silently failed CloudTrail lookup after 4-retry exhaustion. New Reason: "Backfill: {sent} sent, {send_errors} send errors, {lookup_errors}/{N} event types failed lookup" — visible in CloudFormation event history. Still reports SUCCESS so stack create does not block on transient CloudTrail throttles (live tagging is unaffected by backfill failure).' },
+                ],
+            },
             {
                 version: 'v20.6.1',
                 date: '2026-04-25',
@@ -5712,6 +5720,7 @@ ${backfillEventNamesList}
 
           def lookup_events(event_name, start_time):
               results = []
+              lookup_error = None
               kwargs = {
                   'LookupAttributes': [{'AttributeKey': 'EventName', 'AttributeValue': event_name}],
                   'StartTime': start_time,
@@ -5734,13 +5743,17 @@ ${backfillEventNamesList}
                           break
                   except Exception as e:
                       err_str = str(e)
-                      if ('ThrottlingException' in err_str or 'Rate exceeded' in err_str) and throttle_retry < 4:
+                      # CloudTrail normally throws 'ThrottlingException' (with 'ing'),
+                      # but the variant 'ThrottledException' (with 'ed') has been observed
+                      # in some paths — PR #17 class. Match both for defensive symmetry.
+                      if ('ThrottlingException' in err_str or 'ThrottledException' in err_str or 'Rate exceeded' in err_str) and throttle_retry < 4:
                           throttle_retry += 1
                           time.sleep((2 ** throttle_retry) * 0.5)
                           continue
                       print(f"LookupEvents error for {event_name}: {e}")
+                      lookup_error = err_str
                       break
-              return results
+              return (results, lookup_error)
 
           def handler(event, context):
               # Handle CloudFormation Custom Resource
@@ -5770,12 +5783,16 @@ ${backfillEventNamesList}
                   print(f"Backfill: querying CloudTrail from {AGREEMENT_START_DATE} for {len(EVENT_NAMES)} event types")
 
                   all_events = []
+                  lookup_errors = 0
                   with ThreadPoolExecutor(max_workers=3) as executor:
                       futures = {executor.submit(lookup_events, name, start_time): name for name in EVENT_NAMES}
                       for future in as_completed(futures):
-                          all_events.extend(future.result())
+                          events, err = future.result()
+                          all_events.extend(events)
+                          if err is not None:
+                              lookup_errors += 1
 
-                  print(f"Backfill: found {len(all_events)} creation events")
+                  print(f"Backfill: found {len(all_events)} creation events ({lookup_errors} event types failed LookupEvents)")
 
                   sent = 0
                   errors = 0
@@ -5798,12 +5815,21 @@ ${backfillEventNamesList}
                           print(f"SendMessage error for {ct_event.get('eventName','?')}: {e}")
                           errors += 1
 
-                  print(f"Backfill complete: {sent} events sent to EventQueue, {errors} errors")
-                  respond(event, context, 'SUCCESS', f'Backfill: {sent} sent, {errors} errors')
+                  # Report SUCCESS to unblock stack create, but surface real counts in the
+                  # Reason so operators reading CFN events can tell whether backfill hit
+                  # LookupEvents errors / SendMessage errors. Prior behavior always said
+                  # "Backfill: N sent, 0 errors" regardless, masking LookupEvents failures.
+                  print(f"Backfill complete: {sent} events sent to EventQueue, {errors} send errors, {lookup_errors} lookup errors")
+                  reason = f'Backfill: {sent} sent, {errors} send errors, {lookup_errors}/{len(EVENT_NAMES)} event types failed lookup'
+                  respond(event, context, 'SUCCESS', reason)
               except Exception as e:
+                  # Top-level exception — backfill could not run at all (permissions,
+                  # SSM read, date parse, etc). Report SUCCESS with error detail in Reason
+                  # so the stack still succeeds (backfill is best-effort; live tagging is
+                  # unaffected) but the failure is visible in CFN event history.
                   import traceback
                   print(traceback.format_exc())
-                  respond(event, context, 'SUCCESS', f'Backfill error (non-fatal): {e}')
+                  respond(event, context, 'SUCCESS', f'Backfill error (non-fatal): {str(e)[:300]}')
 
   BackfillTrigger:
     Type: Custom::Backfill

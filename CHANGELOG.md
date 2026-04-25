@@ -6,6 +6,16 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.6.2 — Backfill robustness (plan-PR #38)
+
+Tooling-only PATCH; YAML runtime is byte-identical to v20.6.1 except the four version stamps. Closes audit items §1.52 and §1.53. §1.54 verified not applicable — the configurator-generated `BackfillTrigger.ScopedAccounts` is a JSON-encoded Custom Resource property, not a CFN `Type: String` parameter; `json.loads` in the handler correctly parses it (no CSV collapse possible).
+
+**§1.52 — Backfill `lookup_events` retry misses `ThrottledException` variant.** CloudTrail normally throws `ThrottlingException` (with "ing") but the "ed" variant has been observed in this class (same as PR #17). Prior check was `'ThrottlingException' in err_str or 'Rate exceeded' in err_str`; now additionally matches `ThrottledException` for defensive symmetry.
+
+**§1.53 — Backfill always reported SUCCESS with misleading Reason, masking partial failures.** `lookup_events` swallowed CloudTrail errors after 4-retry exhaustion, counted only successful returns, and the Custom Resource response said `Backfill: N sent, 0 errors` even when half the event types failed lookup. Fix: `lookup_events` now returns `(results, lookup_error)` tuple; handler counts how many of the ~140 event types failed lookup; Reason now reports `Backfill: {sent} sent, {send_errors} send errors, {lookup_errors}/{N} event types failed lookup` so operators reading CFN event history can see real outcome. Still reports SUCCESS to CFN (backfill is best-effort — live tagging is unaffected, and a FAILURE here would block stack create for transient CloudTrail throttles). Top-level catch-all Reason also truncates error message to 300 chars to stay under CFN's 4KB Reason cap.
+
+---
+
 ### v20.6.1 — Editor update.sh + upgrade.sh SemVer guard hardening (plan-PR #37)
 
 Tooling-only PATCH. YAML runtime is byte-identical to v20.6.0 except for the four version stamps. Closes audit items §1.41, §1.47, §1.48.
