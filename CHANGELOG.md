@@ -6,6 +6,16 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.5.3 — Generated update.sh — fix `--use-previous-parameters` (PR #47)
+
+**Severity: high** (every customer upgrade attempt failed on first run). No runtime Lambda change; YAML is byte-identical to v20.5.2 except for the four version stamps.
+
+**The bug (U1):** `configurator.html`'s upgrade-flow generator produced an `update.sh` that called `aws cloudformation update-stack` and `update-stack-set` with `--use-previous-parameters`. That flag does not exist on either command in AWS CLI v2 (only `--use-previous-template`, which is a different thing). Both call sites failed with `Unknown options: --use-previous-parameters`. PR #26 shipped this broken; any customer who downloaded update.sh and tried to upgrade hit the error immediately.
+
+**The fix:** the generated script now calls `describe-stack-set` / `describe-stacks` first to enumerate the current parameter keys, then builds a `--parameters ParameterKey=<K>,UsePreviousValue=true ...` list dynamically. Each existing parameter value is carried forward. Newly-added template parameters (for example `ReconciliationInterval` from v20.5.0) pick up the new template's `Default` automatically because they are omitted from the `--parameters` list — this is the CFN-documented behavior. If the describe call returns an empty result, the script aborts with a clear error rather than proceeding with an empty parameter list.
+
+Affects only the `update.sh` generator; deploy.sh and the in-place scope-edit editor flow are unchanged.
+
 ### v20.5.2 — Security: generator-side shell-injection fix (PR #46)
 
 **Security class: supply-chain RCE.** Severity: high. No runtime Lambda change; the YAML template is byte-identical to v20.5.1. Customers who already deployed are NOT affected. Customers generating a fresh `deploy.sh` should re-download from the configurator before next deploy.
