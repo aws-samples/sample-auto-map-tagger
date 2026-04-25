@@ -480,6 +480,14 @@ def delete_record(record: dict) -> None:
         safe_delete(_client("logs", region, account).delete_log_group,
                     logGroupName=log_group, resource_desc=arn)
 
+    # ── EventBridge rule ──────────────────────────────────────────────────────
+    # Rule name is after the last "/" in the ARN (arn:aws:events:...:rule/<name>).
+    # E2E fixture creates rules with no targets, so we skip remove_targets.
+    elif service == "events":
+        rule_name = arn.rsplit("/", 1)[-1]
+        safe_delete(_client("events", region, account).delete_rule,
+                    Name=rule_name, resource_desc=arn)
+
     # ── KMS ───────────────────────────────────────────────────────────────────
     elif service == "kms":
         safe_delete(_client("kms", region, account).schedule_key_deletion,

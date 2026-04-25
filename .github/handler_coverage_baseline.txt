@@ -153,7 +153,7 @@ UNCOVERED PutDashboard
 COVERED   PutMetricAlarm
 COVERED   PutParameter
 UNCOVERED PutQueryDefinition
-UNCOVERED PutRule
+COVERED   PutRule
 COVERED   RequestCertificate
 UNCOVERED RestoreTableFromBackup|dynamodb.amazonaws.com
 UNCOVERED RestoreTableToPointInTime|dynamodb.amazonaws.com
