@@ -6,6 +6,38 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.6.0 — Configurator delete.sh flow (PR #48b)
+
+**New feature.** MINOR bump per SemVer — safe in-place upgrade for existing deployments (the YAML runtime is byte-identical to v20.5.4 except for the four version stamps; this PR adds a new configurator UI mode and a new generated script).
+
+**Why:** there was no first-class way to remove a MAP Auto-Tagger deployment. Customers either hand-wrote `delete-stack` / `delete-stack-set` invocations or deleted via the CloudFormation console without consistent coverage of the staging S3 bucket and log groups. Missing in particular: deciding whether the bucket should stay (other deployments may still need it) versus go.
+
+**What you get:** a fourth mode card in `configurator.html` — "Delete existing deployment". Three-step flow (Configure → Review → Download) mirroring Deploy / Editor / Upgrade. Generates `delete-all.sh` (or `delete-<mpe1>-<mpe2>.sh` when scoped to specific MPEs). The script:
+
+- Enumerates matching CloudFormation deployments in the selected region (`map-auto-tagger-mig*`, both single-account Stacks and multi-account StackSets).
+- Deletes StackSet instances in parallel (100% tolerance, region parallel), waits ≤30min, then deletes the StackSet itself. For single-account Stacks, runs `delete-stack` and waits for completion.
+- Inspects the S3 staging bucket `auto-map-tagger-${ACCOUNT}`: **deleted only if no other MAP Auto-Tagger deployments remain**. Otherwise retained so sibling deployments don't break. Race caveat: two simultaneous scoped delete runs could each see the other's stack and both keep the bucket. Accepted — same class as the TOCTOU window we documented in §1.108.
+- Optional opt-in: also delete CloudWatch Log Groups matching `/aws/lambda/map-auto-tagger*`. Off by default because logs are audit history.
+- **Never deletes:** `map-migrated` tags on AWS resources (MAP credits remain intact), or StackSet admin/execution IAM roles (shared org scaffolding).
+
+Confirmation: customer types `DELETE` (uppercase) before generation — works for both "delete all" and "delete one MPE" paths (mirrors `delete-stack-set` CLI ergonomics).
+
+Idempotent: missing resources are reported as skipped, not failures. Exit code is non-zero only if at least one targeted resource failed to delete.
+
+**Legacy pre-namespacing detection:** if no `map-auto-tagger-mig*` matches but an unnamespaced `map-auto-tagger` stack (pre-v19) exists in the region, the script prints a clear "delete manually with these commands" message instead of silently exiting. Same pattern as v20.5.4's upgrade.sh.
+
+**MPE ID regex in the UI:** permissive — matches the Lambda runtime's `^mig[a-zA-Z0-9]+$` pattern (alphanumeric of any length after the `mig` prefix). Will tighten to `^mig[a-z0-9]{10}$` (H6 follow-up) once the YAML-side regex decision lands across the repo.
+
+**Limits, accepted:** no pre-delete scope-overlap preflight (the deploy-side scope-intersection preflight from PR #38 protects the other direction). No dry-run mode — idempotency + the typed confirmation are the dry-run equivalent.
+
+**Compat:** v20.6.0 customers running the configurator Delete mode do not need to upgrade the YAML template first. The delete flow targets whatever `map-auto-tagger-mig*` happens to be deployed, regardless of version. Customers on v20.5.4 and earlier can safely use a v20.6.0-generated `delete.sh` against their older deployments.
+
+English-only for the new i18n keys (`ui_mode_delete_title`, `ui_delete_*`, `err_delete_*`); 7 non-English locales fall back to English via existing `t()` behavior. Translation follow-up flagged.
+
+No Layer 2 E2E in this PR — the E2E harness for delete.sh ships as PR #48c per Sprint 7 P3 mandate.
+
+Co-authored-by: Jin Shan Ng (Wave-0 scope, aws-samples PR #27 commits `b034c93` + `a392cea`).
+
 ### v20.5.4 — Rename Upgrade-mode output `update.sh` → `upgrade.sh` (PR #48a)
 
 Tooling-only; YAML byte-identical to v20.5.3 except for the four version stamps. No runtime Lambda change. Customers who have already deployed are not affected. Customers running `upgrade.sh` next should re-download from the configurator.
