@@ -935,7 +935,7 @@
                             <input type="checkbox" id="update-confirm" style="margin-top:3px;flex-shrink:0;">
                             <span>
                                 <span data-i18n="ui_update_confirm_text">I confirm that the listed MAP Auto-Tagger deployment(s) exist in the selected region and that upgrading them to the target template version is intended.</span>
-                                <strong data-i18n="ui_update_confirm_risk">An upgrade replaces the Lambda code, IAM policy, and EventBridge rules in every matched stack. Scope and agreement dates are preserved via <code>--use-previous-parameters</code>, but a failed rollout may leave a stack in UPDATE_ROLLBACK_COMPLETE state requiring manual recovery.</strong>
+                                <strong data-i18n="ui_update_confirm_risk">An upgrade replaces the Lambda code, IAM policy, and EventBridge rules in every matched stack. Scope and agreement dates are preserved by carrying over each existing CFN parameter value, but a failed rollout may leave a stack in UPDATE_ROLLBACK_COMPLETE state requiring manual recovery.</strong>
                             </span>
                         </label>
                         <div class="error-msg" id="update-confirm-error" style="margin-top:8px;" data-i18n="err_update_confirm">You must confirm before generating the update script</div>
@@ -977,8 +977,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.5.2'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.5.2';
+        // Must match `TEMPLATE_VERSION = 'v20.5.3'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.5.3';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -986,6 +986,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.5.3',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'bugfix', text: 'Fix generated update.sh — previously used --use-previous-parameters, a flag that does not exist on AWS CLI v2 update-stack or update-stack-set. Every customer upgrade attempt failed with "Unknown options: --use-previous-parameters". Replaced with per-parameter UsePreviousValue=true list built dynamically from each stack\'s existing parameters so newly-added template parameters (e.g. ReconciliationInterval) pick up the new template\'s Default. Re-download update.sh from the configurator before upgrading.' },
+                ],
+            },
             {
                 version: 'v20.5.2',
                 date: '2026-04-25',
@@ -1557,8 +1564,9 @@ Note: Only resources created AFTER this update will be tagged in newly added acc
                 alertEmail: '',
                 customerName: '',
                 includeBackfill: false,
-                // Dates are irrelevant at upgrade time — --use-previous-parameters reuses the
-                // deployed values. Use a valid date format so the Default matches AllowedPattern.
+                // Dates are irrelevant at upgrade time — the ParameterKey=X,UsePreviousValue=true
+                // list built below reuses the deployed values. Use a valid date format so the
+                // Default matches AllowedPattern.
                 agreementDate: '1900-01-01',
                 agreementEndDate: '2099-12-31',
             };
@@ -1588,7 +1596,7 @@ Note: Only resources created AFTER this update will be tagged in newly added acc
 #   - Detects presence of the backfill Lambda in the stack and picks the
 #     matching baked template variant (backfill config is preserved).
 #   - Applies full template replacement via update-stack / update-stack-set
-#     with --use-previous-parameters.
+#     with each existing parameter preserved (ParameterKey=X,UsePreviousValue=true).
 #   - For StackSets, uses OperationPreferences {Max=100%, Tolerance=100%,
 #     RegionConcurrency=PARALLEL} for parallel per-account rollout.
 set -e
@@ -1751,10 +1759,35 @@ upgrade_one() {
     local TMPL=\$(mktemp /tmp/map-upgrade-${PLACEHOLDER}-XXXX.yaml)
     sed "s|${PLACEHOLDER}|\${MPE}|g" "$SRC_TMPL" > "$TMPL"
 
-    # Preserve AgreementStartDate/EndDate: these are CFN parameters so
-    # --use-previous-parameters keeps them. We only need to worry about
-    # the Default values in the placeholder template — they'll be shadowed
-    # by --use-previous-parameters.
+    # Parameter preservation: build a --parameters list with UsePreviousValue=true
+    # for every parameter the existing stack/stack-set declares. AWS CLI v2 has NO
+    # --use-previous-parameters flag (only --use-previous-template, different thing);
+    # passing that flag fails with "Unknown options". The per-parameter form below
+    # is the documented equivalent.
+    #
+    # We also avoid listing parameters the current stack doesn't declare (e.g. a
+    # pre-ReconciliationInterval stack upgrading to a template that adds it).
+    # CFN picks up the new template's Default for parameters omitted from the
+    # --parameters list, which is the intended behavior for newly-added params.
+    local PARAM_KEYS
+    if [ "$KIND" = "stackset" ]; then
+        PARAM_KEYS=$(aws cloudformation describe-stack-set \\
+            --region "$REGION" --stack-set-name "$NAME" \\
+            --query "StackSet.Parameters[].ParameterKey" --output text 2>/dev/null)
+    else
+        PARAM_KEYS=$(aws cloudformation describe-stacks \\
+            --region "$REGION" --stack-name "$NAME" \\
+            --query "Stacks[0].Parameters[].ParameterKey" --output text 2>/dev/null)
+    fi
+    if [ -z "$PARAM_KEYS" ]; then
+        echo "  ⚠️  Could not enumerate existing parameters for $NAME. Aborting."
+        rm -f "$TMPL"
+        return 1
+    fi
+    local PREV_PARAMS=""
+    for K in $PARAM_KEYS; do
+        PREV_PARAMS="$PREV_PARAMS ParameterKey=$K,UsePreviousValue=true"
+    done
 
     if [ "$KIND" = "stackset" ]; then
         echo "  Pushing StackSet update (parallel rollout, 100% tolerance)..."
@@ -1763,7 +1796,7 @@ upgrade_one() {
             --region "$REGION" \\
             --stack-set-name "$NAME" \\
             --template-body "file://$TMPL" \\
-            --use-previous-parameters \\
+            --parameters $PREV_PARAMS \\
             --capabilities CAPABILITY_NAMED_IAM \\
             --operation-preferences "MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL" \\
             2>&1) || true
@@ -1805,7 +1838,7 @@ upgrade_one() {
             --region "$REGION" \\
             --stack-name "$NAME" \\
             --template-body "file://$TMPL" \\
-            --use-previous-parameters \\
+            --parameters $PREV_PARAMS \\
             --capabilities CAPABILITY_NAMED_IAM \\
             2>&1) || true
 
@@ -1915,8 +1948,8 @@ What the script does:
       • downgrade → refuse (unless --force)
   - Detects whether the stack has the backfill Lambda and picks the
     matching template variant. Backfill setting is preserved.
-  - Applies the upgrade with --use-previous-parameters so scope, agreement
-    dates, and VPC config are unchanged.
+  - Applies the upgrade while preserving every current parameter value
+    (scope, agreement dates, VPC config) via per-parameter UsePreviousValue=true.
   - For StackSets: parallel rollout (100% tolerance, region PARALLEL) —
     accounts update in parallel per AWS limit.
 
@@ -2529,7 +2562,7 @@ network calls are made from your environment during the upgrade.`;
             ui_update_all_review:'all MAP Auto-Tagger deployments in this account',
             ui_update_target_version:'Target template version',
             ui_update_confirm_text:'I confirm that the listed MAP Auto-Tagger deployment(s) exist in the selected region and that upgrading them to the target template version is intended.',
-            ui_update_confirm_risk:'An upgrade replaces the Lambda code, IAM policy, and EventBridge rules in every matched stack. Scope and agreement dates are preserved via <code>--use-previous-parameters</code>, but a failed rollout may leave a stack in UPDATE_ROLLBACK_COMPLETE state requiring manual recovery.',
+            ui_update_confirm_risk:'An upgrade replaces the Lambda code, IAM policy, and EventBridge rules in every matched stack. Scope and agreement dates are preserved by carrying over each existing CFN parameter value, but a failed rollout may leave a stack in UPDATE_ROLLBACK_COMPLETE state requiring manual recovery.',
             err_update_confirm:'You must confirm before generating the update script',
             ui_update_step3_subtitle:'Run this in AWS CloudShell from the account where the deployment was made',
             ui_version_history_title:'Version history — what changed?',
