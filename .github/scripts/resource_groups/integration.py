@@ -12,6 +12,7 @@ Creates:
   - API Gateway WebSocket API
   - AppSync GraphQL API
   - CloudWatch Log Group
+  - EventBridge rule (proves events:TagResource IAM from PR #44)
 """
 
 from __future__ import annotations
@@ -55,6 +56,7 @@ def create(
     apigw_v2 = boto3.client("apigatewayv2", region_name=region)
     appsync = boto3.client("appsync", region_name=region)
     logs_client = boto3.client("logs", region_name=region)
+    events = boto3.client("events", region_name=region)
     iam = boto3.client("iam")
 
     def rec(arn, service, resource_id, taggable=True):
@@ -215,6 +217,28 @@ def create(
         log.info("AppSync: %s", appsync_arn)
     except Exception as exc:
         log.error("AppSync creation failed: %s", exc)
+
+    # ── EventBridge rule ──────────────────────────────────────────────────────
+    # Proves the events:TagResource IAM permission added in PR #44. Without it,
+    # RGTA TagResources AccessDenied and the rule silently landed in the
+    # permanent-actionable DLQ path (H4).
+    rule_name = prefix("eb-rule")
+    try:
+        resp = events.put_rule(
+            Name=rule_name,
+            # ScheduleExpression is the cheapest rule that passes validation without
+            # needing an EventPattern + target. Runs hourly but never triggers work
+            # because there's no target attached — it's a tag-surface only.
+            ScheduleExpression="rate(1 hour)",
+            State="DISABLED",
+            Description="E2E test rule — no target, disabled; exists only to verify tagging.",
+            Tags=tags,
+        )
+        rule_arn = resp["RuleArn"]
+        rec(rule_arn, "events", rule_name)
+        log.info("EventBridge rule: %s", rule_arn)
+    except Exception as exc:
+        log.error("EventBridge rule creation failed: %s", exc)
 
     return {"arns": arns, "outputs": {}}
 
