@@ -50,6 +50,20 @@ No redeployment needed — updates the account scope across all existing stack i
 
 ---
 
+## Removing a Deployment
+
+1. Open `configurator.html` → **Delete existing deployment** tab
+2. Select region; by default every `map-auto-tagger-mig*` stack/stackset is removed. Optionally scope to specific MPE(s).
+3. Type `DELETE` to confirm → **Generate delete.sh** → download and run:
+
+```bash
+bash delete-all.sh   # or delete-<mpe>.sh if scoped
+```
+
+The S3 staging bucket is deleted only when no other MAP Auto-Tagger deployments remain in the account. `map-migrated` tags on already-tagged AWS resources are preserved (MAP credits remain intact).
+
+---
+
 ## Upgrading from a Previous Version
 
 Prior versions used fixed resource names (`map-auto-tagger`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`). Running `deploy.sh` without removing the old stack will deploy **both side by side**. Delete the old stack first:
@@ -66,7 +80,7 @@ bash deploy.sh
 
 | File | Description |
 |------|-------------|
-| `configurator.html` | Self-service UI. Generates `deploy.sh` for new deployments. Editor tab generates `update.sh` for day-2 account changes. |
+| `configurator.html` | Self-service UI. Generates `deploy.sh` for new deployments, `update.sh` for day-2 account changes (Editor tab), `upgrade.sh` for template-version upgrades (Upgrade tab), and `delete.sh` for clean removal (Delete tab). |
 | `map2-auto-tagger-optimized.yaml` | CloudFormation template (140+ resource types, IAM hardened) |
 | `CHANGELOG.md` | Version history |
 
