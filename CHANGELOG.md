@@ -6,6 +6,18 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.5.1 — Hygiene fixes (SSM TTL, events:TagResource, ConfigParameter output)
+
+Three independent correctness fixes (PR #44). No new capability — tightens existing code against latent failure classes.
+
+**Fixes:**
+
+- **Config SSM cache now has a 60-second TTL.** Previously `_config` was populated on first cold-start call and never invalidated. Warm containers live ~15 min, so an MPE rotation via SSM would be silently misattributed to the old MPE for up to one container lifetime. 60 s bounds the window without meaningful extra SSM load.
+- **Added `events:TagResource` IAM permission.** `ServiceSpecificTagging` previously listed only `iotevents:TagResource` (IoT Events, a different service). Tagging a newly-created EventBridge rule / bus / schedule / connection AccessDenied, silently landing in the permanent-actionable DLQ path. Applies to both YAML + configurator-generated templates.
+- **CFN Output `ConfigParameter` now returns the real parameter path.** Previously emitted the literal string `/auto-map-tagger/config` instead of `/auto-map-tagger/<mpe>/config`. Customers following docs to `aws ssm get-parameter --name <output>` got `ParameterNotFound`. Fix uses `!Ref MapConfig` so the output stays in sync if the parameter is ever renamed.
+
+All three were previously tracked in memory as H2 / H4 / H5 from the 2026-04-24 correctness sweep. H1 shipped in PR #35, H3 was closed by PR #37's three-path classifier.
+
 ### v20.5.0 — Reconciliation Lambda (daily safety-net)
 
 Adds a second Lambda that runs once per day (configurable via new `ReconciliationInterval` CFN parameter) as a safety-net for silent-failure classes the live tagging Lambda cannot catch. Design locked in PR #36.

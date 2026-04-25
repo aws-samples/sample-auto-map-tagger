@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.5.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.5.1 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.5.0
+      Value: v20.5.1
 
   # SSM Parameter Store - single source of truth for config
   MapConfig:
@@ -236,6 +236,9 @@ Resources:
                   - iot:TagResource
                   - iotanalytics:TagResource
                   - iotevents:TagResource
+                  # EventBridge (events:*) — distinct service from IoT Events (iotevents:*).
+                  # Needed to tag newly-created Event rules / buses / schedules / connections.
+                  - events:TagResource
                   - iotsitewise:TagResource
                   # --- Media ---
                   - mediaconvert:TagResource
@@ -368,13 +371,18 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.5.0'
+          TEMPLATE_VERSION = 'v20.5.1'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
           ec2 = boto3.client('ec2')
           tagging = boto3.client('resourcegroupstaggingapi')
           _config = None
+          _config_ts = 0.0
+          # Warm containers live ~15 min; an MPE rotation via SSM wouldn't be
+          # seen until the container recycled, silently misattributing credit.
+          # 60s TTL bounds the window without adding meaningful SSM load.
+          _CONFIG_TTL_SECONDS = 60
 
           def get_account_from_arn(arn):
               """Extract account ID from ARN."""
@@ -382,10 +390,12 @@ Resources:
               return parts[4] if len(parts) > 4 else None
 
           def get_config():
-              global _config
-              if _config is None:
+              global _config, _config_ts
+              now = time.time()
+              if _config is None or (now - _config_ts) > _CONFIG_TTL_SECONDS:
                   resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
                   _config = json.loads(resp['Parameter']['Value'])
+                  _config_ts = now
               return _config
 
           def is_after_agreement(config):
@@ -1837,7 +1847,7 @@ Resources:
 
               tagged, failed = [], []
 
-              # Three-path error classifier (v20.5.0 / §1.115–§1.120):
+              # Three-path error classifier (§1.115–§1.120):
               #
               #   TRANSIENT            → re-raise; SQS redelivers up to
               #                          maxReceiveCount=5 (~15 min budget); if
@@ -2107,7 +2117,7 @@ Resources:
         - !Ref AlertTopic
       TreatMissingData: notBreaching
 
-  # ── Reconciliation Lambda (v20.5.0) ──────────────────────────────────────
+  # ── Reconciliation Lambda ────────────────────────────────────────────────
   # Daily safety-net that enumerates in-scope resources via RGTA GetResources,
   # diffs against map-migrated tag, and re-enqueues missing or wrong-MPE
   # resources through EventQueue so the live Lambda's classifier (PR #37)
@@ -2130,7 +2140,7 @@ Resources:
       # IAM RoleName max 64 chars. Shortened "reconciliation" → "recon" so
       # `map-auto-tagger-recon-role-<MpeId>-<region>` fits (~60 chars for typical
       # 15-char MpeId + ap-northeast-2). The full-word name overran at 69 chars
-      # and failed StackSet deploys (E2E run 24900531765, v20.5.0 initial ship).
+      # and failed StackSet deploys (E2E run 24900531765, reconciliation Lambda initial ship).
       RoleName: !Sub 'map-auto-tagger-recon-role-${MpeId}-${AWS::Region}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -2203,7 +2213,7 @@ Resources:
           from datetime import datetime, timezone
           from botocore.exceptions import ClientError
 
-          # Reconciliation Lambda — v20.5.0.
+          # Reconciliation Lambda.
           # Runs once per ReconciliationInterval (default daily). Enumerates
           # every taggable resource in this account via RGTA GetResources,
           # checks the map-migrated tag, and re-enqueues missing or wrong-MPE
@@ -2391,10 +2401,10 @@ Outputs:
     Value: !GetAtt AutoTaggerFunction.Arn
   ConfigParameter:
     Description: SSM Parameter Store path for MAP tagger config
-    Value: /auto-map-tagger/config
+    Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.5.0
+    Value: v20.5.1
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
