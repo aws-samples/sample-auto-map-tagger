@@ -6,6 +6,20 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.6.1 — Editor update.sh + upgrade.sh SemVer guard hardening (plan-PR #37)
+
+Tooling-only PATCH. YAML runtime is byte-identical to v20.6.0 except for the four version stamps. Closes audit items §1.41, §1.47, §1.48.
+
+**§1.47 — Editor update.sh: missing `--region` on every aws CLI call.** The generated Day-2 account-scope script relied on `AWS_DEFAULT_REGION` / CLI config to target the right region. Customers in CloudShell without that set, or with a different home region than the deployment, either failed the `describe-stack-set` lookup or worse — applied the update to the wrong region's StackSet. Every `aws` call now passes `--region "$REGION"` explicitly.
+
+**§1.48 — Editor update.sh: depends on deprecated S3 staging object.** The script downloaded `s3://auto-map-tagger-<account>/map-auto-tagger-accounts-<mpe>.yaml`, modified scope in place, and re-uploaded. That object is written only by the initial multi-account deploy path and could be garbage-collected, stale, or missing entirely (single-account deploys never wrote it; a deployment later promoted to multi-account wouldn't have it either). Replaced with `describe-stack-set --query StackSet.TemplateBody --output text`. The update also drops the re-upload to S3 — the template lives inside the StackSet.
+
+**§1.41 — Upgrade-mode `compare_versions` misclassified malformed SemVer.** Shell integer tests (`-lt` / `-eq`) on non-numeric operands printed an error to stderr but did not abort the function, so the fall-through `echo "patch"` returned for any unparseable input. Examples that misclassified: `v21.0.0-rc1` → `v20.3.0` returned `patch` (should be error), `v20.6` → `v20.6.0` returned `patch` (should be error). New `is_valid_semver` helper enforces `^v?[0-9]+\.[0-9]+\.[0-9]+$`; `compare_versions` returns `"error"` on unparseable input. `upgrade_one` caller fails closed unless `--force` is passed.
+
+**Not changed:** Editor update.sh's sed-based scope edit (stays readable; downstream would want a structured edit but not in this PR), upgrade.sh's parameter-preservation behavior (already correct as of v20.5.3).
+
+---
+
 ### v20.6.0 — Configurator delete.sh flow (PR #48b)
 
 **New feature.** MINOR bump per SemVer — safe in-place upgrade for existing deployments (the YAML runtime is byte-identical to v20.5.4 except for the four version stamps; this PR adds a new configurator UI mode and a new generated script).

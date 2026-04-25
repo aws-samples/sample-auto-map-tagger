@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.6.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.6.0';
+        // Must match `TEMPLATE_VERSION = 'v20.6.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.6.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,15 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.6.1',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'bugfix', text: 'Editor-mode update.sh generator: every aws CLI call now has explicit --region "$REGION". Customers running the script with AWS_DEFAULT_REGION unset or set to a different region no longer deploy into the wrong region or fail on cross-region StackSet lookup.' },
+                    { tag: 'bugfix', text: 'Editor-mode update.sh now reads the current template via describe-stack-set --query StackSet.TemplateBody instead of downloading the deprecated S3 staging copy (auto-map-tagger-<acct>/map-auto-tagger-accounts-<mpe>.yaml). The staging object was only created during the initial multi-account deploy and could be missing / stale / garbage-collected — this eliminates the S3 dependency entirely.' },
+                    { tag: 'bugfix', text: 'Upgrade-mode compare_versions now strict-validates three-part numeric SemVer (vMAJOR.MINOR.PATCH) and returns "error" on unparseable input instead of silently falling through to "patch". Prior behavior misclassified e.g. v21.0.0-rc1 → v20.3.0 as patch; upgrade_one caller now fails closed and directs the operator to --force.' },
+                ],
+            },
             {
                 version: 'v20.6.0',
                 date: '2026-04-25',
@@ -1976,22 +1985,36 @@ echo ""
 
 # ── Step 1: Verify StackSet exists ────────────
 echo "Step 1: Checking existing deployment..."
-if ! aws cloudformation describe-stack-set --stack-set-name "$STACKSET_NAME" > /dev/null 2>&1; then
-    echo "  ❌ StackSet '$STACKSET_NAME' not found."
+if ! aws cloudformation describe-stack-set --region "$REGION" --stack-set-name "$STACKSET_NAME" > /dev/null 2>&1; then
+    echo "  ❌ StackSet '$STACKSET_NAME' not found in region $REGION."
     echo "     Run the initial deploy.sh from the configurator first."
     exit 1
 fi
 echo "  ✅ StackSet found"
 
-ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-BUCKET="auto-map-tagger-\${ACCOUNT}"
-
-# ── Step 2: Download and update template ──────
+# ── Step 2: Fetch current template and update scope in place ──
 echo ""
 echo "Step 2: Updating account scope..."
 
 TEMPLATE=$(mktemp /tmp/map-update-XXXX.yaml)
-aws s3 cp "s3://\${BUCKET}/map-auto-tagger-accounts-\${MPE}.yaml" "$TEMPLATE" > /dev/null
+# Read the StackSet's live TemplateBody directly; avoids depending on the S3
+# staging copy (which exists only for the initial multi-account deploy and may
+# have been garbage-collected or never created for a single-account deployment
+# later promoted to multi-account).
+if ! aws cloudformation describe-stack-set \\
+        --region "$REGION" \\
+        --stack-set-name "$STACKSET_NAME" \\
+        --query "StackSet.TemplateBody" \\
+        --output text > "$TEMPLATE" 2>/dev/null; then
+    echo "  ❌ Could not read StackSet TemplateBody. Aborting."
+    rm -f "$TEMPLATE"
+    exit 1
+fi
+if [ ! -s "$TEMPLATE" ]; then
+    echo "  ❌ StackSet TemplateBody is empty. Aborting."
+    rm -f "$TEMPLATE"
+    exit 1
+fi
 
 echo "  Current scope:"
 grep "scoped_account_ids" "$TEMPLATE" | head -1 | sed 's/.*scoped_account_ids/  scoped_account_ids/'
@@ -2010,9 +2033,8 @@ grep "scoped_account_ids" "$TEMPLATE" | head -1 | sed 's/.*scoped_account_ids/  
 echo ""
 echo "Step 3: Pushing update to all accounts..."
 
-aws s3 cp "$TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts-\${MPE}.yaml" > /dev/null
-
 UPDATE_OUT=$(aws cloudformation update-stack-set \\
+    --region "$REGION" \\
     --stack-set-name "$STACKSET_NAME" \\
     --template-body "file://$TEMPLATE" \\
     --capabilities CAPABILITY_NAMED_IAM 2>&1) || true
@@ -2024,6 +2046,7 @@ elif echo "$UPDATE_OUT" | grep -q "OperationId"; then
     WAIT=0
     while [ $WAIT -lt 600 ]; do
         STATUS=$(aws cloudformation list-stack-set-operations \\
+            --region "$REGION" \\
             --stack-set-name "$STACKSET_NAME" \\
             --query "Summaries[0].Status" --output text 2>/dev/null)
         if [ "$STATUS" = "SUCCEEDED" ]; then
@@ -2031,7 +2054,7 @@ elif echo "$UPDATE_OUT" | grep -q "OperationId"; then
             break
         elif [ "$STATUS" = "FAILED" ]; then
             echo "  ❌ Update failed. Check:"
-            echo "     aws cloudformation list-stack-instances --stack-set-name $STACKSET_NAME"
+            echo "     aws cloudformation list-stack-instances --region $REGION --stack-set-name $STACKSET_NAME"
             break
         fi
         sleep 15
@@ -2236,9 +2259,20 @@ echo ""
 # ── Helper: compare SemVer versions ────────────────────────────
 version_parts() { echo "$1" | sed -E 's/^v//' | tr '.' ' '; }
 
+# Strict plain three-part numeric SemVer match, no pre-release / build suffix.
+# Prior behavior fell through to "patch" on malformed input because shell
+# integer tests (-lt/-eq) printed an error to stderr but did not abort the
+# function, leaving downgrade / cross-major checks silently misclassified.
+is_valid_semver() {
+    echo "$1" | grep -Eq '^v?[0-9]+\\.[0-9]+\\.[0-9]+$'
+}
+
 compare_versions() {
-    # Returns: "same" | "patch" | "minor" | "major" | "downgrade"
+    # Returns: "same" | "patch" | "minor" | "major" | "downgrade" | "error"
     local FROM="$1" TO="$2"
+    if ! is_valid_semver "$FROM" || ! is_valid_semver "$TO"; then
+        echo "error"; return
+    fi
     local FM FN FP TM TN TP
     read FM FN FP <<< "$(version_parts "$FROM")"
     read TM TN TP <<< "$(version_parts "$TO")"
@@ -2272,6 +2306,12 @@ upgrade_one() {
         local CMP
         CMP=$(compare_versions "$CURRENT" "$TARGET_VERSION")
         echo "  Current: $CURRENT → Target: $TARGET_VERSION ($CMP)"
+
+        if [ "$CMP" = "error" ] && [ "$FORCE" != "--force" ]; then
+            echo "  ❌ Could not parse SemVer for comparison (current=$CURRENT, target=$TARGET_VERSION)."
+            echo "     Expected vMAJOR.MINOR.PATCH. Re-run with --force to override the guard."
+            return 1
+        fi
 
         if [ "$CMP" = "same" ]; then
             echo "  ✅ Already on target version. Skipping."
