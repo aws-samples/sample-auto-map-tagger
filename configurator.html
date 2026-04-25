@@ -5701,7 +5701,7 @@ ${crossAccountCode}
   ReconciliationRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: map-auto-tagger-recon-role-${mpe}-\${AWS::Region}
+      RoleName: !Sub 'map-auto-tagger-recon-role-${mpe}-\${AWS::Region}'
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
