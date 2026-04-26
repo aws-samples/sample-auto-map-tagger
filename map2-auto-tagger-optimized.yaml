@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.6.4 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.6.5 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,13 +64,20 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.6.4
+      Value: v20.6.5
 
-  # SSM Parameter Store - single source of truth for config
+  # SSM Parameter Store - single source of truth for config.
+  # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
+  # (4KB limit) until the Value crosses the threshold, at which point AWS
+  # auto-upgrades to Advanced (8KB limit, $0.05/parameter/month). Closes
+  # §1.60: customers with ~240+ accounts in `scoped_account_ids` generate a
+  # Value > 4KB; prior behavior (default Standard) silently failed stack
+  # create with `ParameterMaxSizeExceeded`.
   MapConfig:
     Type: AWS::SSM::Parameter
     Properties:
       Name: !Sub '/auto-map-tagger/${MpeId}/config'
+      Tier: Intelligent-Tiering
       Type: String
       Description: MAP 2.0 Auto-Tagger configuration
       Value: !Sub
@@ -374,7 +381,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.6.4'
+          TEMPLATE_VERSION = 'v20.6.5'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -2407,7 +2414,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.6.4
+    Value: v20.6.5
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic

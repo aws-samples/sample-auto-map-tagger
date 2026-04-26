@@ -6,6 +6,16 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.6.5 — SSM parameter Intelligent-Tiering (plan-PR #50)
+
+PATCH. Closes audit item §1.60.
+
+**§1.60 — SSM Standard-tier 4KB wall silently fails at ~240 accounts.** `MapConfig` (the JSON configuration that the Lambda reads on every invocation) had no explicit `Tier` on its `AWS::SSM::Parameter` resource, so CFN defaulted it to Standard (4KB Value limit). A customer with ~240+ accounts listed in `scoped_account_ids` generates a Value > 4KB; stack create failed with `ParameterMaxSizeExceeded` and no actionable CFN error message. Added `Tier: Intelligent-Tiering` to both YAML (`map2-auto-tagger-optimized.yaml`) and the configurator's inline template. Intelligent-Tiering stays in the free Standard tier until the Value actually crosses 4KB, at which point AWS auto-upgrades to Advanced ($0.05/parameter/month, $0.60/year for that one parameter). Zero cost impact for normal-sized deployments; graceful auto-upgrade at the 4KB boundary.
+
+No new IAM required — the Intelligent-Tiering upgrade is driven by CloudFormation's deploy-time role at stack create, not by the Lambda. The Lambda's runtime `ssm:GetParameter` grant (scoped to `/auto-map-tagger/${MpeId}/config`) covers both tiers.
+
+---
+
 ### v20.6.4 — IAM completeness + CI gate (plan-PR #42)
 
 Tooling + IAM PATCH. YAML runtime Lambda is byte-identical to v20.6.3 except the version stamps and one added IAM row. Closes audit item §1.99; partially addresses §1.64 (introduces the methodology to prevent future siblings).
