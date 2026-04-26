@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.6.5'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.6.5';
+        // Must match `TEMPLATE_VERSION = 'v20.7.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.7.0';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.7.0',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'coverage', text: 'Added suffix-match fallback to extract_arn (both Lambda template and configurator inline). The hand-curated ARN_FIELDS allowlist was missing ~46 ARN key names across newer/less-common services (AppRunner ServiceArn, Batch jobQueueArn, ImageBuilder imagePipelineArn, Pinpoint PhoneNumberArn, etc.) — every miss was a silent credit loss. Fallback catches any responseElements key ending in Arn/ARN/arn whose value starts with "arn:" AND whose ARN service segment matches the event source (or a known alias like bedrock→bedrock-agent, kinesis→firehose). Allowlist remains Tier-1; fallback is additive, runs only when allowlist misses. Closes §1.31, §1.35, §1.56, §1.57, §1.61, §1.63, §1.65, §1.66, §1.67, §1.68 and ~35 other silent-miss service classes.' },
+                ],
+            },
             {
                 version: 'v20.6.5',
                 date: '2026-04-26',
@@ -6302,6 +6309,53 @@ ${crossAccountCode}
                       if isinstance(v, dict) and field in v and v[field] and str(v[field]).startswith('arn:'):
                           arn = v[field]; break
                   if arn: break
+
+              # Suffix-match fallback (§1.31/§1.35/§1.56/§1.57/§1.61/§1.63 class).
+              # The hand-curated ARN_FIELDS list above misses ~46 ARN key names
+              # across newer/less-common services. Rather than playing whack-a-mole,
+              # this fallback catches any key ending in Arn/ARN/arn whose value is
+              # a string starting with 'arn:'. Guards: value must parse as an ARN
+              # with at least 6 segments, and service segment must match the event
+              # source (or a well-known alias — e.g. bedrock events may produce
+              # bedrock-agent ARNs). Preserves ordering so earlier keys (typically
+              # subject-resource ARN) win over later keys (typically role/policy
+              # ARN of a related resource). Mirror in map2-auto-tagger-optimized.yaml.
+              if not arn:
+                  _event_svc_prefix = detail.get('eventSource', '').split('.')[0].replace('aws.', '').lower()
+                  _arn_aliases = {
+                      'elasticloadbalancing': ('elbv2', 'elb', 'elasticloadbalancing'),
+                      'route53': ('route53', 'route53domains', 'route53resolver'),
+                      'apigateway': ('apigateway',),
+                      'bedrock': ('bedrock', 'bedrock-agent', 'bedrock-runtime'),
+                      'kinesis': ('kinesis', 'kinesisvideo', 'kinesisanalytics', 'firehose'),
+                      'rds': ('rds', 'neptune', 'docdb'),
+                      'sagemaker': ('sagemaker',),
+                      'iot': ('iot', 'iotanalytics', 'iotevents', 'iotsitewise'),
+                  }
+                  def _maybe_arn(k, v):
+                      if not isinstance(v, str) or not v.startswith('arn:'):
+                          return None
+                      if not (k.endswith('Arn') or k.endswith('ARN') or k.endswith('arn')):
+                          return None
+                      parts = v.split(':', 5)
+                      if len(parts) < 6:
+                          return None
+                      arn_svc = parts[2].lower()
+                      if arn_svc == _event_svc_prefix:
+                          return v
+                      if arn_svc in _arn_aliases.get(_event_svc_prefix, ()):
+                          return v
+                      return None
+                  for key, val in resp.items():
+                      m = _maybe_arn(key, val)
+                      if m:
+                          arn = m; break
+                      if isinstance(val, dict):
+                          for nk, nv in val.items():
+                              m = _maybe_arn(nk, nv)
+                              if m:
+                                  arn = m; break
+                          if arn: break
 
               # Service-specific ARN construction for events without ARN in response
               # RunInstances emits multiple ARNs (instance + attached ENI from the

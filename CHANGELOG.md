@@ -6,6 +6,26 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.7.0 — ARN suffix-match fallback (plan-PR #43a, additive subset)
+
+MINOR. Closes §1.31, §1.35, §1.56, §1.57, §1.61, §1.63, §1.65, §1.66, §1.67, §1.68 + roughly 35 other silent-miss classes. No breaking change to existing behavior — the hand-curated `ARN_FIELDS` allowlist remains Tier-1; a new Tier-2 suffix-match runs only when the allowlist misses.
+
+**Root cause.** `extract_arn` reads the subject-resource ARN out of CloudTrail `responseElements`. Every AWS service ships its own field name (`clusterArn`, `functionArn`, `ServiceArn`, `jobQueueArn`, `PhoneNumberArn`, ...). We maintained a hand-curated list of ~90 field names and added to it every time we noticed a silent miss. AWS ships new `*Arn` fields faster than we notice — §1.63 enumerates 46 known-missing fields, and §1.31/§1.35/§1.56/§1.57/§1.65/§1.66/§1.67/§1.68 are the live-confirmed ones. Each miss = tagging path hits `no_arn` skip = customer loses MAP credit with no DLQ entry or alarm.
+
+**What landed.** After the existing allowlist scan runs, a new fallback loop iterates `responseElements` (1-level nested, matching the allowlist's depth) and accepts any key that:
+
+1. ends with `Arn`, `ARN`, or `arn`
+2. has a string value starting with `arn:` that parses as a valid 6-segment ARN
+3. has an ARN service segment matching the event source (or a declared alias — e.g. `bedrock` events may emit `bedrock-agent` ARNs, `kinesis` events may emit `firehose` ARNs)
+
+**Guards against false positives.** The service-match gate is important: a `CreateFunction` response has both `functionArn` (subject) and `roleArn` (related). The allowlist catches `functionArn` first via its priority list. If a response contained only `someOtherArn: "arn:aws:iam::..."` with a Lambda event source, the fallback would reject it (service mismatch) rather than wrongly tag the IAM role.
+
+**What's NOT in this PR.** The plan's full #43 also deletes ~35 explicit handlers that exist only to bypass the allowlist and removes the `ARN_FIELDS` list entirely. That's held for a follow-up once suffix-match has soaked — deletion is irreversible and the existing 85-service vendor E2E suite is insufficient for the full 98-service sweep the plan requires.
+
+**Verified:** 9/9 unit-test matrix including false-positive rejection (multi-ARN Lambda response picks functionArn not roleArn; non-Arn-suffix keys rejected; plain-ID values rejected; cross-service ARNs rejected). Both Lambda blocks compile; sync-check + cfn-lint + IAM completeness + event-prefix + shell-injection + CFN correctness all green.
+
+---
+
 ### v20.6.5 — SSM parameter Intelligent-Tiering (plan-PR #50)
 
 PATCH. Closes audit item §1.60.
