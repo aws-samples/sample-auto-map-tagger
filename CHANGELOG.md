@@ -6,6 +6,23 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.8.1 — Directory Service transient markers (§1.98)
+
+PATCH. Adds `'Directory Status: Creating'` and `'not supported for directories in this state'` to the `TRANSIENT_MARKERS` set in both `map2-auto-tagger-optimized.yaml` and `configurator.html`. Directory Service resources (MS AD and Simple AD, created via `CreateDirectory` / `CreateMicrosoftAD`) spend 5–10 min (Simple AD) or 25–45 min (MS AD) in the `Creating` state after CloudTrail fires the create event. Tagging during that window returns
+
+> "The operation is not supported for directories in this state. Directory Status: Creating"
+
+Before this patch, the three-path classifier (v20.4.0) routed that message to `permanent_actionable` → SNS alert on every AD creation, because the substring didn't match any existing transient marker. After the patch:
+
+- **Simple AD** — transient retries succeed within the 5 × 180s = 900s SQS redelivery budget. The tag lands correctly; no customer action needed.
+- **MS AD** — transient retries exhaust before the 25–45 min provisioning window completes. Exhausted retries land in `EventDLQ` *without* generating a false `permanent_actionable` SNS alert. The `ReconciliationFunction` (v20.5.0) catches the untagged directory on its next nightly sweep and tags it then.
+
+This is a documented Tier 1 MAP service whose credit-loss was the v20.3.0 regression headline. Keyspaces (§1.99) was closed in v20.6.4 by adding `cassandra:Alter` IAM; CloudHSM v2's equivalent §1.99-class bug remains deferred pending a direct-deploy smoke (untested since PR #25).
+
+No template shape change, no IAM change, no new CFN resources — pure classifier tuple extension.
+
+---
+
 ### v20.8.0 — BatchSize 1→10 + peer-tagger detection (plan-PR #57)
 
 MINOR. Two architectural changes closing the Phase 16 "burst × stack-count amplification" class (§1.123, §1.124, §1.125, §1.131) and adding surface for the still-open §1.108 cross-Lambda contamination case. Shipped as MINOR because the runtime batching shape is observable to customers (new SQS invocation pattern, new CloudWatch metric) and the new IAM action `cloudformation:ListStacks` is customer-visible in the Lambda policy.

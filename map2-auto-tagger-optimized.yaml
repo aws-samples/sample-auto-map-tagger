@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.8.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.8.1 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.8.0
+      Value: v20.8.1
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -396,7 +396,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.8.0'
+          TEMPLATE_VERSION = 'v20.8.1'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -2044,6 +2044,22 @@ Resources:
               'RequestLimitExceeded',
               'TooManyRequestsException',
               'LimitExceededException',
+              # Directory Service (MS AD + Simple AD): directory stays in
+              # "Creating" state for 5–10 min (Simple AD) or 25–45 min (MS AD).
+              # Tagging during this window returns AWS error
+              #   "The operation is not supported for directories in this
+              #    state. Directory Status: Creating"
+              # Without these markers the classifier routes to
+              # permanent_actionable → SNS alert on every AD creation, even
+              # though the condition resolves itself. Classifying as
+              # transient retries through SQS redelivery (5 × 180s = 900s),
+              # which succeeds for Simple AD within the retry budget. MS AD
+              # provisioning exceeds 900s; its retries exhaust into
+              # EventDLQ without false SNS alert noise, and the
+              # ReconciliationFunction catches the tag on the next nightly
+              # sweep. (§1.98)
+              'Directory Status: Creating',
+              'not supported for directories in this state',
           )
           _PERMANENT_IGNORABLE_MARKERS = (
               # Resource genuinely deleted between create and tag event.
@@ -2718,7 +2734,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.8.0
+    Value: v20.8.1
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
