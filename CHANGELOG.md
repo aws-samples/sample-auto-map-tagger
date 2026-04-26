@@ -4,6 +4,12 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ---
 
+## COVERAGE.md reset — 2026-04-26
+
+Docs-only, no version bump. Full re-audit of `docs/COVERAGE.md` against the authoritative handler inventory from `.github/scripts/audit_handler_coverage.py --report` (148 explicit `event_name == ...` branches, 153 handler coverage points per the CI baseline) and the `AutoTaggerRole` IAM policy in `map2-auto-tagger-optimized.yaml`. Top-level finding: the v20.3.0–v20.5 doc had drifted across four ship cycles and was carrying claims that were known-broken at ship time (Keyspaces missing `cassandra:Alter`, Directory Service missing `Creating` transient marker — both now fixed per v20.6.4 / v20.8.1) plus claims with no backing handler and no IAM grant (Location Service, Supply Chain, AppConfig, VPC Lattice, Cloud Map HTTP namespaces). Surviving claims now have both a handler branch and the matching IAM action; ambiguous cases are flagged `**UNVERIFIED**` or `**KNOWN GAP**` rather than silently retained. Added a `Retraction history` section covering v20.3.0 Tier 1 MAP claims and the D7 VPC Lattice AccessDenied regression.
+
+---
+
 ## v20 — Resilient SQS Pipeline + Open Source
 
 ### v20.9.1 — 2026-04-26
