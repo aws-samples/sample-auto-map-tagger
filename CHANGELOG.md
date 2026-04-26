@@ -6,6 +6,37 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.9.0 — CFN Custom Resource preflight + support contract (§1.108, plan-PR #59)
+
+MINOR. Closes the §1.108 temporal race — the specific collision case that the configurator's `deploy.sh` preflight cannot catch because `deploy.sh` doesn't run for StackSet `AutoDeployment: True` provisioning into newly-joined OU accounts. PR #60 (v20.8.0) added a runtime alarm for this case but did not prevent the tagging. This PR makes CFN itself refuse to provision the tagger Lambda when a peer tagger already exists with overlapping scope in the same account+region.
+
+**`PreflightFunction` + `Custom::PeerTaggerPreflight` resource.** New Lambda resource invoked by a CFN Custom Resource before `AutoTaggerFunction` is created. Implementation (~90 LOC inline Python):
+
+- Paginates `cloudformation:ListStacks` for `map-auto-tagger-mig*` in this account+region (same pattern as the PR #60 runtime detector).
+- For each peer stack, reads its SSM config (`/auto-map-tagger/<peer_mpe>/config`) and classifies scope overlap across the five cases the configurator preflight already handles: `account/ALL × account/*`, `account/[list] × account/[list]`, `account × vpc` (both directions), `vpc/[list] × vpc/[list]`.
+- On detected overlap: returns `FAILED` with every conflicting stack name, peer MPE, and specific reason — which CFN surfaces as `Received response status [FAILED]` in the stack events.
+- `AutoTaggerFunction` has `DependsOn: PreflightTrigger`, so FAILED → stack rolls back → no tagger Lambda is ever provisioned in the contaminated account. The existing peer Lambda is untouched.
+
+**Fail-open on internal error.** Any exception inside the Custom Resource handler (throttle / IAM propagation / region transient) returns `SUCCESS` with the exception class + message in `Reason`. A transient AWS condition never blocks a legitimate deploy. PR #60's `PeerTaggerDetectedAlarm` remains as the second backstop if fail-open lets a real conflict through.
+
+**Only fires on `Create`.** `Update` and `Delete` are no-ops. Updates don't add a peer Lambda (the tagger already exists); Delete is tear-down. This matches the semantics of preflight — it guards stack provisioning, not lifecycle.
+
+**New IAM role `PreflightRole` with three statements:**
+
+- `cloudformation:ListStacks` on `*` (no resource-level IAM per AWS auth matrix).
+- `ssm:GetParameter` scoped to `arn:aws:ssm:<region>:<account>:parameter/auto-map-tagger/*/config`.
+- CloudWatch Logs write scoped to this account+region.
+
+**What this doesn't do.** It doesn't prevent contamination if the customer already has two tagger stacks at the moment v20.9.0 upgrades into one of them (preflight runs on Create, not Update, so an upgrade proceeds even with a pre-existing peer). The runtime detector from PR #60 still surfaces that case via `PeerTaggerDetectedAlarm`. Customers with existing conflicts should run the ship-recommended cleanup (delete one of the stacks, narrow scope on the other) before upgrading.
+
+**Operator signal.** Unlike PR #60's CloudWatch alarm path, a preflight-blocked StackSet deployment shows up as `CREATE_FAILED` in the StackSet instances view of the CFN console, with the Custom Resource's `Reason` string (peer stack name + MPE + conflict reason) directly visible. No SNS subscribers needed.
+
+### Support contract (docs)
+
+`docs/LIMITATIONS.md` now states explicitly that direct `aws cloudformation create-stack` against `map2-auto-tagger-optimized.yaml` is unsupported. The customer-facing contract is: generate `deploy.sh` from `configurator.html`, run `deploy.sh`. Direct-YAML usage bypasses all preflight checks and has reproducibly surfaced bugs that don't occur through the configurator path. Bugs reported against direct-YAML usage will be closed with a request to reproduce via the configurator.
+
+---
+
 ### v20.8.1 — Directory Service transient markers (§1.98)
 
 PATCH. Adds `'Directory Status: Creating'` and `'not supported for directories in this state'` to the `TRANSIENT_MARKERS` set in both `map2-auto-tagger-optimized.yaml` and `configurator.html`. Directory Service resources (MS AD and Simple AD, created via `CreateDirectory` / `CreateMicrosoftAD`) spend 5–10 min (Simple AD) or 25–45 min (MS AD) in the `Creating` state after CloudTrail fires the create event. Tagging during that window returns
