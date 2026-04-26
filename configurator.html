@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.8.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.8.0';
+        // Must match `TEMPLATE_VERSION = 'v20.8.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.8.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.8.1',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Directory Service MS AD and Simple AD no longer generate false SNS alerts during directory provisioning. Directories stay in "Creating" state for 5–10 min (Simple AD) or 25–45 min (MS AD); tagging during that window returns "not supported for directories in this state. Directory Status: Creating", which the three-path classifier was routing to permanent_actionable → SNS alert on every AD creation. Added both phrases to TRANSIENT_MARKERS so Simple AD retries succeed within the 900s SQS budget; MS AD retries exhaust into EventDLQ without false alert noise, and the ReconciliationFunction catches the tag on the next nightly sweep (§1.98).' },
+                ],
+            },
             {
                 version: 'v20.8.0',
                 date: '2026-04-26',
@@ -6801,6 +6808,18 @@ ${crossAccountCode}
                       'CREATE_IN_PROGRESS','UPDATE_IN_PROGRESS','can not be updated',
                       'rate of control plane requests','ThrottlingException','ThrottledException','Throttling',
                       'RequestLimitExceeded','TooManyRequestsException','LimitExceededException',
+                      # Directory Service (MS AD + Simple AD): directory sits
+                      # in "Creating" state for 5–10 min (Simple AD) or
+                      # 25–45 min (MS AD). Tagging returns
+                      # "not supported for directories in this state.
+                      #  Directory Status: Creating". Without these markers
+                      # the classifier routes every AD creation to
+                      # permanent_actionable → false SNS alert. Transient
+                      # retries succeed for Simple AD; MS AD exceeds the
+                      # 900s retry budget and is caught nightly by the
+                      # ReconciliationFunction. (§1.98)
+                      'Directory Status: Creating',
+                      'not supported for directories in this state',
                   )
                   PERMANENT_IGNORABLE_MARKERS = (
                       'ResourceNotFoundException','Requested resource not found',
