@@ -6,6 +6,18 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.6.4 — IAM completeness + CI gate (plan-PR #42)
+
+Tooling + IAM PATCH. YAML runtime Lambda is byte-identical to v20.6.3 except the version stamps and one added IAM row. Closes audit item §1.99; partially addresses §1.64 (introduces the methodology to prevent future siblings).
+
+**§1.99 — Keyspaces `cassandra:Alter` missing.** v20.3.0 (PR #25) shipped the Keyspaces Tier 1 MAP handler with IAM grant `cassandra:TagResource` only. Per the AWS IAM Service Authorization Reference, `keyspaces:TagResource` requires **both** `cassandra:TagResource` and `cassandra:Alter`. Every Keyspaces tagging attempt AccessDenied'd silently — a Tier 1 MAP service claim was live-broken since v20.3.0. Added `cassandra:Alter` to the YAML `ServiceSpecificTagging` policy and to the configurator's inline `TAGGING_PERMISSIONS` mirror. Also added to `.github/sync/tagging-permissions.txt` canonical list.
+
+**New Layer 1 CI check: IAM Completeness (native-dispatch).** `.github/scripts/generate_iam.py` parses `boto3.client('<svc>')` and `get_service_client('<svc>')` calls from the YAML Lambda source, looks up each discovered service's required IAM actions in a hand-curated map (sourced from AWS's IAM Service Authorization Reference), and fails the build if the canonical tagging-permissions list is missing any. The next time someone adds a native-dispatch branch to `do_tag` without the matching IAM grant, CI will block the merge. Prevents future §1.99-class regressions.
+
+**Not addressed in this PR:** the plan's 28-action list (`codeartifact:TagResource`, `appflow:TagResource`, `batch:TagResource`, ...) was audited against the current handler code — only 3 of 28 have any corresponding code (cassandra, cloudformation, geo/location). The other 25 are cargo-cult grants per the plan's own "⚠️ Verify before coding" note ("only add IAM for services we have a handler OR where RGTA dispatches"). RGTA-dispatched services route through `tag:TagResources` + the per-service `<svc>:TagResource` grants already in the canonical list; no additional IAM is required. `cloudformation:DescribeStackSet` (§1.100) was verified as cargo-cult — no handler calls `describe_stack_set`.
+
+---
+
 ### v20.6.3 — Configurator-generated shell-script correctness (plan-PR #41)
 
 Tooling-only PATCH. YAML runtime is byte-identical to v20.6.2 except the four version stamps. Closes audit items docx #2, #3, #5, #7.

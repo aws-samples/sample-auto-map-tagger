@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.6.3'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.6.3';
+        // Must match `TEMPLATE_VERSION = 'v20.6.4'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.6.4';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,14 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.6.4',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Added cassandra:Alter to the Lambda IAM policy. Keyspaces TagResource requires both cassandra:TagResource AND cassandra:Alter per the AWS IAM Service Authorization Reference — v20.3.0 shipped with only TagResource, causing AccessDenied on every Keyspaces tagging attempt (§1.99). Live-confirmed Tier 1 MAP service bug.' },
+                    { tag: 'other', text: 'New Layer 1 CI check "IAM Completeness (native-dispatch)": parses boto3.client()/get_service_client() calls from the Lambda source, derives required IAM actions from a hand-curated service-authorization map, and fails the build if the canonical tagging-permissions list is missing any. Prevents future §1.99-class bugs where a new native-dispatch handler ships without the matching IAM grant.' },
+                ],
+            },
             {
                 version: 'v20.6.3',
                 date: '2026-04-26',
@@ -5561,7 +5569,7 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             // Database
             'rds:AddTagsToResource','dynamodb:TagResource','elasticache:AddTagsToResource',
             'memorydb:TagResource','redshift:CreateTags','redshift-serverless:TagResource',
-            'es:AddTags','kafka:TagResource','dms:AddTagsToResource','cassandra:TagResource',
+            'es:AddTags','kafka:TagResource','dms:AddTagsToResource','cassandra:TagResource','cassandra:Alter',
             'mq:CreateTags',
             // Networking
             'elasticloadbalancing:AddTags','globalaccelerator:TagResource','cloudfront:TagResource',
