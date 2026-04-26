@@ -6,6 +6,11 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.9.1 — 2026-04-26
+
+- **TRANSIENT_MARKERS expansion.** Added `OperationAborted`, `conflicting conditional operation` (S3 409 concurrent-op), `SnapshotCreationPerVolumeRateExceeded` (EC2 per-volume burst ceiling), and `Throttling.User` (EC2/STS throttle variant). Prior classifier routed these retry-eligible failures to `permanent_actionable` → false SNS alerts during normal burst conditions that resolve on SQS redelivery.
+- **PERMANENT_IGNORABLE for Bedrock system-defined inference profiles.** `CreateInferenceProfile` fires for both application profiles (taggable) and system-defined profiles (tag API returns "System-defined Inference Profile is not taggable"). Silently ack the system ones via CW metric while continuing to tag application profiles from the same event — NOT added to `IGNORE_EVENTS`, which would skip both.
+
 ### v20.9.0 — CFN Custom Resource preflight + support contract (§1.108, plan-PR #59)
 
 MINOR. Closes the §1.108 temporal race — the specific collision case that the configurator's `deploy.sh` preflight cannot catch because `deploy.sh` doesn't run for StackSet `AutoDeployment: True` provisioning into newly-joined OU accounts. PR #60 (v20.8.0) added a runtime alarm for this case but did not prevent the tagging. This PR makes CFN itself refuse to provision the tagger Lambda when a peer tagger already exists with overlapping scope in the same account+region.

@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.9.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.9.1 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.9.0
+      Value: v20.9.1
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -604,7 +604,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.9.0'
+          TEMPLATE_VERSION = 'v20.9.1'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -2268,6 +2268,20 @@ Resources:
               # sweep. (§1.98)
               'Directory Status: Creating',
               'not supported for directories in this state',
+              # S3 409: concurrent CreateBucket/PutBucketTagging or in-flight
+              # lifecycle replication. Resolves on retry — AWS S3 error guide
+              # explicitly classifies OperationAborted as retryable. (Q1)
+              'OperationAborted',
+              'conflicting conditional operation',
+              # EC2 per-volume snapshot rate ceiling. Burst-create workloads
+              # (backup sweeps, DR drills) hit this; retries succeed once the
+              # token bucket refills.
+              'SnapshotCreationPerVolumeRateExceeded',
+              # AWS throttle variant: some services emit Throttling.User
+              # (EC2, STS) distinct from plain 'Throttling'. Substring match
+              # against 'Throttling' already catches it, but enumerate for
+              # clarity alongside the other throttle codes.
+              'Throttling.User',
           )
           _PERMANENT_IGNORABLE_MARKERS = (
               # Resource genuinely deleted between create and tag event.
@@ -2279,6 +2293,8 @@ Resources:
               'DBInstanceNotFound',
               'DBClusterNotFoundFault',
               'InvalidVolume.NotFound',
+              # Bedrock system-defined inference profiles fire CreateInferenceProfile but the tag API returns this error. Application profiles (same event) tag normally; we silently ack the system ones.
+              'System-defined Inference Profile is not taggable',
           )
 
           # Events to ignore — either not taggable, or would cause a feedback
@@ -2942,7 +2958,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.9.0
+    Value: v20.9.1
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
