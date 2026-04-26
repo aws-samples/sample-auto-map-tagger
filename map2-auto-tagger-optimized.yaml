@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.9.1 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.9.2 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -16,6 +16,7 @@ Parameters:
     Type: String
     Description: MAP 2.0 Migration Program Engagement ID (e.g., mig1234567890)
     AllowedPattern: ^mig[a-zA-Z0-9]+$
+    MaxLength: 20
     ConstraintDescription: Must start with 'mig' followed by alphanumeric characters
   AgreementStartDate:
     Type: String
@@ -64,7 +65,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.9.1
+      Value: v20.9.2
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -604,7 +605,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.9.1'
+          TEMPLATE_VERSION = 'v20.9.2'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -731,20 +732,59 @@ Resources:
               global _config, _config_ts
               now = time.time()
               if _config is None or (now - _config_ts) > _CONFIG_TTL_SECONDS:
-                  resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
-                  _config = json.loads(resp['Parameter']['Value'])
+                  try:
+                      resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
+                      cfg = json.loads(resp['Parameter']['Value'])
+                  except Exception as e:
+                      # One SSM hiccup must not DLQ a burst. Fail closed: return a
+                      # safe-default config where mpe_id is None — is_in_scope()
+                      # hard-rejects that, so nothing tags until the next TTL
+                      # refresh succeeds.
+                      print(f'CONFIG_UNREACHABLE: {e}')
+                      return {
+                          'mpe_id': None,
+                          'scope_mode': 'account',
+                          'scoped_account_ids': ['ALL'],
+                          'scoped_vpc_ids': ['NONE'],
+                          'agreement_start_date': None,
+                      }
+                  # Whitespace strip for customer-edited SSM values. CFN
+                  # CommaDelimitedList strips on deploy; SSM-stored config may
+                  # carry customer-edit whitespace. Drop empties after strip.
+                  if isinstance(cfg.get('scoped_account_ids'), list):
+                      cfg['scoped_account_ids'] = [
+                          s.strip() for s in cfg['scoped_account_ids']
+                          if isinstance(s, str) and s.strip()
+                      ]
+                  if isinstance(cfg.get('scoped_vpc_ids'), list):
+                      cfg['scoped_vpc_ids'] = [
+                          s.strip() for s in cfg['scoped_vpc_ids']
+                          if isinstance(s, str) and s.strip()
+                      ]
+                  _config = cfg
                   _config_ts = now
               return _config
 
           def is_after_agreement(config):
               try:
-                  start = datetime.strptime(config['agreement_start_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
-              except ValueError:
-                  print(f"Invalid agreement_start_date '{config['agreement_start_date']}', skipping event.")
+                  start = datetime.strptime(config.get('agreement_start_date'), '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              except (ValueError, TypeError):
+                  print(f"Invalid agreement_start_date '{config.get('agreement_start_date')}', skipping event.")
                   return False
               return datetime.now(timezone.utc) >= start
 
           def is_in_scope(config, account_id, detail):
+              # Fail-closed guards (§1.3 / §1.129 class). Safe-default config
+              # from CONFIG_UNREACHABLE has mpe_id=None; if that ever happens
+              # elsewhere, the scope decision is also False.
+              if not config.get('mpe_id'):
+                  return False
+              asd = config.get('agreement_start_date')
+              try:
+                  datetime.strptime(asd, '%Y-%m-%d')
+              except (ValueError, TypeError):
+                  print(f"CONFIG_INVALID_AGREEMENT_DATE: '{asd}'")
+                  return False
               mode = config['scope_mode']
               if mode == 'account':
                   scoped = config.get('scoped_account_ids', [])
@@ -2958,7 +2998,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.9.1
+    Value: v20.9.2
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic

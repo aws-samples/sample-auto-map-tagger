@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.9.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.9.1';
+        // Must match `TEMPLATE_VERSION = 'v20.9.2'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.9.2';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,17 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.9.2',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'get_config() now wraps ssm.get_parameter and JSON parse in try/except. On SSM failure it logs CONFIG_UNREACHABLE and returns a safe-default config with mpe_id=None; is_in_scope() hard-rejects that state, so nothing tags until the next TTL refresh succeeds. Prior behavior let one transient SSM hiccup DLQ an entire burst.' },
+                    { tag: 'bugfix', text: 'Whitespace stripped from every element of scoped_account_ids and scoped_vpc_ids at config parse time; empty elements dropped. CFN CommaDelimitedList strips on deploy, but SSM-stored config may carry customer-edit whitespace.' },
+                    { tag: 'bugfix', text: 'is_in_scope() now fails closed at the scope-decision entry point: if config.mpe_id is falsy, return False (§1.3 defense-in-depth).' },
+                    { tag: 'bugfix', text: 'is_in_scope() cross-checks agreement_start_date via datetime.strptime and logs CONFIG_INVALID_AGREEMENT_DATE on failure (§1.129 class: 2026-02-31 passes the CFN regex but fails strptime).' },
+                    { tag: 'security', text: 'MpeId CFN parameter now has MaxLength: 20. The ^mig[a-zA-Z0-9]+$ pattern had no length cap; real MPE IDs are mig + 10–13 chars, so 20 is well above real usage and prevents an absurdly long ID from leaking into log group names or SSM parameter paths.' },
+                ],
+            },
             {
                 version: 'v20.9.1',
                 date: '2026-04-26',
@@ -5961,6 +5972,7 @@ Parameters:
     Type: String
     Default: '${mpe}'
     AllowedPattern: ^mig[a-zA-Z0-9]+$
+    MaxLength: 20
     Description: MAP 2.0 MPE ID
   AgreementStartDate:
     Type: String
@@ -6396,22 +6408,58 @@ ${crossAccountCode}
               global _config, _config_ts
               now = time.time()
               if _config is None or (now - _config_ts) > _CONFIG_TTL_SECONDS:
-                  resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
-                  _config = json.loads(resp['Parameter']['Value'])
+                  try:
+                      resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
+                      cfg = json.loads(resp['Parameter']['Value'])
+                  except Exception as e:
+                      # One SSM hiccup must not DLQ a burst. Fail closed: return a
+                      # safe-default config where mpe_id is None — is_in_scope()
+                      # hard-rejects that, so nothing tags until the next TTL
+                      # refresh succeeds.
+                      print(f'CONFIG_UNREACHABLE: {e}')
+                      return {
+                          'mpe_id': None,
+                          'scope_mode': 'account',
+                          'scoped_account_ids': ['ALL'],
+                          'scoped_vpc_ids': ['NONE'],
+                          'agreement_start_date': None,
+                      }
+                  if isinstance(cfg.get('scoped_account_ids'), list):
+                      cfg['scoped_account_ids'] = [
+                          s.strip() for s in cfg['scoped_account_ids']
+                          if isinstance(s, str) and s.strip()
+                      ]
+                  if isinstance(cfg.get('scoped_vpc_ids'), list):
+                      cfg['scoped_vpc_ids'] = [
+                          s.strip() for s in cfg['scoped_vpc_ids']
+                          if isinstance(s, str) and s.strip()
+                      ]
+                  _config = cfg
                   _config_ts = now
               return _config
 
           def is_within_agreement(config):
               now = datetime.now(timezone.utc)
               try:
-                  start = datetime.strptime(config['agreement_start_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
-                  end = datetime.strptime(config['agreement_end_date'], '%Y-%m-%d').replace(tzinfo=timezone.utc)
-              except ValueError:
+                  start = datetime.strptime(config.get('agreement_start_date'), '%Y-%m-%d').replace(tzinfo=timezone.utc)
+                  end = datetime.strptime(config.get('agreement_end_date'), '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              except (ValueError, TypeError):
                   print(f"Invalid agreement date in config (start='{config.get('agreement_start_date')}', end='{config.get('agreement_end_date')}'), skipping event.")
                   return False
               return start <= now <= end
 
           def is_in_scope(config, account_id, detail):
+              # Fail-closed guards: if mpe_id is None (CONFIG_UNREACHABLE path)
+              # or agreement_start_date is poisoned (§1.129 class: 2026-02-31
+              # passes the CFN regex, fails strptime), out of scope.
+              if not config.get('mpe_id'):
+                  return False
+              asd = config.get('agreement_start_date')
+              try:
+                  datetime.strptime(asd, '%Y-%m-%d')
+              except (ValueError, TypeError):
+                  print(f"CONFIG_INVALID_AGREEMENT_DATE: '{asd}'")
+                  return False
               mode = config.get('scope_mode', 'account')
               if mode == 'account':
                   scoped = config.get('scoped_account_ids', ['ALL'])
