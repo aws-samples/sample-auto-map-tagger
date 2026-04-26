@@ -69,6 +69,8 @@ NATIVE_IAM_REQUIREMENTS = {
     "keyspaces": ["cassandra:TagResource", "cassandra:Alter"],
     "cloudhsmv2": ["cloudhsm:TagResource"],
     "ds": ["ds:AddTagsToResource"],
+    "dax": ["dax:TagResource"],
+    "storagegateway": ["storagegateway:AddTagsToResource"],
     # Infrastructure clients — not for tagging dispatch.
     "ssm": [],
     "ec2": [],

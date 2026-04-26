@@ -5,6 +5,7 @@
 #
 # Regeneration: python3 .github/scripts/audit_handler_coverage.py --update
 
+UNCOVERED ActivateGateway|storagegateway.amazonaws.com
 COVERED   AllocateAddress
 COVERED   CreateAccelerator
 UNCOVERED CreateAddon
@@ -72,7 +73,6 @@ COVERED   CreateGraphqlApi|appsync.amazonaws.com
 COVERED   CreateHealthCheck
 COVERED   CreateHostedZone
 UNCOVERED CreateHsm|cloudhsmv2.amazonaws.com
-UNCOVERED CreateHttpNamespace
 COVERED   CreateIPSet|wafv2.amazonaws.com
 COVERED   CreateIdentityPool
 COVERED   CreateImage
@@ -148,10 +148,10 @@ COVERED   CreateWorkGroup
 UNCOVERED CreateWorkflow
 COVERED   CreateWorkgroup
 UNCOVERED CreateWorkspaces
+UNCOVERED EnableSecurityHub|securityhub.amazonaws.com
 UNCOVERED PutDashboard
 COVERED   PutMetricAlarm
 COVERED   PutParameter
-UNCOVERED PutQueryDefinition
 COVERED   PutRule
 COVERED   RequestCertificate
 UNCOVERED RestoreTableFromBackup|dynamodb.amazonaws.com

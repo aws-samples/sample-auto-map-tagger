@@ -6,6 +6,28 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.7.3 — Post-refactor handler gaps (plan-PR #53)
+
+PATCH. Bundle of 6 service-specific handler fixes, mostly runtime correctness bugs where the handler produced an ARN that RGTA silently rejected. Partial collapse from the original plan-PR #53 scope — PR #43a's suffix-match absorbed the generic `*Arn` field-name gap, leaving these service-specific edge cases.
+
+**§1.83 — CloudWatch Dashboard ARN region.** `PutDashboard` handler emitted `arn:aws:cloudwatch:<region>:<acct>:dashboard/<name>`, but AWS dashboards are account-global — the authoritative ARN has an **empty region** segment (`arn:aws:cloudwatch::<acct>:dashboard/<name>`). RGTA rejected the region-scoped form, so every `PutDashboard` event silently AccessDenied'd. Also switched the name-extraction to `ci_get` (camelCase `dashboardName` vs PascalCase `DashboardName` both appear in CloudTrail samples).
+
+**§1.84 — Security Hub + DAX.** Two distinct fixes:
+- `EnableSecurityHub` returns a null body, so the universal ARN scan had nothing to extract → `no_arn` skip. New handler constructs `arn:aws:securityhub:<region>:<acct>:hub/default` directly (hub name is always `default` in the only supported case per AWS docs).
+- DAX's response extraction worked (`cluster.clusterArn`) but the tag_resource dispatch had no DAX branch, so every event fell through to RGTA. RGTA does NOT support DAX — `FailedResourcesMap` AccessDenied on every CreateCluster. New `:dax:` branch uses native `dax.tag_resource(ResourceName=arn, Tags=[…])`. IAM grant `dax:TagResource` was already present.
+
+**§1.85 — Storage Gateway.** `ActivateGateway` handler added. `GatewayARN` field name in the response was caught by PR #43a's suffix-match fallback, but RGTA doesn't support Storage Gateway at all — new `:storagegateway:` branch in tag_resource uses native `storagegateway.add_tags_to_resource(ResourceARN=arn, Tags=[…])`. IAM grant `storagegateway:AddTagsToResource` was already present.
+
+**§1.86 — CloudWatch Logs Insights QueryDefinition.** `PutQueryDefinition` handler constructed `arn:aws:logs:<region>:<acct>:query-definition:<id>`, an ARN shape that RGTA + native tagging both reject (documented in MAP_TAGGING_GAP_ANALYSIS.md). Generated SNS alarm noise on every QueryDefinition creation. Moved to IGNORE_EVENTS; dead handler removed.
+
+**§1.87 — Service Discovery HTTP Namespace.** `CreateHttpNamespace` returns only an `operationId`; resolving to an ARN requires an async `DescribeOperation` poll that could take minutes — well past the SQS 180s visibility window. Handler previously returned `None` with a TODO. Moved to IGNORE_EVENTS.
+
+**CI: `generate_iam.py` extended.** `NATIVE_IAM_REQUIREMENTS` now covers `dax` and `storagegateway`, so the IAM Completeness Layer 1 check catches future drift in these native-dispatch branches.
+
+**Handler coverage baseline regenerated.** 106/153 (unchanged percentage). The two new handlers (`ActivateGateway`, `EnableSecurityHub`) are added as `UNCOVERED` in the baseline with justification — both require dedicated E2E fixtures that don't fit the current Layer 2 budget (Storage Gateway needs an on-prem appliance or VPC-endpoint harness; Security Hub is a global service with side-effect enablement). Tracked as follow-up.
+
+---
+
 ### v20.7.2 — D7-D13 docs + IAM + IGNORE_EVENTS (plan-PR #56)
 
 PATCH. Closes D7, D8, D9, D11, D12, D13 from the plan's docx series. D10 already landed in GH #32.
