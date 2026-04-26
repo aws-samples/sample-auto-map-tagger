@@ -6265,8 +6265,9 @@ ${permissionsList}
 
   PreflightTrigger:
     Type: Custom::PeerTaggerPreflight
-    # No explicit DependsOn — ServiceToken !GetAtt already creates the
-    # implicit dependency on PreflightFunction (cfn-lint W3005).
+    # No explicit DependsOn — the ServiceToken reference below already
+    # creates the implicit dependency on PreflightFunction. Adding an
+    # explicit DependsOn produces cfn-lint W3005 (redundant dependency).
     Properties:
       ServiceToken: !GetAtt PreflightFunction.Arn
       MpeId: !Ref MpeId
