@@ -101,7 +101,7 @@ The auto-tagger covers **150+ AWS resource types** across every major service ca
 | **Migration** | Transfer Family, DataSync, DMS (incl. Serverless), Elastic Disaster Recovery |
 | **IoT** | IoT Core, IoT SiteWise, IoT Analytics, IoT Events |
 | **Media** | MediaConvert, MediaLive, MediaPackage |
-| **Emerging** | HealthLake, Omics, AppStream 2.0, Deadline Cloud, Kinesis Video Streams |
+| **Emerging** | HealthLake, AppStream 2.0, Deadline Cloud, Kinesis Video Streams |
 
 > **Not taggable** (AWS platform limitations): IoT Things, Lambda Layers, Glue Tables (only taggable at creation), CloudWatch Log Streams, API Gateway API Keys.
 
@@ -250,7 +250,7 @@ For a 50-account organization: **< $100/month** to protect potentially **million
 | What | Detail |
 |------|--------|
 | **Purpose** | Auto-tag AWS resources for MAP 2.0 credits |
-| **Coverage** | 150+ resource types, all 88 MAP-eligible services |
+| **Coverage** | 150+ resource types across MAP-eligible services (see [LIMITATIONS.md](LIMITATIONS.md#unsupported-map-eligible-services-handler-gap) for gaps) |
 | **Latency** | Typically 60–90 seconds from creation to tagged |
 | **Deployment** | 1 file, 1 command in CloudShell |
 | **Cost** | < $2/month per account |
