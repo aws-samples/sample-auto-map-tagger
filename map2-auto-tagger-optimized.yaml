@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.8.1 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.9.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.8.1
+      Value: v20.9.0
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -356,6 +356,212 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*
 
+  # ── Preflight: peer-tagger scope-overlap guard at stack-instance creation ──
+  # Runs BEFORE AutoTaggerFunction is created. If another map-auto-tagger-mig*
+  # stack exists in this account+region with an overlapping scope, fail the
+  # Custom Resource → CFN rolls back this stack instance → no AutoTaggerFunction
+  # is ever provisioned. Closes the §1.108 temporal race (Phase 16 Test 5,
+  # evidence 0/50) that configurator.html preflight cannot catch: StackSet
+  # AutoDeployment into newly-joined OU accounts, and member-account deploys
+  # via multi-account StackSet where the member already has a peer stack.
+  # Fail-open on any internal error (throttle / IAM propagation / region issue)
+  # so a legitimate deploy is never blocked by a transient AWS condition;
+  # PR #60's runtime detector + PeerTaggerDetectedAlarm remain as the second
+  # backstop if the preflight's fail-open path let a real conflict through.
+  PreflightRole:
+    Type: AWS::IAM::Role
+    Properties:
+      # Name kept short (≤64 chars worst-case: 21+20+1+14 = 56) to match
+      # AutoTaggerRole's budget. Regional suffix is necessary because IAM
+      # role names are account-global and same-MPE stacks may deploy to
+      # multiple regions in the same account.
+      RoleName: !Sub 'map-preflight-role-${MpeId}-${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: map-auto-tagger-preflight-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ListOwnStacks
+                Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                Resource: '*'  # ListStacks has no resource-level IAM per AWS auth matrix
+              - Sid: ReadPeerConfigs
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/auto-map-tagger/*/config'
+              - Sid: Logging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+
+  PreflightLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/map-auto-tagger-preflight-${MpeId}'
+      RetentionInDays: 14
+
+  PreflightFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: PreflightLogGroup
+    Properties:
+      FunctionName: !Sub 'map-auto-tagger-preflight-${MpeId}'
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt PreflightRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json, os, boto3
+          from urllib.request import urlopen, Request
+
+          def respond(event, context, status, reason=''):
+              body = json.dumps({
+                  'Status': status,
+                  'Reason': reason or 'See CloudWatch logs',
+                  'PhysicalResourceId': context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+              })
+              req = Request(event['ResponseURL'], data=body.encode(), method='PUT')
+              req.add_header('Content-Type', '')
+              req.add_header('Content-Length', str(len(body)))
+              urlopen(req)
+
+          def scope_overlap(new_mode, new_accts, new_vpcs, peer_mode, peer_accts, peer_vpcs, this_account):
+              """Return conflict reason string if scopes overlap; '' otherwise.
+
+              Mirrors the 5-case logic at configurator.html preflight
+              (lines ~6473–6514). Both sides are already in the same
+              account+region; overlap decisions reduce to scope dimensions.
+              """
+              new_accts = set(new_accts or [])
+              peer_accts = set(peer_accts or [])
+              new_vpcs = set(new_vpcs or [])
+              peer_vpcs = set(peer_vpcs or [])
+              if new_mode == 'account' and peer_mode == 'account':
+                  if 'ALL' in peer_accts:
+                      return f'peer scope=account/ALL dominates {this_account}'
+                  if 'ALL' in new_accts:
+                      return f'our scope=account/ALL dominates peer in {this_account}'
+                  if this_account in peer_accts and (this_account in new_accts or 'ALL' in new_accts):
+                      return f'peer scope includes {this_account}'
+                  return ''
+              if new_mode == 'account' and peer_mode == 'vpc':
+                  # Our side claims whole account; peer claims specific VPCs in same account.
+                  if 'ALL' in new_accts or this_account in new_accts:
+                      return 'our account-mode dominates peer VPC-scope on shared VPCs'
+                  return ''
+              if new_mode == 'vpc' and peer_mode == 'account':
+                  if 'ALL' in peer_accts or this_account in peer_accts:
+                      return f'peer account-mode dominates our VPC-scope'
+                  return ''
+              # Both VPC-scoped
+              overlap = new_vpcs & peer_vpcs
+              if overlap:
+                  return f'shared VPC(s): {sorted(overlap)}'
+              return ''
+
+          def check_peers(props, account, region):
+              own_mpe = props['MpeId']
+              new_mode = props.get('ScopeMode', 'account')
+              new_accts = props.get('ScopedAccountIds') or ['ALL']
+              if isinstance(new_accts, str):
+                  new_accts = [s.strip() for s in new_accts.split(',') if s.strip()]
+              new_vpcs = props.get('ScopedVpcIds') or []
+              if isinstance(new_vpcs, str):
+                  new_vpcs = [s.strip() for s in new_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
+
+              cfn = boto3.client('cloudformation')
+              ssm = boto3.client('ssm')
+              conflicts = []
+              active = ['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE']
+              for page in cfn.get_paginator('list_stacks').paginate(StackStatusFilter=active):
+                  for s in page.get('StackSummaries', []):
+                      name = s.get('StackName', '')
+                      if not name.startswith('map-auto-tagger-mig'):
+                          continue
+                      peer_mpe = name[len('map-auto-tagger-'):]
+                      if peer_mpe == own_mpe:
+                          continue  # same MPE = in-place update, not a conflict
+                      try:
+                          p = ssm.get_parameter(Name=f'/auto-map-tagger/{peer_mpe}/config')
+                          cfg = json.loads(p['Parameter']['Value'])
+                      except Exception as e:
+                          # Peer stack exists but we can't read its config — conservatively
+                          # treat as a conflict (same behavior as configurator preflight).
+                          conflicts.append(f'peer {name} config unreadable ({e.__class__.__name__})')
+                          continue
+                      peer_mode = cfg.get('scope_mode', 'account')
+                      peer_accts = cfg.get('scoped_account_ids') or ['ALL']
+                      peer_vpcs = cfg.get('scoped_vpc_ids') or []
+                      reason = scope_overlap(
+                          new_mode, new_accts, new_vpcs,
+                          peer_mode, peer_accts, peer_vpcs,
+                          account,
+                      )
+                      if reason:
+                          conflicts.append(f'{name} (MPE {peer_mpe}): {reason}')
+              return conflicts
+
+          def handler(event, context):
+              try:
+                  rt = event.get('RequestType', '')
+                  # Only enforce on Create. Updates don't add a new peer-Lambda
+                  # (the tagger already exists); Delete is tear-down.
+                  if rt in ('Update', 'Delete'):
+                      return respond(event, context, 'SUCCESS', f'{rt}: no-op')
+                  props = event.get('ResourceProperties', {})
+                  account = context.invoked_function_arn.split(':')[4]
+                  region = os.environ.get('AWS_REGION', '')
+                  conflicts = check_peers(props, account, region)
+                  if conflicts:
+                      reason = (
+                          'Peer tagger scope conflict — stack creation blocked '
+                          f'to prevent §1.108 cross-Lambda contamination. '
+                          f'Conflicts: {"; ".join(conflicts)[:800]}. '
+                          'Resolve via: delete the peer stack, OR narrow this '
+                          'deploy\'s scope to not overlap, OR narrow the peer\'s scope.'
+                      )
+                      print(f'PreflightConflict: {reason}')
+                      return respond(event, context, 'FAILED', reason)
+                  return respond(event, context, 'SUCCESS', 'No peer tagger scope conflict')
+              except Exception as e:
+                  # Fail-open: any internal error (throttle, IAM propagation,
+                  # region transient) must NOT block a legitimate deploy. The
+                  # runtime PeerTaggerDetected alarm (PR #60) remains as the
+                  # second backstop if a real conflict slips through.
+                  import traceback
+                  print(traceback.format_exc())
+                  return respond(event, context, 'SUCCESS', f'Preflight fail-open ({e.__class__.__name__}): {str(e)[:200]}')
+
+  PreflightTrigger:
+    Type: Custom::PeerTaggerPreflight
+    # No explicit DependsOn — the ServiceToken reference below already
+    # creates the implicit dependency on PreflightFunction. Adding an
+    # explicit DependsOn produces cfn-lint W3005 (redundant dependency).
+    Properties:
+      ServiceToken: !GetAtt PreflightFunction.Arn
+      MpeId: !Ref MpeId
+      ScopeMode: !Ref ScopeMode
+      ScopedAccountIds: !Ref ScopedAccountIds
+      ScopedVpcIds: !Ref ScopedVpcIds
+
   # CloudWatch Log Group — explicit declaration sets retention and ensures the
   # group is cleaned up when the stack is deleted, so a customer can redeploy
   # with the same MpeId without hitting ResourceExistenceCheck.
@@ -370,7 +576,9 @@ Resources:
   # Lambda function
   AutoTaggerFunction:
     Type: AWS::Lambda::Function
-    DependsOn: AutoTaggerLogGroup
+    DependsOn:
+      - AutoTaggerLogGroup
+      - PreflightTrigger  # Custom Resource must return SUCCESS before tagger is provisioned
     Properties:
       FunctionName: !Sub 'map-auto-tagger-${MpeId}'
       Runtime: python3.12
@@ -396,7 +604,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.8.1'
+          TEMPLATE_VERSION = 'v20.9.0'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -2734,7 +2942,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.8.1
+    Value: v20.9.0
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic

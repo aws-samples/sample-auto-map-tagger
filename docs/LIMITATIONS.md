@@ -4,6 +4,21 @@ Actual constraints that cannot be worked around. For tagging coverage gaps (what
 
 ---
 
+## Supported Deployment Methodology
+
+The supported deployment path is:
+
+1. Generate a customer-specific `deploy.sh` from `configurator.html` (client-side; runs fully in the browser and requires no outbound network access).
+2. Run the generated `deploy.sh` in the target management or single account.
+
+This pipeline runs preflight checks — IAM `simulate-principal-policy`, SCP validation, CloudTrail delivery probe, stack-state inspection, and scope-overlap detection across existing `map-auto-tagger-mig*` stacks — before any CloudFormation resource is created.
+
+**Running `aws cloudformation create-stack` or `create-stack-set` directly against `map2-auto-tagger-optimized.yaml` is unsupported.** Direct-YAML deploys skip every preflight check and have reproducibly surfaced bugs (scope collisions, cross-MPE contamination, missing IAM grants, malformed parameters) that do not occur through the configurator path. Issues reported against direct-YAML usage will be closed with a request to reproduce through the configurator.
+
+`configurator.html` is checked into this repo at the root. Open it in any modern browser — no server, no installation, no network call required.
+
+---
+
 ## Management Account Not Covered in Multi-Account Mode
 
 `SERVICE_MANAGED` StackSets cannot deploy to the management account (AWS hard constraint). Resources created in the management account will not be tagged. If needed, run an additional single-account deployment targeting the management account.
