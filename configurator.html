@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.6.4'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.6.4';
+        // Must match `TEMPLATE_VERSION = 'v20.6.5'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.6.5';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.6.5',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'MapConfig SSM parameter now uses Tier: Intelligent-Tiering instead of the default Standard tier. Customers with ~240+ accounts in scoped_account_ids generate a Value > 4KB (the Standard-tier limit); prior behavior silently failed stack create with ParameterMaxSizeExceeded. Intelligent-Tiering stays free for normal-sized deployments and auto-upgrades to Advanced ($0.05/parameter/month) only when the Value actually crosses the threshold. Closes §1.60.' },
+                ],
+            },
             {
                 version: 'v20.6.4',
                 date: '2026-04-26',
@@ -5925,6 +5932,11 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Name: /auto-map-tagger/${mpe}/config
+      # Tier: Intelligent-Tiering — see §1.60 comment in map2-auto-tagger-optimized.yaml.
+      # Customers with ~240+ accounts in scoped_account_ids produce a Value > 4KB; AWS
+      # auto-upgrades to Advanced tier ($0.05/parameter/month) instead of failing stack
+      # create with ParameterMaxSizeExceeded. Zero cost impact below the threshold.
+      Tier: Intelligent-Tiering
       # SECURITY NOTE: Type: String is intentional. The stored values (MPE ID, agreement
       # dates, account/VPC scope lists) are non-sensitive operational configuration — not
       # credentials, secrets, or PII. SecureString would require KMS decrypt permissions
