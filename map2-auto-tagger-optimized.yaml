@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.6.5 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.7.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.6.5
+      Value: v20.7.0
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -381,7 +381,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.6.5'
+          TEMPLATE_VERSION = 'v20.7.0'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -657,6 +657,59 @@ Resources:
                   for key, val in resp.items():
                       if isinstance(val, dict) and pattern in val and val[pattern]:
                           return val[pattern]
+
+              # Suffix-match fallback (§1.31/§1.35/§1.56/§1.57/§1.61/§1.63 et al.).
+              # The hand-curated allowlist above misses ~46 ARN field names across
+              # new/less-common AWS services — every miss is a silent tag loss. This
+              # fallback catches any key ending in Arn/ARN/arn whose value is a
+              # string beginning with 'arn:'. Guards against false positives:
+              #   - val must start with 'arn:' (rejects plain IDs, names, dates)
+              #   - ARN's service segment must match the event source (rejects
+              #     related-resource ARNs like roleArn on a CreateFunction event
+              #     where functionArn — caught above — is the real subject)
+              # Ordering: Python dict iteration is insertion order (3.7+), and
+              # CloudTrail typically puts the subject-resource ARN earlier than
+              # related ARNs, so first match wins. Nested scan is 1-level only,
+              # matching the allowlist scan's depth.
+              event_svc_prefix = event_source.split('.')[0].replace('aws.', '').lower()
+              def _maybe_arn(k, v):
+                  if not isinstance(v, str) or not v.startswith('arn:'):
+                      return None
+                  if not (k.endswith('Arn') or k.endswith('ARN') or k.endswith('arn')):
+                      return None
+                  # arn:aws:<service>:<region>:<acct>:<resource>
+                  parts = v.split(':', 5)
+                  if len(parts) < 6:
+                      return None
+                  arn_svc = parts[2].lower()
+                  # Allow common cross-service subject-ARN patterns (e.g. ec2
+                  # events that produce elasticloadbalancing ARNs are rare,
+                  # but event-source-to-ARN-service isn't a strict 1:1 map).
+                  # Accept either an exact prefix match or a well-known alias.
+                  if arn_svc == event_svc_prefix:
+                      return v
+                  aliases = {
+                      'elasticloadbalancing': ('elbv2', 'elb', 'elasticloadbalancing'),
+                      'route53': ('route53', 'route53domains', 'route53resolver'),
+                      'apigateway': ('apigateway',),
+                      'bedrock': ('bedrock', 'bedrock-agent', 'bedrock-runtime'),
+                      'kinesis': ('kinesis', 'kinesisvideo', 'kinesisanalytics', 'firehose'),
+                      'rds': ('rds', 'neptune', 'docdb'),
+                      'sagemaker': ('sagemaker',),
+                      'iot': ('iot', 'iotanalytics', 'iotevents', 'iotsitewise'),
+                  }
+                  if arn_svc in aliases.get(event_svc_prefix, ()):
+                      return v
+                  return None
+              for key, val in resp.items():
+                  m = _maybe_arn(key, val)
+                  if m:
+                      return m
+                  if isinstance(val, dict):
+                      for nk, nv in val.items():
+                          m = _maybe_arn(nk, nv)
+                          if m:
+                              return m
 
               # Glue Table - must be before resources array check to avoid returning database ARN
               # (Glue CreateTable CloudTrail resources array contains database ARN first)
@@ -2414,7 +2467,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.6.5
+    Value: v20.7.0
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
