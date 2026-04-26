@@ -13,6 +13,7 @@ braket:TagResource
 cassandra:Alter
 cassandra:TagResource
 cloud9:TagResource
+cloudformation:ListStacks
 cloudformation:TagResource
 cloudformation:UpdateStack
 cloudformation:UpdateStackSet
