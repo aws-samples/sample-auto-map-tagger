@@ -12,6 +12,14 @@ Docs-only, no version bump. Full re-audit of `docs/COVERAGE.md` against the auth
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.9.3 — 2026-04-26
+
+- **`TrickleFailureAlarm` CloudWatch alarm.** Catches slow-rate `permanent_actionable` tagging failures that the per-minute `TaggerErrorAlarm` misses. Fires when ≥6 of the last 24 hourly buckets each contain ≥1 `TagFailureByClass{ErrorClass=permanent_actionable, MpeId=…}` datapoint. Catches IAM drift / unhandled resource types while ignoring one-off transients.
+- **`InvalidInstanceID.Malformed` carve-out in `RunInstances` volume resolution.** `extract_arns_multi` now fails fast on this error instead of burning the 30s `describe_instances` retry budget. The raised `ClientError` propagates through `_process_event`, the classifier routes it to `permanent_actionable`, and an SNS alert fires. `InvalidInstanceID.NotFound` is unchanged (stays in `PERMANENT_IGNORABLE_MARKERS` — instance may still be materializing).
+- **Removed dead duplicate Glue `CreateTable` branch in `extract_arn`.** The first occurrence (early-check above the resources-array scan) already returned the table ARN; the later `elif` at the same location was unreachable dead code.
+- **SKIPPED `${AWS::URLSuffix}` polish.** Grepped every `amazonaws.com` occurrence in the YAML — all are either IAM service principals (which CFN resolves per-partition on its own) or inside `ZipFile: |` Python code, not `!Sub` expressions. No CFN `!Sub` strings needed replacement.
+- **SKIPPED Neptune/DocDB comment removal.** The comment at the `CreateDBCluster`/`CreateDBInstance` + `rds.amazonaws.com` no-op `elif` documents live behavior (Neptune/DocDB share the RDS event source and are already handled by the existing RDS branches). Not dead; kept.
+
 ### v20.9.2 — 2026-04-26
 
 - **`get_config()` fails closed on SSM unreachability.** Wraps `ssm.get_parameter` + JSON parse in try/except; on failure logs `CONFIG_UNREACHABLE` and returns a safe-default config with `mpe_id=None`. `is_in_scope` hard-rejects that state, so nothing tags until the next TTL refresh succeeds. Prior behavior let one transient SSM hiccup DLQ an entire burst.

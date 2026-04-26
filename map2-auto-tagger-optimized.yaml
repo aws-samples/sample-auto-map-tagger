@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.9.2 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.9.3 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -65,7 +65,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.9.2
+      Value: v20.9.3
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -605,7 +605,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.9.2'
+          TEMPLATE_VERSION = 'v20.9.3'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -894,11 +894,25 @@ Resources:
                                                   volume_ids.add(vid)
                                   if all_have_vols and volume_ids:
                                       break
+                              except ClientError as e:
+                                  # Malformed instance IDs never resolve — no
+                                  # point burning the 30s budget. NotFound is
+                                  # different: the instance may still be
+                                  # materializing, so keep polling.
+                                  if e.response.get('Error', {}).get('Code') == 'InvalidInstanceID.Malformed':
+                                      raise
+                                  print(f'describe_instances poll: {e}')
                               except Exception as e:
                                   print(f'describe_instances poll: {e}')
                               time.sleep(3)
                           for vid in volume_ids:
                               arns.append(f"arn:aws:ec2:{region}:{account_id}:volume/{vid}")
+                  except ClientError as e:
+                      # Let malformed-ID propagate so _classify_error routes
+                      # it to permanent_actionable instead of a silent log.
+                      if e.response.get('Error', {}).get('Code') == 'InvalidInstanceID.Malformed':
+                          raise
+                      print(f'Could not resolve RunInstances attached volumes: {e}')
                   except Exception as e:
                       print(f'Could not resolve RunInstances attached volumes: {e}')
 
@@ -1865,13 +1879,6 @@ Resources:
                   if att_id:
                       return f"arn:aws:ec2:{region}:{account_id}:transit-gateway-attachment/{att_id}"
 
-              # Glue Table
-              elif event_name == 'CreateTable' and event_source == 'glue.amazonaws.com':
-                  db_name = req.get('databaseName')
-                  tbl_name = req.get('tableInput', {}).get('name')
-                  if db_name and tbl_name:
-                      return f"arn:aws:glue:{region}:{account_id}:table/{db_name}/{tbl_name}"
-
               # ElastiCache Snapshot
               elif event_name == 'CreateSnapshot' and event_source == 'elasticache.amazonaws.com':
                   snap = resp.get('snapshot', {})
@@ -2450,7 +2457,21 @@ Resources:
               # (RunInstances → instances + attached EBS volumes + ENIs). AWS
               # does not publish separate CreateVolume / CreateNetworkInterface
               # events for children born inline with the parent.
-              arns = extract_arns_multi(detail, account_id, region)
+              try:
+                  arns = extract_arns_multi(detail, account_id, region)
+              except ClientError as e:
+                  # extract_arns_multi fails fast on InvalidInstanceID.Malformed
+                  # so the classifier can route to permanent_actionable instead
+                  # of burning the 30s describe_instances budget.
+                  err_msg = str(e)
+                  cls = _classify_error(err_msg)
+                  _emit_class_metric(cls, config['mpe_id'])
+                  if cls == 'transient':
+                      return ('transient', err_msg)
+                  if cls == 'permanent_ignorable':
+                      return ('skipped', None)
+                  _publish_permanent_alert(detail.get('eventName', '<unknown>'), config['mpe_id'], err_msg)
+                  return ('permanent_actionable', err_msg)
               if not arns:
                   single = extract_arn(detail, account_id, region)
                   arns = [single] if single else []
@@ -2705,6 +2726,36 @@ Resources:
       Statistic: Sum
       Period: 3600
       EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # CloudWatch alarm — slow, low-rate tagging failures that the per-minute
+  # Errors alarm misses. Fires when ≥6 of the last 24 hourly buckets each
+  # contain ≥1 permanent_actionable failure. This catches a trickle (one
+  # failure/hour for 6+ hours) while ignoring one-off transients.
+  TrickleFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'map-auto-tagger-trickle-failures-${MpeId}'
+      AlarmDescription: >
+        Slow trickle of permanent-actionable tagging failures detected
+        (≥6 of the last 24 hourly buckets had ≥1 failure). Investigate
+        IAM drift, tag-quota exhaustion, or a new resource type the
+        classifier isn't handling yet.
+      Namespace: MapAutoTagger
+      MetricName: TagFailureByClass
+      Dimensions:
+        - Name: ErrorClass
+          Value: permanent_actionable
+        - Name: MpeId
+          Value: !Ref MpeId
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 24
+      DatapointsToAlarm: 6
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
@@ -2998,7 +3049,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.9.2
+    Value: v20.9.3
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic

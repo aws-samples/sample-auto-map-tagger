@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.9.2'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.9.2';
+        // Must match `TEMPLATE_VERSION = 'v20.9.3'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.9.3';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,15 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.9.3',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'other', text: 'New CloudWatch alarm TrickleFailureAlarm catches slow-rate permanent_actionable tagging failures that the existing per-minute TaggerErrorAlarm misses. Fires when ≥6 of the last 24 hourly buckets each contain ≥1 TagFailureByClass{ErrorClass=permanent_actionable} datapoint — catches a trickle (e.g. one failure/hour for 6+ hours indicating IAM drift or a new resource type the classifier does not handle) while ignoring one-off transients.' },
+                    { tag: 'bugfix', text: 'RunInstances volume resolution now fails fast on InvalidInstanceID.Malformed instead of burning the 30s describe_instances retry budget. The error propagates through _process_event, the classifier routes it to permanent_actionable, and an SNS alert fires — malformed instance IDs never resolve on retry and should not silently eat the whole Lambda budget. InvalidInstanceID.NotFound is unchanged (stays in PERMANENT_IGNORABLE_MARKERS — instance may still be materializing).' },
+                    { tag: 'other', text: 'Removed dead duplicate Glue CreateTable branch in extract_arn — the first occurrence (above the resources-array scan) already returned the table ARN, so the later elif was unreachable dead code.' },
+                ],
+            },
             {
                 version: 'v20.9.2',
                 date: '2026-04-26',
@@ -6767,10 +6776,23 @@ ${crossAccountCode}
                                                   v = (m.get('Ebs') or {}).get('VolumeId')
                                                   if v: vols.add(v)
                                       if all_have and vols: break
+                                  except ClientError as ce:
+                                      # Malformed instance IDs never resolve —
+                                      # fail fast instead of burning the 30s
+                                      # budget. NotFound is different (still
+                                      # materializing), keep polling.
+                                      if ce.response.get('Error',{}).get('Code') == 'InvalidInstanceID.Malformed':
+                                          raise
                                   except Exception: pass
                                   _t.sleep(3)
                               for v in vols:
                                   extra_arns.append(f"arn:{p}:ec2:{region}:{account_id}:volume/{v}")
+                          except ClientError as e:
+                              # Let malformed-ID propagate so the classifier
+                              # routes it to permanent_actionable.
+                              if e.response.get('Error',{}).get('Code') == 'InvalidInstanceID.Malformed':
+                                  raise
+                              print(f'RunInstances volume lookup failed: {e}')
                           except Exception as e:
                               print(f'RunInstances volume lookup failed: {e}')
                   elif event_name == 'CreateBucket':
@@ -7308,6 +7330,35 @@ ${crossAccountCode}
       Statistic: Sum
       Period: 3600
       EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # CloudWatch alarm — slow trickle of permanent_actionable tagging failures
+  # (≥6 of the last 24 hourly buckets had ≥1 failure). Catches IAM drift or
+  # unhandled resource types that the per-minute errors alarm misses.
+  TrickleFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-trickle-failures-${mpe}
+      AlarmDescription: >
+        Slow trickle of permanent-actionable tagging failures detected
+        (≥6 of the last 24 hourly buckets had ≥1 failure). Investigate
+        IAM drift, tag-quota exhaustion, or a new resource type the
+        classifier isn't handling yet.
+      Namespace: MapAutoTagger
+      MetricName: TagFailureByClass
+      Dimensions:
+        - Name: ErrorClass
+          Value: permanent_actionable
+        - Name: MpeId
+          Value: '${mpe}'
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 24
+      DatapointsToAlarm: 6
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
