@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.9.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.9.0';
+        // Must match `TEMPLATE_VERSION = 'v20.9.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.9.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,14 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.9.1',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Expanded TRANSIENT_MARKERS so the three-path classifier retries S3 OperationAborted (409 conflicting conditional operation — concurrent CreateBucket/PutBucketTagging), EC2 SnapshotCreationPerVolumeRateExceeded (per-volume snapshot rate ceiling hit by burst backup/DR workloads), and the Throttling.User variant (EC2/STS emit this distinct from plain Throttling). Prior behavior routed all three to permanent_actionable → false SNS alerts during normal burst conditions that resolve on SQS redelivery.' },
+                    { tag: 'bugfix', text: 'Bedrock system-defined inference profiles added to PERMANENT_IGNORABLE_MARKERS. CreateInferenceProfile fires for both application profiles (taggable — tag normally) and system-defined profiles (tag API returns "System-defined Inference Profile is not taggable"). Silently ack the system ones via CW metric while continuing to tag application profiles from the same event — CreateInferenceProfile is NOT added to IGNORE_EVENTS, which would skip both.' },
+                ],
+            },
             {
                 version: 'v20.9.0',
                 date: '2026-04-26',
@@ -7010,11 +7018,21 @@ ${crossAccountCode}
                       # ReconciliationFunction. (§1.98)
                       'Directory Status: Creating',
                       'not supported for directories in this state',
+                      # S3 409 concurrent-op (OperationAborted) and related
+                      # transient signals per Q1 decision. See YAML classifier
+                      # for the full rationale; kept terse here to match the
+                      # configurator's more compact comment style.
+                      'OperationAborted',
+                      'conflicting conditional operation',
+                      'SnapshotCreationPerVolumeRateExceeded',
+                      'Throttling.User',
                   )
                   PERMANENT_IGNORABLE_MARKERS = (
                       'ResourceNotFoundException','Requested resource not found',
                       'NoSuchBucket','InvalidInstanceID.NotFound',
                       'DBInstanceNotFound','DBClusterNotFoundFault','InvalidVolume.NotFound',
+                      # Bedrock system-defined inference profiles fire CreateInferenceProfile but the tag API returns this error. Application profiles (same event) tag normally; we silently ack the system ones.
+                      'System-defined Inference Profile is not taggable',
                   )
                   if any(m in err_msg for m in TRANSIENT_MARKERS):
                       error_class = 'transient'
