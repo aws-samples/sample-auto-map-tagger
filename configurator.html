@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.7.3'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.7.3';
+        // Must match `TEMPLATE_VERSION = 'v20.8.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.8.0';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,15 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.8.0',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'perf', text: 'Lambda SQS event source mapping BatchSize raised 1 → 10 + FunctionResponseTypes=[ReportBatchItemFailures]. Phase 16 measured per-Lambda drain rate at 1.3 msg/s; a 15K-resource burst produced a 2.8-hour backlog. With batching each invocation drains up to 10 messages and only failed records are redelivered — drain rate rises ~10× while retry semantics per record are preserved. Closes §1.123, §1.124, §1.125, §1.131.' },
+                    { tag: 'other', text: 'Runtime peer-tagger detection at Lambda cold-start. Lists map-auto-tagger-mig* stacks in this account/region and emits MapAutoTagger/PeerTaggerDetected + SNS alert via PeerTaggerDetectedAlarm when peers are found. Configurator\'s Class-2 preflight catches overlap at deploy.sh runtime, but StackSet AutoDeployment into new OU accounts bypasses deploy.sh entirely — Phase 16 Test 5 confirmed 0/50 resources got the intended MPE in that case. Detector doesn\'t prevent contamination (architectural routing fix is plan-PR #59); it surfaces it so customers find out from a CloudWatch alarm, not a MAP finance audit. Partial §1.108.' },
+                    { tag: 'other', text: 'New Layer 1 regression guard batchsize-floor ensures EventQueueMapping.BatchSize stays ≥ 10 and ReportBatchItemFailures remains set. Catches silent reverts that our 50-resource E2E can\'t stress.' },
+                ],
+            },
             {
                 version: 'v20.7.3',
                 date: '2026-04-26',
@@ -5645,8 +5654,9 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'cloud9:TagResource',
             // CodeBuild: tags applied via UpdateProject; BatchGetProjects needed for tag resolution
             'codebuild:UpdateProject','codebuild:BatchGetProjects',
-            // CloudFormation: tagging maps to UpdateStack internally; DescribeStacks is AWS's internal read for ARN validation
-            'cloudformation:TagResource','cloudformation:UpdateStack','cloudformation:UpdateStackSet','cloudformation:DescribeStacks',
+            // CloudFormation: tagging maps to UpdateStack internally; DescribeStacks is AWS's internal read for ARN validation.
+            // ListStacks is the peer-tagger detector at Lambda cold-start (§1.108, plan-PR #57).
+            'cloudformation:TagResource','cloudformation:UpdateStack','cloudformation:UpdateStackSet','cloudformation:DescribeStacks','cloudformation:ListStacks',
             // Service Catalog: tagging routes through Update* actions
             'servicecatalog:TagResource',
             'servicecatalog:UpdatePortfolio','servicecatalog:UpdateProduct',
@@ -6052,6 +6062,16 @@ ${permissionsList}
                 Effect: Allow
                 Action: ssm:GetParameter
                 Resource: !Sub arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/auto-map-tagger/${mpe}/config
+              # Peer-tagger detection at cold start. Lists map-auto-tagger-mig*
+              # stacks in this account/region to surface concurrent taggers
+              # (§1.108 Phase 16). ListStacks has no resource-level IAM per
+              # AWS IAM Service Authorization Reference; scope is implicitly
+              # the caller's account. Read-only.
+              - Sid: PeerTaggerDetect
+                Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                Resource: '*'
               - Sid: Logging
                 Effect: Allow
                 Action:
@@ -6104,6 +6124,68 @@ ${permissionsList}
           # seen until the container recycled, silently misattributing credit.
           # 60s TTL bounds the window without adding meaningful SSM load.
           _CONFIG_TTL_SECONDS = 60
+
+          # Peer-tagger detection (§1.108 Phase 16). Runs once at cold-start
+          # and logs WARN + emits MapAutoTagger/PeerTaggerDetected when another
+          # map-auto-tagger-mig* stack is found in this account. Configurator's
+          # Class-2 preflight catches overlap at deploy.sh runtime, but
+          # StackSet AutoDeployment into new OU accounts bypasses deploy.sh
+          # entirely -- Phase 16 Test 5 confirmed the silent contamination
+          # path. This detector doesn't prevent the overlap; it surfaces it.
+          def _detect_peer_taggers():
+              try:
+                  own_mpe = None
+                  cfg_param = os.environ.get('CONFIG_PARAM', '')
+                  m = re.match(r'^/auto-map-tagger/([^/]+)/config$', cfg_param)
+                  if m:
+                      own_mpe = m.group(1)
+                  if not own_mpe:
+                      return
+                  cfn = boto3.client('cloudformation')
+                  paginator = cfn.get_paginator('list_stacks')
+                  peer_mpes = []
+                  active = ['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE']
+                  for page in paginator.paginate(StackStatusFilter=active):
+                      for s in page.get('StackSummaries', []):
+                          name = s.get('StackName', '')
+                          if not name.startswith('map-auto-tagger-mig'):
+                              continue
+                          peer_mpe = name[len('map-auto-tagger-'):]
+                          if peer_mpe == own_mpe:
+                              continue
+                          peer_mpes.append(peer_mpe)
+                  if not peer_mpes:
+                      return
+                  print(
+                      f'PeerTaggerDetect: WARN -- {len(peer_mpes)} peer tagger '
+                      f'stack(s) alongside MpeId={own_mpe}: {peer_mpes}. '
+                      f'Concurrent taggers race on the same CloudTrail events; '
+                      f'last-writer wins on map-migrated tag value.'
+                  )
+                  try:
+                      cw = boto3.client('cloudwatch')
+                      cw.put_metric_data(
+                          Namespace='MapAutoTagger',
+                          MetricData=[
+                              {
+                                  'MetricName': 'PeerTaggerDetected',
+                                  'Dimensions': [
+                                      {'Name': 'MpeId', 'Value': own_mpe},
+                                      {'Name': 'PeerMpeId', 'Value': peer},
+                                  ],
+                                  'Value': 1,
+                                  'Unit': 'Count',
+                              }
+                              for peer in peer_mpes
+                          ],
+                      )
+                  except Exception as mx:
+                      print(f'PeerTaggerDetect: could not emit metric: {mx}')
+              except Exception as e:
+                  # Detector must never break cold start.
+                  print(f'PeerTaggerDetect: detector skipped ({e})')
+
+          _detect_peer_taggers()
 ${crossAccountCode}
           def get_config():
               global _config, _config_ts
@@ -6243,12 +6325,9 @@ ${crossAccountCode}
                       except: pass
                   raise
 
-          def _unwrap_event(event):
-              """Unwrap SQS envelope if present, returning the inner EventBridge event."""
-              records = event.get('Records', [])
-              if records and records[0].get('eventSource') == 'aws:sqs':
-                  return json.loads(records[0]['body'])
-              return event
+          def _unwrap_sqs_record(record):
+              """Extract the inner EventBridge event from one SQS record."""
+              return json.loads(record['body'])
 
           def _publish_failure_alert(arn, tag_value, err):
               """Publish tagging failure to SNS so customer ops see it."""
@@ -6269,8 +6348,11 @@ ${crossAccountCode}
               except Exception as sns_e:
                   print(f'Could not publish SNS alert: {sns_e}')
 
-          def handler(event, context):
-              event = _unwrap_event(event)
+          def _process_event(event, context):
+              # Inner event-processing; returns a dict. The batch-aware handler
+              # at the bottom of this file iterates SQS records and calls this
+              # for each unwrapped EventBridge event. Raises on transient /
+              # permanent-actionable so the caller can map to batchItemFailures.
               config = get_config()
               if not is_within_agreement(config):
                   return {'status': 'skipped', 'reason': 'outside_agreement_period'}
@@ -6755,6 +6837,39 @@ ${crossAccountCode}
                   _publish_failure_alert(arn, tag_value, e)
                   raise
 
+          def handler(event, context):
+              """SQS batch handler.
+
+              EventSourceMapping is configured with BatchSize=10 and
+              FunctionResponseTypes=[ReportBatchItemFailures]. Iterate each
+              SQS record, process its inner EventBridge event, and return a
+              batchItemFailures list so only failing records get redelivered.
+              Successful / skipped / permanent-ignorable records are acked
+              by omission.
+              """
+              records = event.get('Records', [])
+              if not records:
+                  # Direct invocation (no SQS envelope) -- process once.
+                  try:
+                      return _process_event(event, context)
+                  except Exception:
+                      raise
+              failures = []
+              for record in records:
+                  msg_id = record.get('messageId')
+                  try:
+                      inner = _unwrap_sqs_record(record)
+                      _process_event(inner, context)
+                  except Exception as e:
+                      # _process_event raises on transient + permanent-actionable.
+                      # Both map to batchItemFailures so SQS redelivers this record
+                      # only, not the other 9 successes in the batch.
+                      print(f'Batch item {msg_id} failed: {e}')
+                      failures.append({'itemIdentifier': msg_id})
+              if failures:
+                  print(f'Batch: {len(failures)}/{len(records)} records failed, reporting for redelivery')
+              return {'batchItemFailures': failures}
+
   AutoTagEventRule:
     Type: AWS::Events::Rule
     Properties:
@@ -6825,13 +6940,21 @@ ${crossAccountCode}
       MessageRetentionPeriod: 1209600
       SqsManagedSseEnabled: true
 
-  # Lambda event source mapping -- polls SQS and invokes Lambda
+  # Lambda event source mapping -- polls SQS and invokes Lambda.
+  # BatchSize=10 + ReportBatchItemFailures: one invocation processes up to 10
+  # messages; only per-record failures are redelivered. Raises drain rate ~10x
+  # vs prior BatchSize=1 (Phase 16 measured 1.3 msg/s per Lambda -> expected
+  # ~10+ msg/s). MaximumBatchingWindowInSeconds=5 fills small batches under
+  # steady load without adding latency on idle queues.
   EventQueueMapping:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       EventSourceArn: !GetAtt EventQueue.Arn
       FunctionName: !Ref AutoTaggerFunction
-      BatchSize: 1
+      BatchSize: 10
+      MaximumBatchingWindowInSeconds: 5
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
       Enabled: true
 
   AlertTopic:
@@ -6882,6 +7005,33 @@ ${crossAccountCode}
           Value: !GetAtt EventDLQ.QueueName
       Statistic: Sum
       Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # CloudWatch alarm — fires when the Lambda cold-start peer-tagger detector
+  # (§1.108 Phase 16) finds another map-auto-tagger-mig* stack in this
+  # account. Concurrent taggers produce non-deterministic map-migrated tag
+  # values; alarm surface lets customers find this before a MAP audit does.
+  PeerTaggerDetectedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-peer-detected-${mpe}
+      AlarmDescription: >
+        Another map-auto-tagger stack was detected in this account at Lambda
+        cold-start. Concurrent taggers race on CloudTrail events and the
+        map-migrated tag value is last-writer-wins. Review which MPE is
+        intended for which resources.
+      Namespace: MapAutoTagger
+      MetricName: PeerTaggerDetected
+      Dimensions:
+        - Name: MpeId
+          Value: '${mpe}'
+      Statistic: Sum
+      Period: 3600
       EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold

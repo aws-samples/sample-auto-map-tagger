@@ -77,6 +77,10 @@ NATIVE_IAM_REQUIREMENTS = {
     "sns": [],
     "cloudwatch": [],
     "resourcegroupstaggingapi": [],
+    # cloudformation: read-only peer-tagger detector at cold-start (§1.108,
+    # plan-PR #57). cloudformation:ListStacks has no resource-level IAM;
+    # scope is implicitly the caller's account.
+    "cloudformation": ["cloudformation:ListStacks"],
 }
 
 

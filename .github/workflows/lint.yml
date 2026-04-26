@@ -493,6 +493,22 @@ jobs:
       - name: Enforce single-quoted containment for customer-controlled shell values
         run: python3 .github/scripts/lint_shell_injection.py
 
+  # ── 11. BatchSize floor (§1.123/§1.124 regression guard, plan-PR #57) ───
+  # v20.8.0 raised EventQueueMapping.BatchSize from 1 to 10 with
+  # ReportBatchItemFailures to close the Phase 16 drain-rate bottleneck
+  # (1.3 msg/s per Lambda → ~10× higher). A silent revert to BatchSize=1
+  # would re-open §1.123 without any Layer 2 signal, because our E2E
+  # creates ~50 resources and never stresses the drain path. This lint
+  # enforces both: BatchSize >= 10 AND ReportBatchItemFailures present.
+  batchsize-floor:
+    name: BatchSize Floor
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enforce EventQueueMapping BatchSize >= 10 + ReportBatchItemFailures
+        run: python3 .github/scripts/lint_batchsize_floor.py
+
   # IAM completeness guard (§1.27, §1.38, §1.58, §1.64, §1.99, §1.100, §1.105 / plan-PR #42).
   # Lambda adds a native-dispatch branch in do_tag (e.g. boto3.client('newsvc').tag_resource)
   # without the matching IAM grant → silent AccessDenied → SNS alert to a possibly-void topic

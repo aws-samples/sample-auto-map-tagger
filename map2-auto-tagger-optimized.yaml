@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.7.3 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.8.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.7.3
+      Value: v20.8.0
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -338,6 +338,16 @@ Resources:
                 Action:
                   - ssm:GetParameter
                 Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/auto-map-tagger/${MpeId}/config'
+              # Peer-tagger detection at cold start. Lists map-auto-tagger-mig*
+              # stacks in this account/region to surface concurrent taggers
+              # (§1.108 Phase 16). ListStacks has no resource-level IAM per AWS
+              # IAM Service Authorization Reference; scope is implicitly the
+              # caller's account. Read-only.
+              - Sid: PeerTaggerDetect
+                Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                Resource: '*'
               - Sid: Logging
                 Effect: Allow
                 Action:
@@ -386,7 +396,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.7.3'
+          TEMPLATE_VERSION = 'v20.8.0'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -398,6 +408,85 @@ Resources:
           # seen until the container recycled, silently misattributing credit.
           # 60s TTL bounds the window without adding meaningful SSM load.
           _CONFIG_TTL_SECONDS = 60
+
+          # Peer-tagger detection (§1.108, partial). Runs once at cold-start and
+          # logs a WARN + emits a CloudWatch metric (MapAutoTagger /
+          # PeerTaggerDetected, dimensions MpeId + PeerMpeId) when another
+          # map-auto-tagger-mig* stack is found in this account/region.
+          #
+          # Why this exists: the configurator's Class-2 scope-intersection
+          # preflight (PR #24 + PR #38 Option D) hard-fails on overlap at
+          # deploy.sh run-time, but StackSet-engine provisioning (AutoDeployment:
+          # True or stack-instance-creation into new OU accounts) bypasses
+          # deploy.sh entirely. Phase 16 Test 5 confirmed: linked3 had
+          # migbfltest1 (own deploy, passed preflight) + migph2stack01 (arrived
+          # via StackSet AutoDeployment, no preflight) — 0/50 resources tagged
+          # with migbfltest1. This detector doesn't prevent the contamination;
+          # it surfaces it so customers find out from a CloudWatch alarm rather
+          # than during a MAP finance audit.
+          #
+          # Architectural fix (deterministic multi-Lambda routing) is tracked as
+          # plan-PR #59 / Wave 28, blocked on design decision with Jin.
+          def _detect_peer_taggers():
+              try:
+                  own_mpe = None
+                  cfg_param = os.environ.get('CONFIG_PARAM', '')
+                  # CONFIG_PARAM is /auto-map-tagger/<mpe>/config
+                  m = re.match(r'^/auto-map-tagger/([^/]+)/config$', cfg_param)
+                  if m:
+                      own_mpe = m.group(1)
+                  if not own_mpe:
+                      print('PeerTaggerDetect: could not derive own MpeId from CONFIG_PARAM; skipping')
+                      return
+                  cfn = boto3.client('cloudformation')
+                  paginator = cfn.get_paginator('list_stacks')
+                  peer_mpes = []
+                  active = ['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE']
+                  for page in paginator.paginate(StackStatusFilter=active):
+                      for s in page.get('StackSummaries', []):
+                          name = s.get('StackName', '')
+                          if not name.startswith('map-auto-tagger-mig'):
+                              continue
+                          peer_mpe = name[len('map-auto-tagger-'):]
+                          if peer_mpe == own_mpe:
+                              continue
+                          peer_mpes.append(peer_mpe)
+                  if not peer_mpes:
+                      return
+                  print(
+                      f'PeerTaggerDetect: WARN — {len(peer_mpes)} peer tagger '
+                      f'stack(s) found in this account/region alongside '
+                      f'MpeId={own_mpe}: {peer_mpes}. Concurrent taggers race '
+                      f'on the same CloudTrail events; last-writer wins on '
+                      f'map-migrated tag value. See docs/ARCHITECTURE.md for '
+                      f'deterministic-routing status.'
+                  )
+                  try:
+                      cw = boto3.client('cloudwatch')
+                      cw.put_metric_data(
+                          Namespace='MapAutoTagger',
+                          MetricData=[
+                              {
+                                  'MetricName': 'PeerTaggerDetected',
+                                  'Dimensions': [
+                                      {'Name': 'MpeId', 'Value': own_mpe},
+                                      {'Name': 'PeerMpeId', 'Value': peer},
+                                  ],
+                                  'Value': 1,
+                                  'Unit': 'Count',
+                              }
+                              for peer in peer_mpes
+                          ],
+                      )
+                  except Exception as mx:
+                      print(f'PeerTaggerDetect: could not emit PeerTaggerDetected metric: {mx}')
+              except Exception as e:
+                  # Detector must never break cold start. Missing IAM
+                  # (cloudformation:ListStacks) or throttle means we skip
+                  # today and retry on next cold start.
+                  print(f'PeerTaggerDetect: detector skipped ({e})')
+
+          _detect_peer_taggers()
 
           def get_account_from_arn(arn):
               """Extract account ID from ARN."""
@@ -1914,226 +2003,259 @@ Resources:
                               return True
                           raise e
 
-          def _unwrap_event(event):
-              """Unwrap SQS envelope if present, returning the inner EventBridge event."""
-              records = event.get('Records', [])
-              if records and records[0].get('eventSource') == 'aws:sqs':
-                  return json.loads(records[0]['body'])
-              return event
+          # Three-path error classifier (§1.115–§1.120):
+          #
+          #   TRANSIENT            → surface via batchItemFailures so SQS
+          #                          redelivers up to maxReceiveCount=5
+          #                          (~15 min budget); failing past that falls
+          #                          into EventDLQ via the redelivery-exhaustion
+          #                          path.
+          #   PERMANENT_IGNORABLE  → silent ack + CW metric. The resource
+          #                          genuinely no longer exists (deleted
+          #                          between create and tag). Retrying forever
+          #                          just wastes quota and floods alerts.
+          #                          Terraform-rollback / test-infra churn is
+          #                          the typical source.
+          #   PERMANENT_ACTIONABLE → SNS publish + CW metric + send to EventDLQ
+          #                          via batchItemFailures (redelivery-
+          #                          exhaustion path). Treated as actionable by
+          #                          humans.
+          #
+          # SCP AccessDenied at tag time is NOT classified here — Q3's
+          # deploy-time preflight (simulate-principal-policy, PR #38) owns
+          # preventing SCP-denied deploys. If a runtime SCP drift slips past
+          # preflight, it falls into PERMANENT_ACTIONABLE with everything else
+          # this classifier can't anticipate (B.7 class).
+          _TRANSIENT_MARKERS = (
+              'not in an available state',
+              'not in available state',
+              'is not currently available',
+              'InvalidClusterState',
+              'InvalidServerlessCacheStateFault',
+              'InvalidDBClusterStateFault',
+              'InvalidDBInstanceState',
+              'CREATE_IN_PROGRESS',
+              'UPDATE_IN_PROGRESS',
+              'can not be updated',
+              'rate of control plane requests',
+              'ThrottlingException',
+              'ThrottledException',
+              'Throttling',
+              'RequestLimitExceeded',
+              'TooManyRequestsException',
+              'LimitExceededException',
+          )
+          _PERMANENT_IGNORABLE_MARKERS = (
+              # Resource genuinely deleted between create and tag event.
+              # Retrying will not find it; alerting is noise.
+              'ResourceNotFoundException',
+              'Requested resource not found',
+              'NoSuchBucket',
+              'InvalidInstanceID.NotFound',
+              'DBInstanceNotFound',
+              'DBClusterNotFoundFault',
+              'InvalidVolume.NotFound',
+          )
 
-          def handler(event, context):
-              event = _unwrap_event(event)
-              config = get_config()
+          # Events to ignore — either not taggable, or would cause a feedback
+          # loop (e.g. PutBucketTagging: tagging an S3 bucket fires this
+          # event, which would re-trigger this Lambda, which would tag again
+          # — infinite loop).
+          _IGNORE_EVENTS = frozenset([
+              'CreateGrant', 'CreateLogStream', 'CreateTags',
+              'CreateOrUpdateTags', 'ModifyTags', 'DeleteTags',
+              'PutBucketTagging', 'TagResource', 'TagResources',
+              'UntagResource', 'UntagResources', 'AddTagsToResource',
+              # CloudFormation change sets are intermediate — the stack
+              # itself is tagged separately via CreateStack → TagResource.
+              'CreateChangeSet',
+              # Cognito user-pool clients are child resources of the
+              # already-tagged user pool; they don't need their own tags.
+              'CreateUserPoolClient',
+              # Lambda Layers are not taggable — the Lambda TagResource API
+              # regex rejects layer ARNs. Skip to avoid SNS alarm noise.
+              'PublishLayerVersion', 'PublishLayerVersion20181031',
+              # API Gateway API Keys — ARN shape rejected by all tagging
+              # APIs. Documented in docs/MAP_TAGGING_GAP_ANALYSIS.md.
+              'CreateApiKey',
+              # Service Discovery HTTP Namespace — async operationId
+              # resolution doesn't fit the SQS 180s VT. §1.87.
+              'CreateHttpNamespace',
+              # CloudWatch Logs Insights QueryDefinition — §1.86. ARN shape
+              # rejected by RGTA + native.
+              'PutQueryDefinition',
+          ])
+
+          def _classify_error(msg):
+              if any(m in msg for m in _TRANSIENT_MARKERS):
+                  return 'transient'
+              if any(m in msg for m in _PERMANENT_IGNORABLE_MARKERS):
+                  return 'permanent_ignorable'
+              return 'permanent_actionable'
+
+          def _emit_class_metric(error_class, mpe_id):
+              try:
+                  boto3.client('cloudwatch').put_metric_data(
+                      Namespace='MapAutoTagger',
+                      MetricData=[{
+                          'MetricName': 'TagFailureByClass',
+                          'Dimensions': [
+                              {'Name': 'ErrorClass', 'Value': error_class},
+                              {'Name': 'MpeId', 'Value': mpe_id},
+                          ],
+                          'Value': 1,
+                          'Unit': 'Count',
+                      }],
+                  )
+              except Exception as mx:
+                  print(f'Could not emit TagFailureByClass metric ({error_class}): {mx}')
+
+          def _publish_permanent_alert(arn, mpe_id, err_msg):
+              alert_arn = os.environ.get('ALERT_TOPIC_ARN')
+              if not alert_arn:
+                  return
+              try:
+                  boto3.client('sns').publish(
+                      TopicArn=alert_arn,
+                      Subject='MAP Auto-Tagger: Permanent tagging failure',
+                      Message=(
+                          f'Failed to apply map-migrated tag (permanent-actionable class).\n\n'
+                          f'Resource ARN: {arn}\n'
+                          f'MPE ID: {mpe_id}\n'
+                          f'Error: {err_msg}\n\n'
+                          f'This error is not a known transient condition and is not a '
+                          f'benign resource-deleted case. Investigate IAM policy, SCP '
+                          f'drift, or tag-quota exhaustion. Event will land in EventDLQ.\n'
+                      )
+                  )
+              except Exception as sns_e:
+                  print(f'Could not publish SNS alert: {sns_e}')
+
+          def _unwrap_sqs_record(record):
+              """Extract the inner EventBridge event from one SQS record."""
+              return json.loads(record['body'])
+
+          def _process_event(eb_event, config):
+              """Tag all ARNs implied by a single EventBridge event.
+
+              Returns (status, error_class) where status is one of
+              {'ok', 'skipped', 'transient', 'permanent_actionable'} and
+              error_class is the classifier verdict for failures (or None).
+              Callers treat 'ok' / 'skipped' / 'permanent_ignorable' as SQS
+              acks and 'transient' / 'permanent_actionable' as retriable
+              (batchItemFailures).
+              """
               if not is_after_agreement(config):
                   print('Before agreement start date, skipping.')
-                  return {'status': 'skipped', 'reason': 'before_agreement_date'}
+                  return ('skipped', None)
 
-              detail = event.get('detail', {})
-              account_id = detail.get('recipientAccountId', event.get('account', ''))
-              region = event.get('region', detail.get('awsRegion', ''))
-              
+              detail = eb_event.get('detail', {})
+              account_id = detail.get('recipientAccountId', eb_event.get('account', ''))
+              region = eb_event.get('region', detail.get('awsRegion', ''))
+
               if not is_in_scope(config, account_id, detail):
                   print(f'Resource not in MAP scope (account={account_id}), skipping.')
-                  return {'status': 'skipped', 'reason': 'out_of_scope'}
-              
+                  return ('skipped', None)
+
               if detail.get('errorCode') or detail.get('errorMessage'):
                   print(f'CloudTrail event has error, skipping: {detail.get("errorMessage")}')
-                  return {'status': 'skipped', 'reason': 'event_error'}
+                  return ('skipped', None)
 
-              # Skip non-taggable resource events
               event_name = detail.get('eventName', '')
-              # Events to ignore — either not taggable, or would cause a feedback loop
-              # (e.g. PutBucketTagging: tagging an S3 bucket fires this event, which
-              #  would re-trigger this Lambda, which would tag again — infinite loop)
-              IGNORE_EVENTS = [
-                  'CreateGrant', 'CreateLogStream', 'CreateTags',
-                  'CreateOrUpdateTags', 'ModifyTags', 'DeleteTags',
-                  'PutBucketTagging', 'TagResource', 'TagResources',
-                  'UntagResource', 'UntagResources', 'AddTagsToResource',
-                  # CloudFormation change sets are intermediate — the stack
-                  # itself is tagged separately via CreateStack → TagResource.
-                  # Tagging change sets themselves isn't meaningful.
-                  'CreateChangeSet',
-                  # Cognito user-pool clients are child resources of the
-                  # already-tagged user pool; they don't need their own tags.
-                  'CreateUserPoolClient',
-                  # Lambda Layers are not taggable — the Lambda TagResource API
-                  # regex only accepts function/code-signing-config/event-source-mapping/
-                  # capacity-provider ARNs. Both the base layer ARN and the versioned
-                  # ARN are rejected. Skip the event rather than generating SNS alerts.
-                  'PublishLayerVersion', 'PublishLayerVersion20181031',
-                  # API Gateway API Keys — ARN format `arn:aws:apigateway:{region}::/apikeys/{id}`
-                  # is rejected by all tagging APIs (RGTA + native). Documented in
-                  # docs/MAP_TAGGING_GAP_ANALYSIS.md. Skip to avoid SNS alarm noise.
-                  'CreateApiKey',
-                  # Service Discovery HTTP Namespace — CreateHttpNamespace returns
-                  # only an operationId; resolving to an ARN requires async
-                  # DescribeOperation polling that doesn't fit the SQS 180s VT.
-                  # §1.87. Moved to IGNORE_EVENTS rather than leaving a dead
-                  # handler that returns None → no_arn skip.
-                  'CreateHttpNamespace',
-                  # CloudWatch Logs Insights QueryDefinition — §1.86. ARN shape
-                  # `arn:aws:logs:<region>:<acct>:query-definition:<id>` rejected
-                  # by RGTA + native. Not taggable.
-                  'PutQueryDefinition',
-              ]
-              if event_name in IGNORE_EVENTS:
+              if event_name in _IGNORE_EVENTS:
                   print(f'Skipping non-taggable event: {event_name}')
-                  return {'status': 'skipped', 'reason': 'non_taggable_event'}
+                  return ('skipped', None)
 
               # Events that emit multiple resources in a single CloudTrail event
-              # (RunInstances → instances + attached EBS volumes + ENIs). AWS does
-              # not publish separate CreateVolume / CreateNetworkInterface events
-              # for children born inline with the parent, so we must extract them
-              # all from this one event.
+              # (RunInstances → instances + attached EBS volumes + ENIs). AWS
+              # does not publish separate CreateVolume / CreateNetworkInterface
+              # events for children born inline with the parent.
               arns = extract_arns_multi(detail, account_id, region)
               if not arns:
                   single = extract_arn(detail, account_id, region)
                   arns = [single] if single else []
               if not arns:
-                  print(f'Could not extract ARN from event: {detail.get("eventName")}')
-                  return {'status': 'skipped', 'reason': 'no_arn'}
+                  print(f'Could not extract ARN from event: {event_name}')
+                  return ('skipped', None)
 
               tag_key = 'map-migrated'
               tag_value = config['mpe_id']
 
-              tagged, failed = [], []
-
-              # Three-path error classifier (§1.115–§1.120):
-              #
-              #   TRANSIENT            → re-raise; SQS redelivers up to
-              #                          maxReceiveCount=5 (~15 min budget); if
-              #                          still failing, falls into EventDLQ via
-              #                          the redelivery-exhaustion path.
-              #   PERMANENT_IGNORABLE  → silent ack + CW metric. The resource
-              #                          genuinely no longer exists (deleted
-              #                          between create and tag). Retrying
-              #                          forever just wastes quota and floods
-              #                          alerts. Terraform-rollback / test-infra
-              #                          churn is the typical source.
-              #   PERMANENT_ACTIONABLE → SNS publish + CW metric + send to
-              #                          EventDLQ (via explicit re-raise so the
-              #                          event ends up in DLQ after the remaining
-              #                          redelivery budget; treated as
-              #                          actionable by humans).
-              #
-              # SCP AccessDenied at tag time is NOT classified here — Q3's
-              # deploy-time preflight (simulate-principal-policy, backlog)
-              # owns preventing SCP-denied deploys. If a runtime SCP drift
-              # slips past preflight, it falls into PERMANENT_ACTIONABLE with
-              # everything else this classifier can't anticipate (B.7 class).
-              TRANSIENT_MARKERS = (
-                  'not in an available state',
-                  'not in available state',
-                  'is not currently available',
-                  'InvalidClusterState',
-                  'InvalidServerlessCacheStateFault',
-                  'InvalidDBClusterStateFault',
-                  'InvalidDBInstanceState',
-                  'CREATE_IN_PROGRESS',
-                  'UPDATE_IN_PROGRESS',
-                  'can not be updated',
-                  'rate of control plane requests',
-                  'ThrottlingException',
-                  'ThrottledException',
-                  'Throttling',
-                  'RequestLimitExceeded',
-                  'TooManyRequestsException',
-                  'LimitExceededException',
-              )
-              PERMANENT_IGNORABLE_MARKERS = (
-                  # Resource genuinely deleted between create and tag event.
-                  # Retrying will not find it; alerting is noise.
-                  'ResourceNotFoundException',
-                  'Requested resource not found',
-                  'NoSuchBucket',
-                  'InvalidInstanceID.NotFound',
-                  'DBInstanceNotFound',
-                  'DBClusterNotFoundFault',
-                  'InvalidVolume.NotFound',
-              )
-
-              def _classify_error(msg):
-                  if any(m in msg for m in TRANSIENT_MARKERS):
-                      return 'transient'
-                  if any(m in msg for m in PERMANENT_IGNORABLE_MARKERS):
-                      return 'permanent_ignorable'
-                  return 'permanent_actionable'
-
-              def _emit_class_metric(error_class):
-                  try:
-                      boto3.client('cloudwatch').put_metric_data(
-                          Namespace='MapAutoTagger',
-                          MetricData=[{
-                              'MetricName': 'TagFailureByClass',
-                              'Dimensions': [
-                                  {'Name': 'ErrorClass', 'Value': error_class},
-                                  {'Name': 'MpeId', 'Value': tag_value},
-                              ],
-                              'Value': 1,
-                              'Unit': 'Count',
-                          }],
-                      )
-                  except Exception as mx:
-                      print(f'Could not emit TagFailureByClass metric ({error_class}): {mx}')
-
+              # Per-ARN loop. A single record's ARNs share classification
+              # fate: if any ARN classifies transient, the whole record goes
+              # back to SQS (idempotent re-tag is safe); if any ARN is
+              # permanent_actionable, the record goes to DLQ; otherwise ack.
+              worst = 'ok'
+              worst_err = None
               for arn in arns:
                   try:
                       tag_resource(arn, tag_key, tag_value, target_region=region)
                       print(f'Tagged {arn} with {tag_key}={tag_value}')
-                      tagged.append(arn)
                       continue
                   except Exception as e:
                       err_msg = str(e)
                       cls = _classify_error(err_msg)
-                      _emit_class_metric(cls)
+                      _emit_class_metric(cls, tag_value)
 
                       if cls == 'transient':
-                          # Let SQS redeliver. Already-tagged ARNs in this batch
-                          # will no-op on re-run (tagging is idempotent).
-                          print(f'Transient [{arn}] {err_msg} — re-raising for SQS redelivery')
-                          raise
+                          print(f'Transient [{arn}] {err_msg} — will retry via SQS')
+                          # Transient trumps everything — retry wins.
+                          return ('transient', err_msg)
 
                       if cls == 'permanent_ignorable':
-                          # Resource is gone. Silent ack; already counted via metric.
                           print(f'Permanent-ignorable [{arn}] {err_msg} — resource no longer exists, skipping')
-                          failed.append({'arn': arn, 'error': err_msg, 'class': 'permanent_ignorable'})
+                          # Do not downgrade worst; keep scanning other ARNs.
                           continue
 
-                      # PERMANENT_ACTIONABLE: alert + re-raise so the event ends
-                      # up in EventDLQ via redelivery-exhaustion. DLQAlarm will
-                      # also fire once the message lands in the DLQ.
+                      # permanent_actionable
                       print(f'Permanent-actionable [{arn}] {err_msg} — alerting + routing to DLQ')
-                      alert_arn = os.environ.get('ALERT_TOPIC_ARN')
-                      if alert_arn:
-                          try:
-                              boto3.client('sns').publish(
-                                  TopicArn=alert_arn,
-                                  Subject='MAP Auto-Tagger: Permanent tagging failure',
-                                  Message=(
-                                      f'Failed to apply map-migrated tag (permanent-actionable class).\n\n'
-                                      f'Resource ARN: {arn}\n'
-                                      f'MPE ID: {tag_value}\n'
-                                      f'Error: {err_msg}\n\n'
-                                      f'This error is not a known transient condition and is not a '
-                                      f'benign resource-deleted case. Investigate IAM policy, SCP '
-                                      f'drift, or tag-quota exhaustion. Event will land in EventDLQ.\n'
-                                  )
-                              )
-                          except Exception as sns_e:
-                              print(f'Could not publish SNS alert: {sns_e}')
-                      failed.append({'arn': arn, 'error': err_msg, 'class': 'permanent_actionable'})
-                      # Re-raise so SQS retries and eventually DLQs. The next
-                      # redelivery will re-classify; if the underlying condition
-                      # (e.g. SCP drift) is fixed mid-retry, the event tags
-                      # successfully. If not, DLQ captures it for human triage.
-                      raise
+                      _publish_permanent_alert(arn, tag_value, err_msg)
+                      worst = 'permanent_actionable'
+                      worst_err = err_msg
+                      # Keep scanning remaining ARNs so siblings still tag
+                      # (matches the pre-batch behavior's best-effort intent).
 
-              if tagged and not failed:
-                  return {'status': 'tagged', 'resources': tagged}
-              if tagged and failed:
-                  return {'status': 'partial', 'tagged': tagged, 'failed': failed}
-              return {'status': 'failed', 'failed': failed}
+              return (worst, worst_err)
+
+          def handler(event, context):
+              """SQS batch handler.
+
+              EventSourceMapping is configured with BatchSize=10 and
+              FunctionResponseTypes=[ReportBatchItemFailures]. We iterate
+              each SQS record, process its inner EventBridge event, and
+              return a batchItemFailures list so only failing records get
+              redelivered. Successful / skipped / permanent-ignorable
+              records are acked by omission.
+              """
+              config = get_config()
+              records = event.get('Records', [])
+
+              # Backwards compatibility: if the Lambda is invoked directly
+              # with a raw EventBridge event (no SQS envelope), process it
+              # once. Used by ReconciliationFunction re-enqueue test paths
+              # and local smoke tests.
+              if not records:
+                  status, _ = _process_event(event, config)
+                  return {'status': status}
+
+              failures = []
+              for record in records:
+                  msg_id = record.get('messageId')
+                  try:
+                      inner = _unwrap_sqs_record(record)
+                      status, _ = _process_event(inner, config)
+                      if status in ('transient', 'permanent_actionable'):
+                          failures.append({'itemIdentifier': msg_id})
+                  except Exception as e:
+                      # Unexpected parse / unwrap error. Treat as transient
+                      # so SQS redelivers — the DLQ will capture after
+                      # maxReceiveCount if it's a poisoned message.
+                      print(f'Unexpected error processing record {msg_id}: {e}')
+                      failures.append({'itemIdentifier': msg_id})
+
+              if failures:
+                  print(f'Batch: {len(failures)}/{len(records)} records failed, reporting for redelivery')
+              return {'batchItemFailures': failures}
 
   # EventBridge rule - matches ALL resource creation events
   AutoTagEventRule:
@@ -2210,13 +2332,22 @@ Resources:
       MessageRetentionPeriod: 1209600  # 14 days
       SqsManagedSseEnabled: true
 
-  # Lambda event source mapping — polls SQS and invokes Lambda
+  # Lambda event source mapping — polls SQS and invokes Lambda.
+  # BatchSize=10 with ReportBatchItemFailures: one invocation processes up to
+  # 10 messages; only per-record failures are returned for redelivery (via
+  # batchItemFailures). Raises drain rate ~10× vs prior BatchSize=1
+  # (§1.123/§1.124 — measured 1.3 msg/s → expected ~10+ msg/s per Lambda).
+  # MaximumBatchingWindowInSeconds=5 lets SQS fill small batches under steady
+  # load without punishing latency on idle queues.
   EventQueueMapping:
     Type: AWS::Lambda::EventSourceMapping
     Properties:
       EventSourceArn: !GetAtt EventQueue.Arn
       FunctionName: !Ref AutoTaggerFunction
-      BatchSize: 1
+      BatchSize: 10
+      MaximumBatchingWindowInSeconds: 5
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
       Enabled: true
 
   # SNS topic for tagging alerts
@@ -2262,6 +2393,37 @@ Resources:
           Value: !GetAtt EventDLQ.QueueName
       Statistic: Sum
       Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # CloudWatch alarm — fires when the Lambda cold-start peer-tagger detector
+  # (§1.108 Phase 16) finds another map-auto-tagger-mig* stack in this
+  # account/region. Concurrent taggers race on the same CloudTrail events;
+  # the map-migrated tag ends up with a non-deterministic MpeId value, which
+  # can silently misattribute MAP credit. Alarm surface lets customers
+  # discover this before a finance audit does.
+  PeerTaggerDetectedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub 'map-auto-tagger-peer-detected-${MpeId}'
+      AlarmDescription: >
+        Another map-auto-tagger stack was detected in this account at Lambda
+        cold-start. Concurrent taggers race on CloudTrail events and the
+        map-migrated tag value is last-writer-wins. Investigate which MPE is
+        intended for which resources; if both are required, wait for the
+        deterministic-routing feature (plan-PR #59) before relying on tag
+        values for MAP credit attribution.
+      Namespace: MapAutoTagger
+      MetricName: PeerTaggerDetected
+      Dimensions:
+        - Name: MpeId
+          Value: !Ref MpeId
+      Statistic: Sum
+      Period: 3600
       EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
@@ -2556,7 +2718,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.7.3
+    Value: v20.8.0
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
