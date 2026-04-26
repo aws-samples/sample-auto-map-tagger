@@ -6,6 +6,18 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.7.1 — Handler case-sensitivity (plan-PR #51)
+
+PATCH. Closes §1.91 Redshift, §1.97 Kendra CreateIndex, §1.103 Elastic Beanstalk CreateApplication — three live-confirmed silent-miss handlers where CloudTrail emits camelCase response field names while the handler was written against the boto3 SDK PascalCase shape.
+
+**Root cause.** AWS CloudTrail's field casing reflects the API's wire format — older services (Kendra, Redshift, Elastic Beanstalk, SageMaker) emit camelCase or lowercase keys (`id`, `clusterIdentifier`, `applicationName`); newer services emit PascalCase (`Id`, `ClusterIdentifier`, `ApplicationName`). The boto3 SDK presents the PascalCase shape to Python code, so handlers written via `resp.get('Id')` silently returned `None` when CloudTrail actually emitted `id`.
+
+**Fix.** New `ci_get(d, key)` helper at the top of the Lambda: case-insensitive dict lookup with exact-match priority (exact casing always wins over a case-folded match to preserve behavior when both variants exist). Only applied to `responseElements` / `requestParameters` reads — not to internal dicts where we control the key shape. Refactored §1.91 (Redshift `clusterIdentifier`), §1.97 (Kendra `Id` → `id`), §1.103 (Elastic Beanstalk `Application.ApplicationName` → nested `application.applicationName`), and proactively simplified SageMaker `CreateDomain` / `CreatePipeline` / `CreateFeatureGroup` hand-coded or-chains (`resp.get('xArn') or resp.get('XArn')`) to use `ci_get`.
+
+**Defense.** 10/10 unit-test matrix for ci_get semantics (exact match wins over case-folded match; both variants work; None handling; non-dict handling; insertion-order tie-break on case-folded collisions).
+
+---
+
 ### v20.7.0 — ARN suffix-match fallback (plan-PR #43a, additive subset)
 
 MINOR. Closes §1.31, §1.35, §1.56, §1.57, §1.61, §1.63, §1.65, §1.66, §1.67, §1.68 + roughly 35 other silent-miss classes. No breaking change to existing behavior — the hand-curated `ARN_FIELDS` allowlist remains Tier-1; a new Tier-2 suffix-match runs only when the allowlist misses.
