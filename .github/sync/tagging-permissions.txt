@@ -1,4 +1,6 @@
 acm:AddTagsToCertificate
+apigateway:PATCH
+apigateway:POST
 apigateway:PUT
 appmesh:TagResource
 appstream:TagResource
@@ -8,6 +10,7 @@ autoscaling:CreateOrUpdateTags
 backup:TagResource
 bedrock:TagResource
 braket:TagResource
+cassandra:Alter
 cassandra:TagResource
 cloud9:TagResource
 cloudformation:TagResource

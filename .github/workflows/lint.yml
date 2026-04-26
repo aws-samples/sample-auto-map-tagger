@@ -492,3 +492,23 @@ jobs:
 
       - name: Enforce single-quoted containment for customer-controlled shell values
         run: python3 .github/scripts/lint_shell_injection.py
+
+  # IAM completeness guard (§1.27, §1.38, §1.58, §1.64, §1.99, §1.100, §1.105 / plan-PR #42).
+  # Lambda adds a native-dispatch branch in do_tag (e.g. boto3.client('newsvc').tag_resource)
+  # without the matching IAM grant → silent AccessDenied → SNS alert to a possibly-void topic
+  # → customer loses credits. Static gate:
+  #   1. Parse `boto3.client('<svc>')` and `get_service_client('<svc>')` from the YAML Lambda
+  #   2. For each discovered service, look up its required IAM actions in
+  #      .github/scripts/generate_iam.py's NATIVE_IAM_REQUIREMENTS map
+  #      (hand-curated from AWS's IAM Service Authorization Reference).
+  #   3. Fail if any required action is missing from .github/sync/tagging-permissions.txt
+  # The author MUST add the row to both the canonical list and the YAML ServiceSpecificTagging
+  # policy when they add a native-dispatch handler.
+  iam-completeness:
+    name: IAM Completeness (native-dispatch)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive IAM actions from Lambda source and cross-check canonical list
+        run: python3 .github/scripts/generate_iam.py --check
