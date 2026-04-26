@@ -6,6 +6,26 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.7.2 — D7-D13 docs + IAM + IGNORE_EVENTS (plan-PR #56)
+
+PATCH. Closes D7, D8, D9, D11, D12, D13 from the plan's docx series. D10 already landed in GH #32.
+
+**D7 — VPC Lattice coverage actually backed.** COVERAGE.md claims "VPC Lattice: Service networks via RGTA" but the YAML IAM policy was missing `vpc-lattice:TagResource`. RGTA dispatches to the underlying service's TagResource API — without the grant, every `CreateServiceNetwork` event AccessDenied'd silently through the RGTA fallthrough. Added `vpc-lattice:TagResource` to YAML `ServiceSpecificTagging` + canonical list. Configurator's inline Lambda already had it.
+
+**D8 — Bedrock AgentCore ghost claim removed.** OVERVIEW.md line 97 listed Bedrock AgentCore among AI/ML coverage, but there's no standalone handler (AgentCore support is in the configurator inline Lambda but not the distributable YAML). Removed the claim; it will return when plan-PR #55 ships the dedicated handler.
+
+**D9 — Cost table completeness.** OVERVIEW.md cost table added SQS ($0, within free tier) and SNS ($0, alarm-only) rows. Lambda + EventBridge + CloudTrail + SSM rows unchanged. Total-per-account figure unchanged.
+
+**D11 — API Gateway API Key handler removed → IGNORE_EVENTS.** The handler at YAML:1388 constructed `arn:aws:apigateway:{region}::/apikeys/{id}`, an ARN shape that RGTA + native tagging both reject (documented in MAP_TAGGING_GAP_ANALYSIS.md). Every `CreateApiKey` event generated a tagging failure and SNS alarm noise. Moved to `IGNORE_EVENTS` and deleted the dead construction branch.
+
+**D12 — v20.3.0 CHANGELOG retraction note.** v20.3.0 shipped Tier 1 MAP service claims (Keyspaces, DS, CloudHSM) with two live-broken handlers (§1.98 MS AD TRANSIENT_MARKERS gap, §1.99 Keyspaces missing `cassandra:Alter`). Added a retraction note to the v20.3.0 entry pointing at the v20.5.1 / v20.6.4 fixes so customers reading back through the changelog don't miss that v20.3.0–v20.6.3 were broken for those services.
+
+**D13 — INSTRUCTIONS upgrade dual-Lambda warning.** INSTRUCTIONS.md's "Upgrading from a Previous Version" section described only the pre-v19 migration path; recommended flow for v19+ is in-place via `upgrade.sh` (no dual-Lambda window). For the legacy migration path, added an explicit warning about the 2-5 minute window where both the old and new Lambdas process events, plus a mitigation note (pause resource creation during migration).
+
+**Bonus fix: sync-check IAM regex.** Discovered while verifying D7 — the `re.findall(r"'([\w]+:[\w]+)'", ...)` patterns in `sync-check.py` didn't match hyphens in service prefixes, so 11 hyphenated actions (`vpc-lattice:*`, `resource-explorer-2:*`, `sms-voice:*`, `network-firewall:*`, `redshift-serverless:*`, etc.) were invisible to the drift check. Widened to `[\w-]+:[\w]+`.
+
+---
+
 ### v20.7.1 — Handler case-sensitivity (plan-PR #51)
 
 PATCH. Closes §1.91 Redshift, §1.97 Kendra CreateIndex, §1.103 Elastic Beanstalk CreateApplication — three live-confirmed silent-miss handlers where CloudTrail emits camelCase response field names while the handler was written against the boto3 SDK PascalCase shape.
@@ -265,6 +285,13 @@ Multiple small fixes that did not warrant individual MINOR bumps. Grouped here r
 - **#35 Cross-account rip-out**: deleted ~62 LOC of unused cross-account boto3 machinery in the Lambda. Cross-account assume was always dead code; the per-account StackSet architecture is the only supported deployment path. Also removes an unbounded-growth cache and a silent `get_service_client` failure mode that caused permanent tag drops on assume-role failure. Resolves H1.
 
 ### v20.3.0 — Tier 1 MAP service handlers (#25)
+
+> **⚠️ Retraction note (added 2026-04-26, plan-PR #56 D12):** Two of the three Tier 1 handlers shipped in v20.3.0 were live-broken at release:
+> - **Keyspaces** AccessDenied on every `CreateKeyspace` — IAM policy had `cassandra:TagResource` but missed `cassandra:Alter`, which the AWS IAM Service Authorization Reference requires for `keyspaces:TagResource`. Fixed in v20.6.4 (§1.99, PR #54).
+> - **Managed Microsoft AD** silently dropped tags during the `Creating` directory status because `"Directory Status: Creating"` was not in `TRANSIENT_MARKERS` → classified as permanent → no SQS redelivery. Fixed in v20.5.1 (§1.98, PR #44).
+> - **CloudHSM v2** was never live-tested at release; status "covered but unverified" until a dedicated E2E fixture lands (cluster init is 10–15 minutes, kept out of the Layer 2 budget).
+>
+> The bullets below describe what was shipped in code at v20.3.0. Customers running v20.3.0–v20.6.3 should upgrade via `upgrade.sh` to get the live-tagging fixes.
 
 - Added auto-tagging for services on the MAP 2.0 Included Services List that previously had no handler — customers in affected verticals were silently losing credits:
   - **Amazon Keyspaces** (Cassandra-compatible): `CreateKeyspace`

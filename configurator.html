@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.7.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.7.1';
+        // Must match `TEMPLATE_VERSION = 'v20.7.2'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.7.2';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,16 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.7.2',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Added vpc-lattice:TagResource to the Lambda IAM policy. COVERAGE.md claimed VPC Lattice was supported via RGTA fallthrough, but without the per-service TagResource grant every CreateServiceNetwork event AccessDenied\'d silently (D7).' },
+                    { tag: 'bugfix', text: 'CreateApiKey added to IGNORE_EVENTS (dead handler removed). API Gateway API Key ARN shape is rejected by all tagging APIs per MAP_TAGGING_GAP_ANALYSIS.md; prior handler constructed an ARN that RGTA + native both refuse — generated SNS alarm noise on every CreateApiKey event (D11).' },
+                    { tag: 'bugfix', text: 'Sync-check IAM-action regex now allows hyphens in the service prefix (vpc-lattice, resource-explorer-2, sms-voice). Prior regex [\\w]+:[\\w]+ silently skipped 11 hyphenated actions in the configurator TAGGING_PERMISSIONS list — bug in sync-check itself, not the catalog.' },
+                    { tag: 'other', text: 'Documentation cleanup (plan-PR #56 D7-D13): OVERVIEW.md Bedrock claim no longer lists AgentCore (ghost claim, no handler). OVERVIEW.md cost table adds SQS + SNS rows. CHANGELOG v20.3.0 gets a retraction note documenting the §1.98/§1.99 Tier 1 live bugs shipped at that version and fixed in v20.5.1/v20.6.4. INSTRUCTIONS.md upgrade section documents the dual-Lambda concurrent-tagging window when migrating from pre-v19.' },
+                ],
+            },
             {
                 version: 'v20.7.1',
                 date: '2026-04-26',
