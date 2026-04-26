@@ -12,6 +12,14 @@ Docs-only, no version bump. Full re-audit of `docs/COVERAGE.md` against the auth
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.9.2 — 2026-04-26
+
+- **`get_config()` fails closed on SSM unreachability.** Wraps `ssm.get_parameter` + JSON parse in try/except; on failure logs `CONFIG_UNREACHABLE` and returns a safe-default config with `mpe_id=None`. `is_in_scope` hard-rejects that state, so nothing tags until the next TTL refresh succeeds. Prior behavior let one transient SSM hiccup DLQ an entire burst.
+- **Whitespace-strip on SSM config lists.** `scoped_account_ids` and `scoped_vpc_ids` are `.strip()`-ed on config parse; empty elements dropped. CFN `CommaDelimitedList` strips on deploy, but SSM-stored config may carry customer-edit whitespace.
+- **Empty-`mpe_id` guard in `is_in_scope`.** Returns False at the scope-decision entry point if `config.mpe_id` is falsy (§1.3 defense-in-depth).
+- **`agreement_start_date` strptime cross-check in `is_in_scope`.** CFN `AllowedPattern` is already strict, but `2026-02-31` passes the regex and fails `strptime`; logs `CONFIG_INVALID_AGREEMENT_DATE` and returns False. Additive — the CFN regex is unchanged (§1.129 class).
+- **`MpeId` CFN parameter `MaxLength: 20`.** The existing `^mig[a-zA-Z0-9]+$` pattern had no length cap; real MPE IDs are `mig` + 10–13 chars, so 20 is well above real usage and prevents an absurdly long ID from leaking into log group names or SSM parameter paths.
+
 ### v20.9.1 — 2026-04-26
 
 - **TRANSIENT_MARKERS expansion.** Added `OperationAborted`, `conflicting conditional operation` (S3 409 concurrent-op), `SnapshotCreationPerVolumeRateExceeded` (EC2 per-volume burst ceiling), and `Throttling.User` (EC2/STS throttle variant). Prior classifier routed these retry-eligible failures to `permanent_actionable` → false SNS alerts during normal burst conditions that resolve on SQS redelivery.
