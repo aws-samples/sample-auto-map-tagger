@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.7.2'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.7.2';
+        // Must match `TEMPLATE_VERSION = 'v20.7.3'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.7.3';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,17 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.7.3',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'CloudWatch Dashboard PutDashboard ARN now has empty region (arn:aws:cloudwatch::ACCT:dashboard/NAME) per AWS IAM Service Authorization Reference. Prior handler emitted arn:aws:cloudwatch:REGION:… which RGTA rejected on every PutDashboard event (§1.83).' },
+                    { tag: 'coverage', text: 'New EnableSecurityHub handler: response is null, so construct arn:aws:securityhub:REGION:ACCT:hub/default directly. Hub is always named "default" per AWS docs (§1.84).' },
+                    { tag: 'coverage', text: 'New ActivateGateway handler for AWS Storage Gateway + native dispatch in tag_resource. GatewayARN field name caught by suffix-match in extract_arn (PR #43a), but RGTA does not support Storage Gateway — native storagegateway.add_tags_to_resource required (§1.85).' },
+                    { tag: 'bugfix', text: 'DAX native dispatch added to tag_resource. Response extraction already worked but RGTA does not support DAX — every CreateCluster event fell to RGTA and AccessDenied silently. Native dax.tag_resource(ResourceName=arn, …) dispatch (§1.84).' },
+                    { tag: 'bugfix', text: 'CreateHttpNamespace (Service Discovery) and PutQueryDefinition (CW Logs Insights) moved to IGNORE_EVENTS. CreateHttpNamespace returns only operationId (would need async polling that exceeds SQS 180s VT); PutQueryDefinition ARN shape is rejected by RGTA + native (not taggable per AWS). Prior dead handlers generated SNS noise. Closes §1.86, §1.87.' },
+                ],
+            },
             {
                 version: 'v20.7.2',
                 date: '2026-04-26',

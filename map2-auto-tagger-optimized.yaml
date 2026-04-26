@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.7.2 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.7.3 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.7.2
+      Value: v20.7.3
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -386,7 +386,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.7.2'
+          TEMPLATE_VERSION = 'v20.7.3'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -1094,11 +1094,14 @@ Resources:
                   if plan_id:
                       return f"arn:aws:backup:{region}:{account_id}:backup-plan:{plan_id}"
 
-              # CloudWatch Dashboard
+              # CloudWatch Dashboard — §1.83. ARN has EMPTY region per AWS IAM
+              # Service Authorization Reference (dashboards are global within an
+              # account). Prior handler emitted `arn:aws:cloudwatch:<region>:…` which
+              # RGTA rejected on every PutDashboard event.
               elif event_name == 'PutDashboard':
-                  dashboard_name = req.get('dashboardName')
+                  dashboard_name = ci_get(req, 'dashboardName')
                   if dashboard_name:
-                      return f"arn:aws:cloudwatch:{region}:{account_id}:dashboard/{dashboard_name}"
+                      return f"arn:aws:cloudwatch::{account_id}:dashboard/{dashboard_name}"
 
               # EMR Cluster (RunJobFlow)
               elif event_name == 'RunJobFlow':
@@ -1390,10 +1393,10 @@ Resources:
               # docs/MAP_TAGGING_GAP_ANALYSIS.md.
 
               # CloudWatch Insights Query Definition
-              elif event_name == 'PutQueryDefinition':
-                  query_def_id = resp.get('queryDefinitionId')
-                  if query_def_id:
-                      return f"arn:aws:logs:{region}:{account_id}:query-definition:{query_def_id}"
+              # CloudWatch Logs Insights QueryDefinition — §1.86. Not taggable
+              # per AWS (the `arn:aws:logs:<region>:<acct>:query-definition:<id>`
+              # shape is rejected by RGTA). Moved to IGNORE_EVENTS; dead
+              # handler removed.
 
               # Athena WorkGroup
               elif event_name == 'CreateWorkGroup':
@@ -1401,12 +1404,31 @@ Resources:
                   if workgroup_name:
                       return f"arn:aws:athena:{region}:{account_id}:workgroup/{workgroup_name}"
 
-              # Service Discovery HTTP Namespace
-              elif event_name == 'CreateHttpNamespace':
-                  operation_id = resp.get('operationId')
-                  # Need to construct ARN from namespace ID (requires additional API call)
-                  # For now, skip - would need async operation tracking
-                  return None
+              # Service Discovery HTTP Namespace — §1.87. AWS returns an
+              # operationId, not the namespace ID. Constructing the ARN would
+              # require an async DescribeOperation poll (possibly minutes) that
+              # doesn't fit the 180s SQS visibility window. Moved to
+              # IGNORE_EVENTS rather than leaving a dead handler that generates
+              # no_arn skips (and potential SNS noise if any follow-up promotes
+              # no_arn to a permanent failure class).
+
+              # AWS Security Hub — §1.84. EnableSecurityHub returns a null body,
+              # so the universal ARN scan has nothing to extract. The hub is
+              # always named `default` (the only supported case per AWS docs);
+              # construct the ARN directly.
+              elif event_name == 'EnableSecurityHub' and event_source == 'securityhub.amazonaws.com':
+                  return f"arn:aws:securityhub:{region}:{account_id}:hub/default"
+
+              # AWS Storage Gateway — §1.85. ActivateGateway returns the ARN on
+              # `GatewayARN` (uppercase per the Storage Gateway API shape), which
+              # the allowlist didn't include prior to PR #43a's suffix-match.
+              # The suffix-match catches it, but Storage Gateway also requires
+              # native `storagegateway:AddTagsToResource` dispatch (RGTA doesn't
+              # cover it) — enforced in tag_resource below.
+              elif event_name == 'ActivateGateway' and event_source == 'storagegateway.amazonaws.com':
+                  gw_arn = ci_get(resp, 'GatewayARN') or ci_get(resp, 'gatewayArn')
+                  if gw_arn:
+                      return gw_arn
 
               # (CreateLoadBalancer handled above at the ELBv2 branch — both
               # ELBv1 Classic and ELBv2 share eventSource.)
@@ -1825,6 +1847,18 @@ Resources:
                   memorydb = get_service_client('memorydb')
                   memorydb.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
                   return True
+              elif ':dax:' in arn:
+                  # §1.84. RGTA does not support DAX — native dax.tag_resource
+                  # takes `ResourceName=<arn>` per the boto3 service model.
+                  dax = get_service_client('dax')
+                  dax.tag_resource(ResourceName=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
+              elif ':storagegateway:' in arn:
+                  # §1.85. RGTA does not support Storage Gateway — native
+                  # storagegateway.add_tags_to_resource takes the ARN directly.
+                  sg = get_service_client('storagegateway')
+                  sg.add_tags_to_resource(ResourceARN=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  return True
               elif ':iot:' in arn:
                   iot = get_service_client('iot')
                   iot.tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
@@ -1932,6 +1966,16 @@ Resources:
                   # is rejected by all tagging APIs (RGTA + native). Documented in
                   # docs/MAP_TAGGING_GAP_ANALYSIS.md. Skip to avoid SNS alarm noise.
                   'CreateApiKey',
+                  # Service Discovery HTTP Namespace — CreateHttpNamespace returns
+                  # only an operationId; resolving to an ARN requires async
+                  # DescribeOperation polling that doesn't fit the SQS 180s VT.
+                  # §1.87. Moved to IGNORE_EVENTS rather than leaving a dead
+                  # handler that returns None → no_arn skip.
+                  'CreateHttpNamespace',
+                  # CloudWatch Logs Insights QueryDefinition — §1.86. ARN shape
+                  # `arn:aws:logs:<region>:<acct>:query-definition:<id>` rejected
+                  # by RGTA + native. Not taggable.
+                  'PutQueryDefinition',
               ]
               if event_name in IGNORE_EVENTS:
                   print(f'Skipping non-taggable event: {event_name}')
@@ -2512,7 +2556,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.7.2
+    Value: v20.7.3
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
