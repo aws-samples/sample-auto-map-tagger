@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.7.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.7.0';
+        // Must match `TEMPLATE_VERSION = 'v20.7.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.7.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.7.1',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Handler case-sensitivity fixes via new ci_get() helper. CloudTrail emits camelCase field names for some older services (Kendra CreateIndex response: "id" not "Id", §1.97; Redshift CreateCluster: "clusterIdentifier" with variant casing, §1.91; Elastic Beanstalk CreateApplication nested at "application.applicationName" not "Application.ApplicationName", §1.103). Prior handlers assumed boto3 SDK PascalCase shape → silent miss. ci_get() does case-insensitive dict lookup with exact-match priority. Also applied to SageMaker CreateDomain/CreatePipeline/CreateFeatureGroup handlers (pre-existing hand-coded or-chains simplified). Only applied to responseElements/requestParameters reads; not to internal dict keys.' },
+                ],
+            },
             {
                 version: 'v20.7.0',
                 date: '2026-04-26',

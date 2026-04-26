@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.7.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.7.1 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -64,7 +64,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.7.0
+      Value: v20.7.1
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -381,7 +381,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.7.0'
+          TEMPLATE_VERSION = 'v20.7.1'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -398,6 +398,32 @@ Resources:
               """Extract account ID from ARN."""
               parts = arn.split(':')
               return parts[4] if len(parts) > 4 else None
+
+          def ci_get(d, key):
+              """Case-insensitive dict lookup.
+
+              Handlers read CloudTrail responseElements / requestParameters fields
+              that AWS has historically emitted in inconsistent casing — older
+              services (Kendra, Redshift, Elastic Beanstalk) emit camelCase or
+              lowercase keys while handlers written against the boto3 SDK
+              response shape assumed PascalCase. §1.91 / §1.97 / §1.103 document
+              three live-confirmed silent-miss handlers.
+
+              Only use on `responseElements` and `requestParameters` — not on
+              fixed-shape keys we control. On a response that legitimately has
+              both `Id` and `id`, this returns whichever sorts first by key
+              (stable across Python 3.7+ dict insertion order, so effectively
+              the one AWS emitted first).
+              """
+              if not isinstance(d, dict) or not d:
+                  return None
+              if key in d:
+                  return d[key]
+              lk = key.lower()
+              for k, v in d.items():
+                  if isinstance(k, str) and k.lower() == lk:
+                      return v
+              return None
 
           def get_config():
               global _config, _config_ts
@@ -945,7 +971,10 @@ Resources:
                   cluster = resp.get('dBCluster', {})
                   return cluster.get('dBClusterArn')
               elif event_name == 'CreateCluster' and event_source == 'redshift.amazonaws.com':
-                  cluster_id = resp.get('clusterIdentifier')
+                  # §1.91 — CloudTrail casing for Redshift response fields has
+                  # varied across eventVersion revisions (`clusterIdentifier` vs
+                  # `ClusterIdentifier`). ci_get handles both.
+                  cluster_id = ci_get(resp, 'clusterIdentifier')
                   if cluster_id:
                       return f"arn:aws:redshift:{region}:{account_id}:cluster:{cluster_id}"
               elif event_name == 'CreateCluster' and event_source == 'memorydb.amazonaws.com':
@@ -1204,30 +1233,38 @@ Resources:
 
               # Amazon Kendra Index (Id not ARN in response)
               elif event_name == 'CreateIndex' and event_source == 'kendra.amazonaws.com':
-                  idx_id = resp.get('Id')
+                  # §1.97 — CloudTrail emits lowercase `id`, boto3 SDK shape is
+                  # `Id`. Prior handler used resp.get('Id') → silent miss on every
+                  # Kendra Index creation. ci_get catches either casing.
+                  idx_id = ci_get(resp, 'Id')
                   if idx_id:
                       return f"arn:aws:kendra:{region}:{account_id}:index/{idx_id}"
 
               # Amazon Kendra DataSource
               elif event_name == 'CreateDataSource' and event_source == 'kendra.amazonaws.com':
-                  ds_id = resp.get('Id')
-                  idx_id = req.get('IndexId')
+                  ds_id = ci_get(resp, 'Id')
+                  idx_id = ci_get(req, 'IndexId')
                   if ds_id and idx_id:
                       return f"arn:aws:kendra:{region}:{account_id}:index/{idx_id}/data-source/{ds_id}"
 
               # AWS Elastic Beanstalk Application
               elif event_name == 'CreateApplication' and event_source == 'elasticbeanstalk.amazonaws.com':
-                  app = resp.get('Application', {})
-                  app_arn = app.get('ApplicationArn')
+                  # §1.103 — CloudTrail nests at `application.applicationName`
+                  # (lowercase leading) while boto3 SDK shape is
+                  # `Application.ApplicationName`. ci_get the outer object and
+                  # the inner key so either casing works.
+                  app = ci_get(resp, 'Application') or {}
+                  app_arn = ci_get(app, 'ApplicationArn')
                   if app_arn:
                       return app_arn
-                  app_name = app.get('ApplicationName') or req.get('ApplicationName')
+                  app_name = ci_get(app, 'ApplicationName') or ci_get(req, 'ApplicationName')
                   if app_name:
                       return f"arn:aws:elasticbeanstalk:{region}:{account_id}:application/{app_name}"
 
               # AWS Elastic Beanstalk Environment
               elif event_name == 'CreateEnvironment' and event_source == 'elasticbeanstalk.amazonaws.com':
-                  env_arn = resp.get('EnvironmentArn')
+                  # Same casing-variance class as CreateApplication above.
+                  env_arn = ci_get(resp, 'EnvironmentArn')
                   if env_arn:
                       return env_arn
 
@@ -1538,21 +1575,21 @@ Resources:
                   if domain_arn:
                       return domain_arn
 
-              # SageMaker Domain (Studio)
+              # SageMaker Domain (Studio) — case-insensitive per §1.91 class
               elif event_name == 'CreateDomain' and event_source == 'sagemaker.amazonaws.com':
-                  domain_arn = resp.get('domainArn') or resp.get('DomainArn')
+                  domain_arn = ci_get(resp, 'domainArn')
                   if domain_arn:
                       return domain_arn
 
               # SageMaker Pipeline
               elif event_name == 'CreatePipeline' and event_source == 'sagemaker.amazonaws.com':
-                  pipeline_arn = resp.get('pipelineArn') or resp.get('PipelineArn')
+                  pipeline_arn = ci_get(resp, 'pipelineArn')
                   if pipeline_arn:
                       return pipeline_arn
 
               # SageMaker Feature Group
               elif event_name == 'CreateFeatureGroup' and event_source == 'sagemaker.amazonaws.com':
-                  fg_arn = resp.get('featureGroupArn') or resp.get('FeatureGroupArn')
+                  fg_arn = ci_get(resp, 'featureGroupArn')
                   if fg_arn:
                       return fg_arn
 
@@ -2467,7 +2504,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.7.0
+    Value: v20.7.1
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
