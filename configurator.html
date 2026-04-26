@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.6.2'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.6.2';
+        // Must match `TEMPLATE_VERSION = 'v20.6.3'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.6.3';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,16 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.6.3',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Multi-account deploy.sh now defines REGIONS in its header. The preflight loop iterated over $REGIONS (plural) but only $REGION (singular) was ever set, so the stack-state preflight loop silently ran zero iterations in multi-account mode — customers could deploy on top of a stale *_IN_PROGRESS or ROLLBACK_COMPLETE stack without warning.' },
+                    { tag: 'bugfix', text: 'Multi-account deploy.sh DEPLOY_STATUS guard changed from [ -z "$DEPLOY_STATUS" ] to [ "$DEPLOY_STATUS" = "NOT STARTED" ]. The -z guard was always false because DEPLOY_STATUS is initialized non-empty at the top of the script, so the entire StackSet-instance wait block (1200s poll for per-account rollout) was unreachable dead code. On success, DEPLOY_STATUS stayed "NOT STARTED" and the backfill-wait block (which gates on == "SUCCESS") never ran.' },
+                    { tag: 'bugfix', text: 'PREFLIGHT_LOG printed via printf \'%b\' "$PREFLIGHT_LOG" instead of printf "$PREFLIGHT_LOG" — prevents % characters in AWS API output from being interpreted as printf format specifiers. %b preserves \\n → newline interpretation.' },
+                    { tag: 'bugfix', text: 'Backfill wait no longer polls a nonexistent EventBridge rule. Prior code gated the CloudWatch Logs poll on aws events describe-rule --name map-auto-tagger-backfill-$MPE returning DISABLED, but backfill is a Custom::Backfill CustomResource (one-shot during stack create), not an EventBridge rule. Every deploy with backfill enabled silently hit the 1200s timeout before any log poll ran; customers saw the "Backfill is still running" message even when backfill had completed in seconds.' },
+                ],
+            },
             {
                 version: 'v20.6.2',
                 date: '2026-04-25',
@@ -7663,7 +7673,7 @@ if [ "\$ERRORS" -gt 0 ]; then
       echo ""
       echo "${t('r_preflight')}"
       echo "-------------------------"
-      printf "\$PREFLIGHT_LOG"
+      printf '%b' "\$PREFLIGHT_LOG"
       echo ""
       echo "${t('r_action')}"
       echo "  ${t('r_action_desc')}"
@@ -7760,22 +7770,25 @@ echo ""
 BACKFILL_RESULT="${t('d_backfill_timeout')}"
 BACKFILL_WAIT_START_MS=\$(( \$(date +%s) * 1000 ))
 WAIT=0
+# Backfill is a Custom::Backfill CustomResource (one-shot during stack create),
+# NOT an EventBridge rule — so we poll the backfill Lambda's CloudWatch log
+# group for the "Backfill complete" sentinel. The prior version gated this on
+# 'aws events describe-rule --name map-auto-tagger-backfill-\$MPE' returning
+# DISABLED, but no such rule is ever created; every deploy silently hit the
+# 1200s timeout before the CloudWatch poll ran.
 while [ \$WAIT -lt 1200 ]; do
-  RULE_STATE=\$(aws events describe-rule --name map-auto-tagger-backfill-\$MPE --region "\$REGION" --query 'State' --output text 2>/dev/null)
-  if [ "\$RULE_STATE" = "DISABLED" ]; then
-    echo "  ${t('d_backfill_starting')}"
-    COMPLETE=\$(aws logs filter-log-events \\
-      --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
-      --filter-pattern '"Backfill complete"' \\
-      --start-time "\$BACKFILL_WAIT_START_MS" \\
-      --max-items 1 \\
-      --query 'events[0].message' \\
-      --output text 2>/dev/null)
-    if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
-      BACKFILL_RESULT="\$COMPLETE"
-      echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
-      break
-    fi
+  COMPLETE=\$(aws logs filter-log-events \\
+    --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
+    --region "\$REGION" \\
+    --filter-pattern '"Backfill complete"' \\
+    --start-time "\$BACKFILL_WAIT_START_MS" \\
+    --max-items 1 \\
+    --query 'events[0].message' \\
+    --output text 2>/dev/null)
+  if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
+    BACKFILL_RESULT="\$COMPLETE"
+    echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
+    break
   fi
   sleep 30
   WAIT=\$((WAIT + 30))
@@ -7797,7 +7810,7 @@ echo ""
   echo ""
   echo "${t('r_preflight')}"
   echo "-------------------------"
-  printf "\$PREFLIGHT_LOG"
+  printf '%b' "\$PREFLIGHT_LOG"
   echo ""
   echo "${t('r_deployed')}"
   echo "------------------"
@@ -7850,6 +7863,11 @@ set -e
 
 MPE="${mpe}"
 REGION="${region}"
+# Multi-account deployment is pinned to the management-account region selected
+# in the configurator. The preflight iterates over $REGIONS (plural) to align
+# with the single-account generator's loop idiom — this normalizes both paths
+# on a one-element region list.
+REGIONS="\$REGION"
 ACCOUNT=\$(aws sts get-caller-identity --query Account --output text)
 BUCKET="auto-map-tagger-\${ACCOUNT}"
 STACK_NAME="map-auto-tagger-${mpe}"
@@ -8138,7 +8156,7 @@ if [ "\$ERRORS" -gt 0 ]; then
       echo ""
       echo "${t('r_preflight')}"
       echo "-------------------------"
-      printf "\$PREFLIGHT_LOG"
+      printf '%b' "\$PREFLIGHT_LOG"
       echo ""
       echo "${t('r_action')}"
       echo "  ${t('r_action_desc')}"
@@ -8230,8 +8248,11 @@ while true; do
   WAIT_SECS=\$((WAIT_SECS + 30))
   echo "  ${t('d_still_deploying')} (\${WAIT_SECS}s ${t('d_elapsed')})"
 done
-# Wait for StackSet instances to reach CURRENT (stack may be COMPLETE before StackSet finishes)
-if [ -z "\$DEPLOY_STATUS" ]; then
+# Wait for StackSet instances to reach CURRENT (stack may be COMPLETE before StackSet finishes).
+# Gate on "NOT STARTED" rather than -z: DEPLOY_STATUS is initialized non-empty at the top of
+# the script, so the prior -z guard was always false and this whole StackSet-wait block ran
+# as dead code. Any upstream failure marks DEPLOY_STATUS="FAILED — ..." and skips this block.
+if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
   STACKSET_NAME=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" \\
     --query "Stacks[0].Outputs[?OutputKey=='StackSetName'].OutputValue" --output text 2>/dev/null)
   if [ -n "\$STACKSET_NAME" ] && [ "\$STACKSET_NAME" != "None" ]; then
@@ -8259,7 +8280,10 @@ if [ -z "\$DEPLOY_STATUS" ]; then
       sleep 30
       SS_WAIT=\$((SS_WAIT + 30))
     done
-    if [ -z "\$DEPLOY_STATUS" ]; then DEPLOY_STATUS="SUCCESS"; fi
+    # If the 1200s wait expired without reaching all-CURRENT or any FAILED, the StackSet
+    # is still rolling out. Mark as SUCCESS — stack create completed; continued rollout
+    # is tracked by CloudFormation itself and visible via list-stack-instances.
+    if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then DEPLOY_STATUS="SUCCESS"; fi
   else
     DEPLOY_STATUS="SUCCESS"
   fi
@@ -8274,22 +8298,21 @@ if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
   BACKFILL_RESULT="${t('d_backfill_timeout')}"
   BACKFILL_WAIT_START_MS=\$(( \$(date +%s) * 1000 ))
   WAIT=0
+  # See rationale in the single-account branch — backfill is a Custom::Backfill
+  # CustomResource, not an EventBridge rule. Poll the Lambda's log group directly.
   while [ \$WAIT -lt 1200 ]; do
-    RULE_STATE=\$(aws events describe-rule --name map-auto-tagger-backfill-\$MPE --region "\$REGION" --query 'State' --output text 2>/dev/null)
-    if [ "\$RULE_STATE" = "DISABLED" ]; then
-      echo "  ${t('d_backfill_starting')}"
-      COMPLETE=\$(aws logs filter-log-events \\
-        --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
-        --filter-pattern '"Backfill complete"' \\
-        --start-time "\$BACKFILL_WAIT_START_MS" \\
-        --max-items 1 \\
-        --query 'events[0].message' \\
-        --output text 2>/dev/null)
-      if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
-        BACKFILL_RESULT="\$COMPLETE"
-        echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
-        break
-      fi
+    COMPLETE=\$(aws logs filter-log-events \\
+      --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
+      --region "\$REGION" \\
+      --filter-pattern '"Backfill complete"' \\
+      --start-time "\$BACKFILL_WAIT_START_MS" \\
+      --max-items 1 \\
+      --query 'events[0].message' \\
+      --output text 2>/dev/null)
+    if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
+      BACKFILL_RESULT="\$COMPLETE"
+      echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
+      break
     fi
     sleep 30
     WAIT=\$((WAIT + 30))
@@ -8313,7 +8336,7 @@ echo "${t('d_step3')}"
   echo ""
   echo "${t('r_preflight')}"
   echo "-------------------------"
-  printf "\$PREFLIGHT_LOG"
+  printf '%b' "\$PREFLIGHT_LOG"
   echo ""
   if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
     echo "${t('r_deployed')}"

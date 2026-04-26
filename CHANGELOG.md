@@ -6,6 +6,22 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.6.3 — Configurator-generated shell-script correctness (plan-PR #41)
+
+Tooling-only PATCH. YAML runtime is byte-identical to v20.6.2 except the four version stamps. Closes audit items docx #2, #3, #5, #7.
+
+**docx #2 — `$REGIONS` undefined in multi-account deploy.sh.** The multi-account generator's header set `REGION="…"` (singular) but the stack-state preflight later iterated over `$REGIONS` (plural), which was never defined. The `for CHECK_REGION in $REGIONS` loop silently ran zero iterations, skipping the preflight entirely — a customer running `deploy.sh` on top of a stale `*_IN_PROGRESS` or `ROLLBACK_COMPLETE` stack got no warning. Added `REGIONS="$REGION"` in the multi-account header (multi-account is always pinned to the management-account region selected in the configurator; the plural name is kept to align with the single-account idiom).
+
+**docx #3 — `DEPLOY_STATUS` dead-code guard in multi-account deploy.sh.** The StackSet-instance wait block was gated on `if [ -z "$DEPLOY_STATUS" ]`, but `DEPLOY_STATUS` is initialized to `"NOT STARTED"` at the top of the script. The `-z` test was always false, so the entire 1200-second per-account rollout poll was unreachable. On success, `DEPLOY_STATUS` stayed at `"NOT STARTED"`, which in turn made the backfill-wait block (gated on `[ "$DEPLOY_STATUS" = "SUCCESS" ]`) also never run. Changed the outer guard to `= "NOT STARTED"` and the fallback at block-end likewise, so the block fires on the healthy-path. A 1200s timeout without explicit SUCCESS or FAILURE is treated as SUCCESS (stack create completed; StackSet instance rollout continues asynchronously under CloudFormation's control).
+
+**docx #5 — `printf "$PREFLIGHT_LOG"` treats the log as a format string.** All four report sites replaced with `printf '%b' "$PREFLIGHT_LOG"`. `%b` preserves `\n` → real-newline interpretation (needed — the log is built with literal `\n` escape sequences inside shell-string assignments) while preventing `%` characters in AWS API output from being interpreted as format specifiers.
+
+**docx #7 — Backfill wait polled a nonexistent EventBridge rule.** Both single-account and multi-account backfill-wait loops gated the CloudWatch Logs poll on `aws events describe-rule --name map-auto-tagger-backfill-$MPE` returning `DISABLED`. No such EventBridge rule exists — backfill is implemented as a `Custom::Backfill` CustomResource (one-shot during stack create). Every deploy with backfill enabled silently hit the 1200s timeout before any log poll ran; the customer saw "Backfill is still running" for 20 minutes even when backfill completed in seconds. Removed the rule-state gate; poll the backfill Lambda's log group directly.
+
+**Follow-up identified** (out of scope for this PR, filed for Sprint 2 or later): `generateOrgTemplate` at configurator.html:7099 references `scopedAccountIdsJson` without defining it in its local scope (defined only in `generateMainTemplate` at :5634). A direct `generateOrgTemplate(config)` call throws `ReferenceError`. E2E tests use `deploy_stackset.py` directly, not the configurator-generated deploy.sh, so this never fires in CI — but the `Test deploy.sh generation and execution` job is known-broken in multi-account mode per the Sprint 4 report.
+
+---
+
 ### Docs pass — D1–D6 corrections (plan-PR #40, 2026-04-25)
 
 No template version bump — documentation-only corrections against v20.6.2. Closes audit items D1–D6 from the remediation plan's docx series.
