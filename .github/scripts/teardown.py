@@ -1006,7 +1006,7 @@ def _delete_wafv2(arn: str, region: str, account: str) -> None:
 
 
 def _delete_iam_role(role_name: str) -> None:
-    """Detach all policies, then delete the IAM role."""
+    """Detach all policies, remove from instance profiles, then delete the IAM role."""
     iam = boto3.client("iam")
     try:
         paginator = iam.get_paginator("list_attached_role_policies")
@@ -1022,6 +1022,14 @@ def _delete_iam_role(role_name: str) -> None:
             for policy_name in page.get("PolicyNames", []):
                 safe_call_silent(iam.delete_role_policy,
                                  RoleName=role_name, PolicyName=policy_name)
+    except Exception:
+        pass
+    try:
+        for ip in iam.list_instance_profiles_for_role(RoleName=role_name).get("InstanceProfiles", []):
+            ip_name = ip["InstanceProfileName"]
+            safe_call_silent(iam.remove_role_from_instance_profile,
+                             RoleName=role_name, InstanceProfileName=ip_name)
+            safe_call_silent(iam.delete_instance_profile, InstanceProfileName=ip_name)
     except Exception:
         pass
     safe_delete(iam.delete_role, RoleName=role_name, resource_desc=f"IAM role {role_name}")
@@ -1393,7 +1401,36 @@ def main() -> None:
         else:
             log.warning("Could not determine tag value for orphan sweep — skipping")
 
+    # Name-based IAM role cleanup — catches roles that RGTA can't find
+    # because E2E fixtures create them with taggable=False. Roles are
+    # named e2e-pr<N>-<run_id>-*; match on the run_id prefix.
+    if args.pr:
+        _cleanup_iam_roles_by_name(f"e2e-pr{args.pr}-")
+
     log.info("Teardown complete.")
+
+
+def _cleanup_iam_roles_by_name(prefix: str) -> None:
+    """Delete all IAM roles whose name starts with prefix.
+
+    IAM is global so this runs once (not per-region). Handles detaching
+    managed/inline policies and instance profiles before deletion.
+    """
+    iam = boto3.client("iam")
+    deleted = 0
+    try:
+        paginator = iam.get_paginator("list_roles")
+        for page in paginator.paginate():
+            for role in page.get("Roles", []):
+                name = role["RoleName"]
+                if not name.startswith(prefix):
+                    continue
+                _delete_iam_role(name)
+                deleted += 1
+    except Exception as exc:
+        log.warning("IAM role name-based cleanup failed: %s", exc)
+    if deleted:
+        log.info("IAM name-based cleanup: deleted %d roles matching '%s*'", deleted, prefix)
 
 
 if __name__ == "__main__":
