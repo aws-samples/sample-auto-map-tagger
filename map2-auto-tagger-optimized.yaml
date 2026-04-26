@@ -552,7 +552,8 @@ Resources:
 
   PreflightTrigger:
     Type: Custom::PeerTaggerPreflight
-    DependsOn: PreflightFunction
+    # No explicit DependsOn — ServiceToken !GetAtt already creates the
+    # implicit dependency on PreflightFunction (cfn-lint W3005).
     Properties:
       ServiceToken: !GetAtt PreflightFunction.Arn
       MpeId: !Ref MpeId
