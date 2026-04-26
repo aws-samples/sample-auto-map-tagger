@@ -11,7 +11,6 @@ UNCOVERED CreateAddon
 COVERED   CreateAgent|bedrock.amazonaws.com
 UNCOVERED CreateAgentActionGroup|bedrock.amazonaws.com
 UNCOVERED CreateAgentAlias|bedrock.amazonaws.com
-UNCOVERED CreateApiKey
 COVERED   CreateApplication|codedeploy.amazonaws.com
 COVERED   CreateApplication|elasticbeanstalk.amazonaws.com
 COVERED   CreateApplication|emr-serverless.amazonaws.com

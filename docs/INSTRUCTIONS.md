@@ -286,9 +286,17 @@ Yes — all resources are namespaced by MPE ID. Deploy separate stacks for each 
 
 ## Upgrading from a Previous Version
 
-Prior versions used fixed resource names (`map-auto-tagger`, `/auto-map-tagger/config`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`, `/auto-map-tagger/mig111/config`).
+### Recommended: in-place upgrade via `upgrade.sh`
 
-Running `deploy.sh` on an existing deployment will deploy a **second stack** alongside the old one. Delete the old stack first:
+For v19.x+ deployments (MPE-ID-namespaced stacks like `map-auto-tagger-mig1234567890`), open `configurator.html` → **🔄 Upgrade to the latest template version** → download and run `upgrade.sh`. The script reads the deployed SSM version, compares to target via SemVer, and applies the template update in place (scope and agreement dates preserved via `UsePreviousValue=true` on every existing parameter). No dual-Lambda window.
+
+### Migrating from the pre-v19 un-namespaced layout
+
+Prior versions used fixed resource names (`map-auto-tagger`, `/auto-map-tagger/config`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`, `/auto-map-tagger/mig111/config`). `upgrade.sh` refuses to touch the un-namespaced layout — it must be migrated manually.
+
+> **⚠️ Dual-Lambda concurrent-tagging window.** During the migration, the old Lambda will still be processing events from its SQS queue while the new Lambda is being created. If a new resource is created during this window, both Lambdas receive the event and race to tag it. They'll write the same `map-migrated` tag value (SSM config is shared per MPE ID), so the race is a no-op in the single-MPE case — but if the new deployment uses a **different** MPE ID, the last writer wins and you get non-deterministic tag values. Mitigation: pause resource creation during the migration window (typically 2-5 minutes).
+
+Delete the old stack first:
 
 ```bash
 aws cloudformation delete-stack --stack-name map-auto-tagger

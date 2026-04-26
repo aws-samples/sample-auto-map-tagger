@@ -94,7 +94,7 @@ The auto-tagger covers **150+ AWS resource types** across every major service ca
 | **Networking** | VPCs, Load Balancers, Transit Gateways, VPN, CloudFront, Route53, Global Accelerator |
 | **Analytics** | Kinesis, MSK, Glue, Athena, OpenSearch, EMR, DataBrew |
 | **Messaging** | SNS, SQS, Amazon MQ (ActiveMQ + RabbitMQ) |
-| **AI / ML** | SageMaker (all types), Bedrock (Agents, Guardrails, Flows, Prompts, Knowledge Bases, AgentCore), Comprehend, Kendra |
+| **AI / ML** | SageMaker (all types), Bedrock (Agents, Guardrails, Flows, Prompts, Knowledge Bases), Comprehend, Kendra |
 | **Security** | KMS, ACM, Cognito, Security Hub |
 | **Integration** | Step Functions, API Gateway (REST + HTTP + WebSocket), AppSync |
 | **Developer Tools** | CodeBuild, CodePipeline, CloudFormation, Cloud9, Service Catalog |
@@ -235,8 +235,10 @@ A Lambda in an out-of-scope account has negligible cost — it fires, reads SSM,
 |-----------|-------------|
 | Lambda (100–1,000 invocations/day) | $0.10 – $2.00 |
 | EventBridge events | $0.01 – $0.20 |
+| SQS (event buffer, ~1M requests/account/month) | $0.00 (within free tier) |
 | CloudTrail (existing) | $0.00 |
 | SSM Parameter Store | $0.00 |
+| SNS (alert topic, invoked only on DLQ alarm) | $0.00 |
 | **Total per account** | **< $2/month** |
 
 For a 50-account organization: **< $100/month** to protect potentially **millions in MAP credits**.

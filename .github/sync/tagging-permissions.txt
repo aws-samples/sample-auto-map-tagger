@@ -99,5 +99,6 @@ tag:GetResources
 tag:TagResources
 timestream:TagResource
 transfer:TagResource
+vpc-lattice:TagResource
 wafv2:TagResource
 workspaces:CreateTags
