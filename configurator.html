@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.9.3'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.9.3';
+        // Must match `TEMPLATE_VERSION = 'v20.9.4'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.9.4';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,17 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.9.4',
+                date: '2026-04-27',
+                changes: [
+                    { tag: 'bugfix', text: 'CloudHSM v2 handler now matches the real CloudTrail eventSource `cloudhsm.amazonaws.com` (not `cloudhsmv2.amazonaws.com`). Clusters and HSMs created via the CloudHSM v2 API were never tagged before — live-confirmed 2026-04-27 on 586009411781. The boto3 client name is still `cloudhsmv2`; only the CloudTrail eventSource differs. (§1.99b)' },
+                    { tag: 'bugfix', text: 'NAT Gateway ARN extraction now unwraps `CreateNatGatewayResponse` the same way the other EC2 handlers (NetworkAcl, LaunchTemplate, TransitGateway, VpnGateway, RouteTable) do. Prior handler tried top-level keys only and missed the wrapped shape. (§1.50)' },
+                    { tag: 'bugfix', text: 'Added `batch:TagResource` to the Lambda IAM policy. AWS Batch job queues, compute environments, and job definitions were silently AccessDenied by RGTA dispatch — the service-authorization matrix requires the per-service action. (§1.27)' },
+                    { tag: 'bugfix', text: 'Classifier now treats ElastiCache "is either not present or not available" (provisioning race) and SSM "concurrently modified" (ConcurrentUpdateException during parallel PutParameter bursts) as TRANSIENT. Prior behavior routed both to permanent_actionable → false SNS alerts on retry-eligible failures. (§1.101, §1.44)' },
+                    { tag: 'coverage', text: 'Removed the false CloudFormation claim from docs/COVERAGE.md. CloudFormation is NOT on the MAP Included Services List (6 April 2026 edition); stack resources do not earn MAP credit. The IAM actions `cloudformation:TagResource / UpdateStack / UpdateStackSet / ListStacks` stay — they are used for internal CFN TagResource routing and peer-tagger detection, not for customer-visible CFN tagging. (§1.100)' },
+                ],
+            },
             {
                 version: 'v20.9.3',
                 date: '2026-04-26',
@@ -5660,6 +5671,9 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             // Storage
             's3:PutBucketTagging','s3:GetBucketTagging','elasticfilesystem:TagResource','fsx:TagResource',
             'ecr:TagResource','backup:TagResource',
+            // AWS Batch (§1.27): job queues, compute environments, job definitions.
+            // RGTA-dispatched; batch:TagResource required per service-auth matrix.
+            'batch:TagResource',
             // Database
             'rds:AddTagsToResource','dynamodb:TagResource','elasticache:AddTagsToResource',
             'memorydb:TagResource','redshift:CreateTags','redshift-serverless:TagResource',
@@ -6884,10 +6898,12 @@ ${crossAccountCode}
                   elif event_name in ('CreateDirectory', 'CreateMicrosoftAD') and detail.get('eventSource') == 'ds.amazonaws.com':
                       dir_id = resp.get('directoryId')
                       arn = f"arn:{p}:ds:{region}:{account_id}:directory/{dir_id}" if dir_id else None
-                  elif event_name == 'CreateCluster' and detail.get('eventSource') == 'cloudhsmv2.amazonaws.com':
+                  elif event_name == 'CreateCluster' and detail.get('eventSource') == 'cloudhsm.amazonaws.com':
+                      # §1.99b: CloudTrail eventSource is cloudhsm.amazonaws.com for
+                      # CloudHSM v2 (boto3 client name cloudhsmv2 is unchanged).
                       cluster_id = (resp.get('cluster') or {}).get('clusterId')
                       arn = f"arn:{p}:cloudhsm:{region}:{account_id}:cluster/{cluster_id}" if cluster_id else None
-                  elif event_name == 'CreateHsm' and detail.get('eventSource') == 'cloudhsmv2.amazonaws.com':
+                  elif event_name == 'CreateHsm' and detail.get('eventSource') == 'cloudhsm.amazonaws.com':
                       cluster_id = (resp.get('hsm') or {}).get('clusterId') or req.get('clusterId')
                       arn = f"arn:{p}:cloudhsm:{region}:{account_id}:cluster/{cluster_id}" if cluster_id else None
                   elif event_name == 'EnableSecurityHub':
@@ -7096,6 +7112,12 @@ ${crossAccountCode}
                       'conflicting conditional operation',
                       'SnapshotCreationPerVolumeRateExceeded',
                       'Throttling.User',
+                      # ElastiCache provisioning race (§1.101) — cluster
+                      # not fully settled; retries succeed.
+                      'is either not present or not available',
+                      # SSM ConcurrentUpdateException (§1.44) — parallel
+                      # PutParameter bursts; retry resolves.
+                      'concurrently modified',
                   )
                   PERMANENT_IGNORABLE_MARKERS = (
                       'ResourceNotFoundException','Requested resource not found',
