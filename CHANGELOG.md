@@ -12,6 +12,13 @@ Docs-only, no version bump. Full re-audit of `docs/COVERAGE.md` against the auth
 
 ## v20 — Resilient SQS Pipeline + Open Source
 
+### v20.9.5 — 2026-04-27
+
+PATCH. Two items, both resilience/surface hygiene — no functional change for paths already working.
+
+- **Native-API tag dispatch throttle retry (§1.81/§1.92).** Every native-dispatch branch in `tag_resource()` (S3, QuickSight, CloudFront, Route53, Kinesis, Firehose, APIGateway v1/v2, AutoScaling, SQS, MemoryDB, DAX, StorageGateway, IoT, Keyspaces, CloudHSM v2, Directory Service, Bedrock Agent, Global Accelerator, KinesisVideo) now wraps its single tag call in a shared `_retry_throttles()` helper matching the 4-attempt exponential-backoff pattern (1s → 2s → 4s → 8s, ±25% jitter) previously only wired on the RGTA fallthrough. Short throttles are absorbed in-invocation (~15s worst case) instead of burning one of the 5 SQS redeliveries (180s VT each) → ~15 min retry budget reclaimed for actually-unrecoverable failures. `THROTTLE_CODES` hoisted to module scope so both the native branches and the RGTA loop reference the same constant; duplicate definition inside the RGTA else-branch removed.
+- **Configurator review-table XSS hardening (§1.94).** All four review-pane tables (editor, update, delete, main-deploy) now render customer-supplied values via `document.createElement` + `textContent` instead of `innerHTML` + template literal interpolation. The four sites previously interpolated free-form inputs (customer name, contact email, account IDs, VPC IDs) directly into HTML; the input regexes cap what a well-behaved user can type, but `configurator.html` is published publicly and the review pane should not execute arbitrary HTML/JS if a bypass is ever found. Out-of-scope innerHTML sites (`renderVersionHistory`, MPE/account input row scaffolds, `templateListEl` static rows, `btnDiv` / `deployHint`) are left untouched — they build from i18n strings and already-regex-constrained values.
+
 ### v20.9.4 — 2026-04-27
 
 Hotfix bundle. PATCH. No behavior changes for already-working paths; closes five latent bugs that were silently losing MAP credit or generating false SNS alerts, plus one docs-correctness fix.
