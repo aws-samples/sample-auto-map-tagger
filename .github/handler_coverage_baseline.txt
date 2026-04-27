@@ -26,7 +26,7 @@ UNCOVERED CreateBuild|gamelift.amazonaws.com
 COVERED   CreateCacheCluster
 UNCOVERED CreateCarrierGateway
 UNCOVERED CreateCertificateAuthority
-COVERED   CreateCluster|cloudhsmv2.amazonaws.com
+COVERED   CreateCluster|cloudhsm.amazonaws.com
 COVERED   CreateCluster|dax.amazonaws.com
 COVERED   CreateCluster|eks.amazonaws.com
 COVERED   CreateCluster|memorydb.amazonaws.com
@@ -72,7 +72,7 @@ UNCOVERED CreateGateway|iotsitewise.amazonaws.com
 COVERED   CreateGraphqlApi|appsync.amazonaws.com
 COVERED   CreateHealthCheck
 COVERED   CreateHostedZone
-UNCOVERED CreateHsm|cloudhsmv2.amazonaws.com
+UNCOVERED CreateHsm|cloudhsm.amazonaws.com
 COVERED   CreateIPSet|wafv2.amazonaws.com
 COVERED   CreateIdentityPool
 COVERED   CreateImage
