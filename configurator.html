@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.9.4'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.9.4';
+        // Must match `TEMPLATE_VERSION = 'v20.9.5'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.9.5';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,14 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v20.9.5',
+                date: '2026-04-27',
+                changes: [
+                    { tag: 'perf', text: 'Native-API tag dispatch (S3, QuickSight, CloudFront, Route53, Kinesis, Firehose, APIGateway, AutoScaling, SQS, MemoryDB, DAX, StorageGateway, IoT, Keyspaces, CloudHSM v2, Directory Service, Bedrock Agent, Global Accelerator, KinesisVideo) now shares the 4-attempt exponential-backoff throttle retry (1s → 2s → 4s → 8s, ±25% jitter) previously only wired on the RGTA fallthrough. Short throttles are absorbed in-invocation instead of burning one of the 5 SQS redeliveries (180s VT each). `THROTTLE_CODES` is hoisted so both code paths share the same constant. (§1.81/§1.92)' },
+                    { tag: 'security', text: 'Configurator review tables (editor/update/delete/deploy) now render customer-supplied values via `textContent` + `document.createElement` instead of `innerHTML` template literals. Closes the self-XSS surface where a customer-typed name, email, or VPC ID that somehow bypasses the input regex could inject an HTML/JS payload into the review pane. (§1.94)' },
+                ],
+            },
             {
                 version: 'v20.9.4',
                 date: '2026-04-27',
@@ -1528,12 +1536,26 @@
                 [t('ui_editor_review_accounts'), accounts.join(', ')],
             ];
             if (action === 'add') rows.push([t('ui_backfill_title'), backfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
-            table.innerHTML = rows.map(([k, v], i) =>
-                `<tr style="border-bottom:1px solid #eaeded;${i%2===0?'background:#fafafa;':''}">
-                    <td style="padding:8px;font-weight:600;width:40%;color:#687078;">${k}</td>
-                    <td style="padding:8px;">${v}</td>
-                </tr>`
-            ).join('');
+            // Safe DOM construction: v may contain user-controlled values
+            // (customer name, account IDs) so use textContent rather than
+            // innerHTML template-literal interpolation. (§1.94, v20.9.5)
+            table.replaceChildren();
+            rows.forEach(([k, v], i) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eaeded';
+                if (i % 2 === 0) tr.style.background = '#fafafa';
+                const td1 = document.createElement('td');
+                td1.style.padding = '8px';
+                td1.style.fontWeight = '600';
+                td1.style.width = '40%';
+                td1.style.color = '#687078';
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.style.padding = '8px';
+                td2.textContent = v;
+                tr.append(td1, td2);
+                table.appendChild(tr);
+            });
 
             // Reset confirm checkbox
             document.getElementById('editor-confirm').checked = false;
@@ -1621,12 +1643,26 @@
                         : t('ui_update_all_review')],
                 [t('ui_update_target_version'), TEMPLATE_VERSION],
             ];
-            table.innerHTML = rows.map(([k, v], i) =>
-                `<tr style="border-bottom:1px solid #eaeded;${i%2===0?'background:#fafafa;':''}">
-                    <td style="padding:8px;font-weight:600;width:40%;color:#687078;">${k}</td>
-                    <td style="padding:8px;">${v}</td>
-                </tr>`
-            ).join('');
+            // Safe DOM construction: v may contain user-controlled values
+            // (MPE IDs) so use textContent rather than innerHTML template-
+            // literal interpolation. (§1.94, v20.9.5)
+            table.replaceChildren();
+            rows.forEach(([k, v], i) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eaeded';
+                if (i % 2 === 0) tr.style.background = '#fafafa';
+                const td1 = document.createElement('td');
+                td1.style.padding = '8px';
+                td1.style.fontWeight = '600';
+                td1.style.width = '40%';
+                td1.style.color = '#687078';
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.style.padding = '8px';
+                td2.textContent = v;
+                tr.append(td1, td2);
+                table.appendChild(tr);
+            });
 
             document.getElementById('update-confirm').checked = false;
             document.getElementById('update-confirm-error').style.display = 'none';
@@ -1754,9 +1790,29 @@
                 [t('ui_delete_optin_bucket'), bucketLabel],
                 [t('ui_delete_optin_logs'), cfg.deleteLogs ? yes : no],
             ];
-            document.getElementById('delete-reviewTable').innerHTML = rows.map(([k, v], i) =>
-                `<tr style="border-bottom:1px solid #eaeded;${i % 2 === 0 ? 'background:#fafafa;' : ''}"><td style="padding:10px 12px;width:40%;color:#687078;">${k}</td><td style="padding:10px 12px;font-weight:600;">${v}</td></tr>`
-            ).join('');
+            // Safe DOM construction: v may contain user-controlled values
+            // (MPE IDs, region strings) so use textContent rather than
+            // innerHTML template-literal interpolation. Preserves the
+            // delete-review styles (padding 10px 12px, v-cell font-weight
+            // 600). (§1.94, v20.9.5)
+            const deleteTable = document.getElementById('delete-reviewTable');
+            deleteTable.replaceChildren();
+            rows.forEach(([k, v], i) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eaeded';
+                if (i % 2 === 0) tr.style.background = '#fafafa';
+                const td1 = document.createElement('td');
+                td1.style.padding = '10px 12px';
+                td1.style.width = '40%';
+                td1.style.color = '#687078';
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.style.padding = '10px 12px';
+                td2.style.fontWeight = '600';
+                td2.textContent = v;
+                tr.append(td1, td2);
+                deleteTable.appendChild(tr);
+            });
         }
 
         function deleteGenerate() {
@@ -3063,12 +3119,29 @@ network calls are made from your environment during the upgrade.`;
 
             rows.push([t('ui_backfill_title'), config.includeBackfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
 
-            table.innerHTML = rows.map(([k, v]) =>
-                `<tr style="border-bottom: 1px solid #eaeded;">
-                    <td style="padding: 8px; font-weight: 600; width: 200px; vertical-align: top;">${k}</td>
-                    <td style="padding: 8px; font-family: monospace; font-size: 13px;">${v}</td>
-                </tr>`
-            ).join('');
+            // Safe DOM construction: v may contain user-controlled values
+            // (customer name, email, account IDs, VPC IDs) so use textContent
+            // rather than innerHTML template-literal interpolation. Preserves
+            // the main-deploy styles (width 200px, v-cell monospace 13px).
+            // (§1.94, v20.9.5)
+            table.replaceChildren();
+            rows.forEach(([k, v]) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eaeded';
+                const td1 = document.createElement('td');
+                td1.style.padding = '8px';
+                td1.style.fontWeight = '600';
+                td1.style.width = '200px';
+                td1.style.verticalAlign = 'top';
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.style.padding = '8px';
+                td2.style.fontFamily = 'monospace';
+                td2.style.fontSize = '13px';
+                td2.textContent = v;
+                tr.append(td1, td2);
+                table.appendChild(tr);
+            });
 
             const desc = document.getElementById('deployDescription');
             const templateListEl = document.getElementById('templateList');
@@ -6358,6 +6431,30 @@ ${permissionsList}
           ssm = boto3.client('ssm')
           ec2 = boto3.client('ec2')
           tagging = boto3.client('resourcegroupstaggingapi')
+
+          # Shared throttle-code set + retry helper used by both native dispatch
+          # branches and the RGTA fallthrough. RGTA throws 'ThrottledException'
+          # (with "ed"); most other AWS services throw 'ThrottlingException'
+          # (with "ing"). Both variants must be enumerated alongside the
+          # generic rate-limit codes. Native calls wrap in _retry_throttles so
+          # short throttles are absorbed in-invocation instead of burning an
+          # SQS redelivery (180s VT). (§1.81/§1.92, v20.9.5)
+          THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+
+          def _retry_throttles(fn):
+              """4-attempt exponential-backoff retry (1s -> 2s -> 4s -> 8s, +/-25%)."""
+              for attempt in range(4):
+                  try:
+                      return fn()
+                  except ClientError as e:
+                      code = e.response['Error']['Code']
+                      if code in THROTTLE_CODES and attempt < 3:
+                          sleep_time = (2 ** attempt) * 1.0 * (1 + random.uniform(-0.25, 0.25))
+                          print(f"Native-tag throttled (code={code}), retry in {sleep_time:.1f}s (attempt {attempt+1}/4)")
+                          time.sleep(sleep_time)
+                          continue
+                      raise
+
           _config = None
           _config_ts = 0.0
           # Warm containers live ~15 min; an MPE rotation via SSM wouldn't be
@@ -6574,9 +6671,8 @@ ${crossAccountCode}
                   elif ':iot:' in arn and ':policy/' in arn:
                       get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
                   else:
-                      # RGTA throws 'ThrottledException' (with "ed") — most other AWS services
-                      # throw 'ThrottlingException' (with "ing"). Both variants must be enumerated.
-                      THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+                      # Uses the module-level THROTTLE_CODES defined above so the native
+                      # branches and this fallthrough share the same constant.
                       for attempt in range(4):
                           try:
                               resp2 = _t.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
@@ -6984,48 +7080,48 @@ ${crossAccountCode}
                               raise
                       existing = [t for t in existing if t['Key'] != tag_key]
                       existing.append({'Key': tag_key, 'Value': tag_value})
-                      s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing})
+                      _retry_throttles(lambda: s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing}))
                   elif ':kinesis:' in arn and ':stream/' in arn:
-                      get_svc('kinesis').add_tags_to_stream(StreamName=arn.split('/')[-1], Tags={tag_key: tag_value})
+                      _retry_throttles(lambda: get_svc('kinesis').add_tags_to_stream(StreamName=arn.split('/')[-1], Tags={tag_key: tag_value}))
                   elif ':firehose:' in arn:
-                      get_svc('firehose').tag_delivery_stream(DeliveryStreamName=arn.split('/')[-1], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: get_svc('firehose').tag_delivery_stream(DeliveryStreamName=arn.split('/')[-1], Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':apigateway:' in arn:
                       svc = 'apigateway' if '/restapis/' in arn else 'apigatewayv2'
                       c = get_svc(svc)
-                      if '/restapis/' in arn: c.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
-                      else: c.tag_resource(ResourceArn=arn, Tags={tag_key: tag_value})
+                      if '/restapis/' in arn: _retry_throttles(lambda: c.tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
+                      else: _retry_throttles(lambda: c.tag_resource(ResourceArn=arn, Tags={tag_key: tag_value}))
                   elif ':autoscaling:' in arn:
-                      get_svc('autoscaling').create_or_update_tags(Tags=[{'ResourceId': arn.split('/')[-1], 'ResourceType': 'auto-scaling-group', 'Key': tag_key, 'Value': tag_value, 'PropagateAtLaunch': False}])
+                      _retry_throttles(lambda: get_svc('autoscaling').create_or_update_tags(Tags=[{'ResourceId': arn.split('/')[-1], 'ResourceType': 'auto-scaling-group', 'Key': tag_key, 'Value': tag_value, 'PropagateAtLaunch': False}]))
                   elif ':sqs:' in arn:
                       qn = arn.split(':')[-1]; qr = arn.split(':')[3]; qa = arn.split(':')[4]
-                      get_svc('sqs').tag_queue(QueueUrl=f"https://sqs.{qr}.amazonaws.com/{qa}/{qn}", Tags={tag_key: tag_value})
+                      _retry_throttles(lambda: get_svc('sqs').tag_queue(QueueUrl=f"https://sqs.{qr}.amazonaws.com/{qa}/{qn}", Tags={tag_key: tag_value}))
                   elif ':cloudfront:' in arn:
-                      boto3.client('cloudfront').tag_resource(Resource=arn, Tags={'Items': [{'Key': tag_key, 'Value': tag_value}]})
+                      _retry_throttles(lambda: boto3.client('cloudfront').tag_resource(Resource=arn, Tags={'Items': [{'Key': tag_key, 'Value': tag_value}]}))
                   elif ':route53:::' in arn:
-                      boto3.client('route53').change_tags_for_resource(ResourceType='hostedzone', ResourceId=arn.split('/')[-1], AddTags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: boto3.client('route53').change_tags_for_resource(ResourceType='hostedzone', ResourceId=arn.split('/')[-1], AddTags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':globalaccelerator:' in arn:
-                      boto3.client('globalaccelerator', region_name='us-west-2').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: boto3.client('globalaccelerator', region_name='us-west-2').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':quicksight:' in arn:
                       qs_r = arn.split(':')[3] or region
-                      boto3.client('quicksight', region_name=qs_r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: boto3.client('quicksight', region_name=qs_r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
-                      boto3.client('bedrock-agent', region_name=arn.split(':')[3]).tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                      _retry_throttles(lambda: boto3.client('bedrock-agent', region_name=arn.split(':')[3]).tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
                   elif ':memorydb:' in arn:
-                      get_svc('memorydb').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: get_svc('memorydb').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':iot:' in arn and ':policy/' in arn:
-                      get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: get_svc('iot').tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':dsql:' in arn:
-                      get_svc('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                      _retry_throttles(lambda: get_svc('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
                   elif ':cassandra:' in arn:
-                      get_svc('keyspaces').tag_resource(resourceArn=arn, tags=[{'key': tag_key, 'value': tag_value}])
+                      _retry_throttles(lambda: get_svc('keyspaces').tag_resource(resourceArn=arn, tags=[{'key': tag_key, 'value': tag_value}]))
                   elif ':cloudhsm:' in arn and ':cluster/' in arn:
                       cluster_id = arn.split('cluster/')[-1]
-                      get_svc('cloudhsmv2').tag_resource(ResourceId=cluster_id, TagList=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: get_svc('cloudhsmv2').tag_resource(ResourceId=cluster_id, TagList=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':ds:' in arn and ':directory/' in arn:
                       dir_id = arn.split('directory/')[-1]
-                      get_svc('ds').add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: get_svc('ds').add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':vpc-lattice:' in arn:
-                      get_svc('vpc-lattice').tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                      _retry_throttles(lambda: get_svc('vpc-lattice').tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
                   elif ':bedrock-agentcore:' in arn:
                       r = arn.split(':')[3] or region
                       import urllib.parse, json as _json
@@ -7045,11 +7141,11 @@ ${crossAccountCode}
                       urllib.request.urlopen(req)
                   elif ':payment-cryptography:' in arn:
                       r = arn.split(':')[3] or region
-                      boto3.client('payment-cryptography', region_name=r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: boto3.client('payment-cryptography', region_name=r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':networkmanager:' in arn:
-                      boto3.client('networkmanager', region_name='us-east-1').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                      _retry_throttles(lambda: boto3.client('networkmanager', region_name='us-east-1').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   elif ':kinesisvideo:' in arn:
-                      get_svc('kinesisvideo').tag_stream(StreamARN=arn, Tags={tag_key: tag_value})
+                      _retry_throttles(lambda: get_svc('kinesisvideo').tag_stream(StreamARN=arn, Tags={tag_key: tag_value}))
                   else:
                       # Universal Resource Groups Tagging API. For RunInstances
                       # batch the parent + attached EBS volumes + ENIs together;

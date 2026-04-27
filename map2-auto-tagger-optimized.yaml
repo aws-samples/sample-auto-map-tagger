@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.9.4 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.9.5 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -65,7 +65,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.9.4
+      Value: v20.9.5
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -611,7 +611,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.9.4'
+          TEMPLATE_VERSION = 'v20.9.5'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -2105,6 +2105,36 @@ Resources:
 
               return None
 
+          # Shared throttle-code set used by both native dispatch branches and
+          # the RGTA fallthrough. RGTA throws 'ThrottledException' (with "ed")
+          # — most other AWS services throw 'ThrottlingException' (with "ing").
+          # Both variants must be enumerated, alongside the generic rate-limit
+          # codes. Hoisted to module scope so _retry_throttles() and the RGTA
+          # retry loop below share the same constant (v20.9.5, §1.81/§1.92).
+          THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+
+          def _retry_throttles(fn):
+              """Call fn() with exponential-backoff retry on throttle ClientError.
+
+              Matches the pattern used by the RGTA fallthrough below — 4 attempts,
+              1s → 2s → 4s → 8s (±25% jitter). Non-throttle ClientErrors propagate
+              to the outer _process_event classifier on the first attempt. Absorbs
+              short throttles inside the invocation so we don't burn one of the
+              5 SQS redeliveries (180s VT each) on a recoverable rate limit
+              (v20.9.5, §1.81/§1.92).
+              """
+              for attempt in range(4):
+                  try:
+                      return fn()
+                  except ClientError as e:
+                      code = e.response['Error']['Code']
+                      if code in THROTTLE_CODES and attempt < 3:
+                          sleep_time = (2 ** attempt) * 1.0 * (1 + random.uniform(-0.25, 0.25))
+                          print(f"Native-tag throttled (code={code}), retry in {sleep_time:.1f}s (attempt {attempt+1}/4)")
+                          time.sleep(sleep_time)
+                          continue
+                      raise
+
           def tag_resource(arn, tag_key, tag_value, tagging_client=None, ec2_client=None, target_region=None):
               _tagging = tagging_client or tagging
               _ec2 = ec2_client or ec2
@@ -2113,7 +2143,11 @@ Resources:
               def get_service_client(service):
                   return boto3.client(service, region_name=_region)
 
-              # Handle special cases that don't support Resource Groups Tagging API
+              # Handle special cases that don't support Resource Groups Tagging API.
+              # Each native tag call is wrapped in _retry_throttles() so short
+              # throttle bursts are absorbed in-invocation (up to 4 attempts,
+              # ~15s total worst case) rather than burning SQS redelivery
+              # budget. (§1.81/§1.92, v20.9.5)
               if ':s3:::' in arn:
                   s3 = get_service_client('s3')
                   bucket = arn.split(':::')[1]
@@ -2132,63 +2166,63 @@ Resources:
                           raise
                   existing = [t for t in existing if t['Key'] != tag_key]
                   existing.append({'Key': tag_key, 'Value': tag_value})
-                  s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing})
+                  _retry_throttles(lambda: s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing}))
                   return True
               elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
                   ba = boto3.client('bedrock-agent', region_name=arn.split(':')[3])
-                  ba.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                  _retry_throttles(lambda: ba.tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
                   return True
               elif ':quicksight:' in arn:
                   # QuickSight resources must be tagged in the region where they exist
                   qs_region = arn.split(':')[3] or region
                   qs = boto3.client('quicksight', region_name=qs_region)
                   account = arn.split(':')[4]
-                  qs.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: qs.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':globalaccelerator:' in arn:
                   ga = boto3.client('globalaccelerator', region_name='us-west-2')
-                  ga.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: ga.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':cloudfront:' in arn:
                   cf = boto3.client('cloudfront')
-                  cf.tag_resource(Resource=arn, Tags={'Items': [{'Key': tag_key, 'Value': tag_value}]})
+                  _retry_throttles(lambda: cf.tag_resource(Resource=arn, Tags={'Items': [{'Key': tag_key, 'Value': tag_value}]}))
                   return True
               elif ':route53:::hostedzone/' in arn:
                   r53 = boto3.client('route53')
                   zone_id = arn.split('/')[-1]
-                  r53.change_tags_for_resource(ResourceType='hostedzone', ResourceId=zone_id, AddTags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: r53.change_tags_for_resource(ResourceType='hostedzone', ResourceId=zone_id, AddTags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':kinesis:' in arn and ':stream/' in arn:
                   kinesis = get_service_client('kinesis')
                   stream_name = arn.split('/')[-1]
-                  kinesis.add_tags_to_stream(StreamName=stream_name, Tags={tag_key: tag_value})
+                  _retry_throttles(lambda: kinesis.add_tags_to_stream(StreamName=stream_name, Tags={tag_key: tag_value}))
                   return True
               elif ':kinesisvideo:' in arn:
                   kv = get_service_client('kinesisvideo')
-                  kv.tag_stream(StreamARN=arn, Tags={tag_key: tag_value})
+                  _retry_throttles(lambda: kv.tag_stream(StreamARN=arn, Tags={tag_key: tag_value}))
                   return True
               elif ':firehose:' in arn:
                   firehose = get_service_client('firehose')
                   stream_name = arn.split('/')[-1]
-                  firehose.tag_delivery_stream(DeliveryStreamName=stream_name, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: firehose.tag_delivery_stream(DeliveryStreamName=stream_name, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':apigateway:' in arn:
                   apigw = get_service_client('apigateway') if '/restapis/' in arn else get_service_client('apigatewayv2')
                   if '/restapis/' in arn:
-                      apigw.tag_resource(resourceArn=arn, tags={tag_key: tag_value})
+                      _retry_throttles(lambda: apigw.tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
                   else:
-                      apigw.tag_resource(ResourceArn=arn, Tags={tag_key: tag_value})
+                      _retry_throttles(lambda: apigw.tag_resource(ResourceArn=arn, Tags={tag_key: tag_value}))
                   return True
               elif ':autoscaling:' in arn:
                   asg = get_service_client('autoscaling')
                   name = arn.split('/')[-1]
-                  asg.create_or_update_tags(Tags=[{
+                  _retry_throttles(lambda: asg.create_or_update_tags(Tags=[{
                       'ResourceId': name,
                       'ResourceType': 'auto-scaling-group',
                       'Key': tag_key,
                       'Value': tag_value,
                       'PropagateAtLaunch': False
-                  }])
+                  }]))
                   return True
               elif ':sqs:' in arn:
                   sqs = get_service_client('sqs')
@@ -2196,51 +2230,50 @@ Resources:
                   q_region = arn.split(':')[3]
                   q_account = arn.split(':')[4]
                   queue_url = f"https://sqs.{q_region}.amazonaws.com/{q_account}/{queue_name}"
-                  sqs.tag_queue(QueueUrl=queue_url, Tags={tag_key: tag_value})
+                  _retry_throttles(lambda: sqs.tag_queue(QueueUrl=queue_url, Tags={tag_key: tag_value}))
                   return True
               elif ':memorydb:' in arn:
                   memorydb = get_service_client('memorydb')
-                  memorydb.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: memorydb.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':dax:' in arn:
                   # §1.84. RGTA does not support DAX — native dax.tag_resource
                   # takes `ResourceName=<arn>` per the boto3 service model.
                   dax = get_service_client('dax')
-                  dax.tag_resource(ResourceName=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: dax.tag_resource(ResourceName=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':storagegateway:' in arn:
                   # §1.85. RGTA does not support Storage Gateway — native
                   # storagegateway.add_tags_to_resource takes the ARN directly.
                   sg = get_service_client('storagegateway')
-                  sg.add_tags_to_resource(ResourceARN=arn, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: sg.add_tags_to_resource(ResourceARN=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':iot:' in arn:
                   iot = get_service_client('iot')
-                  iot.tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: iot.tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':cassandra:' in arn:
                   # Keyspaces TagResource uses lowercase key/value (service inconsistency).
                   ks = get_service_client('keyspaces')
-                  ks.tag_resource(resourceArn=arn, tags=[{'key': tag_key, 'value': tag_value}])
+                  _retry_throttles(lambda: ks.tag_resource(resourceArn=arn, tags=[{'key': tag_key, 'value': tag_value}]))
                   return True
               elif ':cloudhsm:' in arn and ':cluster/' in arn:
                   # cloudhsmv2 TagResource takes the raw cluster_id as ResourceId.
                   chsm = get_service_client('cloudhsmv2')
                   cluster_id = arn.split('cluster/')[-1]
-                  chsm.tag_resource(ResourceId=cluster_id, TagList=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: chsm.tag_resource(ResourceId=cluster_id, TagList=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':ds:' in arn and ':directory/' in arn:
                   # ds AddTagsToResource takes the raw directory_id as ResourceId.
                   ds = get_service_client('ds')
                   dir_id = arn.split('directory/')[-1]
-                  ds.add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}])
+                  _retry_throttles(lambda: ds.add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               else:
-                  # Use universal Resource Groups Tagging API (with optional cross-account client)
+                  # Use universal Resource Groups Tagging API (with optional cross-account client).
                   # Retry up to 3 times with exponential backoff for throttling errors.
-                  # RGTA throws 'ThrottledException' (with "ed") — most other AWS services
-                  # throw 'ThrottlingException' (with "ing"). Both variants must be enumerated.
-                  THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+                  # Uses the module-level THROTTLE_CODES defined above so the native
+                  # branches and this fallthrough share the same constant.
                   for attempt in range(4):
                       try:
                           response = _tagging.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
@@ -3071,7 +3104,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.9.4
+    Value: v20.9.5
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
