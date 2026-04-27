@@ -1155,7 +1155,7 @@
                 date: '2026-04-27',
                 changes: [
                     { tag: 'perf', text: 'Native-API tag dispatch (S3, QuickSight, CloudFront, Route53, Kinesis, Firehose, APIGateway, AutoScaling, SQS, MemoryDB, DAX, StorageGateway, IoT, Keyspaces, CloudHSM v2, Directory Service, Bedrock Agent, Global Accelerator, KinesisVideo) now shares the 4-attempt exponential-backoff throttle retry (1s → 2s → 4s → 8s, ±25% jitter) previously only wired on the RGTA fallthrough. Short throttles are absorbed in-invocation instead of burning one of the 5 SQS redeliveries (180s VT each). `THROTTLE_CODES` is hoisted so both code paths share the same constant. (§1.81/§1.92)' },
-                    { tag: 'security', text: 'Configurator review tables (editor/update/delete/deploy) now render customer-supplied values via `textContent` + `document.createElement` instead of `innerHTML` template literals. Closes the self-XSS surface where a customer-typed name, email, or VPC ID that somehow bypasses the input regex could inject a `<script>` tag into the review pane. (§1.94)' },
+                    { tag: 'security', text: 'Configurator review tables (editor/update/delete/deploy) now render customer-supplied values via `textContent` + `document.createElement` instead of `innerHTML` template literals. Closes the self-XSS surface where a customer-typed name, email, or VPC ID that somehow bypasses the input regex could inject an HTML/JS payload into the review pane. (§1.94)' },
                 ],
             },
             {
