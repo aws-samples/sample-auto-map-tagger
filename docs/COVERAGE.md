@@ -134,7 +134,6 @@ All services below have an explicit handler in the Lambda function **and** the c
 |---------|---------------|----------------|
 | CloudWatch | Alarms, dashboards, log groups | RGTA (dashboard ARN region fix v20.7.3) |
 | Systems Manager | Parameters, documents | RGTA |
-| CloudFormation | Stacks, StackSets | RGTA |
 | Service Catalog | Portfolios | RGTA |
 
 ### Developer Tools
@@ -257,3 +256,4 @@ python3 .github/scripts/audit_handler_coverage.py --report
   - **CloudHSM v2** — handler + IAM (`cloudhsm:TagResource`) are in place, but has not been live-verified since the v20.3.0 ship. Marked `**UNVERIFIED**` above pending a direct-deploy smoke test.
 - **v20.7.3** retracted the original `PutDashboard` ARN shape (region-scoped) — AWS dashboards are account-global, so RGTA rejected the region form with silent AccessDenied. The current ARN shape is `arn:aws:cloudwatch::<acct>:dashboard/<name>` and is live-verified.
 - **VPC Lattice** was historically listed as "supported" while the Lambda's RGTA fallthrough silently AccessDenied'd every `CreateServiceNetwork` event (D7). The `vpc-lattice:TagResource` grant was added later. Moved to **Unverified** above until a live smoke test confirms the fix.
+- **CloudFormation** (Stacks, StackSets) was listed under Management & Governance through v20.9.3. Removed in **v20.9.4** (§1.100): CloudFormation is NOT on the MAP Included Services List (6 April 2026 edition), so stack resources do not earn MAP credit and should not be advertised as covered. The `cloudformation:TagResource / UpdateStack / UpdateStackSet / ListStacks` IAM actions remain in the Lambda role — they support internal CFN TagResource routing (the AWS auth matrix maps `tag:TagResources` on CFN stacks through `UpdateStack`) and the peer-tagger detector at cold start (§1.108). The actions are not there to earn MAP credit on customer stacks.

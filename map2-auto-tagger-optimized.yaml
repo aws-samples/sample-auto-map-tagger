@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.9.3 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.9.4 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -65,7 +65,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.9.3
+      Value: v20.9.4
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -144,6 +144,12 @@ Resources:
                   - elasticbeanstalk:AddTags
                   - emr-serverless:TagResource
                   - elasticmapreduce:AddTags
+                  # AWS Batch (§1.27) — job queues, compute environments, job
+                  # definitions. RGTA dispatches tag:TagResources on these to
+                  # batch:TagResource per the AWS service-authorization matrix;
+                  # without this grant every Batch CreateJobQueue / CreateComputeEnvironment
+                  # / RegisterJobDefinition fell through to AccessDenied.
+                  - batch:TagResource
                   # --- Storage ---
                   - s3:PutBucketTagging
                   - s3:GetBucketTagging
@@ -605,7 +611,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.9.3'
+          TEMPLATE_VERSION = 'v20.9.4'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -1216,13 +1222,15 @@ Resources:
                   if acl_id:
                       return f"arn:aws:ec2:{region}:{account_id}:network-acl/{acl_id}"
 
-              # NAT Gateway (improved extraction)
+              # NAT Gateway (§1.50 — CloudTrail EC2 responses wrap in
+              # <EventName>Response; match the unwrap pattern used by
+              # CreateNetworkAcl / CreateLaunchTemplate / CreateTransitGateway /
+              # CreateVpnGateway / CreateRouteTable above.)
               elif event_name == 'CreateNatGateway':
-                  nat_id = None
-                  if 'natGateway' in resp:
-                      nat_id = resp['natGateway'].get('natGatewayId')
-                  if not nat_id:
-                      nat_id = resp.get('natGatewayId')
+                  nat = resp.get('natGateway', {})
+                  if not nat and 'CreateNatGatewayResponse' in resp:
+                      nat = resp['CreateNatGatewayResponse'].get('natGateway', {})
+                  nat_id = nat.get('natGatewayId')
                   if nat_id:
                       return f"arn:aws:ec2:{region}:{account_id}:natgateway/{nat_id}"
 
@@ -1337,14 +1345,17 @@ Resources:
                   cluster = resp.get('cluster', {})
                   return cluster.get('aRN')  # Note: capital ARN
 
-              # CloudHSM v2 Cluster — responseElements has no ARN, only cluster.clusterId
-              elif event_name == 'CreateCluster' and event_source == 'cloudhsmv2.amazonaws.com':
+              # CloudHSM v2 Cluster — responseElements has no ARN, only cluster.clusterId.
+              # §1.99b: CloudTrail eventSource for CloudHSM v2 is 'cloudhsm.amazonaws.com'
+              # (NOT 'cloudhsmv2.amazonaws.com'). The boto3 service name IS 'cloudhsmv2';
+              # only the CloudTrail eventSource differs. Live-confirmed 2026-04-27.
+              elif event_name == 'CreateCluster' and event_source == 'cloudhsm.amazonaws.com':
                   cluster_id = (resp.get('cluster') or {}).get('clusterId')
                   if cluster_id:
                       return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
 
               # CloudHSM v2 HSM — tagging routes to parent cluster (idempotent with CreateCluster handler)
-              elif event_name == 'CreateHsm' and event_source == 'cloudhsmv2.amazonaws.com':
+              elif event_name == 'CreateHsm' and event_source == 'cloudhsm.amazonaws.com':
                   cluster_id = (resp.get('hsm') or {}).get('clusterId') or req.get('clusterId')
                   if cluster_id:
                       return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
@@ -2329,6 +2340,17 @@ Resources:
               # against 'Throttling' already catches it, but enumerate for
               # clarity alongside the other throttle codes.
               'Throttling.User',
+              # ElastiCache provisioning race (§1.101). During rapid
+              # CreateCacheCluster / CreateReplicationGroup bursts, the tag
+              # API occasionally returns "<resource> is either not present or
+              # not available" while the cluster is still settling. Retries
+              # succeed once provisioning completes.
+              'is either not present or not available',
+              # SSM ConcurrentUpdateException (§1.44). PutParameter bursts
+              # (e.g. customer automation rotating config in parallel) return
+              # "concurrently modified" when two writers touch the same
+              # parameter. Retry after SQS redelivery resolves it.
+              'concurrently modified',
           )
           _PERMANENT_IGNORABLE_MARKERS = (
               # Resource genuinely deleted between create and tag event.
@@ -3049,7 +3071,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.9.3
+    Value: v20.9.4
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
