@@ -6359,7 +6359,23 @@ ${permissionsList}
                   rt = event.get('RequestType', '')
                   if rt in ('Update', 'Delete'):
                       return respond(event, context, 'SUCCESS', f'{rt}: no-op')
+                  # Detect upgrade: CFN sends Create for a new resource, but if a
+                  # tagger stack with this MpeId already exists then the peer-Lambda
+                  # is already live — this is a template upgrade, not a fresh deploy.
+                  # Uses ListStacks (already in PreflightRole IAM) instead of
+                  # DescribeStacks to avoid needing an extra IAM grant.
                   props = event.get('ResourceProperties', {})
+                  own_mpe = props.get('MpeId', '')
+                  if own_mpe:
+                      own_stack = f'map-auto-tagger-{own_mpe}'
+                      cfn_client = boto3.client('cloudformation')
+                      active = ['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE', 'UPDATE_IN_PROGRESS']
+                      for page in cfn_client.get_paginator('list_stacks').paginate(StackStatusFilter=active):
+                          for s in page.get('StackSummaries', []):
+                              if s['StackName'] == own_stack:
+                                  return respond(event, context, 'SUCCESS',
+                                                 f'Upgrade detected ({own_stack} exists): skip preflight')
+                      # stack not found — genuine first deploy, proceed to check
                   account = context.invoked_function_arn.split(':')[4]
                   region = os.environ.get('AWS_REGION', '')
                   conflicts = check_peers(props, account, region)
