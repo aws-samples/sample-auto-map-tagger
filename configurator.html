@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v20.9.5'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v20.9.5';
+        // Must match `TEMPLATE_VERSION = 'v20.10.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v20.10.0';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1151,11 +1151,19 @@
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
             {
+                version: 'v20.10.0',
+                date: '2026-04-28',
+                changes: [
+                    { tag: 'feature', text: 'YAML Lambda now includes native tag dispatch for DSQL, VPC Lattice, Bedrock AgentCore, Payment Cryptography, and Network Manager — previously only in the configurator Lambda. Closes the back-port gap that blocked F012 (configurator Lambda sync).' },
+                    { tag: 'bugfix', text: 'AD Connector (ConnectDirectory) now tagged. Added ConnectDirectory to the Directory Service handler and added "Connect" prefix to the EventBridge event pattern. Closes F006 (silent credit loss for AD Connector resources).' },
+                ],
+            },
+            {
                 version: 'v20.9.5',
                 date: '2026-04-27',
                 changes: [
-                    { tag: 'perf', text: 'Native-API tag dispatch (S3, QuickSight, CloudFront, Route53, Kinesis, Firehose, APIGateway, AutoScaling, SQS, MemoryDB, DAX, StorageGateway, IoT, Keyspaces, CloudHSM v2, Directory Service, Bedrock Agent, Global Accelerator, KinesisVideo) now shares the 4-attempt exponential-backoff throttle retry (1s → 2s → 4s → 8s, ±25% jitter) previously only wired on the RGTA fallthrough. Short throttles are absorbed in-invocation instead of burning one of the 5 SQS redeliveries (180s VT each). `THROTTLE_CODES` is hoisted so both code paths share the same constant. (§1.81/§1.92)' },
-                    { tag: 'security', text: 'Configurator review tables (editor/update/delete/deploy) now render customer-supplied values via `textContent` + `document.createElement` instead of `innerHTML` template literals. Closes the self-XSS surface where a customer-typed name, email, or VPC ID that somehow bypasses the input regex could inject an HTML/JS payload into the review pane. (§1.94)' },
+                    { tag: 'perf', text: 'Native-API tag dispatch (S3, QuickSight, CloudFront, Route53, Kinesis, Firehose, APIGateway, AutoScaling, SQS, MemoryDB, DAX, StorageGateway, IoT, Keyspaces, CloudHSM v2, Directory Service, Bedrock Agent, Global Accelerator, KinesisVideo) now shares the 4-attempt exponential-backoff throttle retry (1s → 2s → 4s → 8s, ±25% jitter) previously only wired on the RGTA fallthrough. Short throttles are absorbed in-invocation instead of burning one of the 5 SQS redeliveries (180s VT each). THROTTLE_CODES is hoisted so both code paths share the same constant. (§1.81/§1.92)' },
+                    { tag: 'security', text: 'Configurator review tables (editor/update/delete/deploy) now render customer-supplied values via textContent + document.createElement instead of innerHTML template literals. Closes the self-XSS surface where a customer-typed name, email, or VPC ID that somehow bypasses the input regex could inject an HTML/JS payload into the review pane. (§1.94)' },
                 ],
             },
             {
@@ -1538,7 +1546,7 @@
             if (action === 'add') rows.push([t('ui_backfill_title'), backfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
             // Safe DOM construction: v may contain user-controlled values
             // (customer name, account IDs) so use textContent rather than
-            // innerHTML template-literal interpolation. (§1.94, v20.9.5)
+            // innerHTML template-literal interpolation. (§1.94, v20.10.0)
             table.replaceChildren();
             rows.forEach(([k, v], i) => {
                 const tr = document.createElement('tr');
@@ -1645,7 +1653,7 @@
             ];
             // Safe DOM construction: v may contain user-controlled values
             // (MPE IDs) so use textContent rather than innerHTML template-
-            // literal interpolation. (§1.94, v20.9.5)
+            // literal interpolation. (§1.94, v20.10.0)
             table.replaceChildren();
             rows.forEach(([k, v], i) => {
                 const tr = document.createElement('tr');
@@ -1794,7 +1802,7 @@
             // (MPE IDs, region strings) so use textContent rather than
             // innerHTML template-literal interpolation. Preserves the
             // delete-review styles (padding 10px 12px, v-cell font-weight
-            // 600). (§1.94, v20.9.5)
+            // 600). (§1.94, v20.10.0)
             const deleteTable = document.getElementById('delete-reviewTable');
             deleteTable.replaceChildren();
             rows.forEach(([k, v], i) => {
@@ -3123,7 +3131,7 @@ network calls are made from your environment during the upgrade.`;
             // (customer name, email, account IDs, VPC IDs) so use textContent
             // rather than innerHTML template-literal interpolation. Preserves
             // the main-deploy styles (width 200px, v-cell monospace 13px).
-            // (§1.94, v20.9.5)
+            // (§1.94, v20.10.0)
             table.replaceChildren();
             rows.forEach(([k, v]) => {
                 const tr = document.createElement('tr');
@@ -5708,7 +5716,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             'CreateAsset','CreateAssetModel','CreateGateway','CreatePortal',
             'CreateTopicRule',
             'CreateSourceServer',
-            'CreateDomain'
+            'CreateDomain',
+            'ConnectDirectory'
         ];
 
         const ALL_SOURCES = [
@@ -6454,7 +6463,7 @@ ${permissionsList}
           # (with "ing"). Both variants must be enumerated alongside the
           # generic rate-limit codes. Native calls wrap in _retry_throttles so
           # short throttles are absorbed in-invocation instead of burning an
-          # SQS redelivery (180s VT). (§1.81/§1.92, v20.9.5)
+          # SQS redelivery (180s VT). (§1.81/§1.92, v20.10.0)
           THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
 
           def _retry_throttles(fn):
@@ -7327,6 +7336,7 @@ ${crossAccountCode}
             - prefix: "Enable"
             - prefix: "Copy"
             - prefix: "Restore"
+            - prefix: "Connect"
       Targets:
         - Arn: !GetAtt EventQueue.Arn
           Id: MapAutoTaggerQueue

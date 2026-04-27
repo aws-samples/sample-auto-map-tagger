@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v20.9.5 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v20.10.0 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -65,7 +65,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v20.9.5
+      Value: v20.10.0
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -250,6 +250,7 @@ Resources:
                   - comprehend:TagResource
                   - kendra:TagResource
                   - bedrock:TagResource
+                  - bedrock-agentcore:TagResource
                   - braket:TagResource
                   # --- IoT ---
                   - iot:TagResource
@@ -279,6 +280,9 @@ Resources:
                   - drs:TagResource
                   - deadline:TagResource
                   - kinesisvideo:TagStream
+                  - dsql:TagResource
+                  - payment-cryptography:TagResource
+                  - networkmanager:TagResource
                   # --- Tier 1 MAP services (PR #25) ---
                   # Keyspaces (Cassandra-compatible) — RGTA support is unreliable
                   # for cassandra resources, so Lambda calls keyspaces:TagResource
@@ -625,7 +629,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v20.9.5'
+          TEMPLATE_VERSION = 'v20.10.0'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -1374,10 +1378,8 @@ Resources:
                   if cluster_id:
                       return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
 
-              # AWS Directory Service (Simple AD + Managed Microsoft AD)
-              # Note: AD Connector fires ConnectDirectory, which is not in the
-              # EventBridge prefix list (no 'Connect' prefix) — skip for now.
-              elif event_name in ('CreateDirectory', 'CreateMicrosoftAD') and event_source == 'ds.amazonaws.com':
+              # AWS Directory Service (Simple AD + Managed Microsoft AD + AD Connector)
+              elif event_name in ('CreateDirectory', 'CreateMicrosoftAD', 'ConnectDirectory') and event_source == 'ds.amazonaws.com':
                   dir_id = resp.get('directoryId')
                   if dir_id:
                       return f"arn:aws:ds:{region}:{account_id}:directory/{dir_id}"
@@ -2124,7 +2126,7 @@ Resources:
           # — most other AWS services throw 'ThrottlingException' (with "ing").
           # Both variants must be enumerated, alongside the generic rate-limit
           # codes. Hoisted to module scope so _retry_throttles() and the RGTA
-          # retry loop below share the same constant (v20.9.5, §1.81/§1.92).
+          # retry loop below share the same constant (v20.10.0, §1.81/§1.92).
           THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
 
           def _retry_throttles(fn):
@@ -2135,7 +2137,7 @@ Resources:
               to the outer _process_event classifier on the first attempt. Absorbs
               short throttles inside the invocation so we don't burn one of the
               5 SQS redeliveries (180s VT each) on a recoverable rate limit
-              (v20.9.5, §1.81/§1.92).
+              (v20.10.0, §1.81/§1.92).
               """
               for attempt in range(4):
                   try:
@@ -2161,7 +2163,7 @@ Resources:
               # Each native tag call is wrapped in _retry_throttles() so short
               # throttle bursts are absorbed in-invocation (up to 4 attempts,
               # ~15s total worst case) rather than burning SQS redelivery
-              # budget. (§1.81/§1.92, v20.9.5)
+              # budget. (§1.81/§1.92, v20.10.0)
               if ':s3:::' in arn:
                   s3 = get_service_client('s3')
                   bucket = arn.split(':::')[1]
@@ -2282,6 +2284,36 @@ Resources:
                   ds = get_service_client('ds')
                   dir_id = arn.split('directory/')[-1]
                   _retry_throttles(lambda: ds.add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':dsql:' in arn:
+                  _retry_throttles(lambda: get_service_client('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
+                  return True
+              elif ':vpc-lattice:' in arn:
+                  _retry_throttles(lambda: get_service_client('vpc-lattice').tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
+                  return True
+              elif ':bedrock-agentcore:' in arn:
+                  r = arn.split(':')[3] or region
+                  import urllib.parse, urllib.request, json as _json
+                  creds = boto3.Session().get_credentials().get_frozen_credentials()
+                  encoded = urllib.parse.quote(arn, safe='')
+                  url = f"https://bedrock-agentcore-control.{r}.amazonaws.com/tags/{encoded}"
+                  body = _json.dumps({'tags': {tag_key: tag_value}}).encode()
+                  req = urllib.request.Request(url, data=body, method='POST')
+                  req.add_header('Content-Type', 'application/json')
+                  from botocore.auth import SigV4Auth
+                  from botocore.awsrequest import AWSRequest
+                  aws_req = AWSRequest(method='POST', url=url, data=body, headers={'Content-Type': 'application/json'})
+                  SigV4Auth(creds, 'bedrock-agentcore', r).add_auth(aws_req)
+                  for h,v in aws_req.headers.items():
+                      req.add_header(h, v)
+                  urllib.request.urlopen(req)
+                  return True
+              elif ':payment-cryptography:' in arn:
+                  r = arn.split(':')[3] or region
+                  _retry_throttles(lambda: boto3.client('payment-cryptography', region_name=r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':networkmanager:' in arn:
+                  _retry_throttles(lambda: boto3.client('networkmanager', region_name='us-east-1').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               else:
                   # Use universal Resource Groups Tagging API (with optional cross-account client).
@@ -2654,6 +2686,7 @@ Resources:
             - prefix: "Copy"       # RDS/EBS snapshots, AMIs
             - prefix: "Restore"    # RDS/Aurora/Redshift from snapshots
             - prefix: "Enable"     # SecurityHub
+            - prefix: "Connect"    # AD Connector (ConnectDirectory)
       Targets:
         - Arn: !GetAtt EventQueue.Arn
           Id: MapAutoTaggerQueue
@@ -3118,7 +3151,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v20.9.5
+    Value: v20.10.0
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
