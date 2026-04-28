@@ -8402,13 +8402,13 @@ ${permissionsList}
                       TopicArn=alert_arn,
                       Subject='MAP Auto-Tagger: Permanent tagging failure',
                       Message=(
-                          f'Failed to apply map-migrated tag (permanent-actionable class).\n\n'
-                          f'Resource ARN: {arn}\n'
-                          f'MPE ID: {mpe_id}\n'
-                          f'Error: {err_msg}\n\n'
+                          f'Failed to apply map-migrated tag (permanent-actionable class).\\n\\n'
+                          f'Resource ARN: {arn}\\n'
+                          f'MPE ID: {mpe_id}\\n'
+                          f'Error: {err_msg}\\n\\n'
                           f'This error is not a known transient condition and is not a '
                           f'benign resource-deleted case. Investigate IAM policy, SCP '
-                          f'drift, or tag-quota exhaustion. Event will land in EventDLQ.\n'
+                          f'drift, or tag-quota exhaustion. Event will land in EventDLQ.\\n'
                       )
                   )
               except Exception as sns_e:
