@@ -38,13 +38,13 @@ if [[ ! "$EMAIL" =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; then
 fi
 
 ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
-REGION="$(aws configure get region || echo "${AWS_DEFAULT_REGION:-${AWS_REGION:-}}")"
+REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-$(aws configure get region 2>/dev/null || true)}}"
 if [[ -z "$REGION" ]]; then
     echo "error: no AWS region resolved (set AWS_REGION or AWS_DEFAULT_REGION, or 'aws configure')" >&2
     exit 1
 fi
 
-TOPIC_ARN="arn:aws:sns:${REGION}:${ACCOUNT}:map-auto-tagger-alerts-${MPE}"
+TOPIC_ARN="arn:aws:sns:${REGION}:${ACCOUNT}:auto-map-tagger-alerts-${MPE}"
 
 echo "Subscribing ${EMAIL} to ${TOPIC_ARN}"
 aws sns subscribe \
