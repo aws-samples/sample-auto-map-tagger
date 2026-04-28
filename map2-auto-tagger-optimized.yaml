@@ -703,16 +703,26 @@ Resources:
                       cw.put_metric_data(
                           Namespace='MapAutoTagger',
                           MetricData=[
+                              *[
+                                  {
+                                      'MetricName': 'PeerTaggerDetected',
+                                      'Dimensions': [
+                                          {'Name': 'MpeId', 'Value': own_mpe},
+                                          {'Name': 'PeerMpeId', 'Value': peer},
+                                      ],
+                                      'Value': 1,
+                                      'Unit': 'Count',
+                                  }
+                                  for peer in peer_mpes
+                              ],
                               {
                                   'MetricName': 'PeerTaggerDetected',
                                   'Dimensions': [
                                       {'Name': 'MpeId', 'Value': own_mpe},
-                                      {'Name': 'PeerMpeId', 'Value': peer},
                                   ],
-                                  'Value': 1,
+                                  'Value': len(peer_mpes),
                                   'Unit': 'Count',
-                              }
-                              for peer in peer_mpes
+                              },
                           ],
                       )
                   except Exception as mx:
@@ -2298,19 +2308,25 @@ Resources:
               elif ':bedrock-agentcore:' in arn:
                   r = arn.split(':')[3] or region
                   import urllib.parse, urllib.request, json as _json
-                  creds = boto3.Session().get_credentials().get_frozen_credentials()
-                  encoded = urllib.parse.quote(arn, safe='')
-                  url = f"https://bedrock-agentcore-control.{r}.amazonaws.com/tags/{encoded}"
-                  body = _json.dumps({'tags': {tag_key: tag_value}}).encode()
-                  req = urllib.request.Request(url, data=body, method='POST')
-                  req.add_header('Content-Type', 'application/json')
-                  from botocore.auth import SigV4Auth
-                  from botocore.awsrequest import AWSRequest
-                  aws_req = AWSRequest(method='POST', url=url, data=body, headers={'Content-Type': 'application/json'})
-                  SigV4Auth(creds, 'bedrock-agentcore', r).add_auth(aws_req)
-                  for h,v in aws_req.headers.items():
-                      req.add_header(h, v)
-                  urllib.request.urlopen(req)
+                  from botocore.auth import SigV4Auth as _SigV4Auth
+                  from botocore.awsrequest import AWSRequest as _AWSReq
+                  def _agentcore_tag():
+                      creds = boto3.Session().get_credentials().get_frozen_credentials()
+                      encoded = urllib.parse.quote(arn, safe='')
+                      url = f"https://bedrock-agentcore-control.{r}.amazonaws.com/tags/{encoded}"
+                      body = _json.dumps({'tags': {tag_key: tag_value}}).encode()
+                      aws_req = _AWSReq(method='POST', url=url, data=body, headers={'Content-Type': 'application/json'})
+                      _SigV4Auth(creds, 'bedrock-agentcore', r).add_auth(aws_req)
+                      http_req = urllib.request.Request(url, data=body, method='POST')
+                      for h, v in aws_req.headers.items():
+                          http_req.add_header(h, v)
+                      try:
+                          urllib.request.urlopen(http_req)
+                      except urllib.error.HTTPError as he:
+                          if he.code in (429, 503):
+                              raise ClientError({'Error': {'Code': 'ThrottlingException', 'Message': str(he)}}, 'TagResource')
+                          raise
+                  _retry_throttles(_agentcore_tag)
                   return True
               elif ':payment-cryptography:' in arn:
                   r = arn.split(':')[3] or region
@@ -2733,7 +2749,7 @@ Resources:
         deadLetterTargetArn: !GetAtt EventDLQ.Arn
         maxReceiveCount: 5
 
-  # Dead letter queue — receives events that fail after 3 processing attempts
+  # Dead letter queue — receives events that fail after 5 processing attempts
   EventDLQ:
     Type: AWS::SQS::Queue
     Properties:
@@ -2786,13 +2802,13 @@ Resources:
       AlarmActions:
         - !Ref AlertTopic
 
-  # CloudWatch alarm - fires if events land in DLQ (failed after 3 SQS retries)
+  # CloudWatch alarm - fires if events land in DLQ (failed after 5 SQS retries)
   DLQAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: !Sub 'map-auto-tagger-dlq-${MpeId}'
       AlarmDescription: >
-        MAP auto-tagger events failed after 3 processing attempts and were moved
+        MAP auto-tagger events failed after 5 processing attempts and were moved
         to the dead letter queue. Check DLQ for stranded events and investigate
         Lambda errors. Events are retained for 14 days.
       Namespace: AWS/SQS
