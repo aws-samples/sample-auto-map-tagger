@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v21.0.2 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v21.0.3 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -65,7 +65,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v21.0.2
+      Value: v21.0.3
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -505,17 +505,18 @@ Resources:
               for page in cfn.get_paginator('list_stacks').paginate(StackStatusFilter=active):
                   for s in page.get('StackSummaries', []):
                       name = s.get('StackName', '')
-                      if not name.startswith('map-auto-tagger-mig'):
+                      if name.startswith('StackSet-map-auto-tagger-mig'):
+                          peer_mpe = name[len('StackSet-map-auto-tagger-'):]
+                      elif name.startswith('map-auto-tagger-mig'):
+                          peer_mpe = name[len('map-auto-tagger-'):]
+                      else:
                           continue
-                      peer_mpe = name[len('map-auto-tagger-'):]
                       if peer_mpe == own_mpe:
                           continue  # same MPE = in-place update, not a conflict
                       try:
                           p = ssm.get_parameter(Name=f'/auto-map-tagger/{peer_mpe}/config')
                           cfg = json.loads(p['Parameter']['Value'])
                       except Exception as e:
-                          # Peer stack exists but we can't read its config — conservatively
-                          # treat as a conflict (same behavior as configurator preflight).
                           conflicts.append(f'peer {name} config unreadable ({e.__class__.__name__})')
                           continue
                       peer_mode = cfg.get('scope_mode', 'account')
@@ -629,7 +630,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v21.0.2'
+          TEMPLATE_VERSION = 'v21.0.3'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -678,9 +679,12 @@ Resources:
                   for page in paginator.paginate(StackStatusFilter=active):
                       for s in page.get('StackSummaries', []):
                           name = s.get('StackName', '')
-                          if not name.startswith('map-auto-tagger-mig'):
+                          if name.startswith('StackSet-map-auto-tagger-mig'):
+                              peer_mpe = name[len('StackSet-map-auto-tagger-'):]
+                          elif name.startswith('map-auto-tagger-mig'):
+                              peer_mpe = name[len('map-auto-tagger-'):]
+                          else:
                               continue
-                          peer_mpe = name[len('map-auto-tagger-'):]
                           if peer_mpe == own_mpe:
                               continue
                           peer_mpes.append(peer_mpe)
@@ -2126,7 +2130,7 @@ Resources:
           # — most other AWS services throw 'ThrottlingException' (with "ing").
           # Both variants must be enumerated, alongside the generic rate-limit
           # codes. Hoisted to module scope so _retry_throttles() and the RGTA
-          # retry loop below share the same constant (v21.0.2, §1.81/§1.92).
+          # retry loop below share the same constant (v21.0.3, §1.81/§1.92).
           THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
 
           def _retry_throttles(fn):
@@ -2137,7 +2141,7 @@ Resources:
               to the outer _process_event classifier on the first attempt. Absorbs
               short throttles inside the invocation so we don't burn one of the
               5 SQS redeliveries (180s VT each) on a recoverable rate limit
-              (v21.0.2, §1.81/§1.92).
+              (v21.0.3, §1.81/§1.92).
               """
               for attempt in range(4):
                   try:
@@ -2163,7 +2167,7 @@ Resources:
               # Each native tag call is wrapped in _retry_throttles() so short
               # throttle bursts are absorbed in-invocation (up to 4 attempts,
               # ~15s total worst case) rather than burning SQS redelivery
-              # budget. (§1.81/§1.92, v21.0.2)
+              # budget. (§1.81/§1.92, v21.0.3)
               if ':s3:::' in arn:
                   s3 = get_service_client('s3')
                   bucket = arn.split(':::')[1]
@@ -2443,6 +2447,8 @@ Resources:
               'InvalidVolume.NotFound',
               # Bedrock system-defined inference profiles fire CreateInferenceProfile but the tag API returns this error. Application profiles (same event) tag normally; we silently ack the system ones.
               'System-defined Inference Profile is not taggable',
+              'UPDATE_ROLLBACK_FAILED',
+              'Tag related operations on the managed rule',
           )
 
           # Events to ignore — either not taggable, or would cause a feedback
@@ -3151,7 +3157,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v21.0.2
+    Value: v21.0.3
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
