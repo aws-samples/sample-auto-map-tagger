@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v21.0.4 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v21.0.6 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -22,6 +22,11 @@ Parameters:
     Type: String
     Description: MAP 2.0 agreement start date (YYYY-MM-DD)
     AllowedPattern: ^(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$
+  AgreementEndDate:
+    Type: String
+    Description: MAP 2.0 agreement end date (YYYY-MM-DD). Resources created after this date will NOT be tagged.
+    AllowedPattern: ^(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$
+    Default: "2099-12-31"
   ScopeMode:
     Type: String
     Description: How to determine which resources to tag
@@ -65,7 +70,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v21.0.4
+      Value: v21.0.6
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -86,6 +91,7 @@ Resources:
           {
             "mpe_id": "${MpeId}",
             "agreement_start_date": "${AgreementStartDate}",
+            "agreement_end_date": "${AgreementEndDate}",
             "scope_mode": "${ScopeMode}",
             "scoped_account_ids": ${AccountIdsArray},
             "scoped_vpc_ids": ${VpcIdsArray}
@@ -630,7 +636,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v21.0.4'
+          TEMPLATE_VERSION = 'v21.0.6'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -809,7 +815,19 @@ Resources:
               except (ValueError, TypeError):
                   print(f"Invalid agreement_start_date '{config.get('agreement_start_date')}', skipping event.")
                   return False
-              return datetime.now(timezone.utc) >= start
+              now = datetime.now(timezone.utc)
+              if now < start:
+                  return False
+              end_str = config.get("agreement_end_date")
+              if end_str:
+                  try:
+                      end = datetime.strptime(end_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                      if now > end:
+                          print(f"Event after agreement_end_date {end_str}, skipping.")
+                          return False
+                  except (ValueError, TypeError):
+                      pass
+              return True
 
           def is_in_scope(config, account_id, detail):
               # Fail-closed guards (§1.3 / §1.129 class). Safe-default config
@@ -2140,7 +2158,7 @@ Resources:
           # — most other AWS services throw 'ThrottlingException' (with "ing").
           # Both variants must be enumerated, alongside the generic rate-limit
           # codes. Hoisted to module scope so _retry_throttles() and the RGTA
-          # retry loop below share the same constant (v21.0.4, §1.81/§1.92).
+          # retry loop below share the same constant (v21.0.6, §1.81/§1.92).
           THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
 
           def _retry_throttles(fn):
@@ -2151,7 +2169,7 @@ Resources:
               to the outer _process_event classifier on the first attempt. Absorbs
               short throttles inside the invocation so we don't burn one of the
               5 SQS redeliveries (180s VT each) on a recoverable rate limit
-              (v21.0.4, §1.81/§1.92).
+              (v21.0.6, §1.81/§1.92).
               """
               for attempt in range(4):
                   try:
@@ -2177,7 +2195,7 @@ Resources:
               # Each native tag call is wrapped in _retry_throttles() so short
               # throttle bursts are absorbed in-invocation (up to 4 attempts,
               # ~15s total worst case) rather than burning SQS redelivery
-              # budget. (§1.81/§1.92, v21.0.4)
+              # budget. (§1.81/§1.92, v21.0.6)
               if ':s3:::' in arn:
                   s3 = get_service_client('s3')
                   bucket = arn.split(':::')[1]
@@ -3042,7 +3060,17 @@ Resources:
                   return False
               if creation_time.tzinfo is None:
                   creation_time = creation_time.replace(tzinfo=timezone.utc)
-              return creation_time >= start
+              if creation_time < start:
+                  return False
+              end_str = cfg.get("agreement_end_date")
+              if end_str:
+                  try:
+                      end = datetime.strptime(end_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                      if creation_time > end:
+                          return False
+                  except (KeyError, ValueError):
+                      pass
+              return True
 
           def _current_map_tag_value(tag_list):
               for t in tag_list or []:
@@ -3173,7 +3201,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v21.0.4
+    Value: v21.0.6
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
