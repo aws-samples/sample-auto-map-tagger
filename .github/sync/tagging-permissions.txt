@@ -10,6 +10,7 @@ autoscaling:CreateOrUpdateTags
 backup:TagResource
 batch:TagResource
 bedrock:TagResource
+bedrock-agentcore:TagResource
 braket:TagResource
 cassandra:Alter
 cassandra:TagResource
@@ -35,6 +36,7 @@ directconnect:TagResource
 dms:AddTagsToResource
 drs:TagResource
 ds:AddTagsToResource
+dsql:TagResource
 dynamodb:TagResource
 ec2:CreateTags
 ecr:TagResource
@@ -72,7 +74,9 @@ medialive:CreateTags
 mediapackage:TagResource
 memorydb:TagResource
 mq:CreateTags
+networkmanager:TagResource
 omics:TagResource
+payment-cryptography:TagResource
 quicksight:TagResource
 ram:TagResource
 rds:AddTagsToResource

@@ -69,7 +69,11 @@ NATIVE_IAM_REQUIREMENTS = {
     "keyspaces": ["cassandra:TagResource", "cassandra:Alter"],
     "cloudhsmv2": ["cloudhsm:TagResource"],
     "ds": ["ds:AddTagsToResource"],
+    "dsql": ["dsql:TagResource"],
     "dax": ["dax:TagResource"],
+    "vpc-lattice": ["vpc-lattice:TagResource"],
+    "payment-cryptography": ["payment-cryptography:TagResource"],
+    "networkmanager": ["networkmanager:TagResource"],
     "storagegateway": ["storagegateway:AddTagsToResource"],
     # Infrastructure clients — not for tagging dispatch.
     "ssm": [],
