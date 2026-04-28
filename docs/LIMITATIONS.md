@@ -99,6 +99,30 @@ The services below appear on the MAP Included Services List but are **not** yet 
 
 ---
 
+## Migration Type Prefix — Only `mig` Supported
+
+This tagger only supports the general migration `mig` prefix. The CFN parameter `MpeId` enforces `AllowedPattern: ^mig[a-zA-Z0-9]+$`, which rejects non-`mig` prefixes at deploy time.
+
+MAP 2.0 covers additional migration types (SAP `sap`, Oracle, Database & Analytics commercial `d-mig` / `comm_ec2_`, Windows `map-migrated-windows`) — none of these are supported. Customers with non-`mig` MAP agreements must use a `mig`-prefixed engagement ID or tag those resources through another mechanism.
+
+---
+
+## Standalone YAML Deploy — No Agreement End-Date Enforcement
+
+Deploying the YAML directly (i.e., without going through the configurator) does **not** enforce an agreement end date. The standalone `map2-auto-tagger-optimized.yaml` has no `AgreementEndDate` parameter. A direct-deploy stack will tag resources indefinitely past agreement expiry, which may trigger MAP audit rejection.
+
+The configurator-generated template includes `AgreementEndDate` and the Lambda checks `is_within_agreement()` on every event. Use the configurator path.
+
+---
+
+## Reconciliation VPC Scope Limitation
+
+The daily reconciliation Lambda enumerates resources via the Resource Groups Tagging API (RGTA), which does not return VPC association context. Resources in VPC-scoped deployments that were missed by the real-time Lambda (e.g., due to transient throttling) may not be caught by reconciliation, because the reconciliation Lambda cannot determine which VPC a resource belongs to.
+
+Customers using VPC scope should monitor DLQ depth as a proxy for missed tags. Resources that exhaust SQS retries land in the DLQ and trigger the SNS alert — these are the ones most likely to need manual remediation.
+
+---
+
 ## SSM Parameter Store Advanced tier (very large scopes)
 
 When `ScopedAccountIds` contains more than approximately 235 explicitly-named AWS account IDs, the serialized config payload exceeds the 4 KB Standard-tier SSM parameter limit. This template declares the config parameter with `Tier: Intelligent-Tiering`, so SSM automatically promotes the parameter to Advanced tier when the payload crosses the threshold.
