@@ -98,6 +98,18 @@ for handler, reason in CRITICAL_HANDLERS:
             f"         Reason it's critical: {reason}"
         )
 
+# ── Check 2b: Handler count parity ───────────────────────────────────────────
+# The configurator Lambda must be a superset of the YAML Lambda. If the
+# configurator has fewer handlers, customers deploying via the supported path
+# get a gutted Lambda (F012 class regression).
+yaml_count = len(yaml_handlers)
+html_count = len(html_handlers)
+if html_count < yaml_count:
+    fails.append(
+        f"HANDLER_COUNT: configurator has {html_count} handlers but YAML has {yaml_count}. "
+        f"The configurator Lambda must be a superset of the YAML Lambda."
+    )
+
 # ── Check 3: CodePipeline handler has correct source guard ──────────────────
 # The universal scanner would pick up roleArn from CreatePipeline response.
 # The correct handler must guard on event_source == 'codepipeline.amazonaws.com'.
