@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v21.0.0'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v21.0.0';
+        // Must match `TEMPLATE_VERSION = 'v21.0.1'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v21.0.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v21.0.1',
+                date: '2026-04-28',
+                changes: [
+                    { tag: 'bugfix', text: 'Multi-account deploy path unblocked: fixed scopedAccountIdsJson undefined in generateOrgTemplate (F007), RetainStacksOnAccountRemoval when AutoDeployment=false (F015), delete.sh now detects SERVICE_MANAGED StackSets and uses OrganizationalUnitIds instead of --accounts (F019).' },
+                ],
+            },
             {
                 version: 'v21.0.0',
                 date: '2026-04-28',
@@ -1311,7 +1318,7 @@
                 changes: [
                     { tag: 'bugfix', text: 'Editor-mode update.sh generator: every aws CLI call now has explicit --region "$REGION". Customers running the script with AWS_DEFAULT_REGION unset or set to a different region no longer deploy into the wrong region or fail on cross-region StackSet lookup.' },
                     { tag: 'bugfix', text: 'Editor-mode update.sh now reads the current template via describe-stack-set --query StackSet.TemplateBody instead of downloading the deprecated S3 staging copy (auto-map-tagger-<acct>/map-auto-tagger-accounts-<mpe>.yaml). The staging object was only created during the initial multi-account deploy and could be missing / stale / garbage-collected — this eliminates the S3 dependency entirely.' },
-                    { tag: 'bugfix', text: 'Upgrade-mode compare_versions now strict-validates three-part numeric SemVer (vMAJOR.MINOR.PATCH) and returns "error" on unparseable input instead of silently falling through to "patch". Prior behavior misclassified e.g. v21.0.0-rc1 → v20.3.0 as patch; upgrade_one caller now fails closed and directs the operator to --force.' },
+                    { tag: 'bugfix', text: 'Upgrade-mode compare_versions now strict-validates three-part numeric SemVer (vMAJOR.MINOR.PATCH) and returns "error" on unparseable input instead of silently falling through to "patch". Prior behavior misclassified e.g. v21.0.1-rc1 → v20.3.0 as patch; upgrade_one caller now fails closed and directs the operator to --force.' },
                 ],
             },
             {
@@ -1554,7 +1561,7 @@
             if (action === 'add') rows.push([t('ui_backfill_title'), backfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
             // Safe DOM construction: v may contain user-controlled values
             // (customer name, account IDs) so use textContent rather than
-            // innerHTML template-literal interpolation. (§1.94, v21.0.0)
+            // innerHTML template-literal interpolation. (§1.94, v21.0.1)
             table.replaceChildren();
             rows.forEach(([k, v], i) => {
                 const tr = document.createElement('tr');
@@ -1661,7 +1668,7 @@
             ];
             // Safe DOM construction: v may contain user-controlled values
             // (MPE IDs) so use textContent rather than innerHTML template-
-            // literal interpolation. (§1.94, v21.0.0)
+            // literal interpolation. (§1.94, v21.0.1)
             table.replaceChildren();
             rows.forEach(([k, v], i) => {
                 const tr = document.createElement('tr');
@@ -1810,7 +1817,7 @@
             // (MPE IDs, region strings) so use textContent rather than
             // innerHTML template-literal interpolation. Preserves the
             // delete-review styles (padding 10px 12px, v-cell font-weight
-            // 600). (§1.94, v21.0.0)
+            // 600). (§1.94, v21.0.1)
             const deleteTable = document.getElementById('delete-reviewTable');
             deleteTable.replaceChildren();
             rows.forEach(([k, v], i) => {
@@ -1940,12 +1947,23 @@ delete_one() {
         local INSTANCES
         INSTANCES=\$(aws cloudformation list-stack-instances --region "\$REGION" --stack-set-name "\$NAME" --query "Summaries[].[Account,Region]" --output text 2>/dev/null)
         if [ -n "\$INSTANCES" ]; then
-            local ACCOUNTS REGIONS
-            ACCOUNTS=\$(echo "\$INSTANCES" | awk '{print \$1}' | sort -u | tr '\\n' ' ')
+            local REGIONS PERM_MODEL
             REGIONS=\$(echo "\$INSTANCES" | awk '{print \$2}' | sort -u | tr '\\n' ' ')
-            echo "  Deleting stack instances (\$(echo \$ACCOUNTS | wc -w) account(s))..."
+            PERM_MODEL=\$(aws cloudformation describe-stack-set --region "\$REGION" --stack-set-name "\$NAME" --query "StackSet.PermissionModel" --output text 2>/dev/null)
+            local DELETE_TARGETS
+            if [ "\$PERM_MODEL" = "SERVICE_MANAGED" ]; then
+                local ROOT_OU
+                ROOT_OU=\$(aws organizations list-roots --query "Roots[0].Id" --output text 2>/dev/null)
+                echo "  SERVICE_MANAGED StackSet — targeting root OU \$ROOT_OU..."
+                DELETE_TARGETS="--deployment-targets OrganizationalUnitIds=\$ROOT_OU"
+            else
+                local ACCOUNTS
+                ACCOUNTS=\$(echo "\$INSTANCES" | awk '{print \$1}' | sort -u | tr '\\n' ' ')
+                echo "  Deleting stack instances (\$(echo \$ACCOUNTS | wc -w) account(s))..."
+                DELETE_TARGETS="--accounts \$ACCOUNTS"
+            fi
             local OP_ID
-            OP_ID=\$(aws cloudformation delete-stack-instances --region "\$REGION" --stack-set-name "\$NAME" --accounts \$ACCOUNTS --regions \$REGIONS --no-retain-stacks --operation-preferences "MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL" --query OperationId --output text 2>&1) || { echo "  ❌ \$OP_ID"; return 1; }
+            OP_ID=\$(aws cloudformation delete-stack-instances --region "\$REGION" --stack-set-name "\$NAME" \$DELETE_TARGETS --regions \$REGIONS --no-retain-stacks --operation-preferences "MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL" --query OperationId --output text 2>&1) || { echo "  ❌ \$OP_ID"; return 1; }
             local WAIT=0
             while [ \$WAIT -lt 1800 ]; do
                 local STATUS
@@ -3139,7 +3157,7 @@ network calls are made from your environment during the upgrade.`;
             // (customer name, email, account IDs, VPC IDs) so use textContent
             // rather than innerHTML template-literal interpolation. Preserves
             // the main-deploy styles (width 200px, v-cell monospace 13px).
-            // (§1.94, v21.0.0)
+            // (§1.94, v21.0.1)
             table.replaceChildren();
             rows.forEach(([k, v]) => {
                 const tr = document.createElement('tr');
@@ -7951,7 +7969,7 @@ ${permissionsList}
           # — most other AWS services throw 'ThrottlingException' (with "ing").
           # Both variants must be enumerated, alongside the generic rate-limit
           # codes. Hoisted to module scope so _retry_throttles() and the RGTA
-          # retry loop below share the same constant (v21.0.0, §1.81/§1.92).
+          # retry loop below share the same constant (v21.0.1, §1.81/§1.92).
           THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
 
           def _retry_throttles(fn):
@@ -7962,7 +7980,7 @@ ${permissionsList}
               to the outer _process_event classifier on the first attempt. Absorbs
               short throttles inside the invocation so we don't burn one of the
               5 SQS redeliveries (180s VT each) on a recoverable rate limit
-              (v21.0.0, §1.81/§1.92).
+              (v21.0.1, §1.81/§1.92).
               """
               for attempt in range(4):
                   try:
@@ -7988,7 +8006,7 @@ ${permissionsList}
               # Each native tag call is wrapped in _retry_throttles() so short
               # throttle bursts are absorbed in-invocation (up to 4 attempts,
               # ~15s total worst case) rather than burning SQS redelivery
-              # budget. (§1.81/§1.92, v21.0.0)
+              # budget. (§1.81/§1.92, v21.0.1)
               if ':s3:::' in arn:
                   s3 = get_service_client('s3')
                   bucket = arn.split(':::')[1]
@@ -9014,6 +9032,9 @@ ${t('ui_instr_cloudtrail_note')}`;
             const accounts = (config.stacksetAccounts || []);
             const regions = (config.regions || ['ap-northeast-2']);
             const regionsList = regions.map(r => `        - ${r}`).join('\n');
+            const scopedAccountIdsJson = (config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0)
+                ? JSON.stringify(config.stacksetAccounts.map(a => a.id))
+                : '["ALL"]';
             const accountsNote = accounts.length > 0
                 ? `      # Lambda deployed to all org accounts. Tagging scoped to: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ')}`
                 : `      # Lambda deployed to all org accounts. Tagging applies to all accounts.`;
@@ -9172,7 +9193,7 @@ Resources:
                           ],
                           Capabilities=['CAPABILITY_NAMED_IAM'],
                           PermissionModel='SERVICE_MANAGED',
-                          AutoDeployment={'Enabled': auto_deploy, 'RetainStacksOnAccountRemoval': False})
+                          AutoDeployment={'Enabled': auto_deploy, 'RetainStacksOnAccountRemoval': False} if auto_deploy else {'Enabled': False})
                       print('StackSet created')
                   except cf.exceptions.NameAlreadyExistsException:
                       print('StackSet already exists')
