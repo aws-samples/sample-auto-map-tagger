@@ -6769,12 +6769,8 @@ ${permissionsList}
                       except: pass
                   if vpc_id and vpc_id in scoped_vpcs:
                       return True
-                  # §1.3 / U5: when scope_mode == 'vpc' and the resource has no
-                  # VPC (S3, DDB, Lambda, SQS, IAM, …), DO NOT fall through to
-                  # account-scope. The customer explicitly chose VPC scoping;
-                  # silently including non-VPC resources defeats that intent
-                  # (e.g. data-residency exclusion). Return False — the resource
-                  # is out of scope.
+                  if not vpc_id and config.get('tag_non_vpc_services'):
+                      return True
                   return False
               return False
 
