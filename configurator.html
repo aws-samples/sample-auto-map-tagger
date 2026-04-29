@@ -9950,10 +9950,12 @@ else
     fi
 fi
 
-STACKSETS_ACCESS=\$(aws organizations list-aws-service-access-for-organization --query "EnabledServicePrincipals[?ServicePrincipal=='stacksets.cloudformation.amazonaws.com'].ServicePrincipal" --output text 2>/dev/null)
+STACKSETS_ACCESS=\$(aws organizations list-aws-service-access-for-organization --query "EnabledServicePrincipals[?contains(ServicePrincipal,'stacksets.cloudformation')].ServicePrincipal" --output text 2>/dev/null)
 if [ -z "\$STACKSETS_ACCESS" ]; then
-    echo "  ⚠️  ${t('d_warn_stacksets')}"
-    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_warn')} ${t('d_warn_stacksets')}\\n"
+    echo "  ❌ CloudFormation StackSets trusted access is not enabled in this organization."
+    echo "     → Fix: aws organizations enable-aws-service-access --service-principal member.org.stacksets.cloudformation.amazonaws.com"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: StackSets trusted access not enabled\\n"
+    ERRORS=\$((ERRORS + 1))
 else
     echo "  ✅ ${t('d_ok_stacksets')}"
     PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stacksets')}\\n"
