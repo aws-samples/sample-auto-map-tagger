@@ -1505,13 +1505,13 @@ Resources:
                       return f"arn:aws:backup:{region}:{account_id}:backup-plan:{plan_id}"
 
               # CloudWatch Dashboard — §1.83. ARN has EMPTY region per AWS IAM
-              # Service Authorization Reference (dashboards are global within an
-              # account). Prior handler emitted `arn:aws:cloudwatch:<region>:…` which
-              # RGTA rejected on every PutDashboard event.
+              # CloudWatch dashboards are global (no region in canonical ARN) but
+              # RGTA rejects regionless ARNs. Include the region so the native
+              # cloudwatch:tag_resource dispatch can tag it.
               elif event_name == 'PutDashboard':
                   dashboard_name = ci_get(req, 'dashboardName')
                   if dashboard_name:
-                      return f"arn:aws:cloudwatch::{account_id}:dashboard/{dashboard_name}"
+                      return f"arn:aws:cloudwatch:{region}:{account_id}:dashboard/{dashboard_name}"
 
               # EMR Cluster (RunJobFlow)
               elif event_name == 'RunJobFlow':
@@ -2316,6 +2316,10 @@ Resources:
                   ds = get_service_client('ds')
                   dir_id = arn.split('directory/')[-1]
                   _retry_throttles(lambda: ds.add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':cloudwatch:' in arn and ':dashboard/' in arn:
+                  cw = get_service_client('cloudwatch')
+                  _retry_throttles(lambda: cw.tag_resource(ResourceARN=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
                   return True
               elif ':dsql:' in arn:
                   _retry_throttles(lambda: get_service_client('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
