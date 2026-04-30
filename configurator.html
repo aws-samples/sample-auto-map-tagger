@@ -6418,6 +6418,9 @@ ${permissionsList}
                           peer_mpe = name[len('map-auto-tagger-'):]
                       else:
                           continue
+                      # StackSet instance stack names have a UUID suffix: {mpe}-{uuid}
+                      import re
+                      peer_mpe = re.sub(r'-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', '', peer_mpe)
                       if peer_mpe == own_mpe:
                           continue
                       try:
