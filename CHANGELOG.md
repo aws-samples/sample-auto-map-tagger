@@ -4,6 +4,18 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ---
 
+## v21.0.7 — 2026-05-01
+
+PATCH. Two correctness fixes for VPC-scope and StackSet cross-region deployments.
+
+- **PreflightLogGroup orphan race fix.** Removed the explicit `PreflightLogGroup` CloudFormation resource. On StackSet delete+redeploy with the same MPE ID, the Custom Resource Delete handler wrote CloudWatch logs *after* CFN deleted the log group, creating an orphan that blocked subsequent deploys with `AlreadyExists`. CloudWatch now auto-creates the log group on Lambda invocation — no explicit resource needed. Root cause of the MA8-use1 cross-region StackSet failure.
+
+- **VPC-scope reconciliation leak + `tag_non_vpc_services` fix.** Added a `_VPC_BOUND` service set (22 service prefixes: ec2, rds, elasticache, etc.) to `is_in_scope`. When `vpc_id` is unresolvable and `tag_non_vpc_services` is `true`, VPC-bound services now return `False` (fail closed) while genuinely non-VPC services (S3, SQS, Lambda, etc.) return `True`. Prevents the daily reconciliation from converting VPC scope into account scope — the reconciliation's synthetic events have no VPC context, so without this check every RGTA-returned resource was re-tagged regardless of VPC membership. Also restores the `tag_non_vpc_services` toggle in the standalone YAML (v21.0.5 PR #83 had removed it entirely).
+
+- **Documentation fixes (PR #87).** Corrected 16 inaccuracies: added `agreement_end_date` and `tag_non_vpc_services` to all SSM JSON examples, fixed claim that `tag_non_vpc_services` was UI-only (it is read at runtime), corrected LIMITATIONS.md on standalone YAML AgreementEndDate, documented `_VPC_BOUND` reconciliation behavior, updated handler count to 154, added Reconciliation and Preflight Lambdas to deployment and cost tables.
+
+---
+
 ## COVERAGE.md reset — 2026-04-26
 
 Docs-only, no version bump. Full re-audit of `docs/COVERAGE.md` against the authoritative handler inventory from `.github/scripts/audit_handler_coverage.py --report` (148 explicit `event_name == ...` branches, 153 handler coverage points per the CI baseline) and the `AutoTaggerRole` IAM policy in `map2-auto-tagger-optimized.yaml`. Top-level finding: the v20.3.0–v20.5 doc had drifted across four ship cycles and was carrying claims that were known-broken at ship time (Keyspaces missing `cassandra:Alter`, Directory Service missing `Creating` transient marker — both now fixed per v20.6.4 / v20.8.1) plus claims with no backing handler and no IAM grant (Location Service, Supply Chain, AppConfig, VPC Lattice, Cloud Map HTTP namespaces). Surviving claims now have both a handler branch and the matching IAM action; ambiguous cases are flagged `**UNVERIFIED**` or `**KNOWN GAP**` rather than silently retained. Added a `Retraction history` section covering v20.3.0 Tier 1 MAP claims and the D7 VPC Lattice AccessDenied regression.
