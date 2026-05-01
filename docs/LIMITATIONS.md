@@ -107,17 +107,21 @@ MAP 2.0 covers additional migration types (SAP `sap`, Oracle, Database & Analyti
 
 ---
 
-## Standalone YAML Deploy — No Agreement End-Date Enforcement
+## Standalone YAML Deploy — Agreement End-Date Defaults to 2099
 
-Deploying the YAML directly (i.e., without going through the configurator) does **not** enforce an agreement end date. The standalone `map2-auto-tagger-optimized.yaml` has no `AgreementEndDate` parameter. A direct-deploy stack will tag resources indefinitely past agreement expiry, which may trigger MAP audit rejection.
+Both the standalone YAML and the configurator-generated template include an `AgreementEndDate` CFN parameter. The standalone YAML defaults to `2099-12-31`, which effectively disables end-date enforcement. A direct-deploy without explicitly setting `AgreementEndDate` will tag resources indefinitely past the actual agreement expiry.
 
-The configurator-generated template includes `AgreementEndDate` and the Lambda checks `is_within_agreement()` on every event. Use the configurator path.
+The configurator requires the end date to be set explicitly. Use the configurator path to ensure correct agreement boundaries.
 
 ---
 
 ## Reconciliation VPC Scope Limitation
 
-The daily reconciliation Lambda enumerates resources via the Resource Groups Tagging API (RGTA), which does not return VPC association context. Resources in VPC-scoped deployments that were missed by the real-time Lambda (e.g., due to transient throttling) may not be caught by reconciliation, because the reconciliation Lambda cannot determine which VPC a resource belongs to.
+The daily reconciliation Lambda enumerates resources via the Resource Groups Tagging API (RGTA), which does not return VPC association context. When reconciliation re-enqueues a missing tag, the auto-tagger Lambda cannot determine VPC membership from the synthetic event.
+
+**Behavior with `tag_non_vpc_services=true` (default):** Non-VPC services (S3, DynamoDB, Lambda, SQS, SNS, etc.) are re-tagged by reconciliation as expected. VPC-bound services (EC2, RDS, ElastiCache, ELB, etc.) are **not** re-tagged because the Lambda detects them as VPC-bound but cannot resolve their VPC — it fails closed to prevent scope leaks.
+
+**Behavior with `tag_non_vpc_services=false`:** No resources without resolved VPC context are re-tagged by reconciliation. Only resources whose VPC can be determined from the live event (not the synthetic reconciliation event) are tagged.
 
 Customers using VPC scope should monitor DLQ depth as a proxy for missed tags. Resources that exhaust SQS retries land in the DLQ and trigger the SNS alert — these are the ones most likely to need manual remediation.
 

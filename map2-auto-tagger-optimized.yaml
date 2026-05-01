@@ -4,7 +4,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   MAP 2.0 Auto-Tagger v21.0.7 - Auto-tags AWS resources with map-migrated for MAP 2.0
-  credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
+  credit eligibility. 154 resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
   distinguishes transient / permanent-ignorable / permanent-actionable failures.
