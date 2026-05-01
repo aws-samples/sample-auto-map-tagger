@@ -3,7 +3,7 @@
 
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
-  MAP 2.0 Auto-Tagger v21.0.6 - Auto-tags AWS resources with map-migrated for MAP 2.0
+  MAP 2.0 Auto-Tagger v21.0.7 - Auto-tags AWS resources with map-migrated for MAP 2.0
   credit eligibility. 190+ resource types. Deploy once; tagging happens within 60-90 s
   of resource creation. Daily reconciliation Lambda (RGTA-based) catches any tags the
   live Lambda missed. Three-path error classifier + TagFailureByClass CloudWatch metric
@@ -70,7 +70,7 @@ Resources:
       Name: !Sub '/auto-map-tagger/${MpeId}/version'
       Type: String
       Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
-      Value: v21.0.6
+      Value: v21.0.7
 
   # SSM Parameter Store - single source of truth for config.
   # Tier: Intelligent-Tiering leaves the parameter in the free Standard tier
@@ -423,17 +423,8 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
 
-  PreflightLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      LogGroupName: !Sub '/aws/lambda/map-auto-tagger-preflight-${MpeId}'
-      RetentionInDays: 14
-
   PreflightFunction:
     Type: AWS::Lambda::Function
-    DependsOn: PreflightLogGroup
     Properties:
       FunctionName: !Sub 'map-auto-tagger-preflight-${MpeId}'
       Runtime: python3.12
@@ -638,7 +629,7 @@ Resources:
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
-          TEMPLATE_VERSION = 'v21.0.6'
+          TEMPLATE_VERSION = 'v21.0.7'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
 
           ssm = boto3.client('ssm')
@@ -883,12 +874,23 @@ Resources:
                       except: pass
                   if vpc_id and vpc_id in scoped_vpcs:
                       return True
-                  # §1.3 / U5: when scope_mode == 'vpc' and the resource has no
-                  # VPC (S3, DDB, Lambda, SQS, IAM, …), DO NOT fall through to
-                  # account-scope. The customer explicitly chose VPC scoping;
-                  # silently including non-VPC resources defeats that intent
-                  # (e.g. data-residency exclusion). Return False — the resource
-                  # is out of scope.
+                  if not vpc_id and config.get('tag_non_vpc_services'):
+                      _VPC_BOUND = {'ec2', 'elasticloadbalancing', 'rds', 'elasticache',
+                          'redshift', 'es', 'aoss', 'eks', 'ecs', 'elasticmapreduce', 'dax',
+                          'memorydb', 'neptune', 'mq', 'dms', 'elasticfilesystem', 'fsx',
+                          'kafka', 'msk', 'workspaces', 'ds', 'cloudhsm', 'cloudhsmv2'}
+                      svc = ''
+                      es = detail.get('eventSource', '')
+                      if es:
+                          svc = es.split('.')[0]
+                      else:
+                          arn = (resp_els.get('arn') or resp_els.get('Arn')
+                                 or resp_els.get('ARN') or '')
+                          if arn.count(':') >= 5:
+                              svc = arn.split(':')[2]
+                      if svc in _VPC_BOUND:
+                          return False
+                      return True
                   return False
               return False
 
@@ -2162,7 +2164,7 @@ Resources:
           # — most other AWS services throw 'ThrottlingException' (with "ing").
           # Both variants must be enumerated, alongside the generic rate-limit
           # codes. Hoisted to module scope so _retry_throttles() and the RGTA
-          # retry loop below share the same constant (v21.0.6, §1.81/§1.92).
+          # retry loop below share the same constant (v21.0.7, §1.81/§1.92).
           THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
 
           def _retry_throttles(fn):
@@ -2173,7 +2175,7 @@ Resources:
               to the outer _process_event classifier on the first attempt. Absorbs
               short throttles inside the invocation so we don't burn one of the
               5 SQS redeliveries (180s VT each) on a recoverable rate limit
-              (v21.0.6, §1.81/§1.92).
+              (v21.0.7, §1.81/§1.92).
               """
               for attempt in range(4):
                   try:
@@ -2199,7 +2201,7 @@ Resources:
               # Each native tag call is wrapped in _retry_throttles() so short
               # throttle bursts are absorbed in-invocation (up to 4 attempts,
               # ~15s total worst case) rather than burning SQS redelivery
-              # budget. (§1.81/§1.92, v21.0.6)
+              # budget. (§1.81/§1.92, v21.0.7)
               if ':s3:::' in arn:
                   s3 = get_service_client('s3')
                   bucket = arn.split(':::')[1]
@@ -3205,7 +3207,7 @@ Outputs:
     Value: !Ref MapConfig
   TemplateVersion:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
-    Value: v21.0.6
+    Value: v21.0.7
   AlertTopicArn:
     Description: SNS topic for tagger alerts - subscribe your email here
     Value: !Ref AlertTopic
