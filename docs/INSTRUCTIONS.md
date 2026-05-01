@@ -201,9 +201,11 @@ aws ssm put-parameter \
   --value '{
     "mpe_id": "mig9999999999",
     "agreement_start_date": "2024-06-01",
+    "agreement_end_date": "2027-12-31",
     "scope_mode": "account",
     "scoped_account_ids": ["ALL"],
-    "scoped_vpc_ids": []
+    "scoped_vpc_ids": [],
+    "tag_non_vpc_services": true
   }'
 ```
 
@@ -213,13 +215,11 @@ aws ssm put-parameter \
 >
 > - `mpe_id` — the MAP Engagement ID applied as the tag value.
 > - `agreement_start_date` — `YYYY-MM-DD`; events with `eventTime` before this date are skipped (also used by the backfill CustomResource as the CloudTrail lookup start).
+> - `agreement_end_date` — `YYYY-MM-DD`; events with `eventTime` after this date are skipped. Default `2099-12-31` if not set. Set this to your MAP agreement expiry to stop tagging after the engagement ends.
 > - `scope_mode` — `account` or `vpc`. Determines which field below is authoritative.
 > - `scoped_account_ids` — list of 12-digit account IDs, or `["ALL"]`. In `account` mode, only tags resources whose creation event came from a listed account. Ignored in `vpc` mode.
-> - `scoped_vpc_ids` — list of `vpc-…` IDs. In `vpc` mode, only tags resources whose VPC membership resolves to a listed VPC; resources with no VPC association (S3, DynamoDB, Lambda, SNS, SQS, etc.) are **skipped** in `vpc` mode by design. Ignored in `account` mode.
->
-> Fields shown in the configurator UI like `tag_non_vpc_services` are UI-only
-> controls that shape how `scoped_vpc_ids` is populated at deploy time; they
-> are not read by the runtime Lambda and have no effect if added here.
+> - `scoped_vpc_ids` — list of `vpc-…` IDs. In `vpc` mode, only tags resources whose VPC membership resolves to a listed VPC. Ignored in `account` mode.
+> - `tag_non_vpc_services` — `true` or `false`. In `vpc` mode, controls whether non-VPC services (S3, DynamoDB, Lambda, SNS, SQS, etc.) are tagged. When `true` (default), non-VPC services are tagged; VPC-bound services (EC2, RDS, ElastiCache, etc.) are still filtered by VPC membership. When `false`, only resources in scoped VPCs are tagged. Ignored in `account` mode.
 
 ---
 
@@ -319,9 +319,11 @@ aws ssm put-parameter \
   --value '{
     "mpe_id": "mig9999999999",
     "agreement_start_date": "2024-06-01",
+    "agreement_end_date": "2027-12-31",
     "scope_mode": "account",
     "scoped_account_ids": ["ALL"],
-    "scoped_vpc_ids": []
+    "scoped_vpc_ids": [],
+    "tag_non_vpc_services": true
   }'
 ```
 

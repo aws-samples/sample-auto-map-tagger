@@ -84,7 +84,7 @@ EventBridge → Lambda direct invocation has a 24-hour retry limit. Some resourc
 
 ## What Gets Tagged
 
-The auto-tagger covers **150+ AWS resource types** across every major service category — all confirmed through real-world testing across 9 AWS accounts.
+The auto-tagger covers **154 AWS resource types** across every major service category — validated through automated chaos testing (CT3) across 9 AWS accounts.
 
 | Category | Examples |
 |----------|---------|
@@ -129,11 +129,13 @@ The script handles everything automatically:
 
 | Component | Purpose |
 |-----------|---------|
-| **Lambda function** | Extracts resource ARN and applies `map-migrated` tag |
+| **Auto-Tagger Lambda** | Extracts resource ARN and applies `map-migrated` tag |
+| **Preflight Lambda** | Runs once at deploy time to detect peer-tagger scope conflicts |
+| **Reconciliation Lambda** | Runs daily via EventBridge schedule; scans RGTA for missing/wrong tags and re-enqueues corrections |
 | **EventBridge rule** | Catches resource creation events from CloudTrail |
 | **SQS queue** | Buffers events with 14-day retention and 5 retries |
 | **Dead Letter Queue** | Captures events that fail after all retries |
-| **SSM parameter** | Stores MPE ID, agreement date, and scope configuration |
+| **SSM parameter** | Stores MPE ID, agreement start/end dates, and scope configuration |
 | **SNS topic** | Sends alert notifications on tagging failures |
 | **CloudWatch alarms** | Fires on Lambda errors or DLQ activity |
 | **S3 bucket** (multi-account only) | Stages CloudFormation templates for the StackSet. Retained after deployment — StackSets require a persistent template URL for new accounts. Contains only the per-account template (~40KB) with Block Public Access, AES-256 encryption, and HTTPS-only enforcement. |
@@ -179,16 +181,19 @@ The SSM parameter (`/auto-map-tagger/{mpe_id}/config`) is the **single source of
 {
   "mpe_id": "mig1234567890",
   "agreement_start_date": "2024-06-01",
+  "agreement_end_date": "2027-12-31",
   "scope_mode": "account",
   "scoped_account_ids": ["111111111111", "222222222222"],
-  "scoped_vpc_ids": []
+  "scoped_vpc_ids": [],
+  "tag_non_vpc_services": true
 }
 ```
 
 When the Lambda fires, it reads this parameter and checks:
 1. Is the current date after the agreement start date? If not → skip.
-2. Is this account in `scoped_account_ids`? If `ALL` → tag. If specific IDs and this account isn't listed → skip.
-3. If VPC scoping, is this resource in a scoped VPC? If not → skip.
+2. Is the current date before the agreement end date? If not → skip.
+3. Is this account in `scoped_account_ids`? If `ALL` → tag. If specific IDs and this account isn't listed → skip.
+4. If VPC scoping, is this resource in a scoped VPC? If not → check `tag_non_vpc_services` (see below).
 
 Only after passing all checks does the Lambda apply the `map-migrated` tag.
 
@@ -233,7 +238,9 @@ A Lambda in an out-of-scope account has negligible cost — it fires, reads SSM,
 
 | Component | Monthly Cost |
 |-----------|-------------|
-| Lambda (100–1,000 invocations/day) | $0.10 – $2.00 |
+| Lambda — Auto-Tagger (100–1,000 invocations/day) | $0.10 – $2.00 |
+| Lambda — Reconciliation (1 invocation/day, ~200ms) | < $0.01 |
+| Lambda — Preflight (1 invocation at deploy time) | $0.00 |
 | EventBridge events | $0.01 – $0.20 |
 | SQS (event buffer, ~1M requests/account/month) | $0.00 (within free tier) |
 | CloudTrail (existing) | $0.00 |
@@ -250,7 +257,7 @@ For a 50-account organization: **< $100/month** to protect potentially **million
 | What | Detail |
 |------|--------|
 | **Purpose** | Auto-tag AWS resources for MAP 2.0 credits |
-| **Coverage** | 150+ resource types across MAP-eligible services (see [LIMITATIONS.md](LIMITATIONS.md#unsupported-map-eligible-services-handler-gap) for gaps) |
+| **Coverage** | 154 resource types across MAP-eligible services (see [LIMITATIONS.md](LIMITATIONS.md#unsupported-map-eligible-services-handler-gap) for gaps) |
 | **Latency** | Typically 60–90 seconds from creation to tagged |
 | **Deployment** | 1 file, 1 command in CloudShell |
 | **Cost** | < $2/month per account |

@@ -4,7 +4,7 @@ Service and resource coverage for the MAP 2.0 Auto-Tagger, derived from the Lamb
 
 **Methodology.** This doc was reset on 2026-04-26 by cross-checking every claim against:
 
-1. Handler inventory from `.github/scripts/audit_handler_coverage.py --report` (148 explicit `event_name == ...` branches).
+1. Handler inventory from `.github/scripts/audit_handler_coverage.py --report` (154 explicit `event_name == ...` branches).
 2. IAM grants in the `AutoTaggerRole` policy (`Sid: ServiceSpecificTagging`).
 3. The `_IGNORE_EVENTS` and `_TRANSIENT_MARKERS` constants in the Lambda source.
 
@@ -238,7 +238,7 @@ For detailed gap analysis (customer-side configuration required, timing-dependen
 
 ## E2E Coverage Snapshot
 
-Current baseline (from `.github/handler_coverage_baseline.txt`): **106 of 153 handlers** E2E-covered (69.3%). The uncovered 47 are primarily handlers added without matching boto3 resource-creation in the E2E test suite; they are guarded against regression by the CI `audit_handler_coverage.py --check` gate rather than by positive E2E verification.
+Current baseline (from `.github/handler_coverage_baseline.txt`): **106 of 154 handlers** E2E-covered (68.8%). The uncovered 48 are primarily handlers added without matching boto3 resource-creation in the E2E test suite; they are guarded against regression by the CI `audit_handler_coverage.py --check` gate rather than by positive E2E verification.
 
 To regenerate the inventory:
 
