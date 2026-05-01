@@ -1141,8 +1141,8 @@
 
     <script>
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v21.0.6'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v21.0.6';
+        // Must match `TEMPLATE_VERSION = 'v21.0.7'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v21.0.7';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1150,6 +1150,14 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
         const VERSION_HISTORY = [
+            {
+                version: 'v21.0.7',
+                date: '2026-05-01',
+                changes: [
+                    { tag: 'bugfix', text: 'Remove explicit PreflightLogGroup CFN resource to prevent AlreadyExists error on StackSet cross-region redeploy. CloudWatch auto-creates the log group; eliminates the orphan race where the Custom Resource Delete handler writes logs after CFN deletes the explicit log group.' },
+                    { tag: 'bugfix', text: 'Fix VPC-scope reconciliation scope leak and is_in_scope over-tagging. When vpc_id is unresolvable and tag_non_vpc_services is true, VPC-bound services (ec2, rds, elasticache, etc.) now return False instead of falling through. Prevents reconciliation from converting VPC scope into account scope on the nightly sweep.' },
+                ],
+            },
             {
                 version: 'v21.0.6',
                 date: '2026-04-29',
@@ -1589,7 +1597,7 @@
             if (action === 'add') rows.push([t('ui_backfill_title'), backfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
             // Safe DOM construction: v may contain user-controlled values
             // (customer name, account IDs) so use textContent rather than
-            // innerHTML template-literal interpolation. (§1.94, v21.0.6)
+            // innerHTML template-literal interpolation. (§1.94, 21.0.6)
             table.replaceChildren();
             rows.forEach(([k, v], i) => {
                 const tr = document.createElement('tr');
@@ -1696,7 +1704,7 @@
             ];
             // Safe DOM construction: v may contain user-controlled values
             // (MPE IDs) so use textContent rather than innerHTML template-
-            // literal interpolation. (§1.94, v21.0.6)
+            // literal interpolation. (§1.94, 21.0.6)
             table.replaceChildren();
             rows.forEach(([k, v], i) => {
                 const tr = document.createElement('tr');
@@ -1845,7 +1853,7 @@
             // (MPE IDs, region strings) so use textContent rather than
             // innerHTML template-literal interpolation. Preserves the
             // delete-review styles (padding 10px 12px, v-cell font-weight
-            // 600). (§1.94, v21.0.6)
+            // 600). (§1.94, 21.0.6)
             const deleteTable = document.getElementById('delete-reviewTable');
             deleteTable.replaceChildren();
             rows.forEach(([k, v], i) => {
@@ -3208,7 +3216,7 @@ network calls are made from your environment during the upgrade.`;
             // (customer name, email, account IDs, VPC IDs) so use textContent
             // rather than innerHTML template-literal interpolation. Preserves
             // the main-deploy styles (width 200px, v-cell monospace 13px).
-            // (§1.94, v21.0.6)
+            // (§1.94, 21.0.6)
             table.replaceChildren();
             rows.forEach(([k, v]) => {
                 const tr = document.createElement('tr');
@@ -6333,17 +6341,8 @@ ${permissionsList}
                   - logs:PutLogEvents
                 Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*
 
-  PreflightLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      LogGroupName: /aws/lambda/map-auto-tagger-preflight-${mpe}
-      RetentionInDays: 14
-
   PreflightFunction:
     Type: AWS::Lambda::Function
-    DependsOn: PreflightLogGroup
     Properties:
       FunctionName: map-auto-tagger-preflight-${mpe}
       Runtime: python3.12
@@ -6773,6 +6772,21 @@ ${permissionsList}
                   if vpc_id and vpc_id in scoped_vpcs:
                       return True
                   if not vpc_id and config.get('tag_non_vpc_services'):
+                      _VPC_BOUND = {'ec2', 'elasticloadbalancing', 'rds', 'elasticache',
+                          'redshift', 'es', 'aoss', 'eks', 'ecs', 'elasticmapreduce', 'dax',
+                          'memorydb', 'neptune', 'mq', 'dms', 'elasticfilesystem', 'fsx',
+                          'kafka', 'msk', 'workspaces', 'ds', 'cloudhsm', 'cloudhsmv2'}
+                      svc = ''
+                      es = detail.get('eventSource', '')
+                      if es:
+                          svc = es.split('.')[0]
+                      else:
+                          arn = (resp_els.get('arn') or resp_els.get('Arn')
+                                 or resp_els.get('ARN') or '')
+                          if arn.count(':') >= 5:
+                              svc = arn.split(':')[2]
+                      if svc in _VPC_BOUND:
+                          return False
                       return True
                   return False
               return False
@@ -8045,7 +8059,7 @@ ${permissionsList}
           # — most other AWS services throw 'ThrottlingException' (with "ing").
           # Both variants must be enumerated, alongside the generic rate-limit
           # codes. Hoisted to module scope so _retry_throttles() and the RGTA
-          # retry loop below share the same constant (v21.0.6, §1.81/§1.92).
+          # retry loop below share the same constant (21.0.6, §1.81/§1.92).
           THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
 
           def _retry_throttles(fn):
@@ -8056,7 +8070,7 @@ ${permissionsList}
               to the outer _process_event classifier on the first attempt. Absorbs
               short throttles inside the invocation so we don't burn one of the
               5 SQS redeliveries (180s VT each) on a recoverable rate limit
-              (v21.0.6, §1.81/§1.92).
+              (21.0.6, §1.81/§1.92).
               """
               for attempt in range(4):
                   try:
@@ -8082,7 +8096,7 @@ ${permissionsList}
               # Each native tag call is wrapped in _retry_throttles() so short
               # throttle bursts are absorbed in-invocation (up to 4 attempts,
               # ~15s total worst case) rather than burning SQS redelivery
-              # budget. (§1.81/§1.92, v21.0.6)
+              # budget. (§1.81/§1.92, 21.0.6)
               if ':s3:::' in arn:
                   s3 = get_service_client('s3')
                   bucket = arn.split(':::')[1]
