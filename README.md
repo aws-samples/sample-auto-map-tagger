@@ -101,6 +101,8 @@ Source files live in `src/`. Edit there, run `npm run build`, open `build/config
 
 **Adding a new AWS service:** drop a `.js` file in `src/js/services/` following the format in `src/js/services/README.md`, then `npm run build`.
 
+For the full source structure, build process, and extension guide, see [DEVELOPMENT.md](docs/DEVELOPMENT.md).
+
 ---
 
 ## Cost
