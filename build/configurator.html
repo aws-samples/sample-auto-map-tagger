@@ -6969,13 +6969,13 @@ ${permissionsList}
           import json, os, boto3, re, time, random
           from datetime import datetime, timezone
           from botocore.exceptions import ClientError
-
+          
           # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
           # every cold start so ops can trace which version processed an event
           # without reading the CFN stack or SSM parameter.
           TEMPLATE_VERSION = '${TEMPLATE_VERSION}'
           print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
-
+          
           ssm = boto3.client('ssm')
           ec2 = boto3.client('ec2')
           tagging = boto3.client('resourcegroupstaggingapi')
@@ -6985,7 +6985,7 @@ ${permissionsList}
           # seen until the container recycled, silently misattributing credit.
           # 60s TTL bounds the window without adding meaningful SSM load.
           _CONFIG_TTL_SECONDS = 60
-
+          
           # Peer-tagger detection (§1.108, partial). Runs once at cold-start and
           # logs a WARN + emits a CloudWatch metric (MapAutoTagger /
           # PeerTaggerDetected, dimensions MpeId + PeerMpeId) when another
@@ -7075,24 +7075,24 @@ ${permissionsList}
                   # (cloudformation:ListStacks) or throttle means we skip
                   # today and retry on next cold start.
                   print(f'PeerTaggerDetect: detector skipped ({e})')
-
+          
           _detect_peer_taggers()
-
+          
           def get_account_from_arn(arn):
               """Extract account ID from ARN."""
               parts = arn.split(':')
               return parts[4] if len(parts) > 4 else None
-
+          
           def ci_get(d, key):
               """Case-insensitive dict lookup.
-
+          
               Handlers read CloudTrail responseElements / requestParameters fields
               that AWS has historically emitted in inconsistent casing — older
               services (Kendra, Redshift, Elastic Beanstalk) emit camelCase or
               lowercase keys while handlers written against the boto3 SDK
               response shape assumed PascalCase. §1.91 / §1.97 / §1.103 document
               three live-confirmed silent-miss handlers.
-
+          
               Only use on 'responseElements' and 'requestParameters' — not on
               fixed-shape keys we control. On a response that legitimately has
               both 'Id' and 'id', this returns whichever sorts first by key
@@ -7108,7 +7108,7 @@ ${permissionsList}
                   if isinstance(k, str) and k.lower() == lk:
                       return v
               return None
-
+          
           def get_config():
               global _config, _config_ts
               now = time.time()
@@ -7145,7 +7145,7 @@ ${permissionsList}
                   _config = cfg
                   _config_ts = now
               return _config
-
+          
           def is_after_agreement(config):
               try:
                   start = datetime.strptime(config.get('agreement_start_date'), '%Y-%m-%d').replace(tzinfo=timezone.utc)
@@ -7165,7 +7165,7 @@ ${permissionsList}
                   except (ValueError, TypeError):
                       pass
               return True
-
+          
           def is_in_scope(config, account_id, detail):
               # Fail-closed guards (§1.3 / §1.129 class). Safe-default config
               # from CONFIG_UNREACHABLE has mpe_id=None; if that ever happens
@@ -7235,14 +7235,14 @@ ${permissionsList}
                       return True
                   return False
               return False
-
+          
           def extract_arns_multi(detail, account_id, region):
               """Return a list of ARNs for events that create multiple resources.
-
+          
               Used for events where AWS does NOT emit separate CloudTrail events
               for each child resource. Returns None if the event is not one of
               these; callers should fall back to single-ARN extract_arn.
-
+          
               RunInstances: the CloudTrail responseElements contains instance IDs
               and the primary ENI, but the block-device-mapping is usually empty
               — AWS populates the attached EBS volume IDs AFTER the instance
@@ -7269,7 +7269,7 @@ ${permissionsList}
                       ni_id = ni.get('networkInterfaceId')
                       if ni_id:
                           arns.append(f"arn:aws:ec2:{region}:{account_id}:network-interface/{ni_id}")
-
+          
               # Look up attached volume IDs via describe_instances. CloudTrail
               # fires RunInstances milliseconds after the API call returns;
               # volumes may not yet be attached. Poll briefly (up to 30s) for
@@ -7319,17 +7319,17 @@ ${permissionsList}
                       print(f'Could not resolve RunInstances attached volumes: {e}')
                   except Exception as e:
                       print(f'Could not resolve RunInstances attached volumes: {e}')
-
+          
               return arns or None
-
-
+          
+          
           def extract_arn(detail, account_id, region):
               event_name = detail.get('eventName', '')
               event_source = detail.get('eventSource', '')
               resp = detail.get('responseElements') or {}
               req = detail.get('requestParameters') or {}
               resources = detail.get('resources', [])
-
+          
               # Handle early exceptions BEFORE universal pattern scan
               # (prevents universal scan from picking up wrong ARNs)
               # Bedrock Agent (nested: agent.agentArn)
@@ -7337,7 +7337,7 @@ ${permissionsList}
                   agent_arn = resp.get('agent', {}).get('agentArn')
                   if agent_arn:
                       return agent_arn
-
+          
               # Bedrock Agent Action Group (no ARN in response — construct from IDs)
               elif event_name == 'CreateAgentActionGroup' and event_source == 'bedrock.amazonaws.com':
                   ag = resp.get('agentActionGroup', {})
@@ -7346,13 +7346,13 @@ ${permissionsList}
                   ag_id = ag.get('actionGroupId')
                   if agent_id and ag_id:
                       return f"arn:aws:bedrock:{region}:{account_id}:agent/{agent_id}/agentversion/{agent_ver}/actiongroup/{ag_id}"
-
+          
               # Bedrock Agent Alias (nested: agentAlias.agentAliasArn)
               elif event_name == 'CreateAgentAlias' and event_source == 'bedrock.amazonaws.com':
                   alias_arn = resp.get('agentAlias', {}).get('agentAliasArn')
                   if alias_arn:
                       return alias_arn
-
+          
               # Bedrock Knowledge Base Data Source (no ARN in response — construct)
               elif event_name == 'CreateDataSource' and event_source == 'bedrock.amazonaws.com':
                   ds = resp.get('dataSource', {})
@@ -7360,23 +7360,23 @@ ${permissionsList}
                   ds_id = ds.get('dataSourceId')
                   if kb_id and ds_id:
                       return f"arn:aws:bedrock:{region}:{account_id}:knowledge-base/{kb_id}/data-source/{ds_id}"
-
+          
               # (Lambda Layer handling removed — layers are not taggable per AWS
               # Lambda TagResource API regex; PublishLayerVersion is in IGNORE_EVENTS
               # at the handler level.)
-
+          
               # ECS Service — early exit to prevent clusterArn being picked up by universal scan
               if event_name == 'CreateService' and event_source == 'ecs.amazonaws.com':
                   svc_arn = resp.get('service', {}).get('serviceArn')
                   if svc_arn:
                       return svc_arn
-
+          
               elif event_name == 'CreateVpnConnection':
                   vpn = resp.get('vpnConnection', {})
                   vpn_id = vpn.get('vpnConnectionId')
                   if vpn_id:
                       return f"arn:aws:ec2:{region}:{account_id}:vpn-connection/{vpn_id}"
-
+          
               elif event_name == 'CreatePlacementGroup':
                   pg = resp.get('placementGroup', {})
                   if not pg and 'CreatePlacementGroupResponse' in resp:
@@ -7387,7 +7387,7 @@ ${permissionsList}
                   pg_arn = pg.get('groupArn')
                   if pg_arn:
                       return pg_arn
-
+          
               # Universal ARN patterns
               arn_patterns = [
                   'arn', 'Arn', 'ARN', 'resourceArn', 'ResourceArn', 'clusterArn', 'functionArn',
@@ -7435,7 +7435,7 @@ ${permissionsList}
                   # MediaLive / MediaPackage / MediaStore
                   'ChannelArn', 'OriginEndpointArn',
               ]
-
+          
               # Try to find ARN in response
               for pattern in arn_patterns:
                   if pattern in resp and resp[pattern]:
@@ -7443,7 +7443,7 @@ ${permissionsList}
                   for key, val in resp.items():
                       if isinstance(val, dict) and pattern in val and val[pattern]:
                           return val[pattern]
-
+          
               # Suffix-match fallback (§1.31/§1.35/§1.56/§1.57/§1.61/§1.63 et al.).
               # The hand-curated allowlist above misses ~46 ARN field names across
               # new/less-common AWS services — every miss is a silent tag loss. This
@@ -7496,7 +7496,7 @@ ${permissionsList}
                           m = _maybe_arn(nk, nv)
                           if m:
                               return m
-
+          
               # Glue Table - must be before resources array check to avoid returning database ARN
               # (Glue CreateTable CloudTrail resources array contains database ARN first)
               if event_name == 'CreateTable' and event_source == 'glue.amazonaws.com':
@@ -7504,7 +7504,7 @@ ${permissionsList}
                   tbl_name = req.get('tableInput', {}).get('name')
                   if db_name and tbl_name:
                       return f"arn:aws:glue:{region}:{account_id}:table/{db_name}/{tbl_name}"
-
+          
               # Check resources array (used by some services like Keyspaces)
               # Skip catalog ARNs for Glue (use database ARN instead)
               if resources and len(resources) > 0:
@@ -7513,10 +7513,10 @@ ${permissionsList}
                       # Skip Glue catalog ARNs - we want the database/table ARN
                       if arn and ':catalog' not in arn:
                           return arn
-
+          
               # Construct ARNs for specific services
               service = event_source.split('.')[0].replace('aws.', '')
-
+          
               if event_name == 'RunInstances':
                   # RunInstances is handled via extract_arns_multi (called from
                   # the handler) because it emits multiple resources: all instance
@@ -7562,7 +7562,7 @@ ${permissionsList}
                   if queue_url:
                       queue_name = queue_url.split('/')[-1]
                       return f"arn:aws:sqs:{region}:{account_id}:{queue_name}"
-
+          
               # EC2 Resources (use resource IDs to construct ARNs)
               elif event_name == 'CreateVpc':
                   vpc = resp.get('vpc', {})
@@ -7592,7 +7592,7 @@ ${permissionsList}
                   alloc_id = resp.get('allocationId')
                   if alloc_id:
                       return f"arn:aws:ec2:{region}:{account_id}:elastic-ip/{alloc_id}"
-
+          
               # Egress-only Internet Gateway
               elif event_name == 'CreateEgressOnlyInternetGateway':
                   eigw = resp.get('egressOnlyInternetGateway', {})
@@ -7601,7 +7601,7 @@ ${permissionsList}
                   eigw_id = eigw.get('egressOnlyInternetGatewayId')
                   if eigw_id:
                       return f"arn:aws:ec2:{region}:{account_id}:egress-only-internet-gateway/{eigw_id}"
-
+          
               # Customer Gateway
               elif event_name == 'CreateCustomerGateway':
                   cgw = resp.get('customerGateway', {})
@@ -7610,7 +7610,7 @@ ${permissionsList}
                   cgw_id = cgw.get('customerGatewayId')
                   if cgw_id:
                       return f"arn:aws:ec2:{region}:{account_id}:customer-gateway/{cgw_id}"
-
+          
               # Network ACL
               elif event_name == 'CreateNetworkAcl':
                   acl = resp.get('networkAcl', {})
@@ -7619,7 +7619,7 @@ ${permissionsList}
                   acl_id = acl.get('networkAclId')
                   if acl_id:
                       return f"arn:aws:ec2:{region}:{account_id}:network-acl/{acl_id}"
-
+          
               # NAT Gateway (§1.50 — CloudTrail EC2 responses wrap in
               # <EventName>Response; match the unwrap pattern used by
               # CreateNetworkAcl / CreateLaunchTemplate / CreateTransitGateway /
@@ -7631,7 +7631,7 @@ ${permissionsList}
                   nat_id = nat.get('natGatewayId')
                   if nat_id:
                       return f"arn:aws:ec2:{region}:{account_id}:natgateway/{nat_id}"
-
+          
               # Simple ARN Extractions
               elif event_name == 'CreateRepository' and event_source == 'ecr.amazonaws.com':
                   repo = resp.get('repository', {})
@@ -7661,25 +7661,25 @@ ${permissionsList}
                   template_id = template.get('launchTemplateId')
                   if template_id:
                       return f"arn:aws:ec2:{region}:{account_id}:launch-template/{template_id}"
-
+          
               # CloudWatch Alarms
               elif event_name == 'PutMetricAlarm':
                   alarm_name = req.get('alarmName')
                   if alarm_name:
                       return f"arn:aws:cloudwatch:{region}:{account_id}:alarm:{alarm_name}"
-
+          
               # SSM Parameters — name may or may not have a leading "/".
               # Valid ARN is always "parameter/<name>"; normalize to exactly one "/".
               elif event_name == 'PutParameter':
                   param_name = req.get('name')
                   if param_name:
                       return f"arn:aws:ssm:{region}:{account_id}:parameter/{param_name.lstrip('/')}"
-
+          
               # ACM Certificates
               elif event_name == 'RequestCertificate':
                   cert_arn = resp.get('certificateArn')
                   return cert_arn
-
+          
               # Transit Gateway (EC2 response wrapper)
               elif event_name == 'CreateTransitGateway':
                   tgw = resp.get('transitGateway', {})
@@ -7688,7 +7688,7 @@ ${permissionsList}
                   tgw_id = tgw.get('transitGatewayId')
                   if tgw_id:
                       return f"arn:aws:ec2:{region}:{account_id}:transit-gateway/{tgw_id}"
-
+          
               # VPN Gateway (EC2 response wrapper)
               elif event_name == 'CreateVpnGateway':
                   vpn = resp.get('vpnGateway', {})
@@ -7697,7 +7697,7 @@ ${permissionsList}
                   vpn_id = vpn.get('vpnGatewayId')
                   if vpn_id:
                       return f"arn:aws:ec2:{region}:{account_id}:vpn-gateway/{vpn_id}"
-
+          
               # Route Table
               elif event_name == 'CreateRouteTable':
                   rt = resp.get('routeTable', {})
@@ -7706,13 +7706,13 @@ ${permissionsList}
                   rt_id = rt.get('routeTableId')
                   if rt_id:
                       return f"arn:aws:ec2:{region}:{account_id}:route-table/{rt_id}"
-
+          
               # Glue Job
               elif event_name == 'CreateJob':
                   job_name = req.get('name')
                   if job_name:
                       return f"arn:aws:glue:{region}:{account_id}:job/{job_name}"
-
+          
               # Load Balancer — ELBv1 Classic AND ELBv2 (ALB/NLB/GWLB) share
               # eventSource='elasticloadbalancing.amazonaws.com'. They're
               # disambiguated only by response shape:
@@ -7727,7 +7727,7 @@ ${permissionsList}
                   lb_name = req.get('loadBalancerName')
                   if lb_name:
                       return f"arn:aws:elasticloadbalancing:{region}:{account_id}:loadbalancer/{lb_name}"
-
+          
               # Database Clusters
               elif event_name == 'CreateDBCluster':
                   cluster = resp.get('dBCluster', {})
@@ -7742,7 +7742,7 @@ ${permissionsList}
               elif event_name == 'CreateCluster' and event_source == 'memorydb.amazonaws.com':
                   cluster = resp.get('cluster', {})
                   return cluster.get('aRN')  # Note: capital ARN
-
+          
               # CloudHSM v2 Cluster — responseElements has no ARN, only cluster.clusterId.
               # §1.99b: CloudTrail eventSource for CloudHSM v2 is 'cloudhsm.amazonaws.com'
               # (NOT 'cloudhsmv2.amazonaws.com'). The boto3 service name IS 'cloudhsmv2';
@@ -7751,19 +7751,19 @@ ${permissionsList}
                   cluster_id = (resp.get('cluster') or {}).get('clusterId')
                   if cluster_id:
                       return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
-
+          
               # CloudHSM v2 HSM — tagging routes to parent cluster (idempotent with CreateCluster handler)
               elif event_name == 'CreateHsm' and event_source == 'cloudhsm.amazonaws.com':
                   cluster_id = (resp.get('hsm') or {}).get('clusterId') or req.get('clusterId')
                   if cluster_id:
                       return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
-
+          
               # AWS Directory Service (Simple AD + Managed Microsoft AD + AD Connector)
               elif event_name in ('CreateDirectory', 'CreateMicrosoftAD', 'ConnectDirectory') and event_source == 'ds.amazonaws.com':
                   dir_id = resp.get('directoryId')
                   if dir_id:
                       return f"arn:aws:ds:{region}:{account_id}:directory/{dir_id}"
-
+          
               # Amazon Keyspaces — responseElements is empty on CreateKeyspace;
               # name is in requestParameters.keyspaceName. Trailing slash required
               # per keyspaces ARN format.
@@ -7771,117 +7771,117 @@ ${permissionsList}
                   ks_name = req.get('keyspaceName')
                   if ks_name:
                       return f"arn:aws:cassandra:{region}:{account_id}:/keyspace/{ks_name}/"
-
+          
               # SageMaker
               elif event_name == 'CreateNotebookInstance':
                   return resp.get('notebookInstanceArn')
-
+          
               # Comprehend
               elif event_name == 'CreateDocumentClassifier':
                   return resp.get('documentClassifierArn')
-
+          
               # AppSync
               elif event_name == 'CreateGraphqlApi' and event_source == 'appsync.amazonaws.com':
                   api = resp.get('graphqlApi', {})
                   return api.get('arn')
-
+          
               # IoT
               elif event_name == 'CreateThing':
                   return resp.get('thingArn')
-
+          
               # Service Catalog
               elif event_name == 'CreatePortfolio':
                   portfolio = resp.get('portfolioDetail', {})
                   return portfolio.get('aRN')  # Note: capital ARN
-
+          
               # Transfer Family Server
               elif event_name == 'CreateServer' and event_source == 'transfer.amazonaws.com':
                   server_id = resp.get('serverId')
                   if server_id:
                       return f"arn:aws:transfer:{region}:{account_id}:server/{server_id}"
-
+          
               # RDS Proxy
               elif event_name == 'CreateDBProxy':
                   proxy = resp.get('dBProxy', {})
                   return proxy.get('dBProxyArn')
-
+          
               # Global Accelerator
               elif event_name == 'CreateAccelerator':
                   accelerator = resp.get('accelerator', {})
                   return accelerator.get('acceleratorArn')
-
+          
               # CodeBuild Project
               elif event_name == 'CreateProject' and event_source == 'codebuild.amazonaws.com':
                   project = resp.get('project', {})
                   return project.get('arn')
-
+          
               # CodePipeline Pipeline - ARN not in response, construct from name
               elif event_name == 'CreatePipeline' and event_source == 'codepipeline.amazonaws.com':
                   pipeline = resp.get('pipeline', {})
                   pipeline_name = pipeline.get('name')
                   if pipeline_name:
                       return f"arn:aws:codepipeline:{region}:{account_id}:{pipeline_name}"
-
+          
               # Target Group
               elif event_name == 'CreateTargetGroup':
                   tgs = resp.get('targetGroups', [])
                   if tgs and len(tgs) > 0:
                       return tgs[0].get('targetGroupArn')
-
+          
               # Glue Database
               elif event_name == 'CreateDatabase' and event_source == 'glue.amazonaws.com':
                   db_name = req.get('databaseInput', {}).get('name')
                   if db_name:
                       return f"arn:aws:glue:{region}:{account_id}:database/{db_name}"
-
+          
               # Glue Crawler
               elif event_name == 'CreateCrawler':
                   crawler_name = req.get('name')
                   if crawler_name:
                       return f"arn:aws:glue:{region}:{account_id}:crawler/{crawler_name}"
-
+          
               # Glue Workflow
               elif event_name == 'CreateWorkflow':
                   workflow_name = resp.get('name')
                   if workflow_name:
                       return f"arn:aws:glue:{region}:{account_id}:workflow/{workflow_name}"
-
+          
               # Backup Plan
               elif event_name == 'CreateBackupPlan':
                   plan_id = resp.get('backupPlanId')
                   if plan_id:
                       return f"arn:aws:backup:{region}:{account_id}:backup-plan:{plan_id}"
-
+          
               # CloudWatch Dashboard — RGTA rejects both regionless and regional
               # ARNs. Include region so native cloudwatch:tag_resource dispatch works.
               elif event_name == 'PutDashboard':
                   dashboard_name = ci_get(req, 'dashboardName')
                   if dashboard_name:
                       return f"arn:aws:cloudwatch:{region}:{account_id}:dashboard/{dashboard_name}"
-
+          
               # EMR Cluster (RunJobFlow)
               elif event_name == 'RunJobFlow':
                   cluster_id = resp.get('jobFlowId')
                   if cluster_id:
                       return f"arn:aws:elasticmapreduce:{region}:{account_id}:cluster/{cluster_id}"
-
+          
               # EKS Cluster
               elif event_name == 'CreateCluster' and event_source == 'eks.amazonaws.com':
                   cluster = resp.get('cluster', {})
                   cluster_arn = cluster.get('arn')
                   if cluster_arn:
                       return cluster_arn
-
+          
               # EKS Nodegroup
               elif event_name == 'CreateNodegroup':
                   nodegroup = resp.get('nodegroup', {})
                   return nodegroup.get('nodegroupArn')
-
+          
               # ElastiCache - needs retry, but add ARN extraction
               elif event_name == 'CreateCacheCluster':
                   cache = resp.get('cacheCluster', {})
                   return cache.get('aRN')
-
+          
               # Route53 Hosted Zone
               elif event_name == 'CreateHostedZone':
                   zone_id = resp.get('hostedZone', {}).get('id')
@@ -7889,7 +7889,7 @@ ${permissionsList}
                       # ID format: /hostedzone/Z0862949349EG6JSOWHXK
                       zone_id = zone_id.split('/')[-1]
                       return f"arn:aws:route53:::hostedzone/{zone_id}"
-
+          
               # VPC Peering Connection
               elif event_name == 'CreateVpcPeeringConnection':
                   vpc_pcx = resp.get('vpcPeeringConnection', {})
@@ -7898,7 +7898,7 @@ ${permissionsList}
                   pcx_id = vpc_pcx.get('vpcPeeringConnectionId')
                   if pcx_id:
                       return f"arn:aws:ec2:{region}:{account_id}:vpc-peering-connection/{pcx_id}"
-
+          
               # EBS Snapshot — scope to EC2 source to prevent catching CreateSnapshot
               # from ElastiCache / MemoryDB / FSx (OpenZFS) / Redshift Serverless,
               # which use the same event name but different response shapes.
@@ -7909,7 +7909,7 @@ ${permissionsList}
                   snapshot_id = resp.get('snapshotId')
                   if snapshot_id:
                       return f"arn:aws:ec2:{region}:{account_id}:snapshot/{snapshot_id}"
-
+          
               # VPC Flow Logs
               elif event_name == 'CreateFlowLogs':
                   # EC2 response wrapper: CreateFlowLogsResponse.flowLogIdSet.item
@@ -7925,14 +7925,14 @@ ${permissionsList}
                       fl_id = flow_ids[0] if flow_ids else None
                   if fl_id:
                       return f"arn:aws:ec2:{region}:{account_id}:vpc-flow-log/{fl_id}"
-
+          
               # SSM Document
               elif event_name == 'CreateDocument':
                   doc_desc = resp.get('documentDescription', {})
                   doc_name = doc_desc.get('name')
                   if doc_name:
                       return f"arn:aws:ssm:{region}:{account_id}:document/{doc_name}"
-
+          
               # DHCP Options
               elif event_name == 'CreateDhcpOptions':
                   dhcp = resp.get('dhcpOptions', {})
@@ -7941,7 +7941,7 @@ ${permissionsList}
                   dhcp_id = dhcp.get('dhcpOptionsId')
                   if dhcp_id:
                       return f"arn:aws:ec2:{region}:{account_id}:dhcp-options/{dhcp_id}"
-
+          
               # AMI (CreateImage)
               elif event_name == 'CreateImage':
                   image_id = resp.get('imageId')
@@ -7949,52 +7949,52 @@ ${permissionsList}
                       image_id = resp.get('ImageId')
                   if image_id:
                       return f"arn:aws:ec2:{region}:{account_id}:image/{image_id}"
-
+          
               # DMS Replication Instance
               elif event_name == 'CreateReplicationInstance':
                   rep = resp.get('replicationInstance', {})
                   rep_arn = rep.get('replicationInstanceArn')
                   if rep_arn:
                       return rep_arn
-
+          
               # DataSync Task
               elif event_name == 'CreateTask':
                   task_arn = resp.get('taskArn')
                   if task_arn:
                       return task_arn
-
+          
               # Glue DataBrew Dataset
               elif event_name == 'CreateDataset' and event_source == 'databrew.amazonaws.com':
                   name = resp.get('Name') or req.get('Name')
                   if name:
                       return f"arn:aws:databrew:{region}:{account_id}:dataset/{name}"
-
+          
               # Glue DataBrew Recipe
               elif event_name == 'CreateRecipe' and event_source == 'databrew.amazonaws.com':
                   name = resp.get('Name') or req.get('Name')
                   if name:
                       return f"arn:aws:databrew:{region}:{account_id}:recipe/{name}"
-
+          
               # Amazon Timestream Database
               elif event_name == 'CreateDatabase' and event_source == 'timestream.amazonaws.com':
                   db = resp.get('Database', {})
                   db_arn = db.get('Arn')
                   if db_arn:
                       return db_arn
-
+          
               # Amazon Timestream Table
               elif event_name == 'CreateTable' and event_source == 'timestream.amazonaws.com':
                   tbl = resp.get('Table', {})
                   tbl_arn = tbl.get('Arn')
                   if tbl_arn:
                       return tbl_arn
-
+          
               # EMR Serverless Application (applicationId not ARN in response)
               elif event_name == 'CreateApplication' and event_source == 'emr-serverless.amazonaws.com':
                   app_id = resp.get('applicationId')
                   if app_id:
                       return f"arn:aws:emr-serverless:{region}:{account_id}:/applications/{app_id}"
-
+          
               # Amazon Kendra Index (Id not ARN in response)
               elif event_name == 'CreateIndex' and event_source == 'kendra.amazonaws.com':
                   # §1.97 — CloudTrail emits lowercase 'id', boto3 SDK shape is
@@ -8003,14 +8003,14 @@ ${permissionsList}
                   idx_id = ci_get(resp, 'Id')
                   if idx_id:
                       return f"arn:aws:kendra:{region}:{account_id}:index/{idx_id}"
-
+          
               # Amazon Kendra DataSource
               elif event_name == 'CreateDataSource' and event_source == 'kendra.amazonaws.com':
                   ds_id = ci_get(resp, 'Id')
                   idx_id = ci_get(req, 'IndexId')
                   if ds_id and idx_id:
                       return f"arn:aws:kendra:{region}:{account_id}:index/{idx_id}/data-source/{ds_id}"
-
+          
               # AWS Elastic Beanstalk Application
               elif event_name == 'CreateApplication' and event_source == 'elasticbeanstalk.amazonaws.com':
                   # §1.103 — CloudTrail nests at 'application.applicationName'
@@ -8024,35 +8024,35 @@ ${permissionsList}
                   app_name = ci_get(app, 'ApplicationName') or ci_get(req, 'ApplicationName')
                   if app_name:
                       return f"arn:aws:elasticbeanstalk:{region}:{account_id}:application/{app_name}"
-
+          
               # AWS Elastic Beanstalk Environment
               elif event_name == 'CreateEnvironment' and event_source == 'elasticbeanstalk.amazonaws.com':
                   # Same casing-variance class as CreateApplication above.
                   env_arn = ci_get(resp, 'EnvironmentArn')
                   if env_arn:
                       return env_arn
-
+          
               # Amazon GameLift Build
               elif event_name == 'CreateBuild' and event_source == 'gamelift.amazonaws.com':
                   build = resp.get('Build', {})
                   build_arn = build.get('BuildArn') or build.get('buildArn')
                   if build_arn:
                       return build_arn
-
+          
               # Amazon GameLift Script
               elif event_name == 'CreateScript' and event_source == 'gamelift.amazonaws.com':
                   script = resp.get('Script', {})
                   script_arn = script.get('ScriptArn') or script.get('scriptArn')
                   if script_arn:
                       return script_arn
-
+          
               # Amazon GameLift Fleet
               elif event_name == 'CreateFleet' and event_source == 'gamelift.amazonaws.com':
                   fleet_attrib = resp.get('FleetAttributes', {})
                   fleet_arn = fleet_attrib.get('FleetArn')
                   if fleet_arn:
                       return fleet_arn
-
+          
               # RDS Snapshots (flat response — ARN is at top level)
               elif event_name == 'CreateDBSnapshot':
                   arn = resp.get('dBSnapshotArn')
@@ -8060,27 +8060,27 @@ ${permissionsList}
                       arn = resp.get('dBSnapshot', {}).get('dBSnapshotArn')
                   if arn:
                       return arn
-
+          
               elif event_name == 'CreateDBClusterSnapshot':
                   arn = resp.get('dBClusterSnapshotArn')
                   if not arn:
                       arn = resp.get('dBClusterSnapshot', {}).get('dBClusterSnapshotArn')
                   if arn:
                       return arn
-
+          
               elif event_name == 'CreateDBInstanceReadReplica':
                   arn = resp.get('dBInstanceArn')
                   if not arn:
                       arn = resp.get('dBInstance', {}).get('dBInstanceArn')
                   if arn:
                       return arn
-
+          
               # Bedrock Application Inference Profile
               elif event_name == 'CreateInferenceProfile':
                   inf_arn = resp.get('inferenceProfileArn')
                   if inf_arn:
                       return inf_arn
-
+          
               # Kinesis Analytics v2 (KDA)
               elif event_name == 'CreateApplication' and event_source == 'kinesisanalytics.amazonaws.com':
                   app_arn = resp.get('applicationDetail', {}).get('applicationARN')
@@ -8088,14 +8088,14 @@ ${permissionsList}
                       app_arn = resp.get('ApplicationARN')
                   if app_arn:
                       return app_arn
-
+          
               # Redshift Serverless Namespace
               elif event_name == 'CreateNamespace':
                   ns = resp.get('namespace', {})
                   ns_arn = ns.get('namespaceArn')
                   if ns_arn:
                       return ns_arn
-
+          
               # Redshift Serverless Workgroup (empty responseElements — construct from request)
               elif event_name == 'CreateWorkgroup':
                   wg = resp.get('workgroup', {})
@@ -8106,7 +8106,7 @@ ${permissionsList}
                           wg_arn = f"arn:aws:redshift-serverless:{region}:{account_id}:workgroup/{wg_name}"
                   if wg_arn:
                       return wg_arn
-
+          
               # Carrier Gateway
               elif event_name == 'CreateCarrierGateway':
                   cagw = resp.get('carrierGateway', {})
@@ -8115,13 +8115,13 @@ ${permissionsList}
                   cagw_id = cagw.get('carrierGatewayId')
                   if cagw_id:
                       return f"arn:aws:ec2:{region}:{account_id}:carrier-gateway/{cagw_id}"
-
+          
               # Glue Trigger
               elif event_name == 'CreateTrigger' and event_source == 'glue.amazonaws.com':
                   trigger_name = resp.get('name')
                   if trigger_name:
                       return f"arn:aws:glue:{region}:{account_id}:trigger/{trigger_name}"
-
+          
               # VPC Endpoint
               elif event_name == 'CreateVpcEndpoint':
                   vpc_endpoint = resp.get('vpcEndpoint', {})
@@ -8130,36 +8130,36 @@ ${permissionsList}
                   vpc_endpoint_id = vpc_endpoint.get('vpcEndpointId')
                   if vpc_endpoint_id:
                       return f"arn:aws:ec2:{region}:{account_id}:vpc-endpoint/{vpc_endpoint_id}"
-
+          
               # API Gateway v2 VPC Link
               elif event_name == 'CreateVpcLink' and event_source == 'apigateway.amazonaws.com':
                   vpc_link_id = resp.get('vpcLinkId')
                   if vpc_link_id:
                       return f"arn:aws:apigateway:{region}::/vpclinks/{vpc_link_id}"
-
+          
               # App Mesh (3-level deep: mesh.metadata.arn)
               elif event_name == 'CreateMesh':
                   mesh_arn = resp.get('mesh', {}).get('metadata', {}).get('arn')
                   if mesh_arn:
                       return mesh_arn
-
+          
               # API Gateway API Key — handler removed 2026-04-26 (plan-PR #56 D11).
               # CreateApiKey is now in IGNORE_EVENTS; its ARN shape is rejected
               # by all tagging APIs (RGTA + native) per
               # docs/MAP_TAGGING_GAP_ANALYSIS.md.
-
+          
               # CloudWatch Insights Query Definition
               # CloudWatch Logs Insights QueryDefinition — §1.86. Not taggable
               # per AWS (the 'arn:aws:logs:<region>:<acct>:query-definition:<id>'
               # shape is rejected by RGTA). Moved to IGNORE_EVENTS; dead
               # handler removed.
-
+          
               # Athena WorkGroup
               elif event_name == 'CreateWorkGroup':
                   workgroup_name = req.get('name')
                   if workgroup_name:
                       return f"arn:aws:athena:{region}:{account_id}:workgroup/{workgroup_name}"
-
+          
               # Service Discovery HTTP Namespace — §1.87. AWS returns an
               # operationId, not the namespace ID. Constructing the ARN would
               # require an async DescribeOperation poll (possibly minutes) that
@@ -8167,14 +8167,14 @@ ${permissionsList}
               # IGNORE_EVENTS rather than leaving a dead handler that generates
               # no_arn skips (and potential SNS noise if any follow-up promotes
               # no_arn to a permanent failure class).
-
+          
               # AWS Security Hub — §1.84. EnableSecurityHub returns a null body,
               # so the universal ARN scan has nothing to extract. The hub is
               # always named 'default' (the only supported case per AWS docs);
               # construct the ARN directly.
               elif event_name == 'EnableSecurityHub' and event_source == 'securityhub.amazonaws.com':
                   return f"arn:aws:securityhub:{region}:{account_id}:hub/default"
-
+          
               # AWS Storage Gateway — §1.85. ActivateGateway returns the ARN on
               # 'GatewayARN' (uppercase per the Storage Gateway API shape), which
               # the allowlist didn't include prior to PR #43a's suffix-match.
@@ -8185,56 +8185,56 @@ ${permissionsList}
                   gw_arn = ci_get(resp, 'GatewayARN') or ci_get(resp, 'gatewayArn')
                   if gw_arn:
                       return gw_arn
-
+          
               # (CreateLoadBalancer handled above at the ELBv2 branch — both
               # ELBv1 Classic and ELBv2 share eventSource.)
-
+          
               # ACM Private CA
               elif event_name == 'CreateCertificateAuthority':
                   ca_arn = resp.get('certificateAuthorityArn')
                   if ca_arn:
                       return ca_arn
-
+          
               # RAM Resource Share
               elif event_name == 'CreateResourceShare':
                   share = resp.get('resourceShare', {})
                   share_arn = share.get('resourceShareArn')
                   if share_arn:
                       return share_arn
-
+          
               # Storage Gateway Tape Pool
               elif event_name == 'CreateTapePool':
                   pool_arn = resp.get('poolARN')
                   if pool_arn:
                       return pool_arn
-
+          
               # Cognito User Pool
               elif event_name == 'CreateUserPool' and event_source == 'cognito-idp.amazonaws.com':
                   pool = resp.get('userPool', {})
                   pool_id = pool.get('id')
                   if pool_id:
                       return f"arn:aws:cognito-idp:{region}:{account_id}:userpool/{pool_id}"
-
+          
               # Cognito Identity Pool
               elif event_name == 'CreateIdentityPool':
                   pool_id = resp.get('identityPoolId')
                   if pool_id:
                       return f"arn:aws:cognito-identity:{region}:{account_id}:identitypool/{pool_id}"
-
+          
               # Network Firewall Policy
               elif event_name == 'CreateFirewallPolicy':
                   nfw_resp = resp.get('firewallPolicyResponse', {})
                   nfw_arn = nfw_resp.get('firewallPolicyArn')
                   if nfw_arn:
                       return nfw_arn
-
+          
               # Network Firewall
               elif event_name == 'CreateFirewall':
                   fw = resp.get('firewall', {})
                   fw_arn = fw.get('firewallArn')
                   if fw_arn:
                       return fw_arn
-
+          
               # AWS WAFv2 WebACL
               # responseElements.summary.aRN — works for both REGIONAL and CLOUDFRONT scope.
               # (CLOUDFRONT-scope WebACLs only exist in us-east-1; ARN reflects scope via
@@ -8244,37 +8244,37 @@ ${permissionsList}
                   webacl_arn = summary.get('aRN') or summary.get('ARN') or summary.get('arn')
                   if webacl_arn:
                       return webacl_arn
-
+          
               # AWS WAFv2 IPSet
               elif event_name == 'CreateIPSet' and event_source == 'wafv2.amazonaws.com':
                   summary = resp.get('summary', {})
                   ipset_arn = summary.get('aRN') or summary.get('ARN') or summary.get('arn')
                   if ipset_arn:
                       return ipset_arn
-
+          
               # AWS CodeDeploy Application — response has only applicationId; build ARN.
               elif event_name == 'CreateApplication' and event_source == 'codedeploy.amazonaws.com':
                   app_name = req.get('applicationName')
                   if app_name:
                       return f"arn:aws:codedeploy:{region}:{account_id}:application:{app_name}"
-
+          
               # AWS CodeDeploy DeploymentGroup — response has only deploymentGroupId; build ARN.
               elif event_name == 'CreateDeploymentGroup' and event_source == 'codedeploy.amazonaws.com':
                   app_name = req.get('applicationName')
                   dg_name = req.get('deploymentGroupName')
                   if app_name and dg_name:
                       return f"arn:aws:codedeploy:{region}:{account_id}:deploymentgroup:{app_name}/{dg_name}"
-
+          
               # EKS Add-on
               elif event_name == 'CreateAddon':
                   addon = resp.get('addon', {})
                   addon_arn = addon.get('addonArn')
                   if addon_arn:
                       return addon_arn
-
+          
               # (Lambda Layers and Aliases are not taggable — PublishLayerVersion is
               # in IGNORE_EVENTS. Aliases were already unhandled here.)
-
+          
               # Transit Gateway VPC Attachment
               elif event_name == 'CreateTransitGatewayVpcAttachment':
                   tgwa = resp.get('transitGatewayVpcAttachment', {})
@@ -8283,7 +8283,7 @@ ${permissionsList}
                   att_id = tgwa.get('transitGatewayAttachmentId')
                   if att_id:
                       return f"arn:aws:ec2:{region}:{account_id}:transit-gateway-attachment/{att_id}"
-
+          
               # ElastiCache Snapshot
               elif event_name == 'CreateSnapshot' and event_source == 'elasticache.amazonaws.com':
                   snap = resp.get('snapshot', {})
@@ -8294,7 +8294,7 @@ ${permissionsList}
                           snap_arn = f"arn:aws:elasticache:{region}:{account_id}:snapshot:{snap_name}"
                   if snap_arn:
                       return snap_arn
-
+          
               # WorkSpaces
               elif event_name == 'CreateWorkspaces':
                   pending = resp.get('pendingRequests', [])
@@ -8302,203 +8302,203 @@ ${permissionsList}
                       ws_id = pending[0].get('workspaceId')
                       if ws_id:
                           return f"arn:aws:workspaces:{region}:{account_id}:workspace/{ws_id}"
-
+          
               # Route53 Health Check
               elif event_name == 'CreateHealthCheck':
                   health_check = resp.get('healthCheck', {})
                   health_check_id = health_check.get('id')
                   if health_check_id:
                       return f"arn:aws:route53:::healthcheck/{health_check_id}"
-
+          
               # EC2 Key Pair
               elif event_name == 'CreateKeyPair':
                   key_pair_id = resp.get('keyPairId')
                   if key_pair_id:
                       return f"arn:aws:ec2:{region}:{account_id}:key-pair/{key_pair_id}"
-
+          
               # DAX Cluster
               elif event_name == 'CreateCluster' and event_source == 'dax.amazonaws.com':
                   cluster = resp.get('cluster', {})
                   cluster_arn = cluster.get('clusterArn')
                   if cluster_arn:
                       return cluster_arn
-
+          
               # DynamoDB RestoreTableFromBackup / RestoreTableToPointInTime
               elif event_name in ('RestoreTableFromBackup', 'RestoreTableToPointInTime') and event_source == 'dynamodb.amazonaws.com':
                   desc = resp.get('tableDescription', {})
                   table_arn = desc.get('tableArn')
                   if table_arn:
                       return table_arn
-
+          
               # ElastiCache Serverless
               elif event_name == 'CreateServerlessCache' and event_source == 'elasticache.amazonaws.com':
                   sc = resp.get('serverlessCache', {})
                   sc_arn = sc.get('aRN') or sc.get('arn') or sc.get('ARN')
                   if sc_arn:
                       return sc_arn
-
+          
               # MSK CreateClusterV2 (MSK Serverless / Provisioned v2)
               elif event_name == 'CreateClusterV2' and event_source == 'kafka.amazonaws.com':
                   cluster_arn = resp.get('clusterArn')
                   if cluster_arn:
                       return cluster_arn
-
+          
               # Amazon OpenSearch Service (managed — NOT Serverless)
               elif event_name == 'CreateDomain' and event_source == 'es.amazonaws.com':
                   domain_status = resp.get('domainStatus', {})
                   domain_arn = domain_status.get('ARN') or domain_status.get('arn')
                   if domain_arn:
                       return domain_arn
-
+          
               # SageMaker Domain (Studio) — case-insensitive per §1.91 class
               elif event_name == 'CreateDomain' and event_source == 'sagemaker.amazonaws.com':
                   domain_arn = ci_get(resp, 'domainArn')
                   if domain_arn:
                       return domain_arn
-
+          
               # SageMaker Pipeline
               elif event_name == 'CreatePipeline' and event_source == 'sagemaker.amazonaws.com':
                   pipeline_arn = ci_get(resp, 'pipelineArn')
                   if pipeline_arn:
                       return pipeline_arn
-
+          
               # SageMaker Feature Group
               elif event_name == 'CreateFeatureGroup' and event_source == 'sagemaker.amazonaws.com':
                   fg_arn = ci_get(resp, 'featureGroupArn')
                   if fg_arn:
                       return fg_arn
-
+          
               # FSx Backup
               elif event_name == 'CreateBackup' and event_source == 'fsx.amazonaws.com':
                   backup = resp.get('backup', {})
                   backup_arn = backup.get('resourceARN')
                   if backup_arn:
                       return backup_arn
-
+          
               # FSx CreateFileSystemFromBackup
               elif event_name == 'CreateFileSystemFromBackup' and event_source == 'fsx.amazonaws.com':
                   fs = resp.get('fileSystem', {})
                   fs_arn = fs.get('resourceARN')
                   if fs_arn:
                       return fs_arn
-
+          
               # FSx OpenZFS Snapshot — response.snapshot.ResourceARN (capital R in ARN)
               elif event_name == 'CreateSnapshot' and event_source == 'fsx.amazonaws.com':
                   snapshot = resp.get('snapshot', {})
                   snap_arn = snapshot.get('ResourceARN') or snapshot.get('resourceARN')
                   if snap_arn:
                       return snap_arn
-
+          
               # Redshift Serverless Snapshot
               elif event_name == 'CreateSnapshot' and event_source == 'redshift-serverless.amazonaws.com':
                   snapshot = resp.get('snapshot', {})
                   snap_arn = snapshot.get('snapshotArn')
                   if snap_arn:
                       return snap_arn
-
+          
               # DMS Serverless (CreateReplicationConfig)
               elif event_name == 'CreateReplicationConfig' and event_source == 'dms.amazonaws.com':
                   rc = resp.get('replicationConfig', {})
                   rc_arn = rc.get('replicationConfigArn')
                   if rc_arn:
                       return rc_arn
-
+          
               # Neptune (uses same event names as RDS but different source)
               elif event_name in ('CreateDBCluster', 'CreateDBInstance') and event_source == 'rds.amazonaws.com':
                   # Already handled by existing RDS handlers — this catches Neptune/DocDB
                   # which share the rds.amazonaws.com event source
                   pass
-
+          
               # Transfer Family Connector
               elif event_name == 'CreateConnector' and event_source == 'transfer.amazonaws.com':
                   connector_id = resp.get('connectorId')
                   if connector_id:
                       return f"arn:aws:transfer:{region}:{account_id}:connector/{connector_id}"
-
+          
               # Transfer Family User
               elif event_name == 'CreateUser' and event_source == 'transfer.amazonaws.com':
                   server_id = req.get('serverId')
                   user_name = resp.get('userName') or req.get('userName')
                   if server_id and user_name:
                       return f"arn:aws:transfer:{region}:{account_id}:user/{server_id}/{user_name}"
-
+          
               # Direct Connect LAG
               elif event_name == 'CreateLag' and event_source == 'directconnect.amazonaws.com':
                   lag_id = resp.get('lagId')
                   if lag_id:
                       return f"arn:aws:directconnect:{region}:{account_id}:dxlag/{lag_id}"
-
+          
               # Direct Connect Gateway
               elif event_name == 'CreateDirectConnectGateway' and event_source == 'directconnect.amazonaws.com':
                   gw = resp.get('directConnectGateway', {})
                   gw_id = gw.get('directConnectGatewayId')
                   if gw_id:
                       return f"arn:aws:directconnect::{account_id}:dx-gateway/{gw_id}"
-
+          
               # Kinesis Video Streams (disambiguate from Kinesis Data Streams)
               elif event_name == 'CreateStream' and event_source == 'kinesisvideo.amazonaws.com':
                   stream_arn = resp.get('streamARN') or resp.get('streamArn')
                   if stream_arn:
                       return stream_arn
-
+          
               # Elastic Disaster Recovery (DRS) Source Server
               elif event_name == 'CreateSourceServer' and event_source == 'drs.amazonaws.com':
                   source_arn = resp.get('arn') or resp.get('sourceServerArn')
                   if source_arn:
                       return source_arn
-
+          
               # Deadline Cloud Farm
               elif event_name == 'CreateFarm' and event_source == 'deadline.amazonaws.com':
                   farm_id = resp.get('farmId')
                   if farm_id:
                       return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}"
-
+          
               # Deadline Cloud Queue
               elif event_name == 'CreateQueue' and event_source == 'deadline.amazonaws.com':
                   farm_id = req.get('farmId')
                   queue_id = resp.get('queueId')
                   if farm_id and queue_id:
                       return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}/queue/{queue_id}"
-
+          
               # Deadline Cloud Fleet
               elif event_name == 'CreateFleet' and event_source == 'deadline.amazonaws.com':
                   farm_id = req.get('farmId')
                   fleet_id = resp.get('fleetId')
                   if farm_id and fleet_id:
                       return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}/fleet/{fleet_id}"
-
+          
               # IoT Core Topic Rule
               elif event_name == 'CreateTopicRule' and event_source == 'iot.amazonaws.com':
                   rule_name = req.get('ruleName')
                   if rule_name:
                       return f"arn:aws:iot:{region}:{account_id}:rule/{rule_name}"
-
+          
               # IoT SiteWise Asset
               elif event_name == 'CreateAsset' and event_source == 'iotsitewise.amazonaws.com':
                   asset_id = resp.get('assetId')
                   if asset_id:
                       return f"arn:aws:iotsitewise:{region}:{account_id}:asset/{asset_id}"
-
+          
               # IoT SiteWise Asset Model
               elif event_name == 'CreateAssetModel' and event_source == 'iotsitewise.amazonaws.com':
                   model_id = resp.get('assetModelId')
                   if model_id:
                       return f"arn:aws:iotsitewise:{region}:{account_id}:asset-model/{model_id}"
-
+          
               # IoT SiteWise Gateway
               elif event_name == 'CreateGateway' and event_source == 'iotsitewise.amazonaws.com':
                   gw_id = resp.get('gatewayId')
                   if gw_id:
                       return f"arn:aws:iotsitewise:{region}:{account_id}:gateway/{gw_id}"
-
+          
               # IoT SiteWise Portal
               elif event_name == 'CreatePortal' and event_source == 'iotsitewise.amazonaws.com':
                   portal_id = resp.get('portalId')
                   if portal_id:
                       return f"arn:aws:iotsitewise:{region}:{account_id}:portal/{portal_id}"
-
+          
               return None
-
+          
           # Shared throttle-code set used by both native dispatch branches and
           # the RGTA fallthrough. RGTA throws 'ThrottledException' (with "ed")
           # — most other AWS services throw 'ThrottlingException' (with "ing").
@@ -8506,10 +8506,10 @@ ${permissionsList}
           # codes. Hoisted to module scope so _retry_throttles() and the RGTA
           # retry loop below share the same constant (21.0.6, §1.81/§1.92).
           THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
-
+          
           def _retry_throttles(fn):
               """Call fn() with exponential-backoff retry on throttle ClientError.
-
+          
               Matches the pattern used by the RGTA fallthrough below — 4 attempts,
               1s → 2s → 4s → 8s (±25% jitter). Non-throttle ClientErrors propagate
               to the outer _process_event classifier on the first attempt. Absorbs
@@ -8528,15 +8528,15 @@ ${permissionsList}
                           time.sleep(sleep_time)
                           continue
                       raise
-
+          
           def tag_resource(arn, tag_key, tag_value, tagging_client=None, ec2_client=None, target_region=None):
               _tagging = tagging_client or tagging
               _ec2 = ec2_client or ec2
               _region = target_region or boto3.session.Session().region_name
-
+          
               def get_service_client(service):
                   return boto3.client(service, region_name=_region)
-
+          
               # Handle special cases that don't support Resource Groups Tagging API.
               # Each native tag call is wrapped in _retry_throttles() so short
               # throttle bursts are absorbed in-invocation (up to 4 attempts,
@@ -8735,7 +8735,7 @@ ${permissionsList}
                               _ec2.create_tags(Resources=[resource_id], Tags=[{'Key': tag_key, 'Value': tag_value}])
                               return True
                           raise e
-
+          
           # Three-path error classifier (§1.115–§1.120):
           #
           #   TRANSIENT            → surface via batchItemFailures so SQS
@@ -8834,7 +8834,7 @@ ${permissionsList}
               'UPDATE_ROLLBACK_FAILED',
               'Tag related operations on the managed rule',
           )
-
+          
           # Events to ignore — either not taggable, or would cause a feedback
           # loop (e.g. PutBucketTagging: tagging an S3 bucket fires this
           # event, which would re-trigger this Lambda, which would tag again
@@ -8863,14 +8863,14 @@ ${permissionsList}
               # rejected by RGTA + native.
               'PutQueryDefinition',
           ])
-
+          
           def _classify_error(msg):
               if any(m in msg for m in _TRANSIENT_MARKERS):
                   return 'transient'
               if any(m in msg for m in _PERMANENT_IGNORABLE_MARKERS):
                   return 'permanent_ignorable'
               return 'permanent_actionable'
-
+          
           def _emit_class_metric(error_class, mpe_id):
               try:
                   boto3.client('cloudwatch').put_metric_data(
@@ -8887,7 +8887,7 @@ ${permissionsList}
                   )
               except Exception as mx:
                   print(f'Could not emit TagFailureByClass metric ({error_class}): {mx}')
-
+          
           def _publish_permanent_alert(arn, mpe_id, err_msg):
               alert_arn = os.environ.get('ALERT_TOPIC_ARN')
               if not alert_arn:
@@ -8908,14 +8908,14 @@ ${permissionsList}
                   )
               except Exception as sns_e:
                   print(f'Could not publish SNS alert: {sns_e}')
-
+          
           def _unwrap_sqs_record(record):
               """Extract the inner EventBridge event from one SQS record."""
               return json.loads(record['body'])
-
+          
           def _process_event(eb_event, config):
               """Tag all ARNs implied by a single EventBridge event.
-
+          
               Returns (status, error_class) where status is one of
               {'ok', 'skipped', 'transient', 'permanent_actionable'} and
               error_class is the classifier verdict for failures (or None).
@@ -8926,24 +8926,24 @@ ${permissionsList}
               if not is_after_agreement(config):
                   print('Before agreement start date, skipping.')
                   return ('skipped', None)
-
+          
               detail = eb_event.get('detail', {})
               account_id = detail.get('recipientAccountId', eb_event.get('account', ''))
               region = eb_event.get('region', detail.get('awsRegion', ''))
-
+          
               if not is_in_scope(config, account_id, detail):
                   print(f'Resource not in MAP scope (account={account_id}), skipping.')
                   return ('skipped', None)
-
+          
               if detail.get('errorCode') or detail.get('errorMessage'):
                   print(f'CloudTrail event has error, skipping: {detail.get("errorMessage")}')
                   return ('skipped', None)
-
+          
               event_name = detail.get('eventName', '')
               if event_name in _IGNORE_EVENTS:
                   print(f'Skipping non-taggable event: {event_name}')
                   return ('skipped', None)
-
+          
               # Events that emit multiple resources in a single CloudTrail event
               # (RunInstances → instances + attached EBS volumes + ENIs). AWS
               # does not publish separate CreateVolume / CreateNetworkInterface
@@ -8969,10 +8969,10 @@ ${permissionsList}
               if not arns:
                   print(f'Could not extract ARN from event: {event_name}')
                   return ('skipped', None)
-
+          
               tag_key = 'map-migrated'
               tag_value = config['mpe_id']
-
+          
               # Per-ARN loop. A single record's ARNs share classification
               # fate: if any ARN classifies transient, the whole record goes
               # back to SQS (idempotent re-tag is safe); if any ARN is
@@ -8988,17 +8988,17 @@ ${permissionsList}
                       err_msg = str(e)
                       cls = _classify_error(err_msg)
                       _emit_class_metric(cls, tag_value)
-
+          
                       if cls == 'transient':
                           print(f'Transient [{arn}] {err_msg} — will retry via SQS')
                           # Transient trumps everything — retry wins.
                           return ('transient', err_msg)
-
+          
                       if cls == 'permanent_ignorable':
                           print(f'Permanent-ignorable [{arn}] {err_msg} — resource no longer exists, skipping')
                           # Do not downgrade worst; keep scanning other ARNs.
                           continue
-
+          
                       # permanent_actionable
                       print(f'Permanent-actionable [{arn}] {err_msg} — alerting + routing to DLQ')
                       _publish_permanent_alert(arn, tag_value, err_msg)
@@ -9006,12 +9006,12 @@ ${permissionsList}
                       worst_err = err_msg
                       # Keep scanning remaining ARNs so siblings still tag
                       # (matches the pre-batch behavior's best-effort intent).
-
+          
               return (worst, worst_err)
-
+          
           def handler(event, context):
               """SQS batch handler.
-
+          
               EventSourceMapping is configured with BatchSize=10 and
               FunctionResponseTypes=[ReportBatchItemFailures]. We iterate
               each SQS record, process its inner EventBridge event, and
@@ -9021,7 +9021,7 @@ ${permissionsList}
               """
               config = get_config()
               records = event.get('Records', [])
-
+          
               # Backwards compatibility: if the Lambda is invoked directly
               # with a raw EventBridge event (no SQS envelope), process it
               # once. Used by ReconciliationFunction re-enqueue test paths
@@ -9029,7 +9029,7 @@ ${permissionsList}
               if not records:
                   status, _ = _process_event(event, config)
                   return {'status': status}
-
+          
               failures = []
               for record in records:
                   msg_id = record.get('messageId')
@@ -9044,7 +9044,7 @@ ${permissionsList}
                       # maxReceiveCount if it's a poisoned message.
                       print(f'Unexpected error processing record {msg_id}: {e}')
                       failures.append({'itemIdentifier': msg_id})
-
+          
               if failures:
                   print(f'Batch: {len(failures)}/{len(records)} records failed, reporting for redelivery')
               return {'batchItemFailures': failures}

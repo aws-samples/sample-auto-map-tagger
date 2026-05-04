@@ -20,7 +20,11 @@ const serviceFiles = fs.readdirSync(servicesDir)
   .sort()
   .map(f => `js/services/${f}`);
 
-// 4. Read JS files in dependency order and concatenate
+// 4. Read Lambda handler and prepare for YAML embedding
+const lambdaPy = fs.readFileSync(path.join(SRC, 'templates', 'lambda-handler.py'), 'utf8');
+const lambdaIndented = lambdaPy.split('\n').map(line => '          ' + line).join('\n');
+
+// 5. Read JS files in dependency order and concatenate
 const jsFiles = [
   'js/constants.js',
   'js/shared/ui.js',
@@ -55,6 +59,15 @@ for (const file of jsFiles) {
     .replace(/^import\s+.*;\s*$/gm, '// (import removed by build)');
   jsBundle += stripped;
 }
+
+// 6. Inject Lambda handler into template
+const lambdaPlaceholder = '${LAMBDA_HANDLER_CODE}';
+const lambdaIdx = jsBundle.indexOf(lambdaPlaceholder);
+if (lambdaIdx === -1) {
+  console.error('ERROR: ${LAMBDA_HANDLER_CODE} placeholder not found in JS bundle');
+  process.exit(1);
+}
+jsBundle = jsBundle.slice(0, lambdaIdx) + lambdaIndented.trimEnd() + jsBundle.slice(lambdaIdx + lambdaPlaceholder.length);
 
 const jsPlaceholder = '<!-- BUILD:JS -->';
 html = html.slice(0, html.indexOf(jsPlaceholder)) + jsBundle.trimEnd() + html.slice(html.indexOf(jsPlaceholder) + jsPlaceholder.length);
