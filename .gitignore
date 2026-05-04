@@ -40,3 +40,4 @@ cdk.out/
 # Node
 node_modules/
 package-lock.json
+src/templates/__pycache__
