@@ -10,7 +10,7 @@ let html = fs.readFileSync(path.join(SRC, 'html', 'configurator.html'), 'utf8');
 
 // 2. Inline CSS
 const css = fs.readFileSync(path.join(SRC, 'css', 'styles.css'), 'utf8');
-const cssPlaceholder = '<!-- BUILD:CSS -->';
+const cssPlaceholder = '/* BUILD:CSS */';
 html = html.slice(0, html.indexOf(cssPlaceholder)) + css.trimEnd() + html.slice(html.indexOf(cssPlaceholder) + cssPlaceholder.length);
 
 // 3. Collect service module files (all .js in services/ except index.js, sorted)
@@ -69,7 +69,7 @@ if (lambdaIdx === -1) {
 }
 jsBundle = jsBundle.slice(0, lambdaIdx) + lambdaIndented.trimEnd() + jsBundle.slice(lambdaIdx + lambdaPlaceholder.length);
 
-const jsPlaceholder = '<!-- BUILD:JS -->';
+const jsPlaceholder = '/* BUILD:JS */';
 html = html.slice(0, html.indexOf(jsPlaceholder)) + jsBundle.trimEnd() + html.slice(html.indexOf(jsPlaceholder) + jsPlaceholder.length);
 
 // 5. Write output

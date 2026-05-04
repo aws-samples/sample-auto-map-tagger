@@ -14,7 +14,7 @@ const checks = [
   [html.includes('deleteGenerate'),       'delete flow present'],
   [html.includes('editorGenerate'),       'editor flow present'],
   [html.includes('editorGenerateUpgrade'),'upgrade flow present'],
-  [!html.includes('<!-- BUILD:'),         'no unresolved build placeholders'],
+  [!html.includes('/* BUILD:'),         'no unresolved build placeholders'],
   [!html.includes('require('),            'no require() in output'],
 ];
 
