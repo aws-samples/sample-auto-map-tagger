@@ -15,7 +15,14 @@ html = html.slice(0, html.indexOf(cssPlaceholder)) + css.trimEnd() + html.slice(
 
 // 3. Read JS files in dependency order and concatenate
 const jsFiles = [
-  'js/app.js',
+  'js/app-pre.js',
+  'js/i18n/all.js',
+  'js/services/registry.js',
+  'js/deploy/template-main.js',
+  'js/deploy/instructions.js',
+  'js/deploy/template-org.js',
+  'js/deploy/script-deploy.js',
+  'js/app-post.js',
 ];
 
 let jsBundle = '';
