@@ -15,6 +15,7 @@ html = html.slice(0, html.indexOf(cssPlaceholder)) + css.trimEnd() + html.slice(
 
 // 3. Read JS files in dependency order and concatenate
 const jsFiles = [
+  'js/constants.js',
   'js/app-pre.js',
   'js/i18n/all.js',
   'js/services/registry.js',
