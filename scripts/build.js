@@ -21,13 +21,20 @@ const jsFiles = [
   'js/upgrade/upgrade-flow.js',
   'js/delete/delete-flow.js',
   'js/deploy/deploy-flow.js',
-  'js/i18n/all.js',
+  'js/i18n/en.js',
+  'js/i18n/ko.js',
+  'js/i18n/ja.js',
+  'js/i18n/zh.js',
+  'js/i18n/id.js',
+  'js/i18n/th.js',
+  'js/i18n/vi.js',
+  'js/i18n/engine.js',
   'js/services/registry.js',
   'js/deploy/template-main.js',
   'js/deploy/instructions.js',
   'js/deploy/template-org.js',
   'js/deploy/script-deploy.js',
-  'js/app-post.js',
+  'js/app.js',
 ];
 
 let jsBundle = '';
