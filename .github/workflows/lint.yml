@@ -8,6 +8,21 @@ on:
 
 jobs:
 
+  # ── 0. Build configurator.html from src/ ──────────────────────────────────
+  build-configurator:
+    name: Build Configurator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install && node scripts/build.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: configurator
+          path: build/configurator.html
+
   # ── 1. CloudFormation lint ─────────────────────────────────────────────────
   cfn-lint:
     name: CloudFormation Lint
@@ -246,18 +261,20 @@ jobs:
 
   # ── 4. Configurator HTML check ────────────────────────────────────────────
   configurator-check:
+    needs: build-configurator
     name: Configurator HTML Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: build/
 
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-
-      - name: Build configurator.html
-        run: npm install && node scripts/build.js
 
       - name: Check HTML is well-formed
         run: |
@@ -415,15 +432,15 @@ jobs:
 
   # ── 6. YAML ↔ Configurator sync check ────────────────────────────────────
   sync-drift-check:
+    needs: build-configurator
     name: YAML ↔ Configurator Sync Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '20'
-      - run: npm install && node scripts/build.js
+          name: configurator
+          path: build/
 
       - name: Check IAM permissions and critical handler sync
         run: python3 .github/scripts/sync-check.py
@@ -457,15 +474,15 @@ jobs:
   # EventBridge drops the event before it reaches SQS — silent failure
   # (no DLQ, no alarm). Enforced in both YAML and configurator.html.
   eventbridge-prefix-parity:
+    needs: build-configurator
     name: EventBridge Prefix Parity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '20'
-      - run: npm install && node scripts/build.js
+          name: configurator
+          path: build/
 
       - name: Enforce every handler verb is in the EventBridge prefix list
         run: python3 .github/scripts/lint_event_prefixes.py
@@ -481,15 +498,15 @@ jobs:
   # template variables. Covers both map2-auto-tagger-optimized.yaml
   # and configurator.html's inline CFN template.
   cfn-correctness:
+    needs: build-configurator
     name: CFN Correctness
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '20'
-      - run: npm install && node scripts/build.js
+          name: configurator
+          path: build/
 
       - name: Enforce CFN correctness (name lengths, !Sub coverage, ref targets)
         run: python3 .github/scripts/lint_cfn_correctness.py
@@ -503,15 +520,15 @@ jobs:
   # derived values are emitted only inside single-quoted shell strings
   # via the shellSingleQuote helper.
   shell-injection-guard:
+    needs: build-configurator
     name: Shell Injection Guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '20'
-      - run: npm install && node scripts/build.js
+          name: configurator
+          path: build/
 
       - name: Enforce single-quoted containment for customer-controlled shell values
         run: python3 .github/scripts/lint_shell_injection.py
@@ -524,15 +541,15 @@ jobs:
   # creates ~50 resources and never stresses the drain path. This lint
   # enforces both: BatchSize >= 10 AND ReportBatchItemFailures present.
   batchsize-floor:
+    needs: build-configurator
     name: BatchSize Floor
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '20'
-      - run: npm install && node scripts/build.js
+          name: configurator
+          path: build/
 
       - name: Enforce EventQueueMapping BatchSize >= 10 + ReportBatchItemFailures
         run: python3 .github/scripts/lint_batchsize_floor.py
