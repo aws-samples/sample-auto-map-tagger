@@ -31,7 +31,7 @@ const region        = args['region']             || 'ap-northeast-2';
 const mode          = args['mode']               || 'single';
 const outputFile    = args['output']             || 'deploy-test.sh';
 
-const htmlPath = path.resolve(__dirname, '../../configurator.html');
+const htmlPath = path.resolve(__dirname, '../../build/configurator.html');
 
 (async () => {
   const browser = await chromium.launch({ headless: true });
