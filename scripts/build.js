@@ -13,7 +13,14 @@ const css = fs.readFileSync(path.join(SRC, 'css', 'styles.css'), 'utf8');
 const cssPlaceholder = '<!-- BUILD:CSS -->';
 html = html.slice(0, html.indexOf(cssPlaceholder)) + css.trimEnd() + html.slice(html.indexOf(cssPlaceholder) + cssPlaceholder.length);
 
-// 3. Read JS files in dependency order and concatenate
+// 3. Collect service module files (all .js in services/ except index.js, sorted)
+const servicesDir = path.join(SRC, 'js', 'services');
+const serviceFiles = fs.readdirSync(servicesDir)
+  .filter(f => f.endsWith('.js') && f !== 'index.js')
+  .sort()
+  .map(f => `js/services/${f}`);
+
+// 4. Read JS files in dependency order and concatenate
 const jsFiles = [
   'js/constants.js',
   'js/shared/ui.js',
@@ -29,7 +36,8 @@ const jsFiles = [
   'js/i18n/th.js',
   'js/i18n/vi.js',
   'js/i18n/engine.js',
-  'js/services/registry.js',
+  ...serviceFiles,
+  'js/services/index.js',
   'js/deploy/template-main.js',
   'js/deploy/instructions.js',
   'js/deploy/template-org.js',
@@ -51,7 +59,7 @@ for (const file of jsFiles) {
 const jsPlaceholder = '<!-- BUILD:JS -->';
 html = html.slice(0, html.indexOf(jsPlaceholder)) + jsBundle.trimEnd() + html.slice(html.indexOf(jsPlaceholder) + jsPlaceholder.length);
 
-// 4. Write output
+// 5. Write output
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(OUT, html);
 console.log(`Built: ${OUT} (${(Buffer.byteLength(html) / 1024).toFixed(0)} KB)`);

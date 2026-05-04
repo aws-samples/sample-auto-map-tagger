@@ -5740,190 +5740,629 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
                 vhHost.innerHTML = renderVersionHistory();
             }
         }
-        // Complete list of event names (200+ proven events)
-        const ALL_EVENT_NAMES = [
-            'RunInstances','CreateVolume','CreateBucket','CreateDBInstance','CreateDBCluster',
-            'CreateTable','CreateFunction20150331','CreateLoadBalancer','CreateCluster','CreateService',
-            'CreateTopic','CreateQueue','CreateFileSystem','CreateCacheCluster','CreateReplicationGroup',
-            'CreateDomain','RunJobFlow','CreateStream','CreateDeliveryStream','CreateBroker',
-            'CreateRepository','CreateRestApi','CreateApi','CreateJob','CreateCrawler','CreateDatabase',
-            'CreateStateMachine','CreateKey','CreateSecret','CreateNotebookInstance','CreateEndpoint',
-            'CreateTrainingJob','CreateDistribution','CreateReplicationInstance','CreateReplicationTask',
-            'CreateFirewall','CreateFirewallPolicy','CreateServer','CreateWorkspaces','CreateHostedZone',
-            'ActivateGateway','CreateFleet','CreateImageBuilder','CreateDirectory','CreateMicrosoftAD',
-            'RequestCertificate','CreateGraphqlApi','CreateProject','CreatePipeline','CreateBackupVault',
-            'CreateBackupPlan','CreateLogGroup','CreateUserPool','CreateIdentityPool','CreateApplication',
-            'CreateMemory','CreateAgentRuntime','CreateKey','CreateCoreNetwork','CreateGlobalNetwork',
-            'CreateServiceNetwork','CreateService','CreateWorkspaceInstance',
-            'CreateKeyspace','CreateDatastore','EnableSecurityHub','CreateOpsItem',
-            'CreateIndex','CreateChannel','CreateInput','CreateEnvironment','CreateApp','CreateSequenceStore',
-            'CreateRunGroup','CreateWorkgroup','CreateNamespace','CreateDocumentClassifier',
-            'CreateEntityRecognizer','CreateConnection','CreateHsm','CreateVault','CreateSnapshot',
-            'CopySnapshot','CreateImage','CopyImage','ImportImage','ImportSnapshot',
-            'CreateCapacityReservation','CreateDBInstanceReadReplica','CreateDBSnapshot',
-            'CreateDBClusterSnapshot','CopyDBSnapshot','CopyDBClusterSnapshot',
-            'RestoreDBInstanceFromDBSnapshot','RestoreDBInstanceToPointInTime',
-            'RestoreDBClusterFromSnapshot','RestoreDBClusterToPointInTime','CreateGlobalCluster',
-            'CreateClusterSnapshot','RestoreFromClusterSnapshot','CreateVpc','CreateSubnet',
-            'CreateNatGateway','CreateTransitGateway','CreateTransitGatewayVpcAttachment',
-            'CreateVpcEndpoint','AllocateAddress','CreateClientVpnEndpoint','CreateVpnGateway',
-            'CreateVpnConnection','RunTask','CreateProcessingJob','CreateTransformJob',
-            'CreateModel','CreateEndpointConfig','PutMetricAlarm','RunScheduledInstances',
-            'CreateInferenceProfile','CreateModelCustomizationJob','CreateAgent','CreateKnowledgeBase',
-            'CreateGuardrail','CreateFlow','CreatePrompt','CreateProvisionedModelThroughput',
-            'CreateModelImportJob','CreateModelInvocationJob','CreateEvaluationJob','CreatePromptRouter',
-            'CreateNodegroup','CreateFargateProfile','CreateStorageVirtualMachine',
-            'CreateAgentAlias','CreateDataSource','CreateAgentActionGroup','CreateSnapshots',
-            'CreateDashboard','CreateAnalysis','CreateDataSet','RegisterUser',
-            'CreateComputeEnvironment','CreateReplicationGroup','CreateCacheCluster',
-            'CreateActivity','CreateStateMachine',
-            'CreateAccelerator','PublishLayerVersion20181031','CreateAlias20150331',
-            'CreateAddon','CreateTransitGatewayVpcAttachment','CreateFlowLogs',
-            'CreateUserPool','CreateIdentityPool',
-            'CreateConfigurationProfile',
-            'CreateFirewallPolicy','CreateFirewall',
-            'CreateWebACL','CreateIPSet','CreateDeploymentGroup',
-            'PutParameter','PutRule','PutDashboard','PutQueryDefinition',
-            'CreateAutoScalingGroup','CreateSecurityGroup','CreateInternetGateway',
-            'CreateRouteTable','CreateNetworkAcl','CreateNetworkInterface',
-            'CreateDhcpOptions','CreatePlacementGroup','CreateEgressOnlyInternetGateway',
-            'CreateCustomerGateway','CreateCarrierGateway','CreateKeyPair',
-            'CreateVpcPeeringConnection','CreateVpcLink','CreateLaunchTemplate',
-            'CreateTargetGroup','CreateStack','CreateStackSet',
-            'CreateCollection','CreateWorkGroup','CreateWorkflow','CreateTrigger',
-            'CreateDataset','CreateRecipe',
-            'CreateCertificateAuthority','CreateResourceShare',
-            'CreateDBProxy','CreateHealthCheck','CreateDocument',
-            'CreateHttpNamespace',
-            'CreateTapePool','CreatePortfolio','CreateMesh',
-            'CreateInstance','CreateBuild','CreateScript','CreateTask',
-            'CreateApiKey',
-            'CreateClusterV2','CreateServerlessCache',
-            'RestoreTableFromBackup','RestoreTableToPointInTime',
-            'CreateReplicationConfig','CreateDataProvider','CreateMigrationProject',
-            'CreateConnector','CreateUser',
-            'CreateLag','CreateDirectConnectGateway',
-            'CreateFarm','CreateQueue',
-            'CreateAsset','CreateAssetModel','CreateGateway','CreatePortal',
-            'CreateTopicRule',
-            'CreateSourceServer',
-            'CreateDomain',
-            'ConnectDirectory'
-        ];
+// Permissions for infrastructure/cross-cutting services not owned by a single service module
+const SHARED_PERMISSIONS = [
+    'tag:TagResources', 'tag:GetResources',
+    'sns:Publish',
+    'sqs:DeleteMessage', 'sqs:GetQueueAttributes', 'sqs:ReceiveMessage', 'sqs:SendMessage',
+    'cloudwatch:TagResource', 'ssm:AddTagsToResource',
+    'servicediscovery:TagResource',
+    'cloudformation:TagResource', 'cloudformation:UpdateStack', 'cloudformation:UpdateStackSet',
+    'cloudformation:DescribeStacks', 'cloudformation:ListStacks',
+    'iam:TagRole',
+    'autoscaling:CreateOrUpdateTags',
+    'elasticbeanstalk:AddTags', 'emr-serverless:TagResource',
+    'batch:TagResource',
+    'globalaccelerator:TagResource',
+    'appmesh:TagResource',
+    'databrew:TagResource',
+    'events:TagResource',
+    'cloud9:TagResource',
+    'braket:TagResource',
+    'iotanalytics:TagResource', 'iotevents:TagResource', 'iotsitewise:TagResource',
+    'workspaces-web:TagResource', 'connect:TagResource', 'managedblockchain:TagResource',
+    'healthlake:TagResource', 'medical-imaging:TagResource',
+];
 
-        const ALL_SOURCES = [
-            'aws.ec2','aws.s3','aws.rds','aws.dynamodb','aws.lambda','aws.elasticloadbalancing',
-            'aws.ecs','aws.sns','aws.sqs','aws.eks','aws.elasticfilesystem','aws.elasticache',
-            'aws.redshift','aws.es','aws.fsx','aws.kafka','aws.elasticmapreduce','aws.kinesis',
-            'aws.firehose','aws.mq','aws.ecr','aws.apigateway','aws.glue','aws.states',
-            'aws.kms','aws.secretsmanager','aws.sagemaker','aws.cloudfront','aws.dms',
-            'aws.network-firewall','aws.transfer','aws.workspaces','aws.timestream',
-            'aws.datasync','aws.route53','aws.storagegateway','aws.memorydb','aws.cassandra',
-            'aws.appstream','aws.ds','aws.acm','aws.appsync','aws.codebuild','aws.codepipeline',
-            'aws.backup','aws.logs','aws.cognito-idp','aws.cognito-identity','aws.kinesisanalytics',
-            'aws.gamelift','aws.kendra','aws.mediaconvert','aws.medialive','aws.mediapackage',
-            'aws.m2','aws.resiliencehub','aws.finspace','aws.omics','aws.redshift-serverless',
-            'aws.comprehend','aws.directconnect','aws.cloudhsm','aws.glacier','aws.bedrock',
-            'aws.bedrock-agent','aws.quicksight',
-            'aws.securityhub',
-            'aws.athena',
-            'aws.servicecatalog','aws.ram','aws.acm-pca','aws.aoss',
-            'aws.kinesisvideo','aws.dsql','aws.vpc-lattice','aws.bedrock-agentcore',
-            'aws.payment-cryptography','aws.networkmanager','aws.workspaces-instances',
-            'aws.dax','aws.drs','aws.deadline','aws.iot',
-            'aws.wafv2','aws.codedeploy'
-        ];
+// Events not tied to a specific source (infrastructure/cross-cutting)
+const SHARED_EVENTS = [
+    'PutMetricAlarm', 'PutParameter', 'PutRule', 'PutDashboard',
+    'CreateAutoScalingGroup', 'CreateStack', 'CreateStackSet',
+    'CreateOpsItem', 'CreateConfigurationProfile',
+    'CreateDocument', 'CreateHttpNamespace',
+    'CreateInstance', 'CreateTask', 'CreateMesh',
+    'CreateComputeEnvironment', 'CreateAccelerator',
+    'CreateDatastore',
+];
 
-        const TAGGING_PERMISSIONS = [
-            // Universal tagging
-            'tag:TagResources','tag:GetResources',
-            // Compute
-            'ec2:CreateTags','autoscaling:CreateOrUpdateTags','ecs:TagResource','eks:TagResource',
-            'lambda:TagResource',
-            'elasticbeanstalk:AddTags','elasticmapreduce:AddTags','emr-serverless:TagResource',
-            // Storage
-            's3:PutBucketTagging','s3:GetBucketTagging','elasticfilesystem:TagResource','fsx:TagResource',
-            'ecr:TagResource','backup:TagResource',
-            // AWS Batch (§1.27): job queues, compute environments, job definitions.
-            // RGTA-dispatched; batch:TagResource required per service-auth matrix.
-            'batch:TagResource',
-            // Database
-            'rds:AddTagsToResource','dynamodb:TagResource','elasticache:AddTagsToResource',
-            'memorydb:TagResource','redshift:CreateTags','redshift-serverless:TagResource',
-            'es:AddTags','kafka:TagResource','dms:AddTagsToResource','cassandra:TagResource','cassandra:Alter',
-            'mq:CreateTags',
-            // Networking
-            'elasticloadbalancing:AddTags','globalaccelerator:TagResource','cloudfront:TagResource',
-            'route53:ChangeTagsForResource','network-firewall:TagResource','directconnect:TagResource',
-            'appmesh:TagResource',
-            // Analytics
-            'kinesis:AddTagsToStream','firehose:TagDeliveryStream','kinesisanalytics:TagResource',
-            'glue:TagResource','glue:GetDatabase','databrew:TagResource',
-            'athena:TagResource',
-            // Integration
-            'sns:TagResource','sqs:TagQueue','states:TagResource',
-            'appsync:TagResource','apigateway:TagResource',
-            // SECURITY NOTE: API Gateway v1 REST API tagging requires both PUT and PATCH.
-            // AWS maps tag_resource() to apigateway:PATCH internally (confirmed via AccessDenied testing).
-            // Precedent: MAP Taggr (AppSec-approved) grants all 5 API GW methods (GET/PUT/PATCH/DELETE/POST).
-            // We grant only PUT and PATCH — more conservative than the approved precedent.
-            'apigateway:PUT','apigateway:PATCH','apigateway:POST',
-            // Management & Monitoring
-            'logs:TagResource','cloudwatch:TagResource','ssm:AddTagsToResource',
-            'secretsmanager:TagResource',
-            'servicediscovery:TagResource',
-            'sns:Publish',
-            'sqs:DeleteMessage','sqs:GetQueueAttributes','sqs:ReceiveMessage','sqs:SendMessage',
-            // Security
-            'kms:TagResource','acm:AddTagsToCertificate',
-            'acm-pca:TagCertificateAuthority',
-            'cognito-idp:TagResource','cognito-identity:TagResource',
-            'securityhub:TagResource','wafv2:TagResource',
-            // Developer Tools
-            'codepipeline:TagResource','codedeploy:TagResource',
-            'cloud9:TagResource',
-            // CodeBuild: tags applied via UpdateProject; BatchGetProjects needed for tag resolution
-            'codebuild:UpdateProject','codebuild:BatchGetProjects',
-            // CloudFormation: tagging maps to UpdateStack internally; DescribeStacks is AWS's internal read for ARN validation.
-            // ListStacks is the peer-tagger detector at Lambda cold-start (§1.108, plan-PR #57).
-            'cloudformation:TagResource','cloudformation:UpdateStack','cloudformation:UpdateStackSet','cloudformation:DescribeStacks','cloudformation:ListStacks',
-            // Service Catalog: tagging routes through Update* actions
-            'servicecatalog:TagResource',
-            'servicecatalog:UpdatePortfolio','servicecatalog:UpdateProduct',
-            // Migration & Transfer
-            'transfer:TagResource','datasync:TagResource','storagegateway:AddTagsToResource',
-            // ML / AI
-            'sagemaker:AddTags','comprehend:TagResource',
-            'kendra:TagResource',
-            'bedrock:TagResource','braket:TagResource',
-            // IoT
-            'iot:TagResource','iotanalytics:TagResource','iotevents:TagResource',
-            'iotsitewise:TagResource',
-            // EventBridge (events:*) — distinct service from IoT Events (iotevents:*).
-            // Needed to tag newly-created Event rules / buses / schedules / connections.
-            'events:TagResource',
-            'kinesisvideo:TagStream','dsql:TagResource','vpc-lattice:TagResource',
-            'bedrock-agentcore:TagResource','payment-cryptography:TagResource',
-            'networkmanager:TagResource',
-            // Media
-            'mediaconvert:TagResource',
-            'medialive:CreateTags','mediapackage:TagResource',
-            // Other
-            'ram:TagResource','appstream:TagResource','workspaces:CreateTags',
-            'workspaces-web:TagResource','quicksight:TagResource','connect:TagResource',
-            'managedblockchain:TagResource',
-            'gamelift:TagResource','timestream:TagResource',
-            'healthlake:TagResource','omics:TagResource',
-            'resiliencehub:TagResource','deadline:TagResource','medical-imaging:TagResource',
-            'securityhub:TagResource','cassandra:Alter',
-            'dax:TagResource','drs:TagResource',
-            'kinesisvideo:TagStream',
-            // Tier 1 MAP services (PR #25): Keyspaces, Directory Service, CloudHSM v2.
-            // cassandra:TagResource already granted above under Database.
-            'ds:AddTagsToResource','cloudhsm:TagResource',
-            // IAM role tagging (iam:TagRole not covered by tag:TagResources)
-            'iam:TagRole'
-        ];
+const SERVICE_ACMPCA = {
+    source: 'aws.acm-pca',
+    events: ['CreateCertificateAuthority'],
+    permissions: ['acm-pca:TagCertificateAuthority'],
+};
+
+const SERVICE_ACM = {
+    source: 'aws.acm',
+    events: ['RequestCertificate'],
+    permissions: ['acm:AddTagsToCertificate'],
+};
+
+const SERVICE_AOSS = {
+    source: 'aws.aoss',
+    events: ['CreateCollection'],
+    permissions: [],
+};
+
+const SERVICE_APIGATEWAY = {
+    source: 'aws.apigateway',
+    events: ['CreateRestApi', 'CreateApi', 'CreateVpcLink', 'CreateApiKey'],
+    permissions: ['apigateway:TagResource', 'apigateway:PUT', 'apigateway:PATCH', 'apigateway:POST'],
+};
+
+const SERVICE_APPSTREAM = {
+    source: 'aws.appstream',
+    events: ['CreateFleet', 'CreateImageBuilder'],
+    permissions: ['appstream:TagResource'],
+};
+
+const SERVICE_APPSYNC = {
+    source: 'aws.appsync',
+    events: ['CreateGraphqlApi'],
+    permissions: ['appsync:TagResource'],
+};
+
+const SERVICE_ATHENA = {
+    source: 'aws.athena',
+    events: ['CreateWorkGroup'],
+    permissions: ['athena:TagResource'],
+};
+
+const SERVICE_BACKUP = {
+    source: 'aws.backup',
+    events: ['CreateBackupVault', 'CreateBackupPlan'],
+    permissions: ['backup:TagResource'],
+};
+
+const SERVICE_BEDROCK = {
+    source: 'aws.bedrock',
+    events: [
+        'CreateInferenceProfile', 'CreateModelCustomizationJob', 'CreateGuardrail',
+        'CreateFlow', 'CreatePrompt', 'CreateProvisionedModelThroughput',
+        'CreateModelImportJob', 'CreateModelInvocationJob',
+        'CreateEvaluationJob', 'CreatePromptRouter',
+    ],
+    permissions: ['bedrock:TagResource'],
+};
+
+const SERVICE_BEDROCK_AGENT = {
+    source: 'aws.bedrock-agent',
+    events: [
+        'CreateAgent', 'CreateKnowledgeBase', 'CreateAgentAlias',
+        'CreateDataSource', 'CreateAgentActionGroup',
+        'CreateMemory', 'CreateAgentRuntime',
+    ],
+    permissions: [],
+};
+
+const SERVICE_BEDROCK_AGENTCORE = {
+    source: 'aws.bedrock-agentcore',
+    events: [],
+    permissions: ['bedrock-agentcore:TagResource'],
+};
+
+const SERVICE_CLOUDFRONT = {
+    source: 'aws.cloudfront',
+    events: ['CreateDistribution'],
+    permissions: ['cloudfront:TagResource'],
+};
+
+const SERVICE_CLOUDHSM = {
+    source: 'aws.cloudhsm',
+    events: ['CreateCluster', 'CreateHsm'],
+    permissions: ['cloudhsm:TagResource'],
+};
+
+const SERVICE_CODEBUILD = {
+    source: 'aws.codebuild',
+    events: ['CreateProject'],
+    permissions: ['codebuild:UpdateProject', 'codebuild:BatchGetProjects'],
+};
+
+const SERVICE_CODEDEPLOY = {
+    source: 'aws.codedeploy',
+    events: ['CreateDeploymentGroup'],
+    permissions: ['codedeploy:TagResource'],
+};
+
+const SERVICE_CODEPIPELINE = {
+    source: 'aws.codepipeline',
+    events: ['CreatePipeline'],
+    permissions: ['codepipeline:TagResource'],
+};
+
+const SERVICE_COGNITO_IDP = {
+    source: 'aws.cognito-idp',
+    events: ['CreateUserPool'],
+    permissions: ['cognito-idp:TagResource'],
+};
+
+const SERVICE_COGNITO_IDENTITY = {
+    source: 'aws.cognito-identity',
+    events: ['CreateIdentityPool'],
+    permissions: ['cognito-identity:TagResource'],
+};
+
+const SERVICE_COMPREHEND = {
+    source: 'aws.comprehend',
+    events: ['CreateDocumentClassifier', 'CreateEntityRecognizer'],
+    permissions: ['comprehend:TagResource'],
+};
+
+const SERVICE_DATASYNC = {
+    source: 'aws.datasync',
+    events: [],
+    permissions: ['datasync:TagResource'],
+};
+
+const SERVICE_DAX = {
+    source: 'aws.dax',
+    events: ['CreateCluster'],
+    permissions: ['dax:TagResource'],
+};
+
+const SERVICE_DEADLINE = {
+    source: 'aws.deadline',
+    events: ['CreateFarm', 'CreateQueue'],
+    permissions: ['deadline:TagResource'],
+};
+
+const SERVICE_DIRECTCONNECT = {
+    source: 'aws.directconnect',
+    events: ['CreateConnection', 'CreateLag', 'CreateDirectConnectGateway'],
+    permissions: ['directconnect:TagResource'],
+};
+
+const SERVICE_DMS = {
+    source: 'aws.dms',
+    events: [
+        'CreateReplicationInstance', 'CreateReplicationTask',
+        'CreateReplicationConfig', 'CreateDataProvider', 'CreateMigrationProject',
+    ],
+    permissions: ['dms:AddTagsToResource'],
+};
+
+const SERVICE_DRS = {
+    source: 'aws.drs',
+    events: ['CreateSourceServer'],
+    permissions: ['drs:TagResource'],
+};
+
+const SERVICE_DS = {
+    source: 'aws.ds',
+    events: ['CreateDirectory', 'CreateMicrosoftAD', 'ConnectDirectory'],
+    permissions: ['ds:AddTagsToResource'],
+};
+
+const SERVICE_DSQL = {
+    source: 'aws.dsql',
+    events: ['CreateCluster'],
+    permissions: ['dsql:TagResource'],
+};
+
+const SERVICE_DYNAMODB = {
+    source: 'aws.dynamodb',
+    events: ['CreateTable', 'RestoreTableFromBackup', 'RestoreTableToPointInTime'],
+    permissions: ['dynamodb:TagResource'],
+};
+
+const SERVICE_EC2 = {
+    source: 'aws.ec2',
+    events: [
+        'RunInstances', 'CreateVolume', 'CreateSnapshot', 'CopySnapshot',
+        'CreateImage', 'CopyImage', 'ImportImage', 'ImportSnapshot',
+        'CreateCapacityReservation', 'RunScheduledInstances',
+        'CreateVpc', 'CreateSubnet', 'CreateNatGateway',
+        'CreateTransitGateway', 'CreateTransitGatewayVpcAttachment',
+        'CreateVpcEndpoint', 'AllocateAddress', 'CreateClientVpnEndpoint',
+        'CreateVpnGateway', 'CreateVpnConnection',
+        'CreateSecurityGroup', 'CreateInternetGateway', 'CreateRouteTable',
+        'CreateNetworkAcl', 'CreateNetworkInterface', 'CreateDhcpOptions',
+        'CreatePlacementGroup', 'CreateEgressOnlyInternetGateway',
+        'CreateCustomerGateway', 'CreateCarrierGateway', 'CreateKeyPair',
+        'CreateVpcPeeringConnection', 'CreateLaunchTemplate',
+        'CreateFlowLogs', 'CreateSnapshots',
+    ],
+    permissions: ['ec2:CreateTags'],
+};
+
+const SERVICE_ECR = {
+    source: 'aws.ecr',
+    events: ['CreateRepository'],
+    permissions: ['ecr:TagResource'],
+};
+
+const SERVICE_ECS = {
+    source: 'aws.ecs',
+    events: ['CreateCluster', 'CreateService', 'RunTask'],
+    permissions: ['ecs:TagResource'],
+};
+
+const SERVICE_EFS = {
+    source: 'aws.elasticfilesystem',
+    events: ['CreateFileSystem'],
+    permissions: ['elasticfilesystem:TagResource'],
+};
+
+const SERVICE_EKS = {
+    source: 'aws.eks',
+    events: ['CreateCluster', 'CreateNodegroup', 'CreateFargateProfile', 'CreateAddon'],
+    permissions: ['eks:TagResource'],
+};
+
+const SERVICE_ELASTICACHE = {
+    source: 'aws.elasticache',
+    events: ['CreateCacheCluster', 'CreateReplicationGroup', 'CreateServerlessCache'],
+    permissions: ['elasticache:AddTagsToResource'],
+};
+
+const SERVICE_ELB = {
+    source: 'aws.elasticloadbalancing',
+    events: ['CreateLoadBalancer', 'CreateTargetGroup'],
+    permissions: ['elasticloadbalancing:AddTags'],
+};
+
+const SERVICE_EMR = {
+    source: 'aws.elasticmapreduce',
+    events: ['RunJobFlow'],
+    permissions: ['elasticmapreduce:AddTags'],
+};
+
+const SERVICE_FINSPACE = {
+    source: 'aws.finspace',
+    events: ['CreateEnvironment'],
+    permissions: [],
+};
+
+const SERVICE_FIREHOSE = {
+    source: 'aws.firehose',
+    events: ['CreateDeliveryStream'],
+    permissions: ['firehose:TagDeliveryStream'],
+};
+
+const SERVICE_FSX = {
+    source: 'aws.fsx',
+    events: ['CreateFileSystem', 'CreateStorageVirtualMachine'],
+    permissions: ['fsx:TagResource'],
+};
+
+const SERVICE_GAMELIFT = {
+    source: 'aws.gamelift',
+    events: ['CreateBuild', 'CreateScript', 'CreateFleet'],
+    permissions: ['gamelift:TagResource'],
+};
+
+const SERVICE_GLACIER = {
+    source: 'aws.glacier',
+    events: ['CreateVault'],
+    permissions: [],
+};
+
+const SERVICE_GLUE = {
+    source: 'aws.glue',
+    events: [
+        'CreateJob', 'CreateCrawler', 'CreateDatabase',
+        'CreateWorkflow', 'CreateTrigger', 'CreateDataset', 'CreateRecipe',
+    ],
+    permissions: ['glue:TagResource', 'glue:GetDatabase'],
+};
+
+const SERVICE_IOT = {
+    source: 'aws.iot',
+    events: ['CreateTopicRule', 'CreateAsset', 'CreateAssetModel', 'CreateGateway', 'CreatePortal'],
+    permissions: ['iot:TagResource'],
+};
+
+const SERVICE_KENDRA = {
+    source: 'aws.kendra',
+    events: ['CreateIndex'],
+    permissions: ['kendra:TagResource'],
+};
+
+const SERVICE_KEYSPACES = {
+    source: 'aws.cassandra',
+    events: ['CreateKeyspace'],
+    permissions: ['cassandra:TagResource', 'cassandra:Alter'],
+};
+
+const SERVICE_KINESIS = {
+    source: 'aws.kinesis',
+    events: ['CreateStream'],
+    permissions: ['kinesis:AddTagsToStream'],
+};
+
+const SERVICE_KINESISANALYTICS = {
+    source: 'aws.kinesisanalytics',
+    events: ['CreateApplication'],
+    permissions: ['kinesisanalytics:TagResource'],
+};
+
+const SERVICE_KINESISVIDEO = {
+    source: 'aws.kinesisvideo',
+    events: [],
+    permissions: ['kinesisvideo:TagStream'],
+};
+
+const SERVICE_KMS = {
+    source: 'aws.kms',
+    events: ['CreateKey'],
+    permissions: ['kms:TagResource'],
+};
+
+const SERVICE_LAMBDA = {
+    source: 'aws.lambda',
+    events: ['CreateFunction20150331', 'PublishLayerVersion20181031', 'CreateAlias20150331'],
+    permissions: ['lambda:TagResource'],
+};
+
+const SERVICE_LOGS = {
+    source: 'aws.logs',
+    events: ['CreateLogGroup', 'PutQueryDefinition'],
+    permissions: ['logs:TagResource'],
+};
+
+const SERVICE_M2 = {
+    source: 'aws.m2',
+    events: ['CreateEnvironment', 'CreateApplication'],
+    permissions: [],
+};
+
+const SERVICE_MEDIACONVERT = {
+    source: 'aws.mediaconvert',
+    events: ['CreateJob'],
+    permissions: ['mediaconvert:TagResource'],
+};
+
+const SERVICE_MEDIALIVE = {
+    source: 'aws.medialive',
+    events: ['CreateChannel', 'CreateInput'],
+    permissions: ['medialive:CreateTags'],
+};
+
+const SERVICE_MEDIAPACKAGE = {
+    source: 'aws.mediapackage',
+    events: ['CreateChannel'],
+    permissions: ['mediapackage:TagResource'],
+};
+
+const SERVICE_MEMORYDB = {
+    source: 'aws.memorydb',
+    events: ['CreateCluster'],
+    permissions: ['memorydb:TagResource'],
+};
+
+const SERVICE_MQ = {
+    source: 'aws.mq',
+    events: ['CreateBroker'],
+    permissions: ['mq:CreateTags'],
+};
+
+const SERVICE_MSK = {
+    source: 'aws.kafka',
+    events: ['CreateCluster', 'CreateClusterV2'],
+    permissions: ['kafka:TagResource'],
+};
+
+const SERVICE_NETWORKFIREWALL = {
+    source: 'aws.network-firewall',
+    events: ['CreateFirewall', 'CreateFirewallPolicy'],
+    permissions: ['network-firewall:TagResource'],
+};
+
+const SERVICE_NETWORKMANAGER = {
+    source: 'aws.networkmanager',
+    events: ['CreateCoreNetwork', 'CreateGlobalNetwork'],
+    permissions: ['networkmanager:TagResource'],
+};
+
+const SERVICE_OMICS = {
+    source: 'aws.omics',
+    events: ['CreateSequenceStore', 'CreateRunGroup'],
+    permissions: ['omics:TagResource'],
+};
+
+const SERVICE_OPENSEARCH = {
+    source: 'aws.es',
+    events: ['CreateDomain'],
+    permissions: ['es:AddTags'],
+};
+
+const SERVICE_PAYMENTCRYPTOGRAPHY = {
+    source: 'aws.payment-cryptography',
+    events: ['CreateKey'],
+    permissions: ['payment-cryptography:TagResource'],
+};
+
+const SERVICE_QUICKSIGHT = {
+    source: 'aws.quicksight',
+    events: ['CreateDashboard', 'CreateAnalysis', 'CreateDataSet', 'RegisterUser'],
+    permissions: ['quicksight:TagResource'],
+};
+
+const SERVICE_RAM = {
+    source: 'aws.ram',
+    events: ['CreateResourceShare'],
+    permissions: ['ram:TagResource'],
+};
+
+const SERVICE_RDS = {
+    source: 'aws.rds',
+    events: [
+        'CreateDBInstance', 'CreateDBCluster', 'CreateDBInstanceReadReplica',
+        'CreateDBSnapshot', 'CreateDBClusterSnapshot',
+        'CopyDBSnapshot', 'CopyDBClusterSnapshot',
+        'RestoreDBInstanceFromDBSnapshot', 'RestoreDBInstanceToPointInTime',
+        'RestoreDBClusterFromSnapshot', 'RestoreDBClusterToPointInTime',
+        'CreateGlobalCluster', 'CreateDBProxy',
+    ],
+    permissions: ['rds:AddTagsToResource'],
+};
+
+const SERVICE_REDSHIFT_SERVERLESS = {
+    source: 'aws.redshift-serverless',
+    events: ['CreateWorkgroup', 'CreateNamespace'],
+    permissions: ['redshift-serverless:TagResource'],
+};
+
+const SERVICE_REDSHIFT = {
+    source: 'aws.redshift',
+    events: ['CreateCluster', 'CreateClusterSnapshot', 'RestoreFromClusterSnapshot'],
+    permissions: ['redshift:CreateTags'],
+};
+
+const SERVICE_RESILIENCEHUB = {
+    source: 'aws.resiliencehub',
+    events: ['CreateApp'],
+    permissions: ['resiliencehub:TagResource'],
+};
+
+const SERVICE_ROUTE53 = {
+    source: 'aws.route53',
+    events: ['CreateHostedZone', 'CreateHealthCheck'],
+    permissions: ['route53:ChangeTagsForResource'],
+};
+
+const SERVICE_S3 = {
+    source: 'aws.s3',
+    events: ['CreateBucket'],
+    permissions: ['s3:PutBucketTagging', 's3:GetBucketTagging'],
+};
+
+const SERVICE_SAGEMAKER = {
+    source: 'aws.sagemaker',
+    events: [
+        'CreateNotebookInstance', 'CreateEndpoint', 'CreateTrainingJob',
+        'CreateProcessingJob', 'CreateTransformJob', 'CreateModel',
+        'CreateEndpointConfig', 'CreateDomain', 'CreatePipeline',
+    ],
+    permissions: ['sagemaker:AddTags'],
+};
+
+const SERVICE_SECRETSMANAGER = {
+    source: 'aws.secretsmanager',
+    events: ['CreateSecret'],
+    permissions: ['secretsmanager:TagResource'],
+};
+
+const SERVICE_SECURITYHUB = {
+    source: 'aws.securityhub',
+    events: ['EnableSecurityHub'],
+    permissions: ['securityhub:TagResource'],
+};
+
+const SERVICE_SERVICECATALOG = {
+    source: 'aws.servicecatalog',
+    events: ['CreatePortfolio'],
+    permissions: ['servicecatalog:TagResource', 'servicecatalog:UpdatePortfolio', 'servicecatalog:UpdateProduct'],
+};
+
+const SERVICE_SNS = {
+    source: 'aws.sns',
+    events: ['CreateTopic'],
+    permissions: ['sns:TagResource'],
+};
+
+const SERVICE_SQS = {
+    source: 'aws.sqs',
+    events: ['CreateQueue'],
+    permissions: ['sqs:TagQueue'],
+};
+
+const SERVICE_STEPFUNCTIONS = {
+    source: 'aws.states',
+    events: ['CreateStateMachine', 'CreateActivity'],
+    permissions: ['states:TagResource'],
+};
+
+const SERVICE_STORAGEGATEWAY = {
+    source: 'aws.storagegateway',
+    events: ['ActivateGateway', 'CreateTapePool'],
+    permissions: ['storagegateway:AddTagsToResource'],
+};
+
+const SERVICE_TIMESTREAM = {
+    source: 'aws.timestream',
+    events: [],
+    permissions: ['timestream:TagResource'],
+};
+
+const SERVICE_TRANSFER = {
+    source: 'aws.transfer',
+    events: ['CreateServer', 'CreateConnector', 'CreateUser'],
+    permissions: ['transfer:TagResource'],
+};
+
+const SERVICE_VPCLATTICE = {
+    source: 'aws.vpc-lattice',
+    events: ['CreateServiceNetwork', 'CreateService'],
+    permissions: ['vpc-lattice:TagResource'],
+};
+
+const SERVICE_WAFV2 = {
+    source: 'aws.wafv2',
+    events: ['CreateWebACL', 'CreateIPSet'],
+    permissions: ['wafv2:TagResource'],
+};
+
+const SERVICE_WORKSPACES = {
+    source: 'aws.workspaces',
+    events: ['CreateWorkspaces'],
+    permissions: ['workspaces:CreateTags'],
+};
+
+const SERVICE_WORKSPACES_INSTANCES = {
+    source: 'aws.workspaces-instances',
+    events: ['CreateWorkspaceInstance'],
+    permissions: [],
+};
+
+
+
+const ALL_SERVICES = [
+    SERVICE_EC2, SERVICE_S3, SERVICE_RDS, SERVICE_DYNAMODB, SERVICE_LAMBDA,
+    SERVICE_ELB, SERVICE_ECS, SERVICE_SNS, SERVICE_SQS, SERVICE_EKS,
+    SERVICE_EFS, SERVICE_ELASTICACHE, SERVICE_REDSHIFT, SERVICE_OPENSEARCH,
+    SERVICE_FSX, SERVICE_MSK, SERVICE_EMR, SERVICE_KINESIS, SERVICE_FIREHOSE,
+    SERVICE_MQ, SERVICE_ECR, SERVICE_APIGATEWAY, SERVICE_GLUE, SERVICE_STEPFUNCTIONS,
+    SERVICE_KMS, SERVICE_SECRETSMANAGER, SERVICE_SAGEMAKER, SERVICE_CLOUDFRONT,
+    SERVICE_DMS, SERVICE_NETWORKFIREWALL, SERVICE_TRANSFER,
+    SERVICE_WORKSPACES, SERVICE_TIMESTREAM, SERVICE_DATASYNC, SERVICE_ROUTE53,
+    SERVICE_STORAGEGATEWAY, SERVICE_MEMORYDB, SERVICE_KEYSPACES, SERVICE_APPSTREAM,
+    SERVICE_DS, SERVICE_ACM, SERVICE_APPSYNC, SERVICE_CODEBUILD, SERVICE_CODEPIPELINE,
+    SERVICE_BACKUP, SERVICE_LOGS, SERVICE_COGNITO_IDP, SERVICE_COGNITO_IDENTITY,
+    SERVICE_KINESISANALYTICS, SERVICE_GAMELIFT, SERVICE_KENDRA, SERVICE_MEDIACONVERT,
+    SERVICE_MEDIALIVE, SERVICE_MEDIAPACKAGE, SERVICE_M2, SERVICE_RESILIENCEHUB,
+    SERVICE_FINSPACE, SERVICE_OMICS, SERVICE_REDSHIFT_SERVERLESS, SERVICE_COMPREHEND,
+    SERVICE_DIRECTCONNECT, SERVICE_CLOUDHSM, SERVICE_GLACIER,
+    SERVICE_BEDROCK, SERVICE_BEDROCK_AGENT, SERVICE_QUICKSIGHT,
+    SERVICE_SECURITYHUB, SERVICE_ATHENA, SERVICE_SERVICECATALOG, SERVICE_RAM,
+    SERVICE_ACMPCA, SERVICE_AOSS, SERVICE_KINESISVIDEO, SERVICE_DSQL,
+    SERVICE_VPCLATTICE, SERVICE_BEDROCK_AGENTCORE, SERVICE_PAYMENTCRYPTOGRAPHY,
+    SERVICE_NETWORKMANAGER, SERVICE_WORKSPACES_INSTANCES,
+    SERVICE_DAX, SERVICE_DRS, SERVICE_DEADLINE, SERVICE_IOT,
+    SERVICE_WAFV2, SERVICE_CODEDEPLOY,
+];
+
+const ALL_EVENT_NAMES = [
+    ...SHARED_EVENTS,
+    ...ALL_SERVICES.flatMap(s => s.events),
+];
+
+const ALL_SOURCES = ALL_SERVICES.map(s => s.source);
+
+const TAGGING_PERMISSIONS = [
+    ...SHARED_PERMISSIONS,
+    ...ALL_SERVICES.flatMap(s => s.permissions),
+];
 
         function generateMainTemplate(config) {
             const mpe = config.mpeId;
