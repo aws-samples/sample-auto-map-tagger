@@ -16,7 +16,7 @@
 
 ## Step 1 — Generate deploy.sh
 
-1. Open `build/configurator.html` in any browser
+1. Open `configurator.html` in any browser
 2. Fill in the form:
 
 | Field | What to enter |
@@ -113,11 +113,11 @@ aws cloudformation list-stack-instances \
 
 ## Day-2: Add or Remove Accounts (update.sh)
 
-After the initial deployment, use the **Editor** tab in `build/configurator.html` to add or remove accounts from scope without redeploying.
+After the initial deployment, use the **Editor** tab in `configurator.html` to add or remove accounts from scope without redeploying.
 
 ### Generate update.sh
 
-1. Open `build/configurator.html` and switch to the **Editor** tab
+1. Open `configurator.html` and switch to the **Editor** tab
 2. Enter the MPE ID and region of the existing deployment
 3. Choose **Add accounts** or **Remove accounts**
 4. Enter the account IDs to add or remove
@@ -225,7 +225,7 @@ aws ssm put-parameter \
 
 ## Remove the Auto-Tagger
 
-**Recommended: use the configurator's Delete mode.** Open `build/configurator.html` → **🗑️ Delete existing deployment**, select the region, optionally scope to specific MPE(s), type `DELETE` to confirm, and download `delete.sh`. The generated script auto-detects single-account stacks and multi-account StackSets, deletes stack instances in parallel (100% tolerance), and conditionally removes the S3 staging bucket. See the [configurator delete flow](../build/configurator.html) for details.
+**Recommended: use the configurator's Delete mode.** Open `configurator.html` → **🗑️ Delete existing deployment**, select the region, optionally scope to specific MPE(s), type `DELETE` to confirm, and download `delete.sh`. The generated script auto-detects single-account stacks and multi-account StackSets, deletes stack instances in parallel (100% tolerance), and conditionally removes the S3 staging bucket. See the [configurator delete flow](../configurator.html) for details.
 
 **Manual path (single account):**
 
@@ -288,7 +288,7 @@ Yes — all resources are namespaced by MPE ID. Deploy separate stacks for each 
 
 ### Recommended: in-place upgrade via `upgrade.sh`
 
-For v19.x+ deployments (MPE-ID-namespaced stacks like `map-auto-tagger-mig1234567890`), open `build/configurator.html` → **🔄 Upgrade to the latest template version** → download and run `upgrade.sh`. The script reads the deployed SSM version, compares to target via SemVer, and applies the template update in place (scope and agreement dates preserved via `UsePreviousValue=true` on every existing parameter). No dual-Lambda window.
+For v19.x+ deployments (MPE-ID-namespaced stacks like `map-auto-tagger-mig1234567890`), open `configurator.html` → **🔄 Upgrade to the latest template version** → download and run `upgrade.sh`. The script reads the deployed SSM version, compares to target via SemVer, and applies the template update in place (scope and agreement dates preserved via `UsePreviousValue=true` on every existing parameter). No dual-Lambda window.
 
 ### Migrating from the pre-v19 un-namespaced layout
 

@@ -12,7 +12,7 @@ Customers miss MAP 2.0 credits because engineers forget to tag resources, script
 
 ### 1. Generate deploy.sh
 
-Open `build/configurator.html` in a browser, fill in your MAP Engagement ID and details, click **Generate & Download**.
+Open `configurator.html` in a browser, fill in your MAP Engagement ID and details, click **Generate & Download**.
 
 ### 2. Run deploy.sh
 
@@ -38,7 +38,7 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 
 ## Day-2: Add or Remove Accounts
 
-1. Open `build/configurator.html` → **Editor** tab
+1. Open `configurator.html` → **Editor** tab
 2. Enter MPE ID, choose add/remove, enter account IDs
 3. Click **Generate update.sh** → download and run:
 
@@ -52,7 +52,7 @@ No redeployment needed — updates the account scope across all existing stack i
 
 ## Removing a Deployment
 
-1. Open `build/configurator.html` → **Delete existing deployment** tab
+1. Open `configurator.html` → **Delete existing deployment** tab
 2. Select region; by default every `map-auto-tagger-mig*` stack/stackset is removed. Optionally scope to specific MPE(s).
 3. Type `DELETE` to confirm → **Generate delete.sh** → download and run:
 
@@ -80,9 +80,9 @@ bash deploy.sh
 
 | File | Description |
 |------|-------------|
-| `build/configurator.html` | Self-service UI (built output). Generates `deploy.sh` for new deployments, `update.sh` for day-2 account changes (Editor tab), `upgrade.sh` for template-version upgrades (Upgrade tab), and `delete.sh` for clean removal (Delete tab). |
+| `configurator.html` | Self-service UI (built output). Generates `deploy.sh` for new deployments, `update.sh` for day-2 account changes (Editor tab), `upgrade.sh` for template-version upgrades (Upgrade tab), and `delete.sh` for clean removal (Delete tab). |
 | `src/` | Modular source files — CSS, HTML skeleton, JS modules, i18n, per-service definitions, Lambda Python |
-| `scripts/build.js` | Build script — assembles `build/configurator.html` from `src/` |
+| `scripts/build.js` | Build script — assembles `configurator.html` from `src/` |
 | `map2-auto-tagger-optimized.yaml` | CloudFormation template (154 resource types, IAM hardened) |
 | `CHANGELOG.md` | Version history |
 
@@ -92,12 +92,12 @@ bash deploy.sh
 
 ```bash
 npm install              # install dependencies (first time)
-npm run build            # assemble build/configurator.html from src/
+npm run build            # assemble configurator.html from src/
 npm test                 # run unit tests (vitest)
 npm run verify           # sanity-check the built output
 ```
 
-Source files live in `src/`. Edit there, run `npm run build`, open `build/configurator.html` to test.
+Source files live in `src/`. Edit there, run `npm run build`, open `configurator.html` to test.
 
 **Adding a new AWS service:** drop a `.js` file in `src/js/services/` following the format in [DEVELOPMENT.md](docs/DEVELOPMENT.md), then `npm run build`.
 

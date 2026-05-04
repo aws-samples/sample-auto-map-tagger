@@ -35,7 +35,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 YAML_FILE = ROOT / 'map2-auto-tagger-optimized.yaml'
-HTML_FILE = ROOT / 'build' / 'configurator.html'
+HTML_FILE = ROOT / 'configurator.html'
 
 
 def extract_prefixes(text: str) -> set[str]:

@@ -180,7 +180,7 @@ Retained for the record:
 When Q3 ships and reconciliation goes into implementation:
 
 - **New Lambda inline** in `map2-auto-tagger-optimized.yaml` (matches existing pattern)
-- **Mirror into `build/configurator.html`** (sync-check enforced)
+- **Mirror into `configurator.html`** (sync-check enforced)
 - **CFN resources:** ReconciliationFunction, ReconciliationSchedule, ReconciliationRole, ReconciliationLogGroup (4 new resources)
 - **New CFN parameter:** `ReconciliationInterval` default `24 hours`, min `1 hour` (configurable for customers who want tighter catch-up)
 - **IAM additions** to canonical list (`.github/sync/tagging-permissions.txt` unchanged — reconciliation's IAM is operational, not tagging)

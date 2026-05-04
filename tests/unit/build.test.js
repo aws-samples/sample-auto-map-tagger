@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 describe('build output', () => {
-  const html = fs.readFileSync(path.join(__dirname, '../../build/configurator.html'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '../../configurator.html'), 'utf8');
 
   it('contains inlined CSS', () => {
     expect(html).toContain('<style>');

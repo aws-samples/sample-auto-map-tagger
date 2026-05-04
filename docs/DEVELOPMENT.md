@@ -1,6 +1,6 @@
 # Source Structure & Development Guide
 
-The configurator is built from modular source files in `src/`. A build script (`scripts/build.js`) assembles them into a single `build/configurator.html` that runs entirely in the browser with no dependencies.
+The configurator is built from modular source files in `src/`. A build script (`scripts/build.js`) assembles them into a single `configurator.html` that runs entirely in the browser with no dependencies.
 
 ## Directory Layout
 
@@ -46,7 +46,7 @@ src/
 2. Inlines CSS from `src/css/styles.css`
 3. Concatenates all JS files in dependency order, injects the Lambda Python (indented for YAML embedding), and inlines the result
 
-The output is a single self-contained HTML file at `build/configurator.html`.
+The output is a single self-contained HTML file at `configurator.html`.
 
 ## How to Extend
 
@@ -85,7 +85,7 @@ Edit `src/templates/lambda-handler.py` directly. It's valid standalone Python â€
 ## Verification
 
 ```bash
-npm run build     # assemble build/configurator.html
+npm run build     # assemble configurator.html
 npm test          # 35 unit tests (services, i18n, build output, Lambda)
 npm run verify    # 13 sanity checks on the built HTML
 ```

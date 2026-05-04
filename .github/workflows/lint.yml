@@ -21,7 +21,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: configurator
-          path: build/configurator.html
+          path: configurator.html
 
   # ── 1. CloudFormation lint ─────────────────────────────────────────────────
   cfn-lint:
@@ -269,7 +269,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: configurator
-          path: build/
+          path: .
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -281,7 +281,7 @@ jobs:
           node - <<'EOF'
           const fs = require('fs');
 
-          ['build/configurator.html'].forEach(file => {
+          ['configurator.html'].forEach(file => {
             if (!fs.existsSync(file)) {
               console.log(`  ⚠️  ${file} not found — skipping`);
               return;
@@ -319,7 +319,7 @@ jobs:
           python3 - <<'EOF'
           import re, sys, py_compile, tempfile, os
 
-          with open('build/configurator.html') as f:
+          with open('configurator.html') as f:
               content = f.read()
 
           # Lambda code is inside ZipFile: | blocks within JS template literals
@@ -440,7 +440,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: configurator
-          path: build/
+          path: .
 
       - name: Check IAM permissions and critical handler sync
         run: python3 .github/scripts/sync-check.py
@@ -482,7 +482,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: configurator
-          path: build/
+          path: .
 
       - name: Enforce every handler verb is in the EventBridge prefix list
         run: python3 .github/scripts/lint_event_prefixes.py
@@ -506,7 +506,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: configurator
-          path: build/
+          path: .
 
       - name: Enforce CFN correctness (name lengths, !Sub coverage, ref targets)
         run: python3 .github/scripts/lint_cfn_correctness.py
@@ -528,7 +528,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: configurator
-          path: build/
+          path: .
 
       - name: Enforce single-quoted containment for customer-controlled shell values
         run: python3 .github/scripts/lint_shell_injection.py
@@ -549,7 +549,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: configurator
-          path: build/
+          path: .
 
       - name: Enforce EventQueueMapping BatchSize >= 10 + ReportBatchItemFailures
         run: python3 .github/scripts/lint_batchsize_floor.py

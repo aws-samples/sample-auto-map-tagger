@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const fs = require('fs');
-const html = fs.readFileSync('build/configurator.html', 'utf8');
+const html = fs.readFileSync('configurator.html', 'utf8');
 
 const checks = [
   [html.includes('<style>'),              'CSS is inlined'],

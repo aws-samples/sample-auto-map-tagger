@@ -111,7 +111,7 @@ The auto-tagger covers **154 AWS resource types** across every major service cat
 
 ### Generate one file
 
-Open `build/configurator.html` in a browser, fill in the MAP Engagement ID and details, and download `deploy.sh`. Everything is self-contained — templates are embedded in the script.
+Open `configurator.html` in a browser, fill in the MAP Engagement ID and details, and download `deploy.sh`. Everything is self-contained — templates are embedded in the script.
 
 ### Run one command
 
@@ -163,7 +163,7 @@ Typically 60–90 seconds from resource creation to tagged. Up to 15 minutes dur
 
 ### Day-2 operations
 
-Use the **Editor** tab in `build/configurator.html` to add or remove accounts from scope without redeploying. It generates an `update.sh` script.
+Use the **Editor** tab in `configurator.html` to add or remove accounts from scope without redeploying. It generates an `update.sh` script.
 
 ---
 

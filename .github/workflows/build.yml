@@ -24,6 +24,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add build/configurator.html
+          git add configurator.html
           git diff --cached --quiet || git commit -m "build: regenerate configurator.html [skip ci]"
           git push

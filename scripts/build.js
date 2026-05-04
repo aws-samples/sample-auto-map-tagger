@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SRC = path.join(__dirname, '..', 'src');
-const OUT = path.join(__dirname, '..', 'build', 'configurator.html');
+const OUT = path.join(__dirname, '..', 'configurator.html');
 
 // 1. Read HTML skeleton
 let html = fs.readFileSync(path.join(SRC, 'html', 'configurator.html'), 'utf8');
