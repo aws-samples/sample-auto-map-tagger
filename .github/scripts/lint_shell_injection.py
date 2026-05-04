@@ -43,7 +43,7 @@ import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-HTML_FILE = ROOT / 'configurator.html'
+HTML_FILE = ROOT / 'build' / 'configurator.html'
 
 SINGLE_QUOTE_ESCAPE = re.compile(
     r"""\.replace\(\s*/'/g\s*,\s*["']'\\\\''["']\s*\)"""

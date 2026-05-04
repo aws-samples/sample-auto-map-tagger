@@ -256,12 +256,15 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Build configurator.html
+        run: npm install && node scripts/build.js
+
       - name: Check HTML is well-formed
         run: |
           node - <<'EOF'
           const fs = require('fs');
 
-          ['configurator.html'].forEach(file => {
+          ['build/configurator.html'].forEach(file => {
             if (!fs.existsSync(file)) {
               console.log(`  ⚠️  ${file} not found — skipping`);
               return;
@@ -299,7 +302,7 @@ jobs:
           python3 - <<'EOF'
           import re, sys, py_compile, tempfile, os
 
-          with open('configurator.html') as f:
+          with open('build/configurator.html') as f:
               content = f.read()
 
           # Lambda code is inside ZipFile: | blocks within JS template literals
@@ -417,6 +420,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install && node scripts/build.js
+
       - name: Check IAM permissions and critical handler sync
         run: python3 .github/scripts/sync-check.py
 
@@ -454,6 +462,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install && node scripts/build.js
+
       - name: Enforce every handler verb is in the EventBridge prefix list
         run: python3 .github/scripts/lint_event_prefixes.py
 
@@ -473,6 +486,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install && node scripts/build.js
+
       - name: Enforce CFN correctness (name lengths, !Sub coverage, ref targets)
         run: python3 .github/scripts/lint_cfn_correctness.py
 
@@ -490,6 +508,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install && node scripts/build.js
+
       - name: Enforce single-quoted containment for customer-controlled shell values
         run: python3 .github/scripts/lint_shell_injection.py
 
@@ -505,6 +528,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install && node scripts/build.js
 
       - name: Enforce EventQueueMapping BatchSize >= 10 + ReportBatchItemFailures
         run: python3 .github/scripts/lint_batchsize_floor.py
