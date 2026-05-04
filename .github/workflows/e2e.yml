@@ -990,6 +990,10 @@ jobs:
         working-directory: .
         run: npm install playwright && npx playwright install chromium --with-deps
 
+      - name: Build configurator.html from src/
+        working-directory: .
+        run: npm install && node scripts/build.js
+
       - name: Generate deploy.sh from configurator.html
         working-directory: .
         run: |
