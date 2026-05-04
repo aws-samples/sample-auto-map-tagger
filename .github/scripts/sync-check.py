@@ -41,16 +41,11 @@ yaml_perms: set[str] = set()
 for block in re.findall(r'Sid: \w+.*?Resource:', yaml, re.DOTALL):
     yaml_perms |= set(re.findall(r'- ([\w-]+:[\w]+)', block))
 
-# HTML: extract from TAGGING_PERMISSIONS JS array.
-# Service prefixes may contain hyphens (e.g. vpc-lattice, resource-explorer-2,
-# sms-voice) so the char class must include '-'. Action suffix is always
-# alphanumeric per the AWS IAM action grammar.
-html_perms_match = re.search(r'const TAGGING_PERMISSIONS = \[([\s\S]+?)\];', html)
-html_perms: set[str] = set()
-if html_perms_match:
-    html_perms = set(re.findall(r"'([\w-]+:[\w]+)'", html_perms_match.group(1)))
-else:
-    fails.append("IAM: Could not find TAGGING_PERMISSIONS array in configurator.html")
+# HTML: extract all IAM permission strings from the built configurator.
+# After the per-service decoupling, permissions are spread across individual
+# service module objects (e.g. SERVICE_EC2.permissions = ['ec2:CreateTags']).
+# We scan the entire file for quoted IAM action patterns.
+html_perms: set[str] = set(re.findall(r"'([\w-]+:[\w]+)'", html))
 
 for p in sorted(canonical - yaml_perms):
     fails.append(f"IAM: '{p}' is in canonical list but MISSING from map2-auto-tagger-optimized.yaml")
