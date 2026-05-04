@@ -38,7 +38,7 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 
 ## Day-2: Add or Remove Accounts
 
-1. Open `configurator.html` → **Editor** tab
+1. Open `build/configurator.html` → **Editor** tab
 2. Enter MPE ID, choose add/remove, enter account IDs
 3. Click **Generate update.sh** → download and run:
 
@@ -52,7 +52,7 @@ No redeployment needed — updates the account scope across all existing stack i
 
 ## Removing a Deployment
 
-1. Open `configurator.html` → **Delete existing deployment** tab
+1. Open `build/configurator.html` → **Delete existing deployment** tab
 2. Select region; by default every `map-auto-tagger-mig*` stack/stackset is removed. Optionally scope to specific MPE(s).
 3. Type `DELETE` to confirm → **Generate delete.sh** → download and run:
 
