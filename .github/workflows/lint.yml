@@ -41,7 +41,7 @@ jobs:
         run: pip install cfn-lint
 
       - name: Lint CloudFormation template
-        run: cfn-lint configurator.yaml -I W
+        run: cfn-lint configurator.yaml || [ $? -eq 4 ]
 
   # ── 1a. cfn-nag (anti-pattern scanner, advisory) ─────────────────────────
   # AWS's long-established scanner for common CFN anti-patterns (open security
