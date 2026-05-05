@@ -40,3 +40,4 @@ cdk.out/
 node_modules/
 package-lock.json
 src/templates/__pycache__
+configurator.yaml

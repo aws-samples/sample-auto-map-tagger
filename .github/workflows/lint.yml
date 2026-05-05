@@ -17,11 +17,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - run: npm install && node scripts/build.js
+      - run: npm install && node scripts/build.js && node scripts/build-yaml.js
       - uses: actions/upload-artifact@v4
         with:
           name: configurator
-          path: configurator.html
+          path: |
+            configurator.html
+            configurator.yaml
 
   # ── 1. CloudFormation lint ─────────────────────────────────────────────────
   cfn-lint:
