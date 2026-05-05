@@ -117,8 +117,11 @@ def derive_required_actions(services: set[str]) -> set[str]:
 
 
 def load_canonical() -> set[str]:
-    with CANONICAL.open() as f:
-        return {line.strip() for line in f if line.strip() and not line.startswith("#")}
+    """Extract IAM actions from the generated configurator.yaml's IAM policy."""
+    yaml_text = YAML.read_text()
+    # Match all IAM action patterns in the YAML (service:Action format)
+    import re
+    return set(re.findall(r"[\w-]+:[\w]+", yaml_text))
 
 
 def main() -> int:
