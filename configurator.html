@@ -6960,6 +6960,8 @@ ${permissionsList}
       MemorySize: 256
       # No ReservedConcurrentExecutions -- using SQS buffering. Throttling delays
       # processing but never drops events. Messages retained in SQS for up to 14 days.
+      DeadLetterConfig:
+        TargetArn: !GetAtt EventDLQ.Arn
       Environment:
         Variables:
           CONFIG_PARAM: /auto-map-tagger/${mpe}/config
@@ -7028,6 +7030,7 @@ ${permissionsList}
                               peer_mpe = name[len('map-auto-tagger-'):]
                           else:
                               continue
+                          peer_mpe = re.sub(r'-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', '', peer_mpe)
                           if peer_mpe == own_mpe:
                               continue
                           peer_mpes.append(peer_mpe)

@@ -60,6 +60,7 @@ def _detect_peer_taggers():
                     peer_mpe = name[len('map-auto-tagger-'):]
                 else:
                     continue
+                peer_mpe = re.sub(r'-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', '', peer_mpe)
                 if peer_mpe == own_mpe:
                     continue
                 peer_mpes.append(peer_mpe)

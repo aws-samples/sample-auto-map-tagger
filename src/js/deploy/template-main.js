@@ -594,6 +594,8 @@ ${permissionsList}
       MemorySize: 256
       # No ReservedConcurrentExecutions -- using SQS buffering. Throttling delays
       # processing but never drops events. Messages retained in SQS for up to 14 days.
+      DeadLetterConfig:
+        TargetArn: !GetAtt EventDLQ.Arn
       Environment:
         Variables:
           CONFIG_PARAM: /auto-map-tagger/${mpe}/config
