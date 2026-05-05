@@ -1,6 +1,6 @@
 # MAP 2.0 Auto-Tagger — Coverage
 
-Service and resource coverage for the MAP 2.0 Auto-Tagger, derived from the Lambda handler in `map2-auto-tagger-optimized.yaml`.
+Service and resource coverage for the MAP 2.0 Auto-Tagger, derived from the Lambda handler in `configurator.yaml (generated)`.
 
 **Methodology.** This doc was reset on 2026-04-26 by cross-checking every claim against:
 

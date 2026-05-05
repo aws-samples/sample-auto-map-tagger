@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
 generate_iam.py — derive the canonical IAM tagging-action list from the Lambda
-source. Used as a supplement to the hand-curated tagging-permissions.txt: if a
+source. Used to verify IAM completeness in the generated configurator.yaml: if a
 new native-dispatch branch is added to the Lambda without the matching IAM
 grant, this script surfaces the drift at CI time.
 
 Methodology:
 
-  1. Parse `map2-auto-tagger-optimized.yaml` for every `boto3.client('<svc>')`
+  1. Parse `configurator.yaml` for every `boto3.client('<svc>')`
      and `get_service_client('<svc>')` call — these are the services whose
      native TagResource/AddTags APIs the Lambda invokes directly.
 
@@ -23,7 +23,7 @@ Methodology:
      kept in the hand-curated canonical list.
 
   4. Emit either the derived list (stdout) or compare it against
-     `.github/sync/tagging-permissions.txt` and fail if the derived list has
+     `src/js/services/ (per-service modules)` and fail if the derived list has
      an action not present in the canonical list.
 
 Usage:
@@ -37,8 +37,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-YAML = REPO_ROOT / "map2-auto-tagger-optimized.yaml"
-CANONICAL = REPO_ROOT / ".github" / "sync" / "tagging-permissions.txt"
+YAML = REPO_ROOT / "configurator.yaml"
+# CANONICAL file removed — permissions now live in src/js/services/
 
 # Map native-dispatch service prefix → list of IAM actions required at runtime.
 # Keep one row per service; when a new native branch is added to `do_tag`,
@@ -57,7 +57,7 @@ NATIVE_IAM_REQUIREMENTS = {
     # API Gateway tagging uses HTTP-verb-level IAM actions, NOT the modern
     # TagResource. v1 REST API uses PUT /tags/{arn}, PATCH /tags/{arn} for
     # certain operations; v2 HTTP API uses POST /tags/{arn}. See the comment
-    # block in map2-auto-tagger-optimized.yaml's ServiceSpecificTagging policy.
+    # block in configurator.yaml's ServiceSpecificTagging policy.
     "apigateway": ["apigateway:PUT", "apigateway:PATCH"],
     "apigatewayv2": ["apigateway:POST"],
     "autoscaling": ["autoscaling:CreateOrUpdateTags"],
@@ -143,7 +143,7 @@ def main() -> int:
                 print(f"   - {action}")
             print(
                 f"\nFix by adding each missing action to {CANONICAL.relative_to(REPO_ROOT)} "
-                f"AND the matching row in map2-auto-tagger-optimized.yaml's ServiceSpecificTagging policy.",
+                f"AND the matching row in configurator.yaml's ServiceSpecificTagging policy.",
                 file=sys.stderr,
             )
             return 1

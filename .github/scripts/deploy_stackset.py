@@ -5,7 +5,7 @@ deploy_stackset.py — Create or update a SERVICE_MANAGED StackSet and deploy in
 Usage:
     python3 deploy_stackset.py \
         --stack-set-name map-auto-tagger-e2e-pr42 \
-        --template map2-auto-tagger-optimized.yaml \
+        --template configurator.yaml \
         --mpe-id migTEST0000001 \
         --agreement-date 2024-01-01 \
         --accounts "111111111111,222222222222"

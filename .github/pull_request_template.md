@@ -20,5 +20,5 @@ Brief description of the change and the problem it solves.
 
 ## CI Notes
 > **Layer 1 (lint)** runs immediately on every PR — ~1 min.
-> **Layer 2 (E2E)** runs when `map2-auto-tagger-optimized.yaml` or `configurator.html` changes — ~37 min across 7 AWS accounts. No AWS credentials needed.
+> **Layer 2 (E2E)** runs when `configurator.yaml` or `configurator.html` changes — ~37 min across 7 AWS accounts. No AWS credentials needed.
 > If Layer 2 fails, download `verification-report.json` from the Actions run for details.

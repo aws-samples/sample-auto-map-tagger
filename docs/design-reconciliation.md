@@ -179,11 +179,11 @@ Retained for the record:
 
 When Q3 ships and reconciliation goes into implementation:
 
-- **New Lambda inline** in `map2-auto-tagger-optimized.yaml` (matches existing pattern)
+- **New Lambda inline** in `configurator.yaml (generated)` (matches existing pattern)
 - **Mirror into `configurator.html`** (sync-check enforced)
 - **CFN resources:** ReconciliationFunction, ReconciliationSchedule, ReconciliationRole, ReconciliationLogGroup (4 new resources)
 - **New CFN parameter:** `ReconciliationInterval` default `24 hours`, min `1 hour` (configurable for customers who want tighter catch-up)
-- **IAM additions** to canonical list (`.github/sync/tagging-permissions.txt` unchanged — reconciliation's IAM is operational, not tagging)
+- **IAM additions** to canonical list (`src/js/services/ (per-service modules)` unchanged — reconciliation's IAM is operational, not tagging)
 - **New CloudWatch metrics** emitted: `ReconciliationResourcesScanned`, `ReconciliationMissingTag`, `WrongMpeCorrected`, `ReconciliationTimeoutCanary`, `ReconciliationConfigMissing`, `ReconciliationRunAborted`
 - **E2E test:** create 3 resources, stop live Lambda (event source mapping disabled), run reconciliation manually, verify tags applied via live Lambda's tagging path
 - **Docs:** add to `INSTRUCTIONS.md` "Monitoring" (note the new metrics + the interval parameter + the edge-case warning about pre-Q3 peer taggers); add to `OVERVIEW.md` safety-net section

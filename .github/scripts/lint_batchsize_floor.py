@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-YAML_FILE = ROOT / 'map2-auto-tagger-optimized.yaml'
+YAML_FILE = ROOT / 'configurator.yaml'
 HTML_FILE = ROOT / 'configurator.html'
 
 MIN_BATCH_SIZE = 10

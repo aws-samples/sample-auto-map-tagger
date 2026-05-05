@@ -22,9 +22,8 @@
 The version lives in exactly two places:
 
 1. **`src/js/constants.js`** — `const TEMPLATE_VERSION = 'v20.9.3';` (one occurrence)
-2. **`map2-auto-tagger-optimized.yaml`** — Description header, `MapVersion` SSM parameter default, Lambda `TEMPLATE_VERSION` constant, `TemplateVersion` CFN output (all four must equal the configurator constant)
 
-`.github/scripts/sync-check.py` enforces this invariant. Any drift between references is a sync-check failure.
+The build script generates both `configurator.html` and `configurator.yaml` from the same source, so drift is impossible.
 
 ## Where customers see it
 

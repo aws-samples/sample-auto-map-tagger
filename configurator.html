@@ -6642,7 +6642,7 @@ Resources:
     Type: AWS::SSM::Parameter
     Properties:
       Name: /auto-map-tagger/${mpe}/config
-      # Tier: Intelligent-Tiering — see §1.60 comment in map2-auto-tagger-optimized.yaml.
+      # Tier: Intelligent-Tiering — see §1.60.
       # Customers with ~240+ accounts in scoped_account_ids produce a Value > 4KB; AWS
       # auto-upgrades to Advanced tier ($0.05/parameter/month) instead of failing stack
       # create with ParameterMaxSizeExceeded. Zero cost impact below the threshold.

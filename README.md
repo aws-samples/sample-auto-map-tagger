@@ -83,7 +83,6 @@ bash deploy.sh
 | `configurator.html` | Self-service UI (built output). Generates `deploy.sh` for new deployments, `update.sh` for day-2 account changes (Editor tab), `upgrade.sh` for template-version upgrades (Upgrade tab), and `delete.sh` for clean removal (Delete tab). |
 | `src/` | Modular source files — CSS, HTML skeleton, JS modules, i18n, per-service definitions, Lambda Python |
 | `scripts/build.js` | Build script — assembles `configurator.html` from `src/` |
-| `map2-auto-tagger-optimized.yaml` | CloudFormation template (154 resource types, IAM hardened) |
 | `CHANGELOG.md` | Version history |
 
 ---
