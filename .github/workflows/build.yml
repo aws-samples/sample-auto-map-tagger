@@ -19,11 +19,10 @@ jobs:
       - run: node scripts/build.js
       - run: node scripts/verify-build.js
 
-      - name: Commit built configurator.html
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      - name: Check configurator.html is up to date
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add configurator.html
-          git diff --cached --quiet || git commit -m "build: regenerate configurator.html [skip ci]"
-          git push
+          if ! git diff --quiet configurator.html; then
+            echo "::error::configurator.html is stale. Run 'npm run build' and commit the result."
+            git diff --stat configurator.html
+            exit 1
+          fi
