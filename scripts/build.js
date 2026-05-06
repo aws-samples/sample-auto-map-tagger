@@ -1,0 +1,78 @@
+#!/usr/bin/env node
+const fs = require('fs');
+const path = require('path');
+
+const SRC = path.join(__dirname, '..', 'src');
+const OUT = path.join(__dirname, '..', 'configurator.html');
+
+// 1. Read HTML skeleton
+let html = fs.readFileSync(path.join(SRC, 'html', 'configurator.html'), 'utf8');
+
+// 2. Inline CSS
+const css = fs.readFileSync(path.join(SRC, 'css', 'styles.css'), 'utf8');
+const cssPlaceholder = '/* BUILD:CSS */';
+html = html.slice(0, html.indexOf(cssPlaceholder)) + css.trimEnd() + html.slice(html.indexOf(cssPlaceholder) + cssPlaceholder.length);
+
+// 3. Collect service module files (all .js in services/ except index.js, sorted)
+const servicesDir = path.join(SRC, 'js', 'services');
+const serviceFiles = fs.readdirSync(servicesDir)
+  .filter(f => f.endsWith('.js') && f !== 'index.js')
+  .sort()
+  .map(f => `js/services/${f}`);
+
+// 4. Read Lambda handler and prepare for YAML embedding
+const lambdaPy = fs.readFileSync(path.join(SRC, 'templates', 'lambda-handler.py'), 'utf8');
+const lambdaIndented = lambdaPy.split('\n').map(line => '          ' + line).join('\n');
+
+// 5. Read JS files in dependency order and concatenate
+const jsFiles = [
+  'js/constants.js',
+  'js/shared/ui.js',
+  'js/editor/editor-flow.js',
+  'js/upgrade/upgrade-flow.js',
+  'js/delete/delete-flow.js',
+  'js/deploy/deploy-flow.js',
+  'js/i18n/en.js',
+  'js/i18n/ko.js',
+  'js/i18n/ja.js',
+  'js/i18n/zh.js',
+  'js/i18n/id.js',
+  'js/i18n/th.js',
+  'js/i18n/vi.js',
+  'js/i18n/engine.js',
+  ...serviceFiles,
+  'js/services/index.js',
+  'js/deploy/template-main.js',
+  'js/deploy/instructions.js',
+  'js/deploy/template-org.js',
+  'js/deploy/script-deploy.js',
+  'js/app.js',
+];
+
+let jsBundle = '';
+for (const file of jsFiles) {
+  const content = fs.readFileSync(path.join(SRC, file), 'utf8');
+  // Strip ES module syntax (source files use export/import for IDE support;
+  // output is a single <script> block with everything in global scope)
+  const stripped = content
+    .replace(/^export\s+(default\s+)?/gm, '')
+    .replace(/^import\s+.*;\s*$/gm, '// (import removed by build)');
+  jsBundle += stripped;
+}
+
+// 6. Inject Lambda handler into template
+const lambdaPlaceholder = '${LAMBDA_HANDLER_CODE}';
+const lambdaIdx = jsBundle.indexOf(lambdaPlaceholder);
+if (lambdaIdx === -1) {
+  console.error('ERROR: ${LAMBDA_HANDLER_CODE} placeholder not found in JS bundle');
+  process.exit(1);
+}
+jsBundle = jsBundle.slice(0, lambdaIdx) + lambdaIndented.trimEnd() + jsBundle.slice(lambdaIdx + lambdaPlaceholder.length);
+
+const jsPlaceholder = '/* BUILD:JS */';
+html = html.slice(0, html.indexOf(jsPlaceholder)) + jsBundle.trimEnd() + html.slice(html.indexOf(jsPlaceholder) + jsPlaceholder.length);
+
+// 5. Write output
+fs.mkdirSync(path.dirname(OUT), { recursive: true });
+fs.writeFileSync(OUT, html);
+console.log(`Built: ${OUT} (${(Buffer.byteLength(html) / 1024).toFixed(0)} KB)`);

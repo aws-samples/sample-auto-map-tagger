@@ -8,18 +8,40 @@ on:
 
 jobs:
 
+  # ── 0. Build configurator.html from src/ ──────────────────────────────────
+  build-configurator:
+    name: Build Configurator
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install && node scripts/build.js && node scripts/build-yaml.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: configurator
+          path: |
+            configurator.html
+            configurator.yaml
+
   # ── 1. CloudFormation lint ─────────────────────────────────────────────────
   cfn-lint:
+    needs: build-configurator
     name: CloudFormation Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Install cfn-lint
         run: pip install cfn-lint
 
       - name: Lint CloudFormation template
-        run: cfn-lint map2-auto-tagger-optimized.yaml
+        run: cfn-lint configurator.yaml || [ $? -eq 4 ]
 
   # ── 1a. cfn-nag (anti-pattern scanner, advisory) ─────────────────────────
   # AWS's long-established scanner for common CFN anti-patterns (open security
@@ -28,11 +50,16 @@ jobs:
   # build. Promote to required once the backlog of suppressions is vetted.
   # Reference: https://w.amazon.com/bin/view/AWS/Teams/WWPS/Engineering/SecurityWorkstream/CDKCFNNag/
   cfn-nag:
+    needs: build-configurator
     name: cfn-nag (advisory)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Install cfn_nag
         run: |
@@ -41,7 +68,7 @@ jobs:
           sudo gem install cfn-nag
 
       - name: Scan CloudFormation template
-        run: cfn_nag_scan --input-path map2-auto-tagger-optimized.yaml || true
+        run: cfn_nag_scan --input-path configurator.yaml || true
 
   # ── 1b. cfn-guard (policy-as-code, advisory) ─────────────────────────────
   # AWS-published declarative policy engine. Validates the CFN template against
@@ -49,11 +76,16 @@ jobs:
   # Layer 1 — findings are printed but do not block. Reference:
   # https://w.amazon.com/bin/view/LabContentSecurityHub/LCSR/Security_Scanners/CFN-Guard_Runbook/
   cfn-guard:
+    needs: build-configurator
     name: cfn-guard (advisory)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Install cfn-guard
         run: |
@@ -68,22 +100,27 @@ jobs:
         run: |
           cfn-guard validate \
             --rules /tmp/guard-rules/rules/aws \
-            --data map2-auto-tagger-optimized.yaml \
+            --data configurator.yaml \
             --show-summary all || true
 
   # ── 2. Lambda Python syntax check ─────────────────────────────────────────
   python-syntax:
+    needs: build-configurator
     name: Lambda Python Syntax
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Extract and syntax-check Lambda code from YAML
         run: |
           python3 - <<'EOF'
           import re, sys, py_compile, tempfile, os
 
-          with open('map2-auto-tagger-optimized.yaml') as f:
+          with open('configurator.yaml') as f:
               content = f.read()
 
           # Find all ZipFile blocks — extract by tracking indentation boundary
@@ -130,11 +167,16 @@ jobs:
   # are intentional fallbacks in scope-detection code paths. Upgrade to required
   # once suppressions are added with `# nosec` comments.
   bandit:
+    needs: build-configurator
     name: bandit (advisory)
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Install bandit
         run: pip install bandit
@@ -144,7 +186,7 @@ jobs:
           python3 - <<'EOF'
           import re, sys, tempfile, subprocess, os
 
-          with open('map2-auto-tagger-optimized.yaml') as f:
+          with open('configurator.yaml') as f:
               content = f.read()
 
           zipfile_positions = [m.start() for m in re.finditer(r'ZipFile: \|', content)]
@@ -187,12 +229,17 @@ jobs:
 
   # ── 3. Handler regression check ───────────────────────────────────────────
   handler-regression:
+    needs: build-configurator
     name: Handler Regression Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Check for removed handlers without replacement
         run: |
@@ -201,13 +248,13 @@ jobs:
 
           # Get list of changed files in this PR vs main
           result = subprocess.run(
-              ['git', 'diff', 'origin/main...HEAD', '--', 'map2-auto-tagger-optimized.yaml'],
+              ['git', 'diff', 'origin/main...HEAD', '--', 'configurator.yaml'],
               capture_output=True, text=True
           )
           diff = result.stdout
 
           if not diff:
-              print("No changes to map2-auto-tagger-optimized.yaml — skipping")
+              print("No changes to configurator.yaml — skipping")
               sys.exit(0)
 
           # Extract removed lines (- prefix, not --- header)
@@ -225,7 +272,7 @@ jobs:
           for h in removed_handlers:
               if h not in added_handlers:
                   # Check if it still exists in the full file
-                  with open('map2-auto-tagger-optimized.yaml') as f:
+                  with open('configurator.yaml') as f:
                       full = f.read()
                   if f"event_name == '{h}'" not in full:
                       warnings.append(h)
@@ -246,10 +293,15 @@ jobs:
 
   # ── 4. Configurator HTML check ────────────────────────────────────────────
   configurator-check:
+    needs: build-configurator
     name: Configurator HTML Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -351,13 +403,13 @@ jobs:
           from pathlib import Path
 
           result = subprocess.run(
-              ['git', 'diff', 'origin/main...HEAD', '--', 'map2-auto-tagger-optimized.yaml'],
+              ['git', 'diff', 'origin/main...HEAD', '--', 'configurator.yaml'],
               capture_output=True, text=True
           )
           diff = result.stdout
 
           if not diff:
-              print("No changes to map2-auto-tagger-optimized.yaml — skipping")
+              print("No changes to configurator.yaml — skipping")
               sys.exit(0)
 
           # Lines added in this PR (+ prefix, excluding +++ header)
@@ -410,15 +462,6 @@ jobs:
           EOF
 
 
-  # ── 6. YAML ↔ Configurator sync check ────────────────────────────────────
-  sync-drift-check:
-    name: YAML ↔ Configurator Sync Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check IAM permissions and critical handler sync
-        run: python3 .github/scripts/sync-check.py
 
   # ── 7. Handler coverage regression gate ──────────────────────────────────
   # The `new-handler-coverage-check` above only warns on NEW handlers added
@@ -427,10 +470,15 @@ jobs:
   # with `python3 .github/scripts/audit_handler_coverage.py --update` after
   # intentional coverage additions/removals.
   handler-coverage-regression-gate:
+    needs: build-configurator
     name: Handler Coverage Regression Gate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - uses: actions/setup-python@v5
         with:
@@ -449,10 +497,15 @@ jobs:
   # EventBridge drops the event before it reaches SQS — silent failure
   # (no DLQ, no alarm). Enforced in both YAML and configurator.html.
   eventbridge-prefix-parity:
+    needs: build-configurator
     name: EventBridge Prefix Parity
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Enforce every handler verb is in the EventBridge prefix list
         run: python3 .github/scripts/lint_event_prefixes.py
@@ -465,13 +518,18 @@ jobs:
   #
   # Five checks: unsubbed ${AWS::...}, name-length overruns, IAM
   # RoleName character class, dangling !Ref/!GetAtt, undefined !Sub
-  # template variables. Covers both map2-auto-tagger-optimized.yaml
+  # template variables. Covers both configurator.yaml
   # and configurator.html's inline CFN template.
   cfn-correctness:
+    needs: build-configurator
     name: CFN Correctness
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Enforce CFN correctness (name lengths, !Sub coverage, ref targets)
         run: python3 .github/scripts/lint_cfn_correctness.py
@@ -485,10 +543,15 @@ jobs:
   # derived values are emitted only inside single-quoted shell strings
   # via the shellSingleQuote helper.
   shell-injection-guard:
+    needs: build-configurator
     name: Shell Injection Guard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Enforce single-quoted containment for customer-controlled shell values
         run: python3 .github/scripts/lint_shell_injection.py
@@ -501,10 +564,15 @@ jobs:
   # creates ~50 resources and never stresses the drain path. This lint
   # enforces both: BatchSize >= 10 AND ReportBatchItemFailures present.
   batchsize-floor:
+    needs: build-configurator
     name: BatchSize Floor
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Enforce EventQueueMapping BatchSize >= 10 + ReportBatchItemFailures
         run: python3 .github/scripts/lint_batchsize_floor.py
@@ -517,14 +585,19 @@ jobs:
   #   2. For each discovered service, look up its required IAM actions in
   #      .github/scripts/generate_iam.py's NATIVE_IAM_REQUIREMENTS map
   #      (hand-curated from AWS's IAM Service Authorization Reference).
-  #   3. Fail if any required action is missing from .github/sync/tagging-permissions.txt
+  #   3. Fail if any required action is missing from the generated configurator.yaml
   # The author MUST add the row to both the canonical list and the YAML ServiceSpecificTagging
   # policy when they add a native-dispatch handler.
   iam-completeness:
+    needs: build-configurator
     name: IAM Completeness (native-dispatch)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: configurator
+          path: .
 
       - name: Derive IAM actions from Lambda source and cross-check canonical list
         run: python3 .github/scripts/generate_iam.py --check

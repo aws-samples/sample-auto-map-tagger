@@ -43,7 +43,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TEMPLATE = REPO_ROOT / "map2-auto-tagger-optimized.yaml"
+TEMPLATE = REPO_ROOT / "configurator.yaml"
 RESOURCE_GROUPS = REPO_ROOT / ".github" / "scripts" / "resource_groups"
 BASELINE = REPO_ROOT / ".github" / "handler_coverage_baseline.txt"
 

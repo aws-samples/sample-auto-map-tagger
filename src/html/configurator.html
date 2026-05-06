@@ -1,0 +1,964 @@
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. -->
+<!-- SPDX-License-Identifier: MIT-0 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAP 2.0 Auto-Tagger Configurator</title>
+    <style>
+/* BUILD:CSS */
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 data-i18n="ui_title">MAP 2.0 Auto-Tagger Configurator</h1>
+        <span class="badge">AWS SAMPLE</span>
+        <div class="lang-flags">
+            <span class="lang-flag active" id="lang-en" onclick="setLanguage('en')" title="English">🇺🇸</span>
+            <span class="lang-flag" id="lang-ko" onclick="setLanguage('ko')" title="한국어">🇰🇷</span>
+            <span class="lang-flag" id="lang-ja" onclick="setLanguage('ja')" title="日本語">🇯🇵</span>
+            <span class="lang-flag" id="lang-zh" onclick="setLanguage('zh')" title="中文简体">🇨🇳</span>
+            <span class="lang-flag" id="lang-id" onclick="setLanguage('id')" title="Bahasa Indonesia">🇮🇩</span>
+            <span class="lang-flag" id="lang-th" onclick="setLanguage('th')" title="ภาษาไทย">🇹🇭</span>
+            <span class="lang-flag" id="lang-vi" onclick="setLanguage('vi')" title="Tiếng Việt">🇻🇳</span>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <!-- Landing: mode selection -->
+        <div id="landing">
+            <div class="info-box" style="background:#fff8e1;border-left:4px solid #f9a825;font-size:13px;margin-top:8px;">
+                <strong data-i18n="ui_sample_notice_title">Sample Code Notice:</strong> <span data-i18n="ui_sample_notice_body">This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, and AWS Systems Manager. See the</span> <a href="https://aws.amazon.com/security/shared-responsibility/" target="_blank" rel="noopener" data-i18n="ui_shared_responsibility">AWS Shared Responsibility Model</a>.
+            </div>
+
+            <div class="info-box">
+                <span data-i18n="ui_main_desc1">Generates a CloudFormation template that auto-tags new AWS resources with</span> <code>map-migrated</code> <span data-i18n="ui_main_desc2">within</span> <strong data-i18n="ui_main_desc3">typically 60-90 seconds (up to 15 minutes during high-volume activity)</strong> <span data-i18n="ui_main_desc4">of creation.</span>
+                <span data-i18n="ui_main_desc5">Covers</span> <strong>140+ <span data-i18n="ui_main_desc6">resource types across all major AWS services (CT org E2E tested).</span></strong>
+                <span data-i18n="ui_main_desc7">Customer cost:</span> <strong>&lt; $2/month</strong>.
+            </div>
+
+            <div class="card">
+                <h2 style="margin-bottom:6px;" data-i18n="ui_landing_title">What would you like to do?</h2>
+                <p class="subtitle" style="margin-bottom:24px;" data-i18n="ui_landing_subtitle">Select an option to get started</p>
+
+                <div class="mode-card" onclick="selectMode('deploy')">
+                    <div class="mode-icon">🚀</div>
+                    <div class="mode-body">
+                        <h3 data-i18n="ui_mode_deploy_title">Deploy new MAP Auto-Tagger</h3>
+                        <p data-i18n="ui_mode_deploy_desc">Generate a deployment script for a new MAP 2.0 engagement. Works for single-account and multi-account (AWS Organizations) deployments.</p>
+                    </div>
+                </div>
+
+                <div class="mode-card" onclick="selectMode('edit')">
+                    <div class="mode-icon">✏️</div>
+                    <div class="mode-body">
+                        <h3 data-i18n="ui_mode_edit_title">Edit existing deployment</h3>
+                        <p data-i18n="ui_mode_edit_desc">Add or remove AWS accounts from scope on an already-deployed MAP Auto-Tagger. Generates an update script — no full redeployment needed.</p>
+                        <span class="mode-note" data-i18n="ui_mode_edit_note">Multi-account (AWS Organizations) deployments only</span>
+                    </div>
+                </div>
+
+                <div class="mode-card" onclick="selectMode('update')">
+                    <div class="mode-icon">🔄</div>
+                    <div class="mode-body">
+                        <h3 data-i18n="ui_mode_update_title">Update to latest template version</h3>
+                        <p data-i18n="ui_mode_update_desc">Upgrade Lambda code, IAM policy, and EventBridge rules to the current template version. Scope configuration (accounts, VPCs, agreement date) is preserved. Auto-detects single-account and multi-account deployments.</p>
+                    </div>
+                </div>
+
+                <div class="mode-card" onclick="selectMode('delete')">
+                    <div class="mode-icon">🗑️</div>
+                    <div class="mode-body">
+                        <h3 data-i18n="ui_mode_delete_title">Delete existing deployment</h3>
+                        <p data-i18n="ui_mode_delete_desc">Remove MAP Auto-Tagger deployments from the account. By default deletes every <code>map-auto-tagger-mig*</code> stack and stackset in the region; optionally scope to specific MPE(s). The <code>map-migrated</code> tag is not removed from already-tagged resources.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configurator (deploy flow) — hidden until mode selected -->
+        <div id="deploy-flow" class="hidden">
+
+        <div class="step-indicator">
+            <div class="step active" id="step1-indicator" data-i18n="ui_step1">1. Configure</div>
+            <div class="step" id="step2-indicator" data-i18n="ui_step2">2. Review</div>
+            <div class="step" id="step3-indicator" data-i18n="ui_step3">3. Download</div>
+        </div>
+
+        <div class="info-box" style="background:#fff8e1;border-left:4px solid #f9a825;font-size:13px;">
+            <strong data-i18n="ui_sample_notice_title">Sample Code Notice:</strong> <span data-i18n="ui_sample_notice_body">This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. Deploying this solution may incur AWS charges for AWS Lambda, Amazon EventBridge, Amazon CloudWatch, Amazon SNS, Amazon SQS, and AWS Systems Manager. See the</span> <a href="https://aws.amazon.com/security/shared-responsibility/" target="_blank" rel="noopener" data-i18n="ui_shared_responsibility">AWS Shared Responsibility Model</a>.
+        </div>
+
+        <div class="info-box">
+            <span data-i18n="ui_main_desc1">Generates a CloudFormation template that auto-tags new AWS resources with</span> <code>map-migrated</code> <span data-i18n="ui_main_desc2">within</span> <strong data-i18n="ui_main_desc3">typically 60-90 seconds (up to 15 minutes during high-volume activity)</strong> <span data-i18n="ui_main_desc4">of creation.</span>
+            <span data-i18n="ui_main_desc5">Covers</span> <strong>140+ <span data-i18n="ui_main_desc6">resource types across all major AWS services (CT org E2E tested).</span></strong>
+            <span data-i18n="ui_main_desc7">Customer cost:</span> <strong>&lt; $2/month</strong>.
+        </div>
+
+        <!-- Step 1: Configure -->
+        <div id="step1">
+            <div class="card">
+                <h2 data-i18n="ui_card_deal_title">MAP 2.0 Deal Details</h2>
+                <p class="subtitle" data-i18n="ui_card_deal_subtitle">Enter the MAP agreement details from AWS Investments</p>
+
+                <div class="form-group">
+                    <label><span data-i18n="ui_customer_name">Customer Name</span> <span class="hint" data-i18n="ui_customer_name_hint">(used for filename generation only)</span></label>
+                    <input type="text" id="customerName" data-i18n-placeholder="ui_customer_name_placeholder" placeholder="e.g., Acme Corp">
+                </div>
+
+                <div class="form-group">
+                    <label><span data-i18n="ui_mpe_tag">MAP Engagement ID</span> <span class="hint" data-i18n="ui_mpe_hint">(10-character alphanumeric code from AWS Investments — e.g., A1B2C3D4E5)</span></label>
+                    <div style="display:flex;align-items:center;gap:0;">
+                        <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                        <input type="text" id="mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                    </div>
+                    <div class="error-msg" id="mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
+                </div>
+
+                <div class="form-group">
+                    <label><span data-i18n="ui_agree_start">Agreement Start Date</span> <span class="hint" data-i18n="ui_agree_start_hint">(Date to start tagging newly created MAP 2.0 resources)</span></label>
+                    <input type="date" id="agreementDate" min="1900-01-01" max="9999-12-31">
+                    <div class="error-msg" id="agreementDate-error" data-i18n="err_date_required">Agreement start date is required</div>
+                </div>
+                <div class="form-group">
+                    <label><span data-i18n="ui_agree_end">Agreement End Date</span> <span class="hint" data-i18n="ui_agree_end_hint">(Date to stop tagging newly created resources)</span></label>
+                    <input type="date" id="agreementEndDate" min="1900-01-01" max="9999-12-31">
+                    <div class="error-msg" id="agreementEndDate-error" data-i18n="err_date_end">Agreement end date is required and must be after start date</div>
+                </div>
+
+                <div class="form-group">
+                    <label><span data-i18n="ui_alert_email">Alert Email</span> <span class="hint" data-i18n="ui_alert_email_hint">(optional — email to receive tagging failure alerts, ex. customer ops team)</span></label>
+                    <input type="email" id="alertEmail" placeholder="e.g., ops@customer.com">
+                    <div class="hint" style="margin-top: 4px;" data-i18n="ui_email_confirm_hint">Customer must confirm the AWS subscription email after deployment.</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2 data-i18n="ui_deploy_mode">Deployment Mode</h2>
+                <p class="subtitle" data-i18n="ui_deploy_mode_subtitle">How many AWS accounts are used for migration?</p>
+
+                <div class="option-card" id="opt-single" onclick="selectDeployMode('single')">
+                    <h3>
+                        <input type="radio" name="deployMode" value="single">
+                        <span data-i18n="ui_single_title">Single Account</span>
+                    </h3>
+                    <p data-i18n="ui_single_desc">Migration workloads in one AWS account. Deploy the stack once. Done in 2 minutes.</p>
+                </div>
+
+                <!-- Single-account: region + VPC scope -->
+                <div id="single-account-options" class="hidden">
+                    <div class="section-divider"></div>
+                    <div class="form-group">
+                        <label><span data-i18n="ui_deployment_regions">Deployment Regions</span> <span class="hint" data-i18n="ui_deployment_regions_hint">(regions where the customer creates resources)</span></label>
+                        <div id="singleRegionList">
+                            <div class="entry-row">
+                                <select class="region-select">
+                                    <option value="">Select a region...</option>
+                                    <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                                    <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                                    <option value="us-west-1">US West (N. California) — us-west-1</option>
+                                    <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                                    <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                                    <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                                    <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                                    <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                                    <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                                    <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                                    <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                                    <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                                    <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                                    <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                                    <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                                    <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                                    <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                                    <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                                    <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                                    <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                                    <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                                    <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                                    <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                                    <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                                    <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                                    <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                                    <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                                    <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                                    <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                                    <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                                    <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                                    <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                                    <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                                    <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                                </select>
+                                <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                            </div>
+                        </div>
+                        <button class="btn-add" onclick="addSingleRegion()" data-i18n="ui_add_region">+ Add another region</button>
+                    </div>
+                    <div class="section-divider"></div>
+                    <div class="form-group">
+                        <label><span data-i18n="ui_tagging_scope">Tagging Scope</span> <span class="hint" data-i18n="ui_optional">(optional)</span></label>
+                        <div class="hint" style="margin-bottom: 8px;" data-i18n="ui_vpc_scope_hint">By default all new resources in the account are tagged. Use VPC scoping if migration and non-migration workloads share the same account.</div>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="useVpcScope" onchange="toggleVpcScope()">
+                            <span data-i18n="ui_vpc_limit">Limit tagging to specific VPCs only</span>
+                        </label>
+                    </div>
+                    <div id="vpc-scope-fields" class="hidden">
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="tagNonVpcServices" checked>
+                                <span data-i18n="ui_tag_non_vpc">Also tag non-VPC resources (S3, DynamoDB, Lambda, SNS, SQS, etc.)</span>
+                            </label>
+                            <div class="hint" style="margin-left: 22px; margin-top: 2px;" data-i18n="ui_tag_non_vpc_hint">
+                                These services have no VPC association. Check to tag them all regardless of VPC scope (recommended for MAP eligibility).
+                            </div>
+                        </div>
+                        <label><span data-i18n="ui_vpc_ids">VPC IDs</span> <span class="hint" data-i18n="ui_vpc_ids_hint">(only VPC-bound resources in these VPCs are tagged)</span></label>
+                        <div id="vpcList">
+                            <div class="entry-row">
+                                <input type="text" class="vpc-input" placeholder="vpc-0abc1234def56789">
+                                <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                            </div>
+                        </div>
+                        <button class="btn-add" onclick="addVpc()" data-i18n="ui_add_vpc">+ Add another VPC</button>
+                        <div class="error-msg" id="vpc-error" data-i18n="err_vpc_required">Please enter at least one VPC ID.</div>
+                    </div>
+                </div>
+
+                <div class="option-card" id="opt-multi" onclick="selectDeployMode('multi')">
+                    <h3>
+                        <input type="radio" name="deployMode" value="multi">
+                        <span data-i18n="ui_multi_title">Multiple Accounts (AWS Organizations)</span>
+                    </h3>
+                    <p data-i18n="ui_multi_desc">Customer has multiple linked accounts under an AWS Organization. One StackSet command deploys to all accounts simultaneously.</p>
+                </div>
+
+                <!-- Multi-account options -->
+                <div id="multi-account-options" class="hidden">
+                    <div class="section-divider"></div>
+
+                    <!-- Account Scoping -->
+                    <div id="stackset-options" style="margin-top: 12px;">
+                        <div class="form-group">
+                            <div class="info-box" style="margin-bottom:10px;" data-i18n="ui_stackset_note">
+                                The Lambda is deployed to every account in your org via the root OU. By default, all accounts' resources are tagged. You can optionally limit tagging to specific accounts below.
+                            </div>
+                            <div class="warn-box" style="margin-bottom:10px;font-size:12px;" data-i18n="ui_stackset_bucket_note">
+                                ⓘ This deployment creates a temporary S3 bucket (<code>auto-map-tagger-{account-id}</code>) to stage CloudFormation templates for the StackSet. The bucket is retained after deployment as the StackSet requires it to deploy to new accounts that join your organization in the future.
+                            </div>
+                            <label>
+                                <input type="checkbox" id="useAccountScope" onchange="toggleAccountScope()">
+                                <span data-i18n="ui_account_limit">Limit tagging to specific accounts only</span>
+                            </label>
+                        </div>
+                        <div id="account-scope-fields" class="hidden">
+                            <div id="stacksetAccountList">
+                                <div class="entry-row">
+                                    <input type="text" class="stackset-account-id" placeholder="123456789012" maxlength="12">
+                                    <input type="text" class="stackset-account-label account-label" placeholder="e.g., Migration Account">
+                                    <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="addStacksetAccount()" data-i18n="ui_add_account">+ Add another account</button>
+                            <div class="error-msg" id="account-scope-error" data-i18n="err_account_scope_required">Please enter at least one account ID.</div>
+                        </div>
+                    </div>
+
+                    <!-- Deployment region -->
+                    <div class="section-divider"></div>
+                    <div class="form-group">
+                        <label><span data-i18n="ui_deployment_regions">Deployment Regions</span> <span class="hint" data-i18n="ui_deployment_regions_hint">(regions where the customer creates resources)</span></label>
+                        <div id="regionList">
+                            <div class="entry-row">
+                                <select class="region-select">
+                                    <option value="">Select a region...</option>
+                                    <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                                    <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                                    <option value="us-west-1">US West (N. California) — us-west-1</option>
+                                    <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                                    <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                                    <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                                    <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                                    <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                                    <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                                    <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                                    <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                                    <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                                    <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                                    <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                                    <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                                    <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                                    <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                                    <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                                    <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                                    <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                                    <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                                    <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                                    <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                                    <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                                    <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                                    <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                                    <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                                    <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                                    <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                                    <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                                    <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                                    <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                                    <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                                    <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                                </select>
+                                <button class="btn-remove" onclick="removeEntry(this)" title="Remove">&times;</button>
+                            </div>
+                        </div>
+                        <button class="btn-add" onclick="addRegion()" data-i18n="ui_add_region">+ Add another region</button>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Backfill option -->
+            <div class="card">
+                <h2><span data-i18n="ui_backfill_title">One-Time Backfill</span> <span class="hint" style="font-weight:normal;font-size:13px;" data-i18n="ui_optional">(optional)</span></h2>
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="includeBackfill" style="margin-top:3px;flex-shrink:0;">
+                    <div>
+                        <strong data-i18n="ui_backfill_strong">Tag existing resources created since agreement start date</strong>
+                        <p class="hint" style="margin-top:4px;" data-i18n="ui_backfill_desc">Deploys a one-time Lambda that queries CloudTrail history from your agreement start date and tags all matching resources that were created before this solution was deployed. Runs automatically ~5 minutes after deployment. Results appear in CloudWatch Logs (map-auto-tagger-backfill).</p>
+                        <p class="hint" style="margin-top:4px;color:#d13212;" data-i18n="ui_backfill_note">Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.</p>
+                        <p class="hint" id="backfill-scope-note" style="margin-top:4px;display:none;" data-i18n="ui_backfill_scope_note"></p>
+                    </div>
+                </label>
+            </div>
+
+            <!-- Service coverage summary -->
+            <div class="card">
+                <h2 data-i18n="ui_coverage_title">What Gets Tagged</h2>
+                <p class="subtitle" data-i18n="ui_coverage_subtitle">140+ resource types with explicit handlers — verified across 9 accounts</p>
+                <div class="coverage-grid">
+                    <div class="coverage-item">✅ Amazon EC2, AWS Lambda, Amazon ECS, Amazon EKS, Auto Scaling, Amazon EMR, EMR Serverless, Elastic Beanstalk, GameLift</div>
+                    <div class="coverage-item">✅ Amazon S3, Amazon EFS, Amazon FSx, Amazon ECR, Amazon EBS Volumes &amp; Snapshots, AMIs, AWS Backup, Storage Gateway</div>
+                    <div class="coverage-item">✅ Amazon RDS (all engines + snapshots + replicas + Proxy), Amazon Aurora, Amazon Neptune, Amazon DynamoDB, DynamoDB DAX, Amazon DocumentDB</div>
+                    <div class="coverage-item">✅ Amazon Redshift (Provisioned + Serverless), Amazon MemoryDB, Amazon OpenSearch Service, Amazon MSK (Provisioned + Serverless), Amazon ElastiCache (incl. Serverless)</div>
+                    <div class="coverage-item">✅ Amazon VPC, Subnets, Security Groups, Elastic Load Balancing, AWS Transit Gateway, Amazon VPC Lattice, VPN, VPC Endpoints</div>
+                    <div class="coverage-item">✅ Amazon CloudFront, Amazon Route 53, AWS Global Accelerator, AWS Network Firewall, AWS Direct Connect, AWS App Mesh, Cloud Map</div>
+                    <div class="coverage-item">✅ Amazon Kinesis Data Streams, Amazon Kinesis Data Firehose, Amazon Kinesis Analytics, Amazon Kinesis Video Streams, AWS Glue (incl. DataBrew), Amazon Athena</div>
+                    <div class="coverage-item">✅ Amazon SNS, Amazon SQS, AWS Step Functions, Amazon EventBridge, Amazon API Gateway (REST + HTTP + WebSocket), AWS AppSync, Amazon MQ</div>
+                    <div class="coverage-item">✅ Amazon SageMaker (Notebooks, Domains, Pipelines, Feature Groups), Amazon Comprehend, Amazon Kendra</div>
+                    <div class="coverage-item">✅ Amazon Bedrock (Agents, Guardrails, Flows, Prompts, Inference Profiles, Knowledge Bases)</div>
+                    <div class="coverage-item">✅ AWS CodeBuild, AWS CodeDeploy, AWS CodePipeline, AWS CloudFormation, Service Catalog</div>
+                    <div class="coverage-item">✅ Amazon Cognito, AWS Security Hub, AWS WAF, AWS KMS, AWS Certificate Manager, AWS Private CA, AWS Secrets Manager</div>
+                    <div class="coverage-item">✅ Amazon WorkSpaces, Amazon QuickSight, Amazon AppStream 2.0, Amazon GameLift, Amazon Timestream</div>
+                    <div class="coverage-item">✅ AWS Transfer Family, AWS DataSync, AWS DMS (incl. Serverless), AWS Elastic Disaster Recovery</div>
+                    <div class="coverage-item">✅ AWS IoT Core (Topic Rules), AWS IoT SiteWise (Assets, Models, Gateways, Portals)</div>
+                    <div class="coverage-item">✅ AWS Elemental MediaConvert, AWS Elemental MediaLive, AWS Elemental MediaPackage</div>
+                    <div class="coverage-item">✅ AWS Deadline Cloud, Amazon CloudWatch, AWS Systems Manager, AWS HealthLake</div>
+                    <div class="coverage-item limited">❌ IoT Things, Lambda Layers/Aliases, Keyspaces Tables, Glue Tables, API Gateway API Keys — not taggable (AWS platform limitation)</div>
+                    <div class="coverage-item">✅ NAT Gateways, ElastiCache, Aurora — tagged within 5–15 min of creation (provisioning delay handled automatically via retry)</div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-secondary" onclick="selectMode(null)" style="margin-right:auto;">← Back</button>
+                <button class="btn-primary" onclick="reviewConfig()" data-i18n="ui_btn_next">Review Configuration →</button>
+            </div>
+        </div>
+
+        <!-- Step 2: Review -->
+        <div id="step2" class="hidden">
+            <div class="card">
+                <h2 data-i18n="ui_review_title">Review Configuration</h2>
+                <p class="subtitle" data-i18n="ui_review_subtitle">Verify settings before generating the template</p>
+                <table style="width: 100%; font-size: 14px; border-collapse: collapse;" id="reviewTable"></table>
+            </div>
+
+            <div class="card">
+                <h2 data-i18n="ui_what_deployed">What Gets Deployed</h2>
+                <p class="subtitle" id="deployDescription"></p>
+                <div id="templateList"></div>
+                <div class="cost-note">
+                    <span data-i18n="ui_cost_note">Estimated monthly cost: </span><strong>&lt; $2/month</strong><span data-i18n="ui_cost_note2"> per account (Lambda invocations + CloudWatch). No AWS Config required.</span>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-secondary" onclick="backToConfig()" data-i18n="ui_btn_back">← Back</button>
+                <button class="btn-primary" onclick="generateAndDownload()" data-i18n="ui_btn_generate">Generate & Download →</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Download -->
+        <div id="step3" class="hidden">
+            <div style="position:relative;">
+
+                <!-- Card (original full width, unchanged) -->
+                <div class="card">
+                    <h2 data-i18n="ui_template_ready">Template Ready</h2>
+                    <p class="subtitle" data-i18n="ui_template_ready_subtitle">Share this with the customer along with the deployment instructions below</p>
+
+                    <div id="downloadButtons" style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;"></div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Customer Deployment Instructions</h3>
+                    <div class="preview-box" id="instructions" style="color:#d4d4d4;"></div>
+
+                    <div style="margin-top:40px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                      <h2 style="margin:0;" data-i18n="ui_template_preview">Template Preview</h2>
+                      <button class="btn-secondary" id="downloadTemplateBtn" onclick="downloadFile('')">
+                        <span data-i18n="ui_download_template">Download CloudFormation Template</span><br>
+                        <span style="font-size:11px;color:#687078;font-weight:400;" data-i18n="ui_download_template_note">Optional — for customers who would like to review the CloudFormation code before deploying.</span>
+                      </button>
+                    </div>
+                    <div class="preview-box" id="templatePreview" style="margin-top:12px;"></div>
+                </div>
+
+                <!-- Right: green hint + prerequisites + SCP, outside the card -->
+                <div style="position:absolute;top:0;left:calc(100% + 20px);width:380px;display:flex;flex-direction:column;gap:12px;">
+                    <div id="deployHint"></div>
+
+                    <div class="info-box" style="border-left:4px solid #d13212;background:#fdf3f1;margin:0;">
+                        <strong data-i18n="ui_prereq_title">Customer Prerequisites</strong> — <span data-i18n="ui_prereq_subtitle">the generated deploy.sh verifies these automatically before deploying:</span>
+                        <ul style="margin:8px 0 0;padding-left:20px;">
+                            <li data-i18n="ui_prereq_cloudtrail">CloudTrail must be enabled in the target region(s)</li>
+                            <li data-i18n="ui_prereq_perms">Deployer must have AWS CloudFormation permissions (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)</li>
+                            <li id="prereq-multi" style="display:none;" data-i18n="ui_prereq_org">Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-box" style="border-left:4px solid #f90;background:#fffbf0;margin:0;">
+                        <strong data-i18n="ui_scp_title">⚠️ Service Control Policy (SCP) Advisory</strong><br>
+                        <span data-i18n="ui_scp_intro">If the customer's organization uses SCPs, verify the following before deployment:</span>
+                        <ul style="margin:8px 0 0;padding-left:20px;">
+                            <li data-i18n="ui_scp_tagging"></li>
+                            <li data-i18n="ui_scp_mandatory"></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn-secondary" onclick="backToConfig()" data-i18n="ui_start_over">Start Over</button>
+            </div>
+        </div>
+
+        </div> <!-- end deploy-flow -->
+
+        <!-- Editor flow — hidden until mode selected -->
+        <div id="edit-flow" class="hidden">
+
+            <!-- Step indicator -->
+            <div class="step-indicator" style="margin-top:8px;">
+                <div class="step active" id="estep1-indicator" data-i18n="ui_estep1">1. Configure</div>
+                <div class="step" id="estep2-indicator" data-i18n="ui_estep2">2. Review</div>
+                <div class="step" id="estep3-indicator" data-i18n="ui_estep3">3. Download</div>
+            </div>
+
+            <div class="warn-box" style="font-size:12px;">
+                <strong>Sample Code Notice:</strong> This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. See the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/" style="color:#0073bb;">AWS Shared Responsibility Model</a>.
+            </div>
+
+            <div class="info-box">
+                <span data-i18n="ui_editor_info">This tool modifies an existing deployment created by the MAP Auto-Tagger Configurator. It generates an <code>update.sh</code> script that updates the account scope without redeploying.</span>
+            </div>
+
+            <!-- Editor Step 1: Configure -->
+            <div id="estep1">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_step1_title">Deployment Details</h2>
+                    <p class="subtitle" data-i18n="ui_editor_step1_subtitle">Enter the details of your existing MAP Auto-Tagger deployment</p>
+
+                    <div class="form-group">
+                        <label><span data-i18n="ui_mpe_tag">MAP Engagement ID</span> <span class="hint" data-i18n="ui_editor_mpe_hint">— 10-character alphanumeric code, must match the original deployment</span></label>
+                        <div style="display:flex;align-items:center;gap:0;">
+                            <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                            <input type="text" id="editor-mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                        </div>
+                        <div class="error-msg" id="editor-mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label><span data-i18n="ui_editor_region">Deployment Region</span> <span class="hint" data-i18n="ui_editor_region_hint">— region where the management stack was deployed</span></label>
+                        <select id="editor-region">
+                            <option value="" disabled selected data-i18n="ui_editor_region_placeholder">Select a region...</option>
+                            <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                            <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                            <option value="us-west-1">US West (N. California) — us-west-1</option>
+                            <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                            <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                            <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                            <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                            <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                            <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                            <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                            <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                            <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                            <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                            <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                            <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                            <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                            <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                            <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                            <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                            <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                            <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                            <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                            <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                            <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                            <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                            <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                            <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                            <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                            <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                            <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                            <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                            <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                            <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                            <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                        </select>
+                        <div class="error-msg" id="editor-region-error" data-i18n="err_editor_region">Please select a deployment region</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 data-i18n="ui_editor_action_title">Action</h2>
+                    <p class="subtitle" data-i18n="ui_editor_action_subtitle">Choose whether to add or remove accounts from the MAP scope</p>
+
+                    <div class="option-card" id="editor-opt-add" onclick="editorSelectAction('add')">
+                        <h3><input type="radio" name="editor-action" value="add"> <span data-i18n="ui_editor_add_title">Add accounts to MAP scope</span></h3>
+                        <p data-i18n="ui_editor_add_desc">Selected accounts will start being tagged with the MAP tag.</p>
+                    </div>
+
+                    <div id="editor-add-accounts-section" class="hidden">
+                        <div class="section-divider"></div>
+                        <div class="form-group">
+                            <label><span data-i18n="ui_editor_add_accounts_label">Account IDs to add</span> <span class="hint" data-i18n="ui_editor_add_accounts_hint">— only accounts not currently in scope</span></label>
+                            <div id="editor-add-accountList">
+                                <div class="entry-row">
+                                    <input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12">
+                                    <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="editorAddAccount('add')" data-i18n="ui_add_account">+ Add another account</button>
+                            <div class="error-msg" id="editor-account-error" data-i18n="err_editor_account">Please enter at least one valid 12-digit account ID</div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:4px;">
+                            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="editor-includeBackfill" checked style="margin-top:3px;flex-shrink:0;">
+                                <div>
+                                    <strong data-i18n="ui_editor_backfill_title">Re-run backfill for newly added accounts</strong>
+                                    <p class="hint" style="margin-top:4px;" data-i18n="ui_editor_backfill_desc">Queries CloudTrail history from the agreement start date and tags existing resources in the newly added accounts. Runs automatically during the StackSet update. Results appear in CloudWatch Logs (<code>map-auto-tagger-backfill</code>).</p>
+                                    <p class="hint" style="margin-top:4px;color:#d13212;" data-i18n="ui_editor_backfill_note">Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.</p>
+                                </div>
+                            </label>
+                        </div>
+                        <div class="section-divider"></div>
+                    </div>
+
+                    <div class="option-card" id="editor-opt-remove" onclick="editorSelectAction('remove')">
+                        <h3><input type="radio" name="editor-action" value="remove"> <span data-i18n="ui_editor_remove_title">Remove accounts from MAP scope</span></h3>
+                        <p data-i18n="ui_editor_remove_desc">Selected accounts will stop being tagged. Existing tags are not removed. The Lambda remains deployed but inactive for these accounts.</p>
+                    </div>
+
+                    <div id="editor-remove-accounts-section" class="hidden">
+                        <div class="section-divider"></div>
+                        <div class="form-group" style="margin-bottom:4px;">
+                            <label><span data-i18n="ui_editor_remove_accounts_label">Account IDs to remove</span> <span class="hint" data-i18n="ui_editor_remove_accounts_hint">— only accounts currently in scope</span></label>
+                            <div id="editor-remove-accountList">
+                                <div class="entry-row">
+                                    <input type="text" class="editor-account-input" placeholder="123456789012" maxlength="12">
+                                    <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="editorAddAccount('remove')" data-i18n="ui_add_account">+ Add another account</button>
+                            <div class="error-msg" id="editor-remove-account-error" data-i18n="err_editor_account">Please enter at least one valid 12-digit account ID</div>
+                        </div>
+                        <div class="section-divider"></div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="selectMode(null)" data-i18n="ui_editor_back">← Back</button>
+                    <button class="btn-primary" onclick="editorReview()" style="margin-left:auto;" data-i18n="ui_editor_review">Review →</button>
+                </div>
+            </div>
+
+            <!-- Editor Step 2: Review -->
+            <div id="estep2" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_review_title">Review Configuration</h2>
+                    <p class="subtitle" data-i18n="ui_editor_review_subtitle">Verify your settings before generating the update script</p>
+                    <table style="width:100%;font-size:14px;border-collapse:collapse;" id="editor-reviewTable"></table>
+                </div>
+
+                <div class="card" style="border-left:4px solid #d13212;background:#fdf3f1;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="editor-confirm" style="margin-top:3px;flex-shrink:0;">
+                            <span>
+                                <span data-i18n="ui_editor_confirm_text">I confirm that a MAP Auto-Tagger has already been deployed in the selected region using the specified MPE ID, and that both values are correct.</span>
+                                <strong data-i18n="ui_editor_confirm_risk">Generating and running this script with incorrect information may update the wrong StackSet, corrupt the account scope, or cause resources to be tagged with the wrong MAP engagement ID — resulting in lost MAP credits that cannot be recovered retroactively.</strong>
+                            </span>
+                        </label>
+                        <div class="error-msg" id="editor-confirm-error" style="margin-top:8px;" data-i18n="err_editor_confirm">You must confirm before generating the update script</div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="editorSetStep(1)" data-i18n="ui_btn_back">← Back</button>
+                    <button class="btn-primary" onclick="editorGenerate()" style="margin-left:auto;" data-i18n="ui_editor_generate">Generate update.sh →</button>
+                </div>
+            </div>
+
+            <!-- Editor Step 3: Download -->
+            <div id="estep3" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_step3_title">Script Ready</h2>
+                    <p class="subtitle" data-i18n="ui_editor_step3_subtitle">Run this in AWS CloudShell from the management account</p>
+
+                    <div style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;">
+                        <button class="btn-primary" onclick="editorDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_editor_download">⬇ Download update.sh</button>
+                        <button class="btn-secondary" onclick="editorCopyInstructions()" data-i18n="ui_btn_copy">📋 Copy Instructions</button>
+                    </div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Deployment Instructions</h3>
+                    <div class="preview-box" id="editor-instructions" style="color:#d4d4d4;"></div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_editor_script_preview">Script Preview</h3>
+                    <div class="preview-box" id="editor-scriptContent"></div>
+
+                    <div class="actions" style="margin-top:20px;">
+                        <button class="btn-secondary" onclick="editorSetStep(1)" data-i18n="ui_start_over">Start Over</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Update flow (upgrade template version) — hidden until mode selected -->
+        <div id="update-flow" class="hidden">
+
+            <!-- Step indicator -->
+            <div class="step-indicator" style="margin-top:8px;">
+                <div class="step active" id="ustep1-indicator" data-i18n="ui_ustep1">1. Configure</div>
+                <div class="step" id="ustep2-indicator" data-i18n="ui_ustep2">2. Review</div>
+                <div class="step" id="ustep3-indicator" data-i18n="ui_ustep3">3. Download</div>
+            </div>
+
+            <div class="warn-box" style="font-size:12px;">
+                <strong>Sample Code Notice:</strong> This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. See the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/" style="color:#0073bb;">AWS Shared Responsibility Model</a>.
+            </div>
+
+            <div class="info-box">
+                <span data-i18n="ui_update_info">This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>upgrade.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.</span>
+            </div>
+
+            <!-- Update Step 1: Configure -->
+            <div id="ustep1">
+                <div class="card">
+                    <h2 data-i18n="ui_update_step1_title">Deployment Details</h2>
+                    <p class="subtitle" data-i18n="ui_update_step1_subtitle">Enter the region and optional scope for the upgrade</p>
+
+                    <div class="form-group">
+                        <label><span data-i18n="ui_editor_region">Deployment Region</span> <span class="hint" data-i18n="ui_editor_region_hint">— region where the management stack was deployed</span></label>
+                        <select id="update-region">
+                            <option value="" disabled selected data-i18n="ui_editor_region_placeholder">Select a region...</option>
+                            <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                            <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                            <option value="us-west-1">US West (N. California) — us-west-1</option>
+                            <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                            <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                            <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                            <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                            <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                            <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                            <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                            <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                            <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                            <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                            <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                            <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                            <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                            <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                            <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                            <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                            <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                            <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                            <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                            <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                            <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                            <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                            <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                            <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                            <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                            <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                            <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                            <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                            <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                            <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                            <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                        </select>
+                        <div class="error-msg" id="update-region-error" data-i18n="err_editor_region">Please select a deployment region</div>
+                    </div>
+
+                    <div class="info-box" style="background:#f0f7fc;border-left:4px solid #0073bb;font-size:13px;margin-top:16px;">
+                        <span data-i18n="ui_update_info_detail">The generated <code>upgrade.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.</span>
+                    </div>
+
+                    <details id="update-versionHistory" style="margin-top:16px;border:1px solid #eaeded;border-radius:4px;padding:12px 14px;background:#fafafa;">
+                        <summary style="cursor:pointer;font-weight:600;color:#16191f;font-size:13px;">
+                            <span data-i18n="ui_version_history_title">Version history — what changed?</span>
+                        </summary>
+                        <div id="update-versionHistoryContent" style="margin-top:10px;"></div>
+                    </details>
+
+                    <div class="form-group" style="margin-bottom:4px;margin-top:16px;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="update-scopeToMpe" onchange="updateToggleScope()" style="margin-top:3px;flex-shrink:0;">
+                            <div>
+                                <strong data-i18n="ui_update_scope_title">Update only specific MAP engagement(s)</strong>
+                                <p class="hint" style="margin-top:4px;" data-i18n="ui_update_scope_desc">Leave unchecked to update every MAP Auto-Tagger deployment the script finds in this account (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div id="update-mpeSection" class="hidden" style="margin-top:16px;">
+                        <div class="form-group">
+                            <label><span data-i18n="ui_update_mpe_label">MPE IDs to update</span> <span class="hint" data-i18n="ui_update_mpe_hint">— each must match a deployed MAP Auto-Tagger in this region</span></label>
+                            <div id="update-mpeList">
+                                <div class="entry-row" style="display:flex;align-items:center;gap:8px;">
+                                    <div style="display:flex;align-items:center;gap:0;flex:1;">
+                                        <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                                        <input type="text" class="update-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                                    </div>
+                                    <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="updateAddMpe()" data-i18n="ui_update_add_mpe">+ Add another MPE</button>
+                            <div class="error-msg" id="update-mpe-error" data-i18n="err_update_mpe">Please enter at least one valid 10-character MPE ID</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="selectMode(null)" data-i18n="ui_editor_back">← Back</button>
+                    <button class="btn-primary" onclick="updateReview()" style="margin-left:auto;" data-i18n="ui_editor_review">Review →</button>
+                </div>
+            </div>
+
+            <!-- Update Step 2: Review -->
+            <div id="ustep2" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_review_title">Review Configuration</h2>
+                    <p class="subtitle" data-i18n="ui_editor_review_subtitle">Verify your settings before generating the update script</p>
+                    <table style="width:100%;font-size:14px;border-collapse:collapse;" id="update-reviewTable"></table>
+                </div>
+
+                <div class="card" style="border-left:4px solid #d13212;background:#fdf3f1;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="update-confirm" style="margin-top:3px;flex-shrink:0;">
+                            <span>
+                                <span data-i18n="ui_update_confirm_text">I confirm that the listed MAP Auto-Tagger deployment(s) exist in the selected region and that upgrading them to the target template version is intended.</span>
+                                <strong data-i18n="ui_update_confirm_risk">An upgrade replaces the Lambda code, IAM policy, and EventBridge rules in every matched stack. Scope and agreement dates are preserved by carrying over each existing CFN parameter value, but a failed rollout may leave a stack in UPDATE_ROLLBACK_COMPLETE state requiring manual recovery.</strong>
+                            </span>
+                        </label>
+                        <div class="error-msg" id="update-confirm-error" style="margin-top:8px;" data-i18n="err_update_confirm">You must confirm before generating the update script</div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="updateSetStep(1)" data-i18n="ui_btn_back">← Back</button>
+                    <button class="btn-primary" onclick="updateGenerate()" style="margin-left:auto;" data-i18n="ui_upgrade_generate">Generate upgrade.sh →</button>
+                </div>
+            </div>
+
+            <!-- Update Step 3: Download -->
+            <div id="ustep3" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_step3_title">Script Ready</h2>
+                    <p class="subtitle" data-i18n="ui_update_step3_subtitle">Run this in AWS CloudShell from the account where the deployment was made</p>
+
+                    <div style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;">
+                        <button class="btn-primary" onclick="updateDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_upgrade_download">⬇ Download upgrade.sh</button>
+                        <button class="btn-secondary" onclick="updateCopyInstructions()" data-i18n="ui_btn_copy">📋 Copy Instructions</button>
+                    </div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Deployment Instructions</h3>
+                    <div class="preview-box" id="update-instructions" style="color:#d4d4d4;"></div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_editor_script_preview">Script Preview</h3>
+                    <div class="preview-box" id="update-scriptContent"></div>
+
+                    <div class="actions" style="margin-top:20px;">
+                        <button class="btn-secondary" onclick="updateSetStep(1)" data-i18n="ui_start_over">Start Over</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Delete flow — hidden until mode selected -->
+        <div id="delete-flow" class="hidden">
+
+            <div class="step-indicator" style="margin-top:8px;">
+                <div class="step active" id="dstep1-indicator" data-i18n="ui_dstep1">1. Configure</div>
+                <div class="step" id="dstep2-indicator" data-i18n="ui_dstep2">2. Review</div>
+                <div class="step" id="dstep3-indicator" data-i18n="ui_dstep3">3. Download</div>
+            </div>
+
+            <div class="warn-box" style="font-size:12px;">
+                <strong>Sample Code Notice:</strong> This is sample code for non-production usage. You are responsible for testing, securing, and optimizing this solution to meet your organization's security, regulatory, and compliance requirements before deployment. See the <a href="https://aws.amazon.com/compliance/shared-responsibility-model/" style="color:#0073bb;">AWS Shared Responsibility Model</a>.
+            </div>
+
+            <div class="info-box">
+                <span data-i18n="ui_delete_info">This tool removes MAP Auto-Tagger deployments from your account. It generates a <code>delete.sh</code> script that auto-detects single-account stacks and multi-account StackSets. By default, every <code>map-auto-tagger-mig*</code> deployment in the selected region is removed. The <code>map-migrated</code> tag is <strong>not</strong> removed from already-tagged resources — those tags remain so MAP credits stay intact.</span>
+            </div>
+
+            <div id="dstep1">
+                <div class="card">
+                    <h2 data-i18n="ui_delete_step1_title">Deployment Details</h2>
+                    <p class="subtitle" data-i18n="ui_delete_step1_subtitle">Select the region to delete from</p>
+
+                    <div class="form-group">
+                        <label><span data-i18n="ui_editor_region">Deployment Region</span></label>
+                        <select id="delete-region">
+                            <option value="" disabled selected data-i18n="ui_editor_region_placeholder">Select a region...</option>
+                            <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
+                            <option value="us-east-2">US East (Ohio) — us-east-2</option>
+                            <option value="us-west-1">US West (N. California) — us-west-1</option>
+                            <option value="us-west-2">US West (Oregon) — us-west-2</option>
+                            <option value="af-south-1">Africa (Cape Town) — af-south-1</option>
+                            <option value="ap-east-1">Asia Pacific (Hong Kong) — ap-east-1</option>
+                            <option value="ap-east-2">Asia Pacific (Taipei) — ap-east-2</option>
+                            <option value="ap-northeast-1">Asia Pacific (Tokyo) — ap-northeast-1</option>
+                            <option value="ap-northeast-2">Asia Pacific (Seoul) — ap-northeast-2</option>
+                            <option value="ap-northeast-3">Asia Pacific (Osaka) — ap-northeast-3</option>
+                            <option value="ap-south-1">Asia Pacific (Mumbai) — ap-south-1</option>
+                            <option value="ap-south-2">Asia Pacific (Hyderabad) — ap-south-2</option>
+                            <option value="ap-southeast-1">Asia Pacific (Singapore) — ap-southeast-1</option>
+                            <option value="ap-southeast-2">Asia Pacific (Sydney) — ap-southeast-2</option>
+                            <option value="ap-southeast-3">Asia Pacific (Jakarta) — ap-southeast-3</option>
+                            <option value="ap-southeast-4">Asia Pacific (Melbourne) — ap-southeast-4</option>
+                            <option value="ap-southeast-5">Asia Pacific (Malaysia) — ap-southeast-5</option>
+                            <option value="ap-southeast-6">Asia Pacific (New Zealand) — ap-southeast-6</option>
+                            <option value="ap-southeast-7">Asia Pacific (Thailand) — ap-southeast-7</option>
+                            <option value="ca-central-1">Canada (Central) — ca-central-1</option>
+                            <option value="ca-west-1">Canada West (Calgary) — ca-west-1</option>
+                            <option value="eu-central-1">Europe (Frankfurt) — eu-central-1</option>
+                            <option value="eu-central-2">Europe (Zurich) — eu-central-2</option>
+                            <option value="eu-north-1">Europe (Stockholm) — eu-north-1</option>
+                            <option value="eu-south-1">Europe (Milan) — eu-south-1</option>
+                            <option value="eu-south-2">Europe (Spain) — eu-south-2</option>
+                            <option value="eu-west-1">Europe (Ireland) — eu-west-1</option>
+                            <option value="eu-west-2">Europe (London) — eu-west-2</option>
+                            <option value="eu-west-3">Europe (Paris) — eu-west-3</option>
+                            <option value="il-central-1">Israel (Tel Aviv) — il-central-1</option>
+                            <option value="me-central-1">Middle East (UAE) — me-central-1</option>
+                            <option value="me-south-1">Middle East (Bahrain) — me-south-1</option>
+                            <option value="mx-central-1">Mexico (Central) — mx-central-1</option>
+                            <option value="sa-east-1">South America (Sao Paulo) — sa-east-1</option>
+                        </select>
+                        <div class="error-msg" id="delete-region-error" data-i18n="err_editor_region">Please select a deployment region</div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom:4px;margin-top:16px;">
+                        <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                            <input type="checkbox" id="delete-scopeToMpe" onchange="deleteToggleScope()" style="margin-top:3px;flex-shrink:0;">
+                            <div>
+                                <strong data-i18n="ui_delete_scope_title">Limit to specific MAP engagement(s)</strong>
+                                <p class="hint" style="margin-top:4px;" data-i18n="ui_delete_scope_desc">Leave unchecked to delete every MAP Auto-Tagger deployment found in this region (both stacks and stacksets matching <code>map-auto-tagger-mig*</code>).</p>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div id="delete-mpeSection" class="hidden" style="margin-top:16px;">
+                        <div class="form-group">
+                            <label><span data-i18n="ui_delete_mpe_label">MPE IDs to delete</span> <span class="hint" data-i18n="ui_delete_mpe_hint">— each must match a deployed MAP Auto-Tagger in this region</span></label>
+                            <div id="delete-mpeList">
+                                <div class="entry-row" style="display:flex;align-items:center;gap:8px;">
+                                    <div style="display:flex;align-items:center;gap:0;flex:1;">
+                                        <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
+                                        <input type="text" class="delete-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                                    </div>
+                                    <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
+                                </div>
+                            </div>
+                            <button class="btn-add" onclick="deleteAddMpe()" data-i18n="ui_delete_add_mpe">+ Add another MPE</button>
+                            <div class="error-msg" id="delete-mpe-error" data-i18n="err_delete_mpe">MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
+                        </div>
+                    </div>
+
+                    <div class="info-box" style="background:#fff8e1;border-left:4px solid #f9a825;font-size:13px;margin-top:16px;">
+                        <strong data-i18n="ui_delete_optin_title">Optional — CloudWatch Log Groups</strong>
+                        <div style="margin-top:8px;">
+                            <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                                <input type="checkbox" id="delete-deleteLogs" style="margin-top:3px;flex-shrink:0;">
+                                <span><strong data-i18n="ui_delete_optin_logs">Delete CloudWatch Log Groups</strong> <span class="hint" data-i18n="ui_delete_optin_logs_hint">— removes audit history. By default logs are retained.</span></span>
+                            </label>
+                        </div>
+                        <p class="hint" style="margin-top:10px;" data-i18n="ui_delete_bucket_note">The S3 staging bucket is handled automatically: deleted only when no other MAP Auto-Tagger deployments remain in the account.</p>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="selectMode(null)" data-i18n="ui_editor_back">← Back</button>
+                    <button class="btn-primary" onclick="deleteReview()" style="margin-left:auto;" data-i18n="ui_editor_review">Review →</button>
+                </div>
+            </div>
+
+            <div id="dstep2" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_review_title">Review Configuration</h2>
+                    <p class="subtitle" data-i18n="ui_delete_review_subtitle">Confirm what will be deleted</p>
+                    <table style="width:100%;font-size:14px;border-collapse:collapse;" id="delete-reviewTable"></table>
+                </div>
+
+                <div class="card" style="border-left:4px solid #d13212;background:#fdf3f1;">
+                    <strong data-i18n="ui_delete_confirm_title">⚠️ Type <code>DELETE</code> to confirm</strong>
+                    <p class="hint" style="margin:8px 0;" data-i18n="ui_delete_confirm_hint">This action deletes CloudFormation resources. Existing <code>map-migrated</code> tags on AWS resources are preserved, but the Lambda will stop tagging new resources immediately.</p>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label><span data-i18n="ui_delete_confirm_label">Type the word <code>DELETE</code> to confirm</span></label>
+                        <input type="text" id="delete-confirmInput" placeholder="DELETE" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z]/g,'')">
+                        <div class="error-msg" id="delete-confirm-error" data-i18n="err_delete_confirm">Type the word "DELETE" to proceed</div>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="btn-secondary" onclick="deleteSetStep(1)" data-i18n="ui_btn_back">← Back</button>
+                    <button class="btn-primary" onclick="deleteGenerate()" style="margin-left:auto;" data-i18n="ui_delete_generate">Generate delete.sh →</button>
+                </div>
+            </div>
+
+            <div id="dstep3" class="hidden">
+                <div class="card">
+                    <h2 data-i18n="ui_editor_step3_title">Script Ready</h2>
+                    <p class="subtitle" data-i18n="ui_delete_step3_subtitle">Run this in AWS CloudShell from the deployment account</p>
+
+                    <div style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;">
+                        <button class="btn-primary" onclick="deleteDownload()" style="font-size:16px;padding:14px 32px;" data-i18n="ui_delete_download">⬇ Download delete.sh</button>
+                        <button class="btn-secondary" onclick="deleteCopyInstructions()" data-i18n="ui_btn_copy">📋 Copy Instructions</button>
+                    </div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Deployment Instructions</h3>
+                    <div class="preview-box" id="delete-instructions" style="color:#d4d4d4;"></div>
+
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_editor_script_preview">Script Preview</h3>
+                    <div class="preview-box" id="delete-scriptContent"></div>
+
+                    <div class="actions" style="margin-top:20px;">
+                        <button class="btn-secondary" onclick="deleteSetStep(1)" data-i18n="ui_start_over">Start Over</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <script>
+/* BUILD:JS */
+    </script>
+</body>
+</html>

@@ -30,7 +30,7 @@ Checks:
   5. !Sub undefined template variables
 
 Covers both sources of truth:
-  - map2-auto-tagger-optimized.yaml  (runtime)
+  - configurator.yaml  (runtime)
   - configurator.html                (customer-generated inline template)
 
 Exit codes: 0 all green; 1 drift detected.
@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-YAML_FILE = ROOT / 'map2-auto-tagger-optimized.yaml'
+YAML_FILE = ROOT / 'configurator.yaml'
 HTML_FILE = ROOT / 'configurator.html'
 
 # Worst-case expansion budgets. MpeId is validated by YAML AllowedPattern

@@ -80,9 +80,27 @@ bash deploy.sh
 
 | File | Description |
 |------|-------------|
-| `configurator.html` | Self-service UI. Generates `deploy.sh` for new deployments, `update.sh` for day-2 account changes (Editor tab), `upgrade.sh` for template-version upgrades (Upgrade tab), and `delete.sh` for clean removal (Delete tab). |
-| `map2-auto-tagger-optimized.yaml` | CloudFormation template (154 resource types, IAM hardened) |
+| `configurator.html` | Self-service UI (built output). Generates `deploy.sh` for new deployments, `update.sh` for day-2 account changes (Editor tab), `upgrade.sh` for template-version upgrades (Upgrade tab), and `delete.sh` for clean removal (Delete tab). |
+| `src/` | Modular source files — CSS, HTML skeleton, JS modules, i18n, per-service definitions, Lambda Python |
+| `scripts/build.js` | Build script — assembles `configurator.html` from `src/` |
 | `CHANGELOG.md` | Version history |
+
+---
+
+## Development
+
+```bash
+npm install              # install dependencies (first time)
+npm run build            # assemble configurator.html from src/
+npm test                 # run unit tests (vitest)
+npm run verify           # sanity-check the built output
+```
+
+Source files live in `src/`. Edit there, run `npm run build`, open `configurator.html` to test.
+
+**Adding a new AWS service:** drop a `.js` file in `src/js/services/` following the format in [DEVELOPMENT.md](docs/DEVELOPMENT.md), then `npm run build`.
+
+For the full source structure, build process, and extension guide, see [DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ---
 

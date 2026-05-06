@@ -13,9 +13,9 @@ The supported deployment path is:
 
 This pipeline runs preflight checks — IAM `simulate-principal-policy`, SCP validation, CloudTrail delivery probe, stack-state inspection, and scope-overlap detection across existing `map-auto-tagger-mig*` stacks — before any CloudFormation resource is created.
 
-**Running `aws cloudformation create-stack` or `create-stack-set` directly against `map2-auto-tagger-optimized.yaml` is unsupported.** Direct-YAML deploys skip every preflight check and have reproducibly surfaced bugs (scope collisions, cross-MPE contamination, missing IAM grants, malformed parameters) that do not occur through the configurator path. Issues reported against direct-YAML usage will be closed with a request to reproduce through the configurator.
+**Running `aws cloudformation create-stack` or `create-stack-set` directly against `configurator.yaml (generated)` is unsupported.** Direct-YAML deploys skip every preflight check and have reproducibly surfaced bugs (scope collisions, cross-MPE contamination, missing IAM grants, malformed parameters) that do not occur through the configurator path. Issues reported against direct-YAML usage will be closed with a request to reproduce through the configurator.
 
-`configurator.html` is checked into this repo at the root. Open it in any modern browser — no server, no installation, no network call required.
+`configurator.html` is checked into this repo. Open it in any modern browser — no server, no installation, no network call required.
 
 ---
 

@@ -19,7 +19,7 @@ handler string-matches it. The set of such implicit matches is not knowable
 statically, so we only enforce the direction we can prove.
 
 Checks both source-of-truth files:
-  - map2-auto-tagger-optimized.yaml   (runtime template)
+  - configurator.yaml   (runtime template)
   - configurator.html                 (customer-generated template, inline)
 
 Exit codes:
@@ -34,7 +34,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent.parent
-YAML_FILE = ROOT / 'map2-auto-tagger-optimized.yaml'
+YAML_FILE = ROOT / 'configurator.yaml'
 HTML_FILE = ROOT / 'configurator.html'
 
 
@@ -99,7 +99,7 @@ def main() -> int:
         print(
             "\nFix: add the missing verb(s) to the `- prefix:` block in the "
             "EventBridge rule (AutoTagEventRule.Properties.EventPattern.detail."
-            "eventName). Both map2-auto-tagger-optimized.yaml and configurator."
+            "eventName). Both configurator.yaml and configurator."
             "html must carry every verb used by an explicit `event_name == ...` "
             "handler, otherwise EventBridge drops the event before it reaches "
             "SQS (silent failure — no DLQ, no alarm)."
