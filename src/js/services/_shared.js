@@ -5,7 +5,6 @@ const SHARED_PERMISSIONS = [
     'sqs:DeleteMessage', 'sqs:GetQueueAttributes', 'sqs:ReceiveMessage', 'sqs:SendMessage',
     'cloudwatch:TagResource', 'ssm:AddTagsToResource',
     'servicediscovery:TagResource',
-    'cloudformation:TagResource', 'cloudformation:UpdateStack', 'cloudformation:UpdateStackSet',
     'cloudformation:DescribeStacks', 'cloudformation:ListStacks',
     'iam:TagRole',
     'autoscaling:CreateOrUpdateTags',
@@ -25,7 +24,7 @@ const SHARED_PERMISSIONS = [
 // Events not tied to a specific source (infrastructure/cross-cutting)
 const SHARED_EVENTS = [
     'PutMetricAlarm', 'PutParameter', 'PutRule', 'PutDashboard',
-    'CreateAutoScalingGroup', 'CreateStack', 'CreateStackSet',
+    'CreateAutoScalingGroup',
     'CreateOpsItem', 'CreateConfigurationProfile',
     'CreateDocument', 'CreateHttpNamespace',
     'CreateInstance', 'CreateTask', 'CreateMesh',
