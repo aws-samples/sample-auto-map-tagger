@@ -158,13 +158,13 @@ Resources:
                   print('Fetching template:', bkt, key)
                   body = s3.get_object(Bucket=bkt, Key=key)['Body'].read().decode()
                   print('Template bytes:', len(body))
-                  # AutoDeployment rule: True only when scope is ALL accounts.
-                  # When the customer narrowed scope to specific accounts, flipping
-                  # AutoDeployment=True would silently add the Lambda to any new
-                  # account that joins the org, bypassing their chosen scope. Keep
-                  # it False so scoped deploys remain predictable.
+                  # AutoDeployment always enabled. The Lambda deploys to every
+                  # account in the org but defers to the SSM scope parameter at
+                  # runtime — out-of-scope accounts no-op in ~100ms with negligible
+                  # cost. This ensures new accounts joining the OU are pre-wired;
+                  # customers add them to scope via update.sh when ready.
+                  auto_deploy = True
                   scoped = json.loads(props.get('ScopedAccounts', '["ALL"]'))
-                  auto_deploy = (scoped == ['ALL'])
                   print(f'AutoDeployment={auto_deploy} (scoped_accounts={scoped})')
                   try:
                       cf.create_stack_set(StackSetName=stackset_name,
@@ -178,7 +178,7 @@ Resources:
                           ],
                           Capabilities=['CAPABILITY_NAMED_IAM'],
                           PermissionModel='SERVICE_MANAGED',
-                          AutoDeployment={'Enabled': auto_deploy, 'RetainStacksOnAccountRemoval': False} if auto_deploy else {'Enabled': False})
+                          AutoDeployment={'Enabled': True, 'RetainStacksOnAccountRemoval': False})
                       print('StackSet created')
                   except cf.exceptions.NameAlreadyExistsException:
                       print('StackSet already exists')
