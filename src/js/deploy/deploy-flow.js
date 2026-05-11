@@ -19,7 +19,7 @@
             if (editorMpe) {
                 editorMpe.addEventListener('blur', () => {
                     const val = editorMpe.value.trim();
-                    const bad = val && !/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/.test(val);
+                    const bad = val && !/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{1,44}$/.test(val);
                     editorMpe.classList.toggle('error', bad);
                     document.getElementById('editor-mpeId-error').style.display = bad ? 'block' : 'none';
                 });

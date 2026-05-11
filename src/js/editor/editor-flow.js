@@ -12,7 +12,7 @@
 
             let valid = true;
 
-            if (!/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/.test(mpeRaw)) {
+            if (!/^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{1,44}$/.test(mpeRaw)) {
                 document.getElementById('editor-mpeId').classList.add('error');
                 document.getElementById('editor-mpeId-error').style.display = 'block';
                 valid = false;
@@ -339,7 +339,7 @@ Note: Only resources created AFTER this update will be tagged in newly added acc
         function editorGenerateUpgrade(region) {
             const scopeToMpe = document.getElementById('update-scopeToMpe').checked;
             const mpeInputs = [...document.getElementById('update-mpeList').querySelectorAll('.update-mpe-input')];
-            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{1,44}$/;
             const selectedMpes = scopeToMpe
                 ? mpeInputs.map(el => 'mig' + el.value.trim()).filter(m => mpeRegex.test(m.slice(3)))
                 : [];
