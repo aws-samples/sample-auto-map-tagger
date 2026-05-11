@@ -12,7 +12,7 @@
             row.innerHTML =
                 '<div style="display:flex;align-items:center;gap:0;flex:1;">' +
                     '<span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>' +
-                    '<input type="text" class="update-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')">' +
+                    '<input type="text" class="update-mpe-input" placeholder="A1B2C3D4E5" maxlength="44" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')">' +
                 '</div>' +
                 '<button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
             list.appendChild(row);
@@ -22,7 +22,7 @@
             const region = document.getElementById('update-region').value;
             const scopeToMpe = document.getElementById('update-scopeToMpe').checked;
             const mpeInputs = [...document.getElementById('update-mpeList').querySelectorAll('.update-mpe-input')];
-            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{10}$/;
+            const mpeRegex = /^(?=.*[A-Z])(?=.*[0-9])[A-Z0-9]{1,44}$/;
             const selectedMpes = scopeToMpe
                 ? mpeInputs.map(el => el.value.trim()).filter(v => mpeRegex.test(v))
                 : [];

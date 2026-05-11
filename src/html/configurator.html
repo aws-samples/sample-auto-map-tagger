@@ -112,9 +112,9 @@
                     <label><span data-i18n="ui_mpe_tag">MAP Engagement ID</span> <span class="hint" data-i18n="ui_mpe_hint">(10-character alphanumeric code from AWS Investments — e.g., A1B2C3D4E5)</span></label>
                     <div style="display:flex;align-items:center;gap:0;">
                         <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
-                        <input type="text" id="mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                        <input type="text" id="mpeId" placeholder="A1B2C3D4E5" maxlength="44" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
                     </div>
-                    <div class="error-msg" id="mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
+                    <div class="error-msg" id="mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be 1–44 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
                 </div>
 
                 <div class="form-group">
@@ -473,9 +473,9 @@
                         <label><span data-i18n="ui_mpe_tag">MAP Engagement ID</span> <span class="hint" data-i18n="ui_editor_mpe_hint">— 10-character alphanumeric code, must match the original deployment</span></label>
                         <div style="display:flex;align-items:center;gap:0;">
                             <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
-                            <input type="text" id="editor-mpeId" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                            <input type="text" id="editor-mpeId" placeholder="A1B2C3D4E5" maxlength="44" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
                         </div>
-                        <div class="error-msg" id="editor-mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be exactly 10 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
+                        <div class="error-msg" id="editor-mpeId-error" data-i18n="err_mpe_invalid">MAP Engagement ID must be 1–44 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number</div>
                     </div>
 
                     <div class="form-group">
@@ -730,7 +730,7 @@
                                 <div class="entry-row" style="display:flex;align-items:center;gap:8px;">
                                     <div style="display:flex;align-items:center;gap:0;flex:1;">
                                         <span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span>
-                                        <input type="text" class="update-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+                                        <input type="text" class="update-mpe-input" placeholder="A1B2C3D4E5" maxlength="44" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
                                     </div>
                                     <button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>
                                 </div>

@@ -1,4 +1,4 @@
-        // Mirror the Editor/Update MPE regex: 10 chars, uppercase A–Z + 0–9, at least one
+        // Mirror the Editor/Update MPE regex: 1–44 chars, uppercase A–Z + 0–9, at least one
         // letter and one digit. Stricter than the Lambda AllowedPattern on purpose — the
         // configurator enforces the MAP Engagement ID format at the UI boundary so all
         // three flows (Editor, Update, Delete) behave identically.
@@ -25,7 +25,7 @@
             const row = document.createElement('div');
             row.className = 'entry-row';
             row.style.cssText = 'display:flex;align-items:center;gap:8px;';
-            row.innerHTML = '<div style="display:flex;align-items:center;gap:0;flex:1;"><span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span><input type="text" class="delete-mpe-input" placeholder="A1B2C3D4E5" maxlength="10" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')"></div><button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
+            row.innerHTML = '<div style="display:flex;align-items:center;gap:0;flex:1;"><span style="padding:8px 10px;background:#f2f3f3;border:1px solid #aab7b8;border-right:none;border-radius:4px 0 0 4px;font-size:14px;color:#687078;white-space:nowrap;">mig</span><input type="text" class="delete-mpe-input" placeholder="A1B2C3D4E5" maxlength="44" style="border-radius:0 4px 4px 0;" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,\'\')"></div><button class="btn-remove" onclick="editorRemoveRow(this)" title="Remove">&times;</button>';
             list.appendChild(row);
         }
 
