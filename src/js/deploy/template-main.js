@@ -572,18 +572,9 @@ ${permissionsList}
       ScopedAccountIds: '${scopedAccountIdsJson}'
       ScopedVpcIds: '${scopedVpcIdsJson}'
 
-  AutoTaggerLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      LogGroupName: /aws/lambda/map-auto-tagger-${mpe}
-      RetentionInDays: 14
-
   AutoTaggerFunction:
     Type: AWS::Lambda::Function
     DependsOn:
-      - AutoTaggerLogGroup
       - PreflightTrigger  # Custom Resource must return SUCCESS before tagger is provisioned
     Properties:
       FunctionName: map-auto-tagger-${mpe}
@@ -808,14 +799,6 @@ ${LAMBDA_HANDLER_CODE}
   # is missing or wrong-MPE through EventQueue. Live Lambda's classifier handles
   # the actual tag writes. See docs/design-reconciliation.md for architecture.
 
-  ReconciliationLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: Delete
-    UpdateReplacePolicy: Delete
-    Properties:
-      LogGroupName: /aws/lambda/map-auto-tagger-reconciliation-${mpe}
-      RetentionInDays: 14
-
   ReconciliationRole:
     Type: AWS::IAM::Role
     Properties:
@@ -863,13 +846,13 @@ ${LAMBDA_HANDLER_CODE}
               - Sid: LambdaLogging
                 Effect: Allow
                 Action:
+                  - logs:CreateLogGroup
                   - logs:CreateLogStream
                   - logs:PutLogEvents
-                Resource: !Sub '\${ReconciliationLogGroup.Arn}:*'
+                Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:log-group:/aws/lambda/map-auto-tagger-reconciliation-${mpe}:*
 
   ReconciliationFunction:
     Type: AWS::Lambda::Function
-    DependsOn: ReconciliationLogGroup
     Properties:
       FunctionName: map-auto-tagger-reconciliation-${mpe}
       Runtime: python3.12
