@@ -252,6 +252,19 @@ Parameters:
     Type: String
     Default: '${scopeMode}'
     AllowedValues: [account, vpc]
+  ScopedAccountIds:
+    Type: String
+    Default: '${scopedAccountIdsJson}'
+    Description: JSON array of scoped account IDs or ["ALL"]
+  ScopedVpcIds:
+    Type: String
+    Default: '${scopedVpcIdsJson}'
+    Description: JSON array of scoped VPC IDs or []
+  TagNonVpcServices:
+    Type: String
+    Default: '${tagNonVpc}'
+    AllowedValues: ['true', 'false']
+    Description: Whether to tag non-VPC services when VPC scoping is active
   AlertEmail:
     Type: String
     Default: '${alertEmail}'
@@ -275,7 +288,7 @@ Resources:
   MapConfig:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /auto-map-tagger/${mpe}/config
+      Name: !Sub /auto-map-tagger/\${MpeId}/config
       # Tier: Intelligent-Tiering — see §1.60.
       # Customers with ~240+ accounts in scoped_account_ids produce a Value > 4KB; AWS
       # auto-upgrades to Advanced tier ($0.05/parameter/month) instead of failing stack
@@ -286,15 +299,15 @@ Resources:
       # credentials, secrets, or PII. SecureString would require KMS decrypt permissions
       # on every Lambda invocation with no security benefit for this data classification.
       Type: String
-      Value: |
+      Value: !Sub |
           {
-            "mpe_id": "${mpe}",
-            "agreement_start_date": "${config.agreementDate}",
-            "agreement_end_date": "${config.agreementEndDate}",
-            "scope_mode": "${scopeMode}",
-            "scoped_account_ids": ${scopedAccountIdsJson},
-            "scoped_vpc_ids": ${scopedVpcIdsJson},
-            "tag_non_vpc_services": ${tagNonVpc}
+            "mpe_id": "\${MpeId}",
+            "agreement_start_date": "\${AgreementStartDate}",
+            "agreement_end_date": "\${AgreementEndDate}",
+            "scope_mode": "\${ScopeMode}",
+            "scoped_account_ids": \${ScopedAccountIds},
+            "scoped_vpc_ids": \${ScopedVpcIds},
+            "tag_non_vpc_services": \${TagNonVpcServices}
           }
 
   AutoTaggerRole:
@@ -794,210 +807,6 @@ ${LAMBDA_HANDLER_CODE}
         - !Ref AlertTopic
       TreatMissingData: notBreaching
 
-  # Reconciliation Lambda — daily safety-net that enumerates in-scope
-  # resources via RGTA GetResources and re-enqueues any whose map-migrated tag
-  # is missing or wrong-MPE through EventQueue. Live Lambda's classifier handles
-  # the actual tag writes. See docs/design-reconciliation.md for architecture.
-
-  ReconciliationRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub 'map-auto-tagger-recon-role-${mpe}-\${AWS::Region}'
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: map-auto-tagger-reconciliation-policy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Sid: ReadScopeConfig
-                Effect: Allow
-                Action: ssm:GetParameter
-                Resource: !Sub 'arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/auto-map-tagger/${mpe}/config'
-              - Sid: EnumerateResources
-                Effect: Allow
-                Action:
-                  - tag:GetResources
-                Resource: '*'
-              - Sid: DescribeVpcMembership
-                Effect: Allow
-                Action:
-                  - ec2:DescribeInstances
-                  - ec2:DescribeVpcs
-                  - ec2:DescribeVolumes
-                  - ec2:DescribeNetworkInterfaces
-                Resource: '*'
-              - Sid: EnqueueToEventQueue
-                Effect: Allow
-                Action: sqs:SendMessage
-                Resource: !GetAtt EventQueue.Arn
-              - Sid: EmitReconciliationMetrics
-                Effect: Allow
-                Action: cloudwatch:PutMetricData
-                Resource: '*'
-                Condition:
-                  StringEquals:
-                    cloudwatch:namespace: MapAutoTagger
-              - Sid: LambdaLogging
-                Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: !Sub arn:aws:logs:\${AWS::Region}:\${AWS::AccountId}:log-group:/aws/lambda/map-auto-tagger-reconciliation-${mpe}:*
-
-  ReconciliationFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: map-auto-tagger-reconciliation-${mpe}
-      Runtime: python3.12
-      Handler: index.handler
-      Role: !GetAtt ReconciliationRole.Arn
-      Timeout: 900
-      MemorySize: 512
-      Environment:
-        Variables:
-          CONFIG_PARAM: /auto-map-tagger/${mpe}/config
-          EVENT_QUEUE_URL: !Ref EventQueue
-          MPE_ID: '${mpe}'
-      Code:
-        ZipFile: |
-          import json, os, time, boto3
-          from datetime import datetime, timezone
-          from botocore.exceptions import ClientError
-
-          CONFIG_PARAM = os.environ['CONFIG_PARAM']
-          EVENT_QUEUE_URL = os.environ['EVENT_QUEUE_URL']
-          MPE_ID = os.environ['MPE_ID']
-          TAG_KEY = 'map-migrated'
-          CANARY_THRESHOLD_SECS = 780
-
-          ssm = boto3.client('ssm')
-          sqs = boto3.client('sqs')
-          cw = boto3.client('cloudwatch')
-          tagging = boto3.client('resourcegroupstaggingapi')
-
-          def _emit(name, value=1, **dims):
-              try:
-                  cw.put_metric_data(
-                      Namespace='MapAutoTagger',
-                      MetricData=[{
-                          'MetricName': name,
-                          'Dimensions': [{'Name': k, 'Value': str(v)} for k, v in dims.items()],
-                          'Value': value,
-                          'Unit': 'Count',
-                      }],
-                  )
-              except Exception as e:
-                  print(f'metric emit failed ({name}): {e}')
-
-          def _current_map_tag(tag_list):
-              for t in tag_list or []:
-                  if t.get('Key') == TAG_KEY:
-                      return t.get('Value')
-              return None
-
-          def _parse_arn(arn):
-              parts = arn.split(':', 5)
-              if len(parts) < 6:
-                  return None, None
-              return parts[4] or None, parts[3] or None
-
-          def _synth_event(arn, account_id, region):
-              return {
-                  'version': '0',
-                  'source': 'map-auto-tagger.reconciliation',
-                  'account': account_id,
-                  'region': region,
-                  'detail-type': 'AWS API Call via CloudTrail',
-                  'detail': {
-                      'eventName': 'ReconciliationEnqueue',
-                      'recipientAccountId': account_id,
-                      'awsRegion': region,
-                      'responseElements': {'arn': arn},
-                      'requestParameters': {},
-                      'sourceIPAddress': 'map-auto-tagger.reconciliation',
-                  },
-              }
-
-          def handler(event, context):
-              start = time.time()
-              scanned = missing = wrong = already_ok = 0
-              canary_emitted = False
-              kwargs = {'ResourcesPerPage': 100, 'IncludeComplianceDetails': False}
-              while True:
-                  try:
-                      page = tagging.get_resources(**kwargs)
-                  except ClientError as e:
-                      err = e.response.get('Error', {}).get('Code', '')
-                      if err in ('ThrottledException', 'ThrottlingException'):
-                          time.sleep(2)
-                          continue
-                      _emit('ReconciliationRunAborted', reason='RgtaError')
-                      raise
-                  for r in page.get('ResourceTagMappingList', []):
-                      scanned += 1
-                      arn = r.get('ResourceARN', '')
-                      if not arn:
-                          continue
-                      account_id, region = _parse_arn(arn)
-                      if not account_id or not region:
-                          continue
-                      current = _current_map_tag(r.get('Tags'))
-                      if current == MPE_ID:
-                          already_ok += 1
-                          continue
-                      if current and current != MPE_ID:
-                          wrong += 1
-                          _emit('WrongMpeCorrected', ExpectedMpe=MPE_ID, FoundMpe=current)
-                      else:
-                          missing += 1
-                          _emit('ReconciliationMissingTag')
-                      try:
-                          sqs.send_message(
-                              QueueUrl=EVENT_QUEUE_URL,
-                              MessageBody=json.dumps(_synth_event(arn, account_id, region)),
-                          )
-                      except ClientError as e:
-                          _emit('ReconciliationEnqueueFailed')
-                  if not canary_emitted and (time.time() - start) > CANARY_THRESHOLD_SECS:
-                      _emit('ReconciliationTimeoutCanary', MpeId=MPE_ID)
-                      canary_emitted = True
-                  token = page.get('PaginationToken')
-                  if not token:
-                      break
-                  kwargs['PaginationToken'] = token
-              _emit('ReconciliationResourcesScanned', scanned)
-              print(json.dumps({
-                  'scanned': scanned, 'already_ok': already_ok,
-                  'missing': missing, 'wrong_mpe': wrong,
-                  'elapsed_secs': round(time.time() - start, 1),
-              }))
-              return {'status': 'completed', 'scanned': scanned, 'enqueued': missing + wrong}
-
-  ReconciliationSchedule:
-    Type: AWS::Events::Rule
-    Properties:
-      Name: map-auto-tagger-reconciliation-${mpe}
-      Description: Daily safety-net reconciliation trigger
-      ScheduleExpression: ${config.reconciliationInterval || 'rate(24 hours)'}
-      State: ENABLED
-      Targets:
-        - Arn: !GetAtt ReconciliationFunction.Arn
-          Id: ReconciliationLambda
-
-  ReconciliationSchedulePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref ReconciliationFunction
-      Action: lambda:InvokeFunction
-      Principal: events.amazonaws.com
-      SourceArn: !GetAtt ReconciliationSchedule.Arn
 ${backfillResources}
 Outputs:
   LambdaArn:
