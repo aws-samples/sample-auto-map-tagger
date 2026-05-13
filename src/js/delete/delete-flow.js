@@ -310,15 +310,23 @@ if [ "\$DELETE_LOGS" = "true" ]; then
     if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
         for MPE in "\${SCOPE_MPES[@]}"; do
             LOG_GROUPS=\$(aws logs describe-log-groups --region "\$REGION" --log-group-name-prefix "/aws/lambda/map-auto-tagger" --query "logGroups[?ends_with(logGroupName, '-\${MPE}')].logGroupName" --output text 2>/dev/null)
-            for LG in \$LOG_GROUPS; do
-                aws logs delete-log-group --region "\$REGION" --log-group-name "\$LG" 2>/dev/null && { echo "  ✅ Deleted \$LG"; DELETED=\$((DELETED + 1)); } || { echo "  ❌ Failed: \$LG"; FAILED=\$((FAILED + 1)); }
-            done
+            if [ -z "\$LOG_GROUPS" ] || [ "\$LOG_GROUPS" = "None" ]; then
+                echo "  No log groups found for \$MPE"
+            else
+                for LG in \$LOG_GROUPS; do
+                    aws logs delete-log-group --region "\$REGION" --log-group-name "\$LG" 2>/dev/null && { echo "  ✅ Deleted \$LG"; DELETED=\$((DELETED + 1)); } || { echo "  ❌ Failed: \$LG"; FAILED=\$((FAILED + 1)); }
+                done
+            fi
         done
     else
         LOG_GROUPS=\$(aws logs describe-log-groups --region "\$REGION" --log-group-name-prefix "/aws/lambda/map-auto-tagger" --query "logGroups[].logGroupName" --output text 2>/dev/null)
-        for LG in \$LOG_GROUPS; do
-            aws logs delete-log-group --region "\$REGION" --log-group-name "\$LG" 2>/dev/null && { echo "  ✅ Deleted \$LG"; DELETED=\$((DELETED + 1)); } || { echo "  ❌ Failed: \$LG"; FAILED=\$((FAILED + 1)); }
-        done
+        if [ -z "\$LOG_GROUPS" ] || [ "\$LOG_GROUPS" = "None" ]; then
+            echo "  No log groups found"
+        else
+            for LG in \$LOG_GROUPS; do
+                aws logs delete-log-group --region "\$REGION" --log-group-name "\$LG" 2>/dev/null && { echo "  ✅ Deleted \$LG"; DELETED=\$((DELETED + 1)); } || { echo "  ❌ Failed: \$LG"; FAILED=\$((FAILED + 1)); }
+            done
+        fi
     fi
     echo ""
 fi
