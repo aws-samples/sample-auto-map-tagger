@@ -38,15 +38,34 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 
 ## Day-2: Add or Remove Accounts
 
-1. Open `configurator.html` → **Editor** tab
-2. Enter MPE ID, choose add/remove, enter account IDs
-3. Click **Generate update.sh** → download and run:
+Run in AWS CloudShell from the management account:
 
 ```bash
-bash update.sh
+# 1. View current scope
+aws cloudformation describe-stack-set \
+  --stack-set-name map-auto-tagger-mig<MPE_ID> \
+  --region <REGION> \
+  --query "StackSet.Parameters[?ParameterKey=='ScopedAccountIds'].ParameterValue" \
+  --output text
+
+# 2. Update scope (replace with full list)
+aws cloudformation update-stack-set \
+  --stack-set-name map-auto-tagger-mig<MPE_ID> \
+  --use-previous-template \
+  --parameters \
+    'ParameterKey=ScopedAccountIds,ParameterValue=["111111111111","222222222222"]' \
+    ParameterKey=MpeId,UsePreviousValue=true \
+    ParameterKey=AgreementStartDate,UsePreviousValue=true \
+    ParameterKey=AgreementEndDate,UsePreviousValue=true \
+    ParameterKey=ScopeMode,UsePreviousValue=true \
+    ParameterKey=ScopedVpcIds,UsePreviousValue=true \
+    ParameterKey=TagNonVpcServices,UsePreviousValue=true \
+    ParameterKey=AlertEmail,UsePreviousValue=true \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region <REGION>
 ```
 
-No redeployment needed — updates the account scope across all existing stack instances.
+See [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) for single-account deployments and detailed guidance.
 
 ---
 
@@ -66,7 +85,16 @@ The S3 staging bucket is deleted only when no other MAP Auto-Tagger deployments 
 
 ## Upgrading from a Previous Version
 
-Prior versions used fixed resource names (`map-auto-tagger`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`). Running `deploy.sh` without removing the old stack will deploy **both side by side**. Delete the old stack first:
+The recommended upgrade path is **delete and redeploy**. Existing `map-migrated` tags on resources are preserved — MAP credits stay intact.
+
+```bash
+# Single-account:
+aws cloudformation delete-stack --stack-name map-auto-tagger-mig<MPE_ID> --region <REGION>
+aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger-mig<MPE_ID> --region <REGION>
+bash deploy.sh
+```
+
+For pre-v19 un-namespaced stacks (`map-auto-tagger` without MPE suffix):
 
 ```bash
 aws cloudformation delete-stack --stack-name map-auto-tagger
@@ -74,13 +102,15 @@ aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger
 bash deploy.sh
 ```
 
+Enable backfill to catch resources created during the brief gap (~2-5 minutes).
+
 ---
 
 ## Components
 
 | File | Description |
 |------|-------------|
-| `configurator.html` | Self-service UI (built output). Generates `deploy.sh` for new deployments, `update.sh` for day-2 account changes (Editor tab), `upgrade.sh` for template-version upgrades (Upgrade tab), and `delete.sh` for clean removal (Delete tab). |
+| `configurator.html` | Self-service UI (built output). Generates `deploy.sh` for new deployments and `delete.sh` for clean removal. Day-2 account scope changes are done via CloudShell (see INSTRUCTIONS.md). |
 | `src/` | Modular source files — CSS, HTML skeleton, JS modules, i18n, per-service definitions, Lambda Python |
 | `scripts/build.js` | Build script — assembles `configurator.html` from `src/` |
 | `CHANGELOG.md` | Version history |
