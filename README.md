@@ -38,31 +38,10 @@ aws s3api get-bucket-tagging --bucket test-map-XXXXX
 
 ## Day-2: Add or Remove Accounts
 
-Run in AWS CloudShell from the management account:
+Run in AWS CloudShell from the management account. List **all** accounts that should be in scope (this is a full replacement):
 
 ```bash
-# 1. View current scope
-aws cloudformation describe-stack-set \
-  --stack-set-name map-auto-tagger-mig<MPE_ID> \
-  --region <REGION> \
-  --query "StackSet.Parameters[?ParameterKey=='ScopedAccountIds'].ParameterValue" \
-  --output text
-
-# 2. Update scope (replace with full list)
-aws cloudformation update-stack-set \
-  --stack-set-name map-auto-tagger-mig<MPE_ID> \
-  --use-previous-template \
-  --parameters \
-    'ParameterKey=ScopedAccountIds,ParameterValue=["111111111111","222222222222"]' \
-    ParameterKey=MpeId,UsePreviousValue=true \
-    ParameterKey=AgreementStartDate,UsePreviousValue=true \
-    ParameterKey=AgreementEndDate,UsePreviousValue=true \
-    ParameterKey=ScopeMode,UsePreviousValue=true \
-    ParameterKey=ScopedVpcIds,UsePreviousValue=true \
-    ParameterKey=TagNonVpcServices,UsePreviousValue=true \
-    ParameterKey=AlertEmail,UsePreviousValue=true \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region <REGION>
+aws cloudformation update-stack-set --stack-set-name map-auto-tagger-mig<MPE_ID> --use-previous-template --parameters 'ParameterKey=ScopedAccountIds,ParameterValue="[\"111111111111\",\"222222222222\"]"' 'ParameterKey=MpeId,UsePreviousValue=true' 'ParameterKey=AgreementStartDate,UsePreviousValue=true' 'ParameterKey=AgreementEndDate,UsePreviousValue=true' 'ParameterKey=ScopeMode,UsePreviousValue=true' 'ParameterKey=ScopedVpcIds,UsePreviousValue=true' 'ParameterKey=TagNonVpcServices,UsePreviousValue=true' 'ParameterKey=AlertEmail,UsePreviousValue=true' --capabilities CAPABILITY_NAMED_IAM --region <REGION>
 ```
 
 See [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) for single-account deployments and detailed guidance.
