@@ -29,9 +29,9 @@ src/
 │   │   ├── script-deploy.js     generateDeployScript() — deploy.sh generator
 │   │   └── instructions.js      generateInstructions()
 │   ├── editor/
-│   │   └── editor-flow.js       Editor mode — add/remove accounts, generates update.sh
+│   │   └── editor-flow.js       Editor mode (disabled — kept for reference)
 │   ├── upgrade/
-│   │   └── upgrade-flow.js      Upgrade mode — template version upgrades, generates upgrade.sh
+│   │   └── upgrade-flow.js      Upgrade mode (disabled — kept for reference)
 │   └── delete/
 │       └── delete-flow.js       Delete mode — removal flow, generates delete.sh
 └── templates/

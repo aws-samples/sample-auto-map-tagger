@@ -111,44 +111,37 @@ aws cloudformation list-stack-instances \
 
 ---
 
-## Day-2: Add or Remove Accounts (update.sh)
+## Day-2: Add or Remove Accounts
 
-After the initial deployment, use the **Editor** tab in `configurator.html` to add or remove accounts from scope without redeploying.
+To modify which accounts are tagged, update the `ScopedAccountIds` CloudFormation parameter directly via CloudShell. No configurator UI or script download needed.
 
-### Generate update.sh
-
-1. Open `configurator.html` and switch to the **Editor** tab
-2. Enter the MPE ID and region of the existing deployment
-3. Choose **Add accounts** or **Remove accounts**
-4. Enter the account IDs to add or remove
-5. Click **Generate update.sh** → downloads `update.sh`
-
-### Run update.sh
-
-**Option 1 — AWS CloudShell:**
-
-1. Log into the AWS Console for your **management account**
-2. Open **CloudShell**
-3. Upload `update.sh`
-4. Run:
+### View current scope (optional)
 
 ```bash
-bash update.sh
+aws cloudformation describe-stack-set --stack-set-name map-auto-tagger-mig<MPE_ID> --region <REGION> --query "StackSet.Parameters[?ParameterKey=='ScopedAccountIds'].ParameterValue" --output text
 ```
 
-**Option 2 — Local AWS CLI:**
+### Update account scope
+
+Run as a **single line** in CloudShell from the management account. List **all** accounts that should be in scope (this is a full replacement — any account not listed will be removed from scope):
 
 ```bash
-bash update.sh
+aws cloudformation update-stack-set --stack-set-name map-auto-tagger-mig<MPE_ID> --use-previous-template --parameters 'ParameterKey=ScopedAccountIds,ParameterValue="[\"111111111111\",\"222222222222\",\"333333333333\"]"' 'ParameterKey=MpeId,UsePreviousValue=true' 'ParameterKey=AgreementStartDate,UsePreviousValue=true' 'ParameterKey=AgreementEndDate,UsePreviousValue=true' 'ParameterKey=ScopeMode,UsePreviousValue=true' 'ParameterKey=ScopedVpcIds,UsePreviousValue=true' 'ParameterKey=TagNonVpcServices,UsePreviousValue=true' 'ParameterKey=AlertEmail,UsePreviousValue=true' --capabilities CAPABILITY_NAMED_IAM --region <REGION>
 ```
 
-The script:
-- Verifies the existing StackSet deployment
-- Updates the account scope in the SSM parameter and S3 template
-- Pushes the update to all accounts in the org
-- Optionally re-runs backfill for newly added accounts
+**Format:** Each account ID must be wrapped in `\"...\"`  and separated by commas. Replace the example IDs with your actual account IDs. To tag all accounts in the org, use `"[\"ALL\"]"`.
 
-> Only resources created **after** the update will be tagged in newly added accounts (unless backfill is enabled). Existing tags on removed accounts are not affected.
+**To remove an account:** run the same command but omit that account ID from the list. The Lambda remains deployed but stops tagging in that account.
+
+### Single-account deployments
+
+For single-account stacks, update the SSM parameter directly:
+
+```bash
+aws ssm get-parameter --name "/auto-map-tagger/mig<MPE_ID>/config" --region <REGION> --query Parameter.Value --output text
+# Edit the scoped_account_ids array, then:
+aws ssm put-parameter --name "/auto-map-tagger/mig<MPE_ID>/config" --type String --overwrite --value '<updated JSON>' --region <REGION>
+```
 
 ---
 
@@ -341,7 +334,7 @@ Enable backfill to catch resources created during the brief gap (~2-5 minutes).
 
 ### Migrating from the pre-v19 un-namespaced layout
 
-Prior versions used fixed resource names (`map-auto-tagger`, `/auto-map-tagger/config`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`, `/auto-map-tagger/mig111/config`). `upgrade.sh` refuses to touch the un-namespaced layout — it must be migrated manually.
+Prior versions used fixed resource names (`map-auto-tagger`, `/auto-map-tagger/config`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`, `/auto-map-tagger/mig111/config`). The un-namespaced layout must be migrated manually.
 
 > **⚠️ Dual-Lambda concurrent-tagging window.** During the migration, the old Lambda will still be processing events from its SQS queue while the new Lambda is being created. If a new resource is created during this window, both Lambdas receive the event and race to tag it. They'll write the same `map-migrated` tag value (SSM config is shared per MPE ID), so the race is a no-op in the single-MPE case — but if the new deployment uses a **different** MPE ID, the last writer wins and you get non-deterministic tag values. Mitigation: pause resource creation during the migration window (typically 2-5 minutes).
 

@@ -118,7 +118,7 @@ For the full source structure, build process, and extension guide, see [DEVELOPM
 | Component | Monthly Cost |
 |-----------|-------------|
 | Lambda — Auto-Tagger (100–1,000 invocations/day) | $0.10 – $2.00 |
-| Lambda — Reconciliation (1/day) + Preflight (1 at deploy) | < $0.01 |
+| Lambda — Preflight (1 at deploy) | < $0.01 |
 | EventBridge + SQS + SSM | $0.01 – $0.20 |
 | **Total per account** | **< $2/month** |
 
@@ -129,7 +129,7 @@ For the full source structure, build process, and extension guide, see [DEVELOPM
 | Document | Description |
 |----------|-------------|
 | [OVERVIEW.md](docs/OVERVIEW.md) | How it works — architecture, deployment, auto-deployment, SSM scope, cost |
-| [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) | Deployment steps, day-2 operations (update.sh), monitoring, upgrade path, FAQ |
+| [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) | Deployment steps, day-2 operations, monitoring, upgrade path, FAQ |
 | [COVERAGE.md](docs/COVERAGE.md) | Supported services (154 resource types) and E2E test coverage matrix |
 | [LIMITATIONS.md](docs/LIMITATIONS.md) | Hard constraints — management account, SCPs, latency, upgrade gotcha |
 | [MAP_TAGGING_GAP_ANALYSIS.md](docs/MAP_TAGGING_GAP_ANALYSIS.md) | What can't be tagged and why (AWS API limitations, customer-side config) |
