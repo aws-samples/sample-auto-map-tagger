@@ -28,7 +28,7 @@ The build script generates both `configurator.html` and `configurator.yaml` from
 ## Where customers see it
 
 - **CFN Output `TemplateVersion`** — surfaces in the CloudFormation console after deploy.
-- **SSM Parameter `/auto-map-tagger/${MpeId}/version`** — readable via `aws ssm get-parameter`. Used by `upgrade.sh` for version-guard checks.
+- **SSM Parameter `/auto-map-tagger/${MpeId}/version`** — readable via `aws ssm get-parameter`.
 - **CloudWatch Logs** — every Lambda cold start prints `auto-map-tagger vN.N.N cold start`.
 
 ## Release tagging
@@ -47,4 +47,4 @@ Customers who "Watch → Releases only" on the GitHub repository get an email wh
 
 - Lambda runtime does **not** branch on version. The version string is metadata for humans and external tooling only.
 - Per-resource versioning (Lambda versions, Lambda Layers, etc.) is never used.
-- Cross-version compatibility checks in `upgrade.sh` are out of scope for this policy document — see `upgrade.sh` documentation when that PR lands.
+- Cross-version compatibility checks are out of scope for this policy document.

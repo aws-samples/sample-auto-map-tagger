@@ -115,18 +115,6 @@ The configurator requires the end date to be set explicitly. Use the configurato
 
 ---
 
-## Reconciliation VPC Scope Limitation
-
-The daily reconciliation Lambda enumerates resources via the Resource Groups Tagging API (RGTA), which does not return VPC association context. When reconciliation re-enqueues a missing tag, the auto-tagger Lambda cannot determine VPC membership from the synthetic event.
-
-**Behavior with `tag_non_vpc_services=true` (default):** Non-VPC services (S3, DynamoDB, Lambda, SQS, SNS, etc.) are re-tagged by reconciliation as expected. VPC-bound services (EC2, RDS, ElastiCache, ELB, etc.) are **not** re-tagged because the Lambda detects them as VPC-bound but cannot resolve their VPC — it fails closed to prevent scope leaks.
-
-**Behavior with `tag_non_vpc_services=false`:** No resources without resolved VPC context are re-tagged by reconciliation. Only resources whose VPC can be determined from the live event (not the synthetic reconciliation event) are tagged.
-
-Customers using VPC scope should monitor DLQ depth as a proxy for missed tags. Resources that exhaust SQS retries land in the DLQ and trigger the SNS alert — these are the ones most likely to need manual remediation.
-
----
-
 ## SSM Parameter Store Advanced tier (very large scopes)
 
 When `ScopedAccountIds` contains more than approximately 235 explicitly-named AWS account IDs, the serialized config payload exceeds the 4 KB Standard-tier SSM parameter limit. This template declares the config parameter with `Tier: Intelligent-Tiering`, so SSM automatically promotes the parameter to Advanced tier when the payload crosses the threshold.

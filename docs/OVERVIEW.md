@@ -131,7 +131,6 @@ The script handles everything automatically:
 |-----------|---------|
 | **Auto-Tagger Lambda** | Extracts resource ARN and applies `map-migrated` tag |
 | **Preflight Lambda** | Runs once at deploy time to detect peer-tagger scope conflicts |
-| **Reconciliation Lambda** | Runs daily via EventBridge schedule; scans RGTA for missing/wrong tags and re-enqueues corrections |
 | **EventBridge rule** | Catches resource creation events from CloudTrail |
 | **SQS queue** | Buffers events with 14-day retention and 5 retries |
 | **Dead Letter Queue** | Captures events that fail after all retries |
@@ -163,7 +162,7 @@ Typically 60–90 seconds from resource creation to tagged. Up to 15 minutes dur
 
 ### Day-2 operations
 
-Use the **Editor** tab in `configurator.html` to add or remove accounts from scope without redeploying. It generates an `update.sh` script.
+To add or remove accounts from scope, update the `ScopedAccountIds` CloudFormation parameter via CloudShell. See [INSTRUCTIONS.md](INSTRUCTIONS.md#day-2-add-or-remove-accounts) for commands.
 
 ---
 
@@ -202,7 +201,7 @@ Only after passing all checks does the Lambda apply the `map-migrated` tag.
 StackSet auto-deployment is enabled — when a new account joins the org, CloudFormation automatically deploys the stack. The Lambda starts running but defers to SSM for whether to act:
 
 - **`ALL` scoping (default):** New accounts are tagged immediately with zero intervention.
-- **Specific account scoping:** The Lambda deploys but no-ops. Use `update.sh` to add the account to scope when ready.
+- **Specific account scoping:** The Lambda deploys but no-ops. Update the `ScopedAccountIds` parameter via CloudShell to add the account to scope when ready (see [INSTRUCTIONS.md](INSTRUCTIONS.md#day-2-add-or-remove-accounts)).
 
 ### Multiple MAP engagements
 
@@ -227,7 +226,7 @@ Account 333333333333 — resource created
 | Tool | What it does |
 |------|-------------|
 | `deploy.sh` | Creates StackSet + stack instances. Sets initial SSM parameter. Deploys Lambda to all accounts. |
-| `update.sh` | Updates the SSM parameter (adds/removes accounts from scope). Does not deploy or remove Lambdas. |
+| `update-stack-set` (CloudShell) | Updates the `ScopedAccountIds` CFN parameter → rewrites SSM config in all accounts. Does not deploy or remove Lambdas. |
 | Auto-deployment | CloudFormation deploys the stack when a new account joins the org. Lambda defers to SSM for behavior. |
 
 A Lambda in an out-of-scope account has negligible cost — it fires, reads SSM, determines the account is out of scope, and returns in ~100ms.
@@ -239,7 +238,6 @@ A Lambda in an out-of-scope account has negligible cost — it fires, reads SSM,
 | Component | Monthly Cost |
 |-----------|-------------|
 | Lambda — Auto-Tagger (100–1,000 invocations/day) | $0.10 – $2.00 |
-| Lambda — Reconciliation (1 invocation/day, ~200ms) | < $0.01 |
 | Lambda — Preflight (1 invocation at deploy time) | $0.00 |
 | EventBridge events | $0.01 – $0.20 |
 | SQS (event buffer, ~1M requests/account/month) | $0.00 (within free tier) |
