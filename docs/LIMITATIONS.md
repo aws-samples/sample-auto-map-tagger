@@ -138,3 +138,24 @@ Customer-visible impact:
 - **Downgrade is manual:** subsequently reducing `ScopedAccountIds` below the threshold does **not** automatically revert the parameter to Standard tier. If a customer wants to drop back to Standard pricing after shrinking scope, they must delete and recreate the parameter (or the stack) manually.
 
 See the AWS documentation for [SSM Parameter Store Advanced tier](https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-advanced-parameters.html) for authoritative pricing and limit details.
+
+---
+
+## In-Place Upgrade Not Supported
+
+In-place template upgrades (via `upgrade.sh` or `update-stack-set --template-body`) are not supported. The upgrade flow has been disabled because:
+
+1. **Scope blow-out risk:** New CFN parameters introduced in later template versions (e.g., `ScopedAccountIds`) default to `["ALL"]` when upgrading from an older template that didn't have those parameters. CloudFormation cannot "use previous value" for parameters that didn't previously exist, causing the scope to silently expand to all accounts.
+2. **SSM config overwrite:** The `MapConfig` SSM parameter is rewritten on every stack update because its value is computed via `!Sub` from CFN parameters. Placeholder defaults in the upgrade template overwrite the customer's real configuration.
+
+**Recommended upgrade path:** Delete the existing deployment and redeploy with the latest `deploy.sh`. Existing `map-migrated` tags on resources are preserved — MAP credits stay intact. Enable backfill to catch resources created during the brief gap (~2-5 minutes).
+
+See [INSTRUCTIONS.md](INSTRUCTIONS.md) for step-by-step upgrade guidance.
+
+---
+
+## Reconciliation Lambda Removed
+
+The daily reconciliation Lambda (introduced in v20.5.0) has been removed. The real-time tagger with SQS buffering (14-day retention, 5 retries) provides sufficient coverage. Reconciliation added risk of mass-tagging damage when SSM config was incorrect (e.g., after a scope blow-out) and provided minimal incremental value given the SQS retry guarantees.
+
+Resources that exhaust all SQS retries land in the Dead Letter Queue and trigger the SNS alert — these should be tagged manually or investigated.

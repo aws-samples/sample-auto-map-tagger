@@ -284,11 +284,77 @@ Yes — all resources are namespaced by MPE ID. Deploy separate stacks for each 
 
 ---
 
+## Day-2: Add or Remove Accounts from Scope
+
+To modify which accounts are tagged, update the `ScopedAccountIds` CloudFormation parameter directly via CloudShell. No configurator UI or script download needed.
+
+### Step 1 — View current scope
+
+```bash
+aws cloudformation describe-stack-set \
+  --stack-set-name map-auto-tagger-mig<MPE_ID> \
+  --region <REGION> \
+  --query "StackSet.Parameters[?ParameterKey=='ScopedAccountIds'].ParameterValue" \
+  --output text
+```
+
+### Step 2 — Update scope (full replacement)
+
+Copy the current list from Step 1, add or remove account IDs, then run:
+
+```bash
+aws cloudformation update-stack-set \
+  --stack-set-name map-auto-tagger-mig<MPE_ID> \
+  --use-previous-template \
+  --parameters \
+    'ParameterKey=ScopedAccountIds,ParameterValue=["111111111111","222222222222","333333333333"]' \
+    ParameterKey=MpeId,UsePreviousValue=true \
+    ParameterKey=AgreementStartDate,UsePreviousValue=true \
+    ParameterKey=AgreementEndDate,UsePreviousValue=true \
+    ParameterKey=ScopeMode,UsePreviousValue=true \
+    ParameterKey=ScopedVpcIds,UsePreviousValue=true \
+    ParameterKey=TagNonVpcServices,UsePreviousValue=true \
+    ParameterKey=AlertEmail,UsePreviousValue=true \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --region <REGION>
+```
+
+This propagates the SSM config change to all member accounts via the StackSet. Takes effect immediately on the next Lambda invocation in each account.
+
+> **Note:** The `ParameterValue` must be the **complete** list of scoped accounts — it replaces the existing value, not appends to it. Use `["ALL"]` to tag all accounts in the org.
+
+### Single-account deployments
+
+For single-account stacks, update the SSM parameter directly:
+
+```bash
+aws ssm get-parameter --name "/auto-map-tagger/mig<MPE_ID>/config" --region <REGION> --query Parameter.Value --output text
+# Edit the scoped_account_ids array, then:
+aws ssm put-parameter \
+  --name "/auto-map-tagger/mig<MPE_ID>/config" \
+  --type String --overwrite \
+  --value '<updated JSON>'
+```
+
+---
+
 ## Upgrading from a Previous Version
 
-### Recommended: in-place upgrade via `upgrade.sh`
+> **⚠️ Limitation:** The upgrade flow in the configurator UI has been disabled. Upgrading an existing deployment requires a delete-and-redeploy. See below for the recommended path.
 
-For v19.x+ deployments (MPE-ID-namespaced stacks like `map-auto-tagger-mig1234567890`), open `configurator.html` → **🔄 Upgrade to the latest template version** → download and run `upgrade.sh`. The script reads the deployed SSM version, compares to target via SemVer, and applies the template update in place (scope and agreement dates preserved via `UsePreviousValue=true` on every existing parameter). No dual-Lambda window.
+### Recommended: delete and redeploy
+
+The safest upgrade path is to delete the existing deployment and redeploy with the latest `deploy.sh`. Existing `map-migrated` tags on resources are preserved (MAP credits stay intact).
+
+```bash
+# For StackSets — see "Removing a Deployment" section below
+# For single-account stacks:
+aws cloudformation delete-stack --stack-name map-auto-tagger-mig<MPE_ID> --region <REGION>
+aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger-mig<MPE_ID> --region <REGION>
+bash deploy.sh
+```
+
+Enable backfill to catch resources created during the brief gap (~2-5 minutes).
 
 ### Migrating from the pre-v19 un-namespaced layout
 
