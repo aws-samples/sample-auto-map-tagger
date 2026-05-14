@@ -288,40 +288,23 @@ Yes — all resources are namespaced by MPE ID. Deploy separate stacks for each 
 
 To modify which accounts are tagged, update the `ScopedAccountIds` CloudFormation parameter directly via CloudShell. No configurator UI or script download needed.
 
-### Step 1 — View current scope
+### Update account scope
+
+**View current scope (optional):**
 
 ```bash
-aws cloudformation describe-stack-set \
-  --stack-set-name map-auto-tagger-mig<MPE_ID> \
-  --region <REGION> \
-  --query "StackSet.Parameters[?ParameterKey=='ScopedAccountIds'].ParameterValue" \
-  --output text
+aws cloudformation describe-stack-set --stack-set-name map-auto-tagger-mig<MPE_ID> --region <REGION> --query "StackSet.Parameters[?ParameterKey=='ScopedAccountIds'].ParameterValue" --output text
 ```
 
-### Step 2 — Update scope (full replacement)
-
-Copy the current list from Step 1, add or remove account IDs, then run:
+**Update scope** — run as a single line in CloudShell from the management account. List **all** accounts that should be in scope (this is a full replacement):
 
 ```bash
-aws cloudformation update-stack-set \
-  --stack-set-name map-auto-tagger-mig<MPE_ID> \
-  --use-previous-template \
-  --parameters \
-    'ParameterKey=ScopedAccountIds,ParameterValue=["111111111111","222222222222","333333333333"]' \
-    ParameterKey=MpeId,UsePreviousValue=true \
-    ParameterKey=AgreementStartDate,UsePreviousValue=true \
-    ParameterKey=AgreementEndDate,UsePreviousValue=true \
-    ParameterKey=ScopeMode,UsePreviousValue=true \
-    ParameterKey=ScopedVpcIds,UsePreviousValue=true \
-    ParameterKey=TagNonVpcServices,UsePreviousValue=true \
-    ParameterKey=AlertEmail,UsePreviousValue=true \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region <REGION>
+aws cloudformation update-stack-set --stack-set-name map-auto-tagger-mig<MPE_ID> --use-previous-template --parameters 'ParameterKey=ScopedAccountIds,ParameterValue="[\"111111111111\",\"222222222222\",\"333333333333\"]"' 'ParameterKey=MpeId,UsePreviousValue=true' 'ParameterKey=AgreementStartDate,UsePreviousValue=true' 'ParameterKey=AgreementEndDate,UsePreviousValue=true' 'ParameterKey=ScopeMode,UsePreviousValue=true' 'ParameterKey=ScopedVpcIds,UsePreviousValue=true' 'ParameterKey=TagNonVpcServices,UsePreviousValue=true' 'ParameterKey=AlertEmail,UsePreviousValue=true' --capabilities CAPABILITY_NAMED_IAM --region <REGION>
 ```
 
-This propagates the SSM config change to all member accounts via the StackSet. Takes effect immediately on the next Lambda invocation in each account.
+**Format:** Each account ID must be wrapped in `\"...\"`  and separated by commas. Replace the example IDs with your actual account IDs. To tag all accounts in the org, use `"[\"ALL\"]"`.
 
-> **Note:** The `ParameterValue` must be the **complete** list of scoped accounts — it replaces the existing value, not appends to it. Use `["ALL"]` to tag all accounts in the org.
+**To remove an account:** run the same command but omit that account ID from the list. The Lambda remains deployed but stops tagging in that account.
 
 ### Single-account deployments
 
