@@ -150,10 +150,12 @@ def get_config():
             resp = ssm.get_parameter(Name=os.environ['CONFIG_PARAM'])
             cfg = json.loads(resp['Parameter']['Value'])
         except Exception as e:
-            # One SSM hiccup must not DLQ a burst. Fail closed: return a
-            # safe-default config where mpe_id is None — is_in_scope()
-            # hard-rejects that, so nothing tags until the next TTL
-            # refresh succeeds.
+            # Fail closed: return a safe-default config where mpe_id is
+            # None — is_in_scope() hard-rejects that, so nothing tags.
+            # Invalidate cache so the next invocation retries SSM
+            # immediately rather than waiting for TTL expiry.
+            _config = None
+            _config_ts = 0.0
             print(f'CONFIG_UNREACHABLE: {e}')
             return {
                 'mpe_id': None,
@@ -1530,6 +1532,13 @@ def extract_arn(detail, account_id, region):
         if portal_id:
             return f"arn:aws:iotsitewise:{region}:{account_id}:portal/{portal_id}"
 
+    # CloudFront Distribution
+    elif event_name == 'CreateDistribution' and event_source == 'cloudfront.amazonaws.com':
+        dist = resp.get('distribution', {})
+        arn = ci_get(dist, 'aRN')
+        if arn:
+            return arn
+
     return None
 
 # Shared throttle-code set used by both native dispatch branches and
@@ -1921,27 +1930,6 @@ def _emit_class_metric(error_class, mpe_id):
     except Exception as mx:
         print(f'Could not emit TagFailureByClass metric ({error_class}): {mx}')
 
-def _publish_permanent_alert(arn, mpe_id, err_msg):
-    alert_arn = os.environ.get('ALERT_TOPIC_ARN')
-    if not alert_arn:
-        return
-    try:
-        boto3.client('sns').publish(
-            TopicArn=alert_arn,
-            Subject='MAP Auto-Tagger: Permanent tagging failure',
-            Message=(
-                f'Failed to apply map-migrated tag (permanent-actionable class).\\n\\n'
-                f'Resource ARN: {arn}\\n'
-                f'MPE ID: {mpe_id}\\n'
-                f'Error: {err_msg}\\n\\n'
-                f'This error is not a known transient condition and is not a '
-                f'benign resource-deleted case. Investigate IAM policy, SCP '
-                f'drift, or tag-quota exhaustion. Event will land in EventDLQ.\\n'
-            )
-        )
-    except Exception as sns_e:
-        print(f'Could not publish SNS alert: {sns_e}')
-
 def _unwrap_sqs_record(record):
     """Extract the inner EventBridge event from one SQS record."""
     return json.loads(record['body'])
@@ -1994,7 +1982,6 @@ def _process_event(eb_event, config):
             return ('transient', err_msg)
         if cls == 'permanent_ignorable':
             return ('skipped', None)
-        _publish_permanent_alert(detail.get('eventName', '<unknown>'), config['mpe_id'], err_msg)
         return ('permanent_actionable', err_msg)
     if not arns:
         single = extract_arn(detail, account_id, region)
@@ -2033,8 +2020,7 @@ def _process_event(eb_event, config):
                 continue
 
             # permanent_actionable
-            print(f'Permanent-actionable [{arn}] {err_msg} — alerting + routing to DLQ')
-            _publish_permanent_alert(arn, tag_value, err_msg)
+            print(f'Permanent-actionable [{arn}] {err_msg} — routing to DLQ')
             worst = 'permanent_actionable'
             worst_err = err_msg
             # Keep scanning remaining ARNs so siblings still tag

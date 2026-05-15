@@ -236,7 +236,7 @@ Parameters:
     Type: String
     Default: '${mpe}'
     AllowedPattern: ^mig[a-zA-Z0-9]+$
-    MaxLength: 20
+    MaxLength: 44
     Description: MAP 2.0 MPE ID
   AgreementStartDate:
     Type: String
@@ -357,11 +357,6 @@ ${permissionsList}
                 Resource:
                   - !GetAtt EventQueue.Arn
                   - !GetAtt EventDLQ.Arn
-              - Sid: AlertPublish
-                Effect: Allow
-                Action:
-                  - sns:Publish
-                Resource: !Ref AlertTopic
               - Sid: EmitClassifierMetrics
                 Effect: Allow
                 Action:
@@ -603,7 +598,6 @@ ${permissionsList}
       Environment:
         Variables:
           CONFIG_PARAM: /auto-map-tagger/${mpe}/config
-          ALERT_TOPIC_ARN: !Ref AlertTopic
       Code:
         ZipFile: |
 ${LAMBDA_HANDLER_CODE}
@@ -733,10 +727,15 @@ ${LAMBDA_HANDLER_CODE}
     Type: AWS::CloudWatch::Alarm
     Properties:
       AlarmName: map-auto-tagger-dlq-${mpe}
-      AlarmDescription: >
+      AlarmDescription: !Sub >
         MAP auto-tagger events failed after 5 processing attempts and were moved
-        to the dead letter queue. Check DLQ for stranded events and investigate
-        Lambda errors. Events are retained for 14 days.
+        to the dead letter queue. Events are retained for 14 days.
+        To investigate, open CloudWatch Logs Insights in your AWS Console and
+        run this query against log group /aws/lambda/map-auto-tagger-\${MpeId}:
+        filter @message like /Permanent-actionable/
+        | parse @message "Permanent-actionable [*] *" as arn, error
+        | stats count() as failures by error
+        | sort failures desc
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
       Dimensions:

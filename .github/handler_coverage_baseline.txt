@@ -53,6 +53,7 @@ COVERED   CreateDeploymentGroup|codedeploy.amazonaws.com
 COVERED   CreateDhcpOptions
 UNCOVERED CreateDirectConnectGateway|directconnect.amazonaws.com
 UNCOVERED CreateDirectory|ds.amazonaws.com
+UNCOVERED CreateDistribution|cloudfront.amazonaws.com
 UNCOVERED CreateDocument
 COVERED   CreateDocumentClassifier
 COVERED   CreateDomain|es.amazonaws.com
