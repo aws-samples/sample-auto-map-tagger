@@ -1,6 +1,6 @@
 const SERVICE_FSX = {
     source: 'aws.fsx',
-    events: ['CreateFileSystem', 'CreateStorageVirtualMachine'],
+    events: ['CreateFileSystem', 'CreateStorageVirtualMachine', 'CreateVolume'],
     permissions: ['fsx:TagResource'],
 };
 
