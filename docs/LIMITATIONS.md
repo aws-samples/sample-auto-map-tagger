@@ -146,4 +146,6 @@ See [INSTRUCTIONS.md](INSTRUCTIONS.md) for step-by-step upgrade guidance.
 
 The daily reconciliation Lambda (introduced in v20.5.0) has been removed. The real-time tagger with SQS buffering (14-day retention, 5 retries) provides sufficient coverage. Reconciliation added risk of mass-tagging damage when SSM config was incorrect (e.g., after a scope blow-out) and provided minimal incremental value given the SQS retry guarantees.
 
-Resources that exhaust all SQS retries land in the Dead Letter Queue and trigger the SNS alert — these should be tagged manually or investigated.
+Resources that exhaust all SQS retries land in the Dead Letter Queue and trigger the SNS alert (`map-auto-tagger-dlq-<mpe>`, which fires on DLQ depth regardless of failure class) — these should be tagged manually or investigated.
+
+**Long-provisioning resources lose automatic recovery.** Without the reconciliation sweep, any resource whose provisioning exceeds the 900s retry budget (5 × 180s) is tagged only if it finishes provisioning within that window. The known case is **AWS Managed Microsoft AD**, which stays in `Creating` for 25–45 min: its tagging retries exhaust and the event lands in the DLQ. The DLQ alert still fires, but the tag does **not** land on its own — there is no longer a nightly sweep to re-tag it. Operators must redrive the DLQ (or tag the directory directly) once provisioning completes. Simple AD (5–10 min) finishes within the retry budget and is unaffected.

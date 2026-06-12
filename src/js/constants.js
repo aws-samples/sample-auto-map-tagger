@@ -1,13 +1,27 @@
         // Template version — single source of truth for the SemVer constant.
-        // Must match `TEMPLATE_VERSION = 'v21.0.7'` in map2-auto-tagger-optimized.yaml (sync-check enforces this).
-        const TEMPLATE_VERSION = 'v21.0.7';
+        // The deployable YAML and configurator.html are both generated from src/
+        // (npm run build), so this constant flows into every artifact automatically.
+        const TEMPLATE_VERSION = 'v22.0.0';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
         // (titles, buttons) go through i18n; change bullets stay in source form.
         // Tags: bugfix, coverage, breaking, security, perf, other.
-        // sync-check.py enforces that the newest entry's version matches TEMPLATE_VERSION.
+        // Keep the newest entry's version in sync with TEMPLATE_VERSION above.
         const VERSION_HISTORY = [
+            {
+                version: 'v22.0.0',
+                date: '2026-06-12',
+                changes: [
+                    { tag: 'breaking', text: 'MAJOR: Source decoupling — the deployable YAML and configurator.html are now generated from modular src/ files via npm run build (PR #89). The hand-maintained map2-auto-tagger-optimized.yaml monolith is gone; CI fails any PR whose committed artifacts are stale (PR #91). Forks that patched the YAML directly must re-apply changes against src/.' },
+                    { tag: 'breaking', text: 'Reconciliation Lambda removed (PR #95). The real-time tagger with SQS buffering (14-day retention, 5 retries) is the sole tagging path. DLQ events no longer self-heal — operators must redrive the DLQ after resolving the cause. Long-provisioning resources (notably AWS Managed Microsoft AD, 25-45 min) exhaust the 900s retry budget and require manual redrive; see LIMITATIONS.md.' },
+                    { tag: 'breaking', text: 'Edit and Upgrade configurator flows disabled (PR #97) — Upgrade reset scoped_account_ids to ["ALL"] when upgrading from pre-v22 templates; Edit was incompatible with the new !Sub-based SSM config. Day-2 account add/remove is via CloudShell update-stack-set commands (INSTRUCTIONS.md); upgrades are delete-and-redeploy.' },
+                    { tag: 'other', text: 'SSM MapConfig is now built from CFN parameters (ScopedAccountIds, ScopedVpcIds, TagNonVpcServices) via !Sub instead of baked JS template literals, so stack updates with UsePreviousValue preserve real customer scope (PR #95).' },
+                    { tag: 'other', text: 'StackSet AutoDeployment is always enabled (PR #93) — accounts joining a scoped OU automatically receive the tagger. CloudFormation stacks themselves are no longer tagged (PR #92); CFN is not on the MAP Included Services List.' },
+                    { tag: 'coverage', text: 'FSx for NetApp ONTAP volumes now tagged via CreateVolume event (PR #100). CloudFront CreateDistribution handler added (PR #96).' },
+                    { tag: 'bugfix', text: 'CT5 chaos-test fixes (PR #96): SSM config cache invalidated on fetch failure for immediate retry; delete-flow log-group guard for empty describe-log-groups; MpeId MaxLength raised 20 to 44 to match real MPE IDs (length validation removed across flows in PR #94); per-failure SNS alert flood replaced with CloudWatch Logs Insights query in the DLQ alarm description.' },
+                ],
+            },
             {
                 version: 'v21.0.7',
                 date: '2026-05-01',

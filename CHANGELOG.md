@@ -4,6 +4,38 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ---
 
+## v22 — Decoupled Build + Simplified Recovery Model
+
+### v22.0.0 — 2026-06-12
+
+MAJOR. Retroactive release covering PRs #89–#100 (merged 2026-05-06 through 2026-05-22). Three breaking changes; customers should regenerate `deploy.sh` from the configurator and read the upgrade notes below.
+
+**Breaking:**
+
+- **Source decoupling (PR #89, #91).** The repository no longer carries a hand-maintained `map2-auto-tagger-optimized.yaml` monolith. The deployable YAML and `configurator.html` are generated from modular sources (`src/js/services/*.js`, `src/js/deploy/template-*.js`, `src/templates/lambda-handler.py`) via `npm run build`. CI rebuilds from `src/` on every PR and fails if committed artifacts are stale. Forks that patched the YAML directly must re-apply changes against `src/`. Eliminates the YAML/configurator drift class (F012) by construction. Developer guide: `docs/DEVELOPMENT.md`.
+- **Reconciliation Lambda removed (PR #95).** The nightly reconciliation sweep (introduced v20.5.0) is gone — the real-time tagger with SQS buffering (14-day retention, 5 retries × 180s) is the sole tagging path. Rationale: reconciliation risked mass-tagging damage when SSM config was wrong (e.g., after a scope blow-out) for minimal incremental value. **Operational consequence: DLQ events no longer self-heal.** Resources whose provisioning exceeds the 900s retry budget — notably AWS Managed Microsoft AD (25–45 min in `Creating`) — exhaust retries into the DLQ and must be redriven manually once provisioning completes. The DLQ alarm still fires. See LIMITATIONS.md "Long-provisioning resources."
+- **Edit and Upgrade configurator flows disabled (PR #97, #98, #99).** Both had critical bugs: Upgrade reset `scoped_account_ids` to `["ALL"]` when upgrading from templates that predate the new CFN parameters; Edit's sed-on-template approach is incompatible with the `!Sub`-based SSM config. Day-2 account add/remove is now done via CloudShell `update-stack-set` parameter updates (single-line commands in INSTRUCTIONS.md). Template upgrades are delete-and-redeploy.
+
+**Changed:**
+
+- **SSM MapConfig built from CFN parameters (PR #95).** `ScopedAccountIds`, `ScopedVpcIds`, and `TagNonVpcServices` are now CFN parameters referenced via `!Sub`, replacing values baked in by JS template literals. Stack updates with `UsePreviousValue=true` preserve the customer's real scope instead of overwriting it with placeholders.
+- **AutoDeployment always enabled (PR #93).** StackSet auto-deployment is unconditional — accounts joining a scoped OU automatically receive the tagger. Supersedes the v20.2.0 conditional (ALL-scope-only) behavior.
+- **CloudFormation stacks no longer tagged (PR #92).** CFN is not on the MAP Included Services List; tagging stacks created confusion about credit-earning resources. Also replaced `MAP_Included_Services_List.pdf` with maintainable `docs/MAP_included.md`.
+- **MPE ID length limit removed (PR #94, #96).** Validation caps removed across configurator flows and locales; CFN `MpeId` `MaxLength` raised 20 → 44. Real production MPE IDs exceeded the old limit and were silently rejected.
+
+**Added:**
+
+- **FSx for NetApp ONTAP volume tagging (PR #100).** `CreateVolume` event added to the FSx handler — ONTAP volumes are tagged, not just filesystems.
+- **CloudFront `CreateDistribution` handler (PR #96).** Extracts the distribution ARN via the case-insensitive `aRN` key in CloudTrail responseElements.
+
+**Fixed (PR #96, CT5 chaos-test findings — 708 tests, 25 phases):**
+
+- SSM config cache invalidated on fetch failure, so the next invocation retries immediately instead of serving the failure for the 60s TTL (CB4).
+- Delete-flow log-group guard: no more non-zero exit when `describe-log-groups` returns empty (CB1).
+- Per-failure SNS publish removed (alert floods during burst failures); investigation now via the CloudWatch Logs Insights query embedded in the DLQ alarm description.
+
+---
+
 ## v21.0.7 — 2026-05-01
 
 PATCH. Two correctness fixes for VPC-scope and StackSet cross-region deployments.

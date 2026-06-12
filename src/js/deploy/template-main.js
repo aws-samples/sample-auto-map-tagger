@@ -729,13 +729,19 @@ ${LAMBDA_HANDLER_CODE}
       AlarmName: map-auto-tagger-dlq-${mpe}
       AlarmDescription: !Sub >
         MAP auto-tagger events failed after 5 processing attempts and were moved
-        to the dead letter queue. Events are retained for 14 days.
+        to the dead letter queue. Events are retained for 14 days. DLQ'd events
+        do not auto-recover (the reconciliation sweep was removed in v21) and
+        must be re-tagged manually via DLQ redrive once the cause is resolved.
+        Two failure classes land here: permanent-actionable (IAM drift, unhandled
+        resource type) and transient-exhaustion (resource still provisioning past
+        the 900s retry budget, e.g. MS AD directories that take 25-45 min).
         To investigate, open CloudWatch Logs Insights in your AWS Console and
         run this query against log group /aws/lambda/map-auto-tagger-\${MpeId}:
-        filter @message like /Permanent-actionable/
-        | parse @message "Permanent-actionable [*] *" as arn, error
-        | stats count() as failures by error
-        | sort failures desc
+        filter @message like /Permanent-actionable/ or @message like /will retry via SQS/
+        | parse @message "Permanent-actionable [*] *" as pa_arn, pa_error
+        | parse @message "Transient [*] *" as tr_arn, tr_error
+        | sort @timestamp desc
+        | display @timestamp, pa_arn, pa_error, tr_arn, tr_error
       Namespace: AWS/SQS
       MetricName: ApproximateNumberOfMessagesVisible
       Dimensions:
