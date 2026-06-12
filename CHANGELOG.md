@@ -34,6 +34,10 @@ MAJOR. Retroactive release covering PRs #89–#100 (merged 2026-05-06 through 20
 - Delete-flow log-group guard: no more non-zero exit when `describe-log-groups` returns empty (CB1).
 - Per-failure SNS publish removed (alert floods during burst failures); investigation now via the CloudWatch Logs Insights query embedded in the DLQ alarm description.
 
+**Fixed (PR #102, caught by the 2026-06-12 E2E run):**
+
+- **Kinesis silent tag loss — CloudTrail resources-array ARN validation.** AWS began populating a `resources` array on Kinesis `CreateStream` events with a malformed ARN (stream name in the account-ID field, literal `null` as the resource name). The generic resources-array scan in `extract_arn()` trusted it verbatim, so every Kinesis Data Stream failed `AddTagsToStream` with ResourceNotFoundException and was classified permanent-ignorable — a silent MAP tag loss with no DLQ entry and no alert. New `_is_wellformed_arn()` gate rejects structurally invalid ARNs (account field must be empty or 12 digits; resource part must not be `null`) so malformed entries fall through to the dedicated per-service handlers. Keyspaces (the original consumer of the resources-array path) is unaffected. Live-verified on the E2E account. This was an AWS-side event-shape change, not a regression — May-era events carried `resources: null`.
+
 ---
 
 ## v21.0.7 — 2026-05-01
