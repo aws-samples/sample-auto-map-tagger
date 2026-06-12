@@ -1856,9 +1856,11 @@ _TRANSIENT_MARKERS = (
     # transient retries through SQS redelivery (5 × 180s = 900s),
     # which succeeds for Simple AD within the retry budget. MS AD
     # provisioning exceeds 900s; its retries exhaust into
-    # EventDLQ without false SNS alert noise, and the
-    # ReconciliationFunction catches the tag on the next nightly
-    # sweep. (§1.98)
+    # EventDLQ, where DLQAlarm raises the SNS alert (the alarm
+    # fires on DLQ depth regardless of failure class). The
+    # reconciliation Lambda that used to re-tag these on a nightly
+    # sweep was removed in v21 — a DLQ'd MS AD directory must now
+    # be re-tagged manually (DLQ redrive or direct tag). (§1.98)
     'Directory Status: Creating',
     'not supported for directories in this state',
     # S3 409: concurrent CreateBucket/PutBucketTagging or in-flight
@@ -2069,8 +2071,9 @@ def handler(event, context):
 
     # Backwards compatibility: if the Lambda is invoked directly
     # with a raw EventBridge event (no SQS envelope), process it
-    # once. Used by ReconciliationFunction re-enqueue test paths
-    # and local smoke tests.
+    # once. Used by manual DLQ-redrive re-enqueue and local smoke
+    # tests. (The reconciliation Lambda that formerly drove this
+    # path was removed in v21.)
     if not records:
         status, _ = _process_event(event, config)
         return {'status': status}
