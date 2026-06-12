@@ -186,7 +186,11 @@ def create(
             OnFailure="DELETE",
         )
         cfn_arn = f"arn:aws:cloudformation:{region}:{account}:stack/{cfn_stack_name}/"
-        rec(cfn_arn, "cloudformation", cfn_stack_name)
+        # taggable=False: PR #92 removed CFN stack tagging (stacks are not
+        # MAP-eligible). The stack stays in the manifest so teardown deletes
+        # it and so the bucket born inside it (tagged via CreateBucket from
+        # the stack template) still exercises the CFN-origin event path.
+        rec(cfn_arn, "cloudformation", cfn_stack_name, taggable=False)
         log.info("CloudFormation stack: %s", cfn_stack_name)
     except Exception as exc:
         log.error("CloudFormation stack creation failed: %s", exc)

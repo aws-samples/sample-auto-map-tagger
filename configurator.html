@@ -7336,6 +7336,25 @@ ${permissionsList}
               return arns or None
           
           
+          def _is_wellformed_arn(arn):
+              """Reject structurally invalid ARNs from CloudTrail resources arrays.
+          
+              The account field (parts[4]) must be empty (global services like S3)
+              or a 12-digit account ID, and the resource part must not be the
+              literal string 'null' (JSON null serialized into the ARN).
+              """
+              parts = arn.split(':', 5)
+              if len(parts) != 6:
+                  return False
+              account = parts[4]
+              if account and not (account.isdigit() and len(account) == 12):
+                  return False
+              resource = parts[5]
+              if resource == 'null' or resource.endswith('/null') or resource.endswith(':null'):
+                  return False
+              return True
+          
+          
           def extract_arn(detail, account_id, region):
               event_name = detail.get('eventName', '')
               event_source = detail.get('eventSource', '')
@@ -7520,11 +7539,18 @@ ${permissionsList}
           
               # Check resources array (used by some services like Keyspaces)
               # Skip catalog ARNs for Glue (use database ARN instead)
+              # Validate shape before trusting: AWS occasionally ships malformed
+              # resources-array ARNs. Live case (2026-06): Kinesis CreateStream
+              # events gained a resources array with the stream name in the
+              # account-ID field and literal 'null' as the resource name
+              # (arn:aws:kinesis:<region>:<streamName>:stream/null) — taking it
+              # verbatim made every Kinesis stream a silent tag loss. A malformed
+              # entry falls through to the dedicated per-service handlers below.
               if resources and len(resources) > 0:
                   for resource in resources:
                       arn = resource.get('ARN')
                       # Skip Glue catalog ARNs - we want the database/table ARN
-                      if arn and ':catalog' not in arn:
+                      if arn and ':catalog' not in arn and _is_wellformed_arn(arn):
                           return arn
           
               # Construct ARNs for specific services
