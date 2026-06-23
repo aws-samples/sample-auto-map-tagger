@@ -157,7 +157,7 @@
                         <label><span data-i18n="ui_deployment_regions">Deployment Regions</span> <span class="hint" data-i18n="ui_deployment_regions_hint">(regions where the customer creates resources)</span></label>
                         <div id="singleRegionList">
                             <div class="entry-row">
-                                <select class="region-select">
+                                <select class="region-select" onchange="updateUsEast1Warning()">
                                     <option value="">Select a region...</option>
                                     <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
                                     <option value="us-east-2">US East (Ohio) — us-east-2</option>
@@ -198,6 +198,7 @@
                             </div>
                         </div>
                         <button class="btn-add" onclick="addSingleRegion()" data-i18n="ui_add_region">+ Add another region</button>
+                        <div class="warn-box" id="single-no-useast1-warn" style="margin-top:8px;font-size:12px;display:none;" data-i18n="warn_no_us_east_1_global"></div>
                     </div>
                     <div class="section-divider"></div>
                     <div class="form-group">
@@ -277,7 +278,7 @@
                         <label><span data-i18n="ui_deployment_regions">Deployment Regions</span> <span class="hint" data-i18n="ui_deployment_regions_hint">(regions where the customer creates resources)</span></label>
                         <div id="regionList">
                             <div class="entry-row">
-                                <select class="region-select">
+                                <select class="region-select" onchange="updateUsEast1Warning()">
                                     <option value="">Select a region...</option>
                                     <option value="us-east-1">US East (N. Virginia) — us-east-1</option>
                                     <option value="us-east-2">US East (Ohio) — us-east-2</option>
@@ -318,6 +319,7 @@
                             </div>
                         </div>
                         <button class="btn-add" onclick="addRegion()" data-i18n="ui_add_region">+ Add another region</button>
+                        <div class="warn-box" id="multi-no-useast1-warn" style="margin-top:8px;font-size:12px;display:none;" data-i18n="warn_no_us_east_1_global"></div>
                     </div>
                 </div>
             </div>

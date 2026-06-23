@@ -35,6 +35,7 @@
             document.getElementById('multi-account-options').classList.toggle('hidden', mode !== 'multi');
             document.getElementById('single-account-options').classList.toggle('hidden', mode !== 'single');
             document.getElementById('prereq-multi').style.display = mode === 'multi' ? 'block' : 'none';
+            updateUsEast1Warning();
         }
 
         function toggleVpcScope() {
@@ -134,10 +135,12 @@
             const btn = document.createElement('button');
             btn.className = 'btn-remove'; btn.title = 'Remove'; btn.onclick = function(){ removeEntry(this); };
             btn.textContent = '×';
+            select.addEventListener('change', updateUsEast1Warning);
             const row = document.createElement('div');
             row.className = 'entry-row';
             row.appendChild(select); row.appendChild(btn);
             list.appendChild(row);
+            updateUsEast1Warning();
         }
 
         function addSingleRegion() {
@@ -154,19 +157,36 @@
             const btn = document.createElement('button');
             btn.className = 'btn-remove'; btn.title = 'Remove'; btn.onclick = function(){ removeEntry(this); };
             btn.textContent = '×';
+            select.addEventListener('change', updateUsEast1Warning);
             const row = document.createElement('div');
             row.className = 'entry-row';
             row.appendChild(select); row.appendChild(btn);
             list.appendChild(row);
+            updateUsEast1Warning();
         }
 
         function removeEntry(btn) {
             const list = btn.parentElement.parentElement;
             if (list.children.length > 1) btn.parentElement.remove();
+            updateUsEast1Warning();
         }
 
         function getValues(selector) {
             return Array.from(document.querySelectorAll(selector)).map(i => i.value.trim()).filter(v => v);
+        }
+
+        // Advisory only — we do NOT force us-east-1. Global services (CloudFront,
+        // Route 53, Global Accelerator, etc.) only emit CloudTrail events in
+        // us-east-1, so they go untagged unless that region is deployed. Warn when
+        // the user has picked regions but omitted us-east-1.
+        function updateUsEast1Warning() {
+            const toggle = (warnId, regions) => {
+                const el = document.getElementById(warnId);
+                if (!el) return;
+                el.style.display = (regions.length > 0 && !regions.includes('us-east-1')) ? 'block' : 'none';
+            };
+            toggle('single-no-useast1-warn', getValues('#singleRegionList .region-select'));
+            toggle('multi-no-useast1-warn', getValues('#regionList .region-select'));
         }
 
 
