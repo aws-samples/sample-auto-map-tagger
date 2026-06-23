@@ -416,7 +416,7 @@ if [ "$FORCE" = "--force" ]; then
 fi
 
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-BUCKET="auto-map-tagger-\${ACCOUNT}"
+BUCKET="auto-map-tagger-\${ACCOUNT}-\${REGION}"
 
 # ── Step 1: Enumerate deployments ────────────────────────────
 echo "Step 1: Scanning for MAP Auto-Tagger deployments..."
