@@ -4,6 +4,21 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ---
 
+## Unreleased
+
+**Fixed:**
+
+- **Multi-region single-account deploy no longer collides on the staging bucket.** The S3 template-staging bucket was named `auto-map-tagger-{account-id}` (account only). Because the generated template exceeds the 50 KB inline limit, every deploy stages through S3, and a single-account deploy to 2+ regions had the second region's `head-bucket` find the first region's bucket, mismatch on location, and hard-fail that region (`DEPLOY_STATUS=FAILED`). The bucket name is now region-qualified — `auto-map-tagger-{account-id}-{region}` — across `deploy.sh`, `delete.sh`, and the editor/upgrade script, so each region stages independently. Reported by a partner (Megazone) internal test.
+  - **Back-compat:** a bucket created by a pre-fix deploy is named without the `-{region}` suffix; the new `delete.sh`/upgrade script looks for the region-qualified name and will not auto-remove the old one. Delete the stale `auto-map-tagger-{account-id}` bucket manually (it is idle once templates upload under the new name). No dual-scheme delete logic was added (most deploys are fresh).
+  - On a single-account multi-region deploy failure, the EXIT-trap cleanup removes only the last region's staging bucket (unchanged single-bucket behavior in spirit).
+
+**Added:**
+
+- **us-east-1 advisory warning in the configurator.** When the selected deploy regions omit `us-east-1`, a non-blocking warning notes that global services (CloudFront, Route 53, Global Accelerator, Network Firewall, Direct Connect, App Mesh, Cloud Map) only emit CloudTrail events in us-east-1 and will go untagged. We do **not** force us-east-1 — this is guidance only. Localized across all 7 UI languages.
+- **Regression test** (`tests/unit/deploy-script.test.js`) asserting the generated deploy script's staging-bucket name is region-qualified, locking in the multi-region fix.
+
+---
+
 ## v22 — Decoupled Build + Simplified Recovery Model
 
 ### v22.0.0 — 2026-06-12

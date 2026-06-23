@@ -380,7 +380,7 @@ echo "  ── \$REGION ──────────────────�
 
 TEMPLATE_SIZE=\$(wc -c < "\$TEMPLATE")
 if [ "\$TEMPLATE_SIZE" -gt 51200 ]; then
-    BUCKET="auto-map-tagger-\${ACCT}"
+    BUCKET="auto-map-tagger-\${ACCT}-\${REGION}"
     if aws s3api head-bucket --bucket "\${BUCKET}" 2>/dev/null; then
         ACTUAL_LOC=\$(aws s3api get-bucket-location --bucket "\${BUCKET}" --query LocationConstraint --output text 2>/dev/null)
         [ "\$ACTUAL_LOC" = "None" ] || [ "\$ACTUAL_LOC" = "null" ] && ACTUAL_LOC="us-east-1"
@@ -554,7 +554,7 @@ REGION="${region}"
 # on a one-element region list.
 REGIONS="\$REGION"
 ACCOUNT=\$(aws sts get-caller-identity --query Account --output text)
-BUCKET="auto-map-tagger-\${ACCOUNT}"
+BUCKET="auto-map-tagger-\${ACCOUNT}-\${REGION}"
 STACK_NAME="map-auto-tagger-${mpe}"
 CUSTOMER=${customerDisplay}
 REPORT_FILE="${reportFile}"
