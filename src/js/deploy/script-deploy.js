@@ -381,7 +381,7 @@ echo "  ── \$REGION ──────────────────�
 TEMPLATE_SIZE=\$(wc -c < "\$TEMPLATE")
 if [ "\$TEMPLATE_SIZE" -gt 51200 ]; then
     BUCKET="auto-map-tagger-\${ACCT}-\${REGION}"
-    if aws s3api head-bucket --bucket "\${BUCKET}" 2>/dev/null; then
+    if aws s3api head-bucket --bucket "\${BUCKET}" > /dev/null 2>&1; then
         ACTUAL_LOC=\$(aws s3api get-bucket-location --bucket "\${BUCKET}" --query LocationConstraint --output text 2>/dev/null)
         [ "\$ACTUAL_LOC" = "None" ] || [ "\$ACTUAL_LOC" = "null" ] && ACTUAL_LOC="us-east-1"
         if [ "\$ACTUAL_LOC" != "\$REGION" ]; then
@@ -427,16 +427,14 @@ elif [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
       --region "\$REGION" > /dev/null
     aws cloudformation wait stack-create-complete --stack-name "\$STACK_NAME" --region "\$REGION"
 else
-    echo "  ⚠️  Stack \$STACK_NAME already exists (status: \$STACK_STATUS)."
-    echo "     Updating in-place. Resources not in the new template will be deleted by CFN."
-    UPDATE_OUT=\$(aws cloudformation update-stack \\
-      --stack-name "\$STACK_NAME" \\
-      \$TEMPLATE_REF \\
-      --capabilities CAPABILITY_NAMED_IAM \\
-      --region "\$REGION" 2>&1) || true
-    if ! echo "\$UPDATE_OUT" | grep -q "No updates are to be performed"; then
-      aws cloudformation wait stack-update-complete --stack-name "\$STACK_NAME" --region "\$REGION" 2>/dev/null || true
-    fi
+    echo "  ❌ Stack \$STACK_NAME already exists (status: \$STACK_STATUS)."
+    echo "     deploy.sh does not modify existing stacks — an in-place update here"
+    echo "     would reset scope configuration (scoped accounts / VPCs) to defaults."
+    echo "     To upgrade an existing deployment to the latest template version,"
+    echo "     generate and run upgrade.sh from configurator.html"
+    echo "     (\"Update to latest template version\")."
+    DEPLOY_STATUS="REFUSED — stack exists; use the Update flow (upgrade.sh)"
+    exit 1
 fi
 
 echo "  ✅ \$REGION"
@@ -874,7 +872,7 @@ cat > "\$ACCOUNTS_TEMPLATE" << 'ACCOUNTS_TEMPLATE_EOF'
 ${accountsTpl}
 ACCOUNTS_TEMPLATE_EOF
 
-if aws s3api head-bucket --bucket "\${BUCKET}" 2>/dev/null; then
+if aws s3api head-bucket --bucket "\${BUCKET}" > /dev/null 2>&1; then
     ACTUAL_LOC=\$(aws s3api get-bucket-location --bucket "\${BUCKET}" --query LocationConstraint --output text 2>/dev/null)
     [ "\$ACTUAL_LOC" = "None" ] || [ "\$ACTUAL_LOC" = "null" ] && ACTUAL_LOC="us-east-1"
     if [ "\$ACTUAL_LOC" != "\$REGION" ]; then
@@ -920,12 +918,13 @@ elif [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
       --capabilities CAPABILITY_NAMED_IAM \\
       --region "\$REGION" > /dev/null
 else
-    aws cloudformation update-stack \\
-      --stack-name "\$STACK_NAME" \\
-      --template-url "\$ORG_TEMPLATE_URL" \\
-      --parameters "\$ORG_PARAMS" \\
-      --capabilities CAPABILITY_NAMED_IAM \\
-      --region "\$REGION" > /dev/null 2>&1 || true
+    echo "  ❌ Stack \$STACK_NAME already exists (status: \$STACK_STATUS)."
+    echo "     deploy.sh does not modify existing stacks — an in-place update here"
+    echo "     would reset scope configuration (scoped accounts / VPCs) to defaults."
+    echo "     To upgrade an existing deployment to the latest template version,"
+    echo "     generate and run upgrade.sh from configurator.html"
+    echo "     (\"Update to latest template version\")."
+    exit 1
 fi
 
 echo "  ${t('d_deploying')}"
