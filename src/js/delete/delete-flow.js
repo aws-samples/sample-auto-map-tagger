@@ -280,7 +280,7 @@ done
 # ── Step 3: S3 staging bucket (auto-decide) ─────────────────
 echo "Step 3: Checking S3 staging bucket..."
 BUCKET="auto-map-tagger-\${ACCOUNT}-\${REGION}"
-if ! aws s3api head-bucket --bucket "\$BUCKET" 2>/dev/null; then
+if ! aws s3api head-bucket --bucket "\$BUCKET" > /dev/null 2>&1; then
     echo "  Bucket \$BUCKET not found — nothing to delete."
 else
     REMAINING_SS=\$(aws cloudformation list-stack-sets --region "\$REGION" --status ACTIVE --query "Summaries[?starts_with(StackSetName, 'map-auto-tagger-mig')].StackSetName" --output text 2>/dev/null)
