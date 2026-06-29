@@ -167,6 +167,7 @@ const en_translations = {
             ui_ustep2:'2. Review',
             ui_ustep3:'3. Download',
             ui_update_info:'This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>upgrade.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.',
+            ui_update_changeset_note:'Before applying anything, upgrade.sh creates a CloudFormation change-set and shows exactly which resources will change (Lambda code, IAM, EventBridge) — your scope configuration is preserved, not reset. You confirm before it executes. For non-interactive use (CloudShell batch), run with --auto-approve. StackSets show a dry-run summary instead, since CloudFormation change-sets are not supported for StackSets.',
             ui_update_step1_title:'Deployment Details',
             ui_update_step1_subtitle:'Enter the region and optional scope for the upgrade',
             ui_update_info_detail:'The generated <code>upgrade.sh</code> reads the current template version from SSM Parameter Store (<code>/auto-map-tagger/&lt;mpe&gt;/version</code>), compares it to the target version, and refuses cross-major upgrades (e.g. v19 → v21) without <code>--force</code>. Customer action is only required for MAJOR bumps per SemVer.',

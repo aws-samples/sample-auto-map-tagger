@@ -399,7 +399,19 @@ set -e
 TARGET_VERSION="${TEMPLATE_VERSION}"
 REGION="${region}"
 SCOPE_MPES=(${mpeListShell})
-FORCE="\${1:-}"
+
+# Parse flags in any order:
+#   --force         bypass the SemVer guard AND the pre-#95 scope guard
+#   --auto-approve  skip the interactive change-set confirmation prompt
+#                   (required for non-interactive / CloudShell-batch use)
+FORCE=""
+AUTO_APPROVE=""
+for ARG in "\$@"; do
+    case "$ARG" in
+        --force) FORCE="--force" ;;
+        --auto-approve) AUTO_APPROVE="yes" ;;
+    esac
+done
 
 echo ""
 echo "  ┌──────────────────────────────────────────────────────┐"
@@ -411,9 +423,63 @@ echo "  └───────────────────────
 echo ""
 
 if [ "$FORCE" = "--force" ]; then
-    echo "  ⚠️  --force flag set — version guard will not block cross-major / downgrade."
+    echo "  ⚠️  --force flag set — bypasses BOTH the version guard (cross-major / downgrade)"
+    echo "      AND the pre-#95 scope guard (scope WILL be lost on legacy stacks). Use with care."
     echo ""
 fi
+
+# ── Helper: interactive confirmation gate ──────────────────────
+# Honors --auto-approve; refuses to proceed silently in a non-interactive
+# shell unless --auto-approve was explicitly passed.
+confirm_or_abort() {
+    if [ "$AUTO_APPROVE" = "yes" ]; then
+        echo "  --auto-approve set — proceeding without prompt."
+        return 0
+    fi
+    if [ ! -t 0 ]; then
+        echo "  ❌ Non-interactive shell and no --auto-approve flag. Aborting for safety."
+        return 1
+    fi
+    read -r -p "  \$1 [y/N] " REPLY
+    case "$REPLY" in
+        [yY]|[yY][eE][sS]) return 0 ;;
+        *) echo "  Aborted by operator."; return 1 ;;
+    esac
+}
+
+# ── Helper: stage a template to S3 and set STAGED_TEMPLATE_URL ──
+# create-change-set's --template-body is capped at 51,200 bytes (our template
+# is ~146KB), so the change-set path must use --template-url. Mirrors deploy.sh's
+# staging bucket (auto-map-tagger-<account>-<region>): create if absent, lock
+# down public access, enforce TLS, then upload. \$1 = local template path.
+STAGED_TEMPLATE_URL=""
+stage_template_to_s3() {
+    local SRC="\$1"
+    if aws s3api head-bucket --bucket "$BUCKET" > /dev/null 2>&1; then
+        local LOC
+        LOC=$(aws s3api get-bucket-location --bucket "$BUCKET" --query LocationConstraint --output text 2>/dev/null)
+        { [ "$LOC" = "None" ] || [ "$LOC" = "null" ]; } && LOC="us-east-1"
+        if [ "$LOC" != "$REGION" ]; then
+            echo "  ❌ Staging bucket $BUCKET exists in $LOC, not $REGION."
+            return 1
+        fi
+    else
+        aws s3 mb "s3://$BUCKET" --region "$REGION" > /dev/null 2>&1 || { echo "  ❌ Could not create staging bucket $BUCKET."; return 1; }
+    fi
+    local i
+    for i in 1 2 3 4 5; do
+        aws s3api put-public-access-block --bucket "$BUCKET" --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" > /dev/null 2>&1 && break
+        sleep 2
+    done
+    aws s3api put-bucket-encryption --bucket "$BUCKET" --server-side-encryption-configuration '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}' > /dev/null 2>&1 || true
+    local POL
+    POL=$(printf '{"Version":"2012-10-17","Statement":[{"Sid":"DenyHTTP","Effect":"Deny","Principal":"*","Action":"s3:*","Resource":["arn:aws:s3:::%s","arn:aws:s3:::%s/*"],"Condition":{"Bool":{"aws:SecureTransport":"false"}}}]}' "$BUCKET" "$BUCKET")
+    aws s3api put-bucket-policy --bucket "$BUCKET" --policy "$POL" > /dev/null 2>&1 || true
+    local KEY="map-upgrade-\${MPE}-\$(date +%s).yaml"
+    aws s3 cp "$SRC" "s3://$BUCKET/$KEY" > /dev/null 2>&1 || { echo "  ❌ Could not upload template to s3://$BUCKET/$KEY."; return 1; }
+    STAGED_TEMPLATE_URL="https://$BUCKET.s3.$REGION.amazonaws.com/$KEY"
+    return 0
+}
 
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 BUCKET="auto-map-tagger-\${ACCOUNT}-\${REGION}"
@@ -596,12 +662,46 @@ upgrade_one() {
         rm -f "$TMPL"
         return 1
     fi
+
+    # ── Pre-#95 boundary guard ─────────────────────────────────
+    # Stacks deployed before the scope-parameter refactor (PR #95) have NO
+    # ScopedAccountIds parameter — scope was baked as a literal in the SSM
+    # config. The new template introduces ScopedAccountIds; CFN cannot carry
+    # forward a value that never existed, so it would take the new template's
+    # default (["ALL"]) and silently blow the customer's scope wide open.
+    # Refuse in-place upgrade for these; delete + redeploy is the only safe path.
+    if ! echo "$PARAM_KEYS" | grep -qw "ScopedAccountIds"; then
+        echo "  ❌ Pre-#95 deployment detected — this stack has no ScopedAccountIds parameter."
+        echo "     An in-place upgrade would RESET scope to [\\"ALL\\"] (the new template default),"
+        echo "     because the legacy stack baked scope into config with no parameter to carry"
+        echo "     forward. This is a scope blow-out risk, not a version issue."
+        echo "     Safe path: delete this deployment and redeploy at the target version,"
+        echo "     re-entering the same account/VPC scope (see docs/LIMITATIONS.md)."
+        if [ "$FORCE" != "--force" ]; then
+            rm -f "$TMPL"
+            return 1
+        fi
+        echo "     --force set — proceeding anyway; scope WILL be lost. You have been warned."
+    fi
+
     local PREV_PARAMS=""
     for K in $PARAM_KEYS; do
         PREV_PARAMS="$PREV_PARAMS ParameterKey=$K,UsePreviousValue=true"
     done
 
     if [ "$KIND" = "stackset" ]; then
+        # StackSets have NO change-set API. Show a dry-run summary and require
+        # confirmation before the (irreversible) rollout begins.
+        echo "  StackSet update preview (StackSets do not support change-sets):"
+        echo "    Target template version : $TARGET_VERSION"
+        echo "    Template variant        : $([ "$HAS_BACKFILL" = "true" ] && echo with-backfill || echo no-backfill)"
+        echo "    Parameters preserved    : $PARAM_KEYS"
+        echo "    Affected accounts:"
+        aws cloudformation list-stack-instances --region "$REGION" --stack-set-name "$NAME" --query "Summaries[].[Account,Region,Status]" --output table 2>/dev/null || true
+        if ! confirm_or_abort "Roll out this StackSet update to all listed accounts?"; then
+            rm -f "$TMPL"
+            return 1
+        fi
         echo "  Pushing StackSet update (parallel rollout, 100% tolerance)..."
         local OUT
         OUT=$(aws cloudformation update-stack-set \\
@@ -644,19 +744,48 @@ upgrade_one() {
             return 1
         fi
     else
-        echo "  Pushing Stack update..."
-        local OUT
-        OUT=$(aws cloudformation update-stack \\
-            --region "$REGION" \\
-            --stack-name "$NAME" \\
-            --template-body "file://$TMPL" \\
+        # Single stack: create a change-set so the operator sees exactly what
+        # will change (Lambda code / IAM / EventBridge) BEFORE anything is
+        # applied. --parameters $PREV_PARAMS keeps scope via UsePreviousValue;
+        # dropping it would let scope fall to the template default — do not.
+        #
+        # create-change-set's --template-body is capped at 51,200 bytes inline
+        # (stricter than update-stack, which the CLI auto-uploads). Our template
+        # is ~146KB, so we MUST stage it to S3 and pass --template-url.
+        if ! stage_template_to_s3 "$TMPL"; then
+            echo "  ❌ Could not stage template to S3 for change-set. Aborting."
+            rm -f "$TMPL"
+            return 1
+        fi
+        local CS_NAME="map-upgrade-\$(date +%Y%m%d%H%M%S)"
+        aws cloudformation create-change-set \\
+            --region "$REGION" --stack-name "$NAME" \\
+            --change-set-name "$CS_NAME" --change-set-type UPDATE \\
+            --template-url "$STAGED_TEMPLATE_URL" \\
             --parameters $PREV_PARAMS \\
-            --capabilities CAPABILITY_NAMED_IAM \\
-            2>&1) || true
+            --capabilities CAPABILITY_NAMED_IAM > /dev/null 2>&1 || true
 
-        if echo "$OUT" | grep -q "No updates"; then
-            echo "  ✅ Stack already matches target template. SSM version will be refreshed."
-        elif echo "$OUT" | grep -q "StackId"; then
+        # The waiter exits non-zero when the change-set is empty ("no changes").
+        # Tolerate that under set -e and branch on the actual status/reason.
+        aws cloudformation wait change-set-create-complete \\
+            --region "$REGION" --stack-name "$NAME" --change-set-name "$CS_NAME" > /dev/null 2>&1 || true
+        local CS_STATUS CS_REASON
+        CS_STATUS=$(aws cloudformation describe-change-set --region "$REGION" --stack-name "$NAME" --change-set-name "$CS_NAME" --query "Status" --output text 2>/dev/null || echo "UNKNOWN")
+        CS_REASON=$(aws cloudformation describe-change-set --region "$REGION" --stack-name "$NAME" --change-set-name "$CS_NAME" --query "StatusReason" --output text 2>/dev/null || echo "")
+
+        if [ "$CS_STATUS" = "FAILED" ] && echo "$CS_REASON" | grep -qiE "didn't contain changes|No updates|submitted information"; then
+            echo "  ✅ Stack already matches target template — no changes. SSM version will be refreshed."
+            aws cloudformation delete-change-set --region "$REGION" --stack-name "$NAME" --change-set-name "$CS_NAME" > /dev/null 2>&1 || true
+        elif [ "$CS_STATUS" = "CREATE_COMPLETE" ]; then
+            echo "  Change-set preview — the following resources will change:"
+            aws cloudformation describe-change-set --region "$REGION" --stack-name "$NAME" --change-set-name "$CS_NAME" --query "Changes[].ResourceChange.{Action:Action,Type:ResourceType,LogicalId:LogicalResourceId,Replacement:Replacement}" --output table 2>/dev/null || true
+            echo "  Parameters preserved (UsePreviousValue): $PARAM_KEYS"
+            if ! confirm_or_abort "Execute this change-set on $NAME?"; then
+                aws cloudformation delete-change-set --region "$REGION" --stack-name "$NAME" --change-set-name "$CS_NAME" > /dev/null 2>&1 || true
+                rm -f "$TMPL"
+                return 1
+            fi
+            aws cloudformation execute-change-set --region "$REGION" --stack-name "$NAME" --change-set-name "$CS_NAME" > /dev/null
             echo "  Stack update initiated. Waiting (up to 30 min)..."
             aws cloudformation wait stack-update-complete --region "$REGION" --stack-name "$NAME" || {
                 echo "  ❌ Stack update failed."
@@ -666,7 +795,8 @@ upgrade_one() {
             }
             echo "  ✅ Stack upgrade complete."
         else
-            echo "  $OUT"
+            echo "  ❌ Could not create change-set (status: $CS_STATUS). $CS_REASON"
+            aws cloudformation delete-change-set --region "$REGION" --stack-name "$NAME" --change-set-name "$CS_NAME" > /dev/null 2>&1 || true
             rm -f "$TMPL"
             return 1
         fi
