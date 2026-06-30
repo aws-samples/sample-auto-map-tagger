@@ -77,25 +77,25 @@ There is no automatic detection or sidecar deploy for this case — selecting wh
 
 ## Unsupported MAP-eligible services (handler gap)
 
-The services below appear on the MAP Included Services List but are **not** yet handled by this Lambda. Resources created in these services during the MAP period will not be auto-tagged and must be tagged by another means.
+The services below appear on the MAP Included Services List (edition **18 June 2026**) but are **not** yet handled by this Lambda. Resources created in these services during the MAP period will not be auto-tagged and must be tagged by another means.
 
-**Tier 2 — vertical-specific, deferred until customer demand:**
+This list was last reconciled against the canonical list on **2026-06-30**. The previously-listed Tier 2/Tier 3 gaps (Mainframe Modernization, HealthImaging, FinSpace, Resilience Hub, Omics, Payment Cryptography, Cloud WAN, Aurora DSQL, Bedrock AgentCore, WorkSpaces Core Managed Instances) have since shipped handlers and IAM grants and are now covered — see [COVERAGE.md](COVERAGE.md).
 
-- AWS Mainframe Modernization (M2)
-- AWS HealthImaging
-- Amazon FinSpace
-- AWS Resilience Hub
-- Amazon Omics
-- AWS Payment Cryptography
+**Recently added to the list, no handler yet:**
 
-**Tier 3 — newer services with low current adoption:**
+- **AWS End User Messaging** (`AmazonPinpoint`) — eligible since 2026-05-04. No `pinpoint`/`sms-voice` tagging grant.
+- **Amazon GameLift Streams** (`AmazonGameLiftStreams`) — eligible since 2026-06-17. Distinct from Amazon GameLift (builds/scripts/fleets), which **is** handled.
+- **AWS RTB Fabric** (`AWSRTBFabric`) — eligible since 2026-06-17.
 
-- AWS Cloud WAN
-- Aurora DSQL
-- Amazon Bedrock AgentCore (RunTime, BrowserCustom, CodeInterpreterCustom)
-- Amazon WorkSpaces Core Managed Instances
+**Long-standing gap:**
+
+- **Amazon Cloud Directory** (`AmazonCloudDirectory`) — `CreateDirectory` is handled only for AWS Directory Service (`ds.amazonaws.com`); Cloud Directory (`clouddirectory.amazonaws.com`) has no handler or grant.
 
 **Workaround:** tag affected resources manually via the AWS Resource Groups Tagging API (`tag-resources`) or the service-native console. Handler coverage is prioritized by customer demand — open a GitHub issue on this repo to request a specific service.
+
+### Eligible-but-no-dedicated-handler-needed
+
+- **Amazon Elastic VMware Service (Amazon EVS)** — on the list (added 2026-03-20) but has **no Product Service Code**. Per the list notes, MAP spend accrues only through the *"underlying use of Amazon EC2"* and the *EVS control plane is excluded*. Those EC2 resources are already auto-tagged, so no EVS-specific handler is required.
 
 ---
 

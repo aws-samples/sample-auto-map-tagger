@@ -2,7 +2,7 @@
 
 Service and resource coverage for the MAP 2.0 Auto-Tagger, derived from the Lambda handler in `configurator.yaml (generated)`.
 
-**Methodology.** This doc was reset on 2026-04-26 by cross-checking every claim against:
+**Methodology.** This doc was reset on 2026-04-26 and last reconciled against the canonical MAP Included Services List (edition **18 June 2026**) on **2026-06-30**, by cross-checking every claim against:
 
 1. Handler inventory from `.github/scripts/audit_handler_coverage.py --report` (154 explicit `event_name == ...` branches).
 2. IAM grants in the `AutoTaggerRole` policy (`Sid: ServiceSpecificTagging`).
@@ -31,6 +31,7 @@ All services below have an explicit handler in the Lambda function **and** the c
 | EMR Serverless | Applications | RGTA |
 | Elastic Beanstalk | Applications, environments | RGTA |
 | GameLift | Builds, scripts, fleets | RGTA |
+| Mainframe Modernization (M2) | Environments, applications (universal ARN scan) | RGTA |
 
 ### Storage
 
@@ -58,6 +59,7 @@ All services below have an explicit handler in the Lambda function **and** the c
 | Redshift | Clusters, serverless workgroups, namespaces, snapshots | RGTA |
 | OpenSearch | Domains | RGTA |
 | Timestream | Databases, tables | RGTA |
+| Aurora DSQL | Clusters | Native `dsql:TagResource` |
 | Keyspaces (Cassandra) | Keyspaces | Native `keyspaces:TagResource` (requires `cassandra:Alter` — fixed v20.6.4) |
 
 ### Analytics
@@ -73,6 +75,7 @@ All services below have an explicit handler in the Lambda function **and** the c
 | Glue DataBrew | Datasets, recipes | RGTA |
 | Athena | Workgroups | RGTA |
 | QuickSight | Resources | QuickSight-specific `tag_resource` |
+| FinSpace | Environments (universal ARN scan) | RGTA |
 
 ### Networking
 
@@ -89,6 +92,8 @@ All services below have an explicit handler in the Lambda function **and** the c
 | Route53 | Hosted zones, health checks | Route53-specific `change_tags_for_resource` |
 | Global Accelerator | Accelerators | GA-specific `tag_resource` |
 | Network Firewall | Firewalls, firewall policies | RGTA |
+| Cloud WAN | Core networks, global networks | Native `networkmanager:TagResource` |
+| VPC Lattice | Service networks, services | Native `vpc-lattice:TagResource` |
 | App Mesh | Meshes | RGTA |
 | RAM | Resource shares | RGTA |
 
@@ -110,9 +115,12 @@ All services below have an explicit handler in the Lambda function **and** the c
 |---------|---------------|----------------|
 | SageMaker | Notebook instances, domains, pipelines, feature groups | RGTA |
 | Bedrock | Agents, agent action groups, agent aliases, data sources, inference profiles, guardrails, flows, prompts, knowledge bases | Bedrock Agent-specific `tag_resource` |
+| Bedrock AgentCore | Runtimes, browser-custom, code-interpreter-custom | Native `bedrock-agentcore:TagResource` |
 | Comprehend | Document classifiers | RGTA |
 | Kendra | Indexes, data sources | RGTA |
 | HealthLake | Datastores (universal ARN scan) | RGTA |
+| HealthImaging | Datastores (universal ARN scan) | RGTA (`medical-imaging:TagResource` grant) |
+| Omics | Sequence stores, run groups | Native `omics:TagResource` |
 
 ### Security & Identity
 
@@ -125,6 +133,7 @@ All services below have an explicit handler in the Lambda function **and** the c
 | Secrets Manager | Secrets | RGTA |
 | Security Hub | Hub (EnableSecurityHub) | RGTA |
 | WAFv2 | Web ACLs, IP sets | RGTA |
+| Payment Cryptography | Keys | Native `payment-cryptography:TagResource` |
 | Directory Service | Simple AD, Microsoft AD directories | Native `ds:AddTagsToResource` (transient markers fixed v20.8.1) |
 | CloudHSM v2 | Clusters, HSMs | Native `cloudhsm:TagResource` — **UNVERIFIED** (see Retraction history) |
 
@@ -135,6 +144,7 @@ All services below have an explicit handler in the Lambda function **and** the c
 | CloudWatch | Alarms, dashboards, log groups | RGTA (dashboard ARN region fix v20.7.3) |
 | Systems Manager | Parameters, documents | RGTA |
 | Service Catalog | Portfolios | RGTA |
+| Resilience Hub | Applications | Native `resiliencehub:TagResource` |
 
 ### Developer Tools
 
@@ -174,6 +184,7 @@ All services below have an explicit handler in the Lambda function **and** the c
 |---------|---------------|----------------|
 | AppStream 2.0 | Fleets (universal ARN scan) | RGTA |
 | WorkSpaces | WorkSpaces | RGTA |
+| WorkSpaces Core Managed Instances | Workspace instances (universal ARN scan) | RGTA |
 | Deadline Cloud | Farms, queues, fleets | RGTA |
 
 ---
@@ -184,7 +195,6 @@ These services have an IAM grant and/or universal ARN extraction coverage but no
 
 | Service | Status | Reason |
 |---------|--------|--------|
-| VPC Lattice | **UNVERIFIED** | `vpc-lattice:TagResource` IAM grant added post-D7 fix. No explicit handler; relies on universal ARN scan + RGTA. Live-verification pending. |
 | Location Service | **UNVERIFIED** | No handler, no service-specific IAM grant. Relies on RGTA via universal ARN scan. Not E2E-tested. |
 | Supply Chain | **UNVERIFIED** | No handler, no service-specific IAM grant. Relies on RGTA via universal ARN scan. Not E2E-tested. |
 | AppConfig | **UNVERIFIED** | No handler, no service-specific IAM grant. Relies on RGTA via universal ARN scan. Not E2E-tested. |
@@ -198,6 +208,10 @@ Claims that appeared in earlier versions of this doc but are not actually suppor
 
 | Service | Status | Reason |
 |---------|--------|--------|
+| AWS End User Messaging (Pinpoint) | **KNOWN GAP** | On the list since 2026-05-04 (`AmazonPinpoint` code). No handler and no `pinpoint`/`sms-voice` tagging grant. See LIMITATIONS.md. |
+| Amazon GameLift Streams | **KNOWN GAP** | On the list since 2026-06-17 (`AmazonGameLiftStreams`). Distinct namespace from Amazon GameLift; no handler/grant. See LIMITATIONS.md. |
+| AWS RTB Fabric | **KNOWN GAP** | On the list since 2026-06-17 (`AWSRTBFabric`). No handler/grant. See LIMITATIONS.md. |
+| Amazon Cloud Directory | **KNOWN GAP** | `CreateDirectory` handled only for `ds.amazonaws.com` (Directory Service); Cloud Directory (`clouddirectory.amazonaws.com`) has no handler or `clouddirectory:TagResource` grant. |
 | Cloud Map (HTTP namespaces) | **KNOWN GAP** | `CreateHttpNamespace` is in `_IGNORE_EVENTS` (§1.87 — async operationId resolution doesn't fit SQS 180s visibility timeout). Not tagged. |
 | CloudWatch Logs Insights query definitions | **KNOWN GAP** | `PutQueryDefinition` is in `_IGNORE_EVENTS` (§1.86 — ARN shape rejected by RGTA and native APIs). |
 | EventBridge Connections | **KNOWN GAP** | UUID suffix in ARN makes it invalid for tagging (see MAP_TAGGING_GAP_ANALYSIS.md). |
@@ -255,5 +269,5 @@ python3 .github/scripts/audit_handler_coverage.py --report
   - **Directory Service (MS AD + Simple AD)** — missing `Directory Status: Creating` transient marker caused every AD creation to emit a false `permanent_actionable` SNS alert; retries were misclassified rather than redelivered. Fixed in **v20.8.1** (§1.98).
   - **CloudHSM v2** — handler + IAM (`cloudhsm:TagResource`) are in place, but has not been live-verified since the v20.3.0 ship. Marked `**UNVERIFIED**` above pending a direct-deploy smoke test.
 - **v20.7.3** retracted the original `PutDashboard` ARN shape (region-scoped) — AWS dashboards are account-global, so RGTA rejected the region form with silent AccessDenied. The current ARN shape is `arn:aws:cloudwatch::<acct>:dashboard/<name>` and is live-verified.
-- **VPC Lattice** was historically listed as "supported" while the Lambda's RGTA fallthrough silently AccessDenied'd every `CreateServiceNetwork` event (D7). The `vpc-lattice:TagResource` grant was added later. Moved to **Unverified** above until a live smoke test confirms the fix.
+- **VPC Lattice** was historically listed as "supported", then moved to "Unverified" after the D7 RGTA-fallthrough AccessDenied. The `vpc-lattice:TagResource` grant + explicit `CreateServiceNetwork`/`CreateService` handler are now in place, so it is moved back to **Supported (Networking)** as of the 2026-06-30 reconciliation. A live E2E smoke test is still owed to upgrade it from code-verified to live-verified.
 - **CloudFormation** (Stacks, StackSets) was listed under Management & Governance through v20.9.3. Removed in **v20.9.4** (§1.100): CloudFormation is NOT on the MAP Included Services List (6 April 2026 edition), so stack resources do not earn MAP credit and should not be advertised as covered. The `cloudformation:TagResource / UpdateStack / UpdateStackSet / ListStacks` IAM actions remain in the Lambda role — they support internal CFN TagResource routing (the AWS auth matrix maps `tag:TagResources` on CFN stacks through `UpdateStack`) and the peer-tagger detector at cold start (§1.108). The actions are not there to earn MAP credit on customer stacks.
