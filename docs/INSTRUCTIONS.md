@@ -316,21 +316,53 @@ aws ssm put-parameter \
 
 ## Upgrading from a Previous Version
 
-> **⚠️ Limitation:** The upgrade flow in the configurator UI has been disabled. Upgrading an existing deployment requires a delete-and-redeploy. See below for the recommended path.
+Each release note states whether the update is **upgrade-safe** or requires a **full redeploy**.
 
-### Recommended: delete and redeploy
+### Option A: upgrade.sh (upgrade-safe releases — recommended)
 
-The safest upgrade path is to delete the existing deployment and redeploy with the latest `deploy.sh`. Existing `map-migrated` tags on resources are preserved (MAP credits stay intact).
+Use when the release note says **"Upgrade-safe"** (most releases — new service coverage, bug fixes, no new CloudFormation parameters introduced).
+
+1. Download the latest `configurator.html` from the GitHub release
+2. Select **"Update to latest template version"**
+3. Enter **region** and **MPE ID** only — no account IDs, VPCs, or dates needed
+4. Click Generate → download `upgrade.sh`
+5. Run in CloudShell: `bash upgrade.sh`
+
+**What happens:**
+- The script finds your existing stack (or StackSet)
+- Creates a CloudFormation change-set preview showing exactly what will change (Lambda code, EventBridge rules, IAM permissions)
+- Asks for confirmation before applying
+- Uses `UsePreviousValue=true` for all parameters — your scope, dates, and config are untouched
+- For StackSets, shows a dry-run summary of affected accounts before proceeding
+
+**Flags:**
+- `--auto-approve` — skip confirmation (for non-interactive/batch use)
+- `--force` — bypass version guards (cross-major, downgrade, pre-#95 legacy stacks)
+
+### Option B: Re-run deploy.sh (also safe for any release)
+
+Re-generate `deploy.sh` from the configurator with the same settings you used originally, then run it. The stack updates in-place — CloudFormation only changes resources that differ between the old and new template.
+
+**To retrieve your current settings** (so you don't have to remember what you entered):
 
 ```bash
-# For StackSets — see "Removing a Deployment" section below
-# For single-account stacks:
+aws ssm get-parameter --name /auto-map-tagger/<MPE_ID>/config --query Parameter.Value --output text --region <REGION>
+```
+
+This returns a JSON object with your MPE ID, agreement dates, scope mode, account IDs, and VPC IDs — everything you need to re-fill in the configurator.
+
+### Option C: Full redeploy (required when release notes say so)
+
+Use when the release note explicitly says **"Full redeploy required"** — this is rare and only happens when new CloudFormation parameters are introduced that cannot be defaulted safely.
+
+```bash
+# Single-account:
 aws cloudformation delete-stack --stack-name map-auto-tagger-mig<MPE_ID> --region <REGION>
 aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger-mig<MPE_ID> --region <REGION>
 bash deploy.sh
 ```
 
-Enable backfill to catch resources created during the brief gap (~2-5 minutes).
+Existing `map-migrated` tags on resources are preserved — MAP credits stay intact. Enable backfill to catch resources created during the brief gap (~2-5 minutes).
 
 ### Migrating from the pre-v19 un-namespaced layout
 

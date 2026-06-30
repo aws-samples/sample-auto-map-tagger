@@ -62,26 +62,44 @@ The S3 staging bucket is deleted only when no other MAP Auto-Tagger deployments 
 
 ---
 
-## Upgrading from a Previous Version
+## Upgrading to a New Version
 
-The recommended upgrade path is **delete and redeploy**. Existing `map-migrated` tags on resources are preserved — MAP credits stay intact.
+Each release note states whether the update is **upgrade-safe** or requires a **full redeploy**.
+
+### Option A: Upgrade (service coverage updates — no re-entry needed)
+
+Use when the release note says **"Upgrade-safe"** (most releases — new services, bug fixes, no new parameters).
+
+1. Download the latest `configurator.html`
+2. Select **"Update to latest template version"**
+3. Enter your **region** and **MPE ID** only
+4. Run the generated `upgrade.sh`
+
+Your scope configuration (accounts, VPCs, dates) is preserved automatically. A change-set preview shows exactly what will change before applying.
+
+### Option B: Re-run deploy.sh (also safe for any release)
+
+Re-generate `deploy.sh` from the configurator with the same settings you used originally, then run it. The stack updates in-place.
+
+To retrieve your current settings via CloudShell:
 
 ```bash
-# Single-account:
+aws ssm get-parameter --name /auto-map-tagger/<MPE_ID>/config --query Parameter.Value --output text --region <REGION>
+```
+
+This returns your MPE ID, dates, scope mode, account IDs, and VPC IDs — everything you need to fill in the configurator.
+
+### Option C: Full redeploy (required when release notes say so)
+
+Use when the release note says **"Full redeploy required"** (rare — only when new configuration parameters are introduced).
+
+```bash
 aws cloudformation delete-stack --stack-name map-auto-tagger-mig<MPE_ID> --region <REGION>
 aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger-mig<MPE_ID> --region <REGION>
 bash deploy.sh
 ```
 
-For pre-v19 un-namespaced stacks (`map-auto-tagger` without MPE suffix):
-
-```bash
-aws cloudformation delete-stack --stack-name map-auto-tagger
-aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger
-bash deploy.sh
-```
-
-Enable backfill to catch resources created during the brief gap (~2-5 minutes).
+Existing `map-migrated` tags on resources are preserved — MAP credits stay intact. Enable backfill to catch resources created during the brief gap (~2-5 minutes).
 
 ---
 

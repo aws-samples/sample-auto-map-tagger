@@ -381,7 +381,7 @@ echo "  ── \$REGION ──────────────────�
 TEMPLATE_SIZE=\$(wc -c < "\$TEMPLATE")
 if [ "\$TEMPLATE_SIZE" -gt 51200 ]; then
     BUCKET="auto-map-tagger-\${ACCT}-\${REGION}"
-    if aws s3api head-bucket --bucket "\${BUCKET}" 2>/dev/null; then
+    if aws s3api head-bucket --bucket "\${BUCKET}" > /dev/null 2>&1; then
         ACTUAL_LOC=\$(aws s3api get-bucket-location --bucket "\${BUCKET}" --query LocationConstraint --output text 2>/dev/null)
         [ "\$ACTUAL_LOC" = "None" ] || [ "\$ACTUAL_LOC" = "null" ] && ACTUAL_LOC="us-east-1"
         if [ "\$ACTUAL_LOC" != "\$REGION" ]; then
@@ -874,7 +874,7 @@ cat > "\$ACCOUNTS_TEMPLATE" << 'ACCOUNTS_TEMPLATE_EOF'
 ${accountsTpl}
 ACCOUNTS_TEMPLATE_EOF
 
-if aws s3api head-bucket --bucket "\${BUCKET}" 2>/dev/null; then
+if aws s3api head-bucket --bucket "\${BUCKET}" > /dev/null 2>&1; then
     ACTUAL_LOC=\$(aws s3api get-bucket-location --bucket "\${BUCKET}" --query LocationConstraint --output text 2>/dev/null)
     [ "\$ACTUAL_LOC" = "None" ] || [ "\$ACTUAL_LOC" = "null" ] && ACTUAL_LOC="us-east-1"
     if [ "\$ACTUAL_LOC" != "\$REGION" ]; then

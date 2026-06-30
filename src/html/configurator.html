@@ -51,7 +51,7 @@
                     </div>
                 </div>
 
-                <!-- Edit and Upgrade flows hidden — use CloudShell commands instead (see INSTRUCTIONS.md) -->
+                <!-- Edit flow hidden — add/remove org accounts via CloudShell commands (see INSTRUCTIONS.md) -->
                 <!--
                 <div class="mode-card" onclick="selectMode('edit')">
                     <div class="mode-icon">✏️</div>
@@ -61,6 +61,7 @@
                         <span class="mode-note" data-i18n="ui_mode_edit_note">Multi-account (AWS Organizations) deployments only</span>
                     </div>
                 </div>
+                -->
 
                 <div class="mode-card" onclick="selectMode('update')">
                     <div class="mode-icon">🔄</div>
@@ -69,7 +70,6 @@
                         <p data-i18n="ui_mode_update_desc">Upgrade Lambda code, IAM policy, and EventBridge rules to the current template version. Scope configuration (accounts, VPCs, agreement date) is preserved. Auto-detects single-account and multi-account deployments.</p>
                     </div>
                 </div>
-                -->
 
                 <div class="mode-card" onclick="selectMode('delete')">
                     <div class="mode-icon">🗑️</div>
@@ -657,6 +657,10 @@
 
             <div class="info-box">
                 <span data-i18n="ui_update_info">This tool upgrades an existing MAP Auto-Tagger deployment to the latest template version. It generates an <code>upgrade.sh</code> script that preserves scope configuration and auto-detects single-account and multi-account deployments.</span>
+            </div>
+
+            <div class="info-box" style="font-size:12px;">
+                <span data-i18n="ui_update_changeset_note">Before applying anything, upgrade.sh creates a CloudFormation change-set and shows exactly which resources will change (Lambda code, IAM, EventBridge) — your scope configuration is preserved, not reset. You confirm before it executes. For non-interactive use (CloudShell batch), run with <code>--auto-approve</code>. StackSets show a dry-run summary instead, since CloudFormation change-sets are not supported for StackSets.</span>
             </div>
 
             <!-- Update Step 1: Configure -->

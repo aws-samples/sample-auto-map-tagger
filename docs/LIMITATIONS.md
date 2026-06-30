@@ -77,25 +77,25 @@ There is no automatic detection or sidecar deploy for this case — selecting wh
 
 ## Unsupported MAP-eligible services (handler gap)
 
-The services below appear on the MAP Included Services List but are **not** yet handled by this Lambda. Resources created in these services during the MAP period will not be auto-tagged and must be tagged by another means.
+The services below appear on the MAP Included Services List (edition **18 June 2026**) but are **not** yet handled by this Lambda. Resources created in these services during the MAP period will not be auto-tagged and must be tagged by another means.
 
-**Tier 2 — vertical-specific, deferred until customer demand:**
+This list was last reconciled against the canonical list on **2026-06-30**. The previously-listed Tier 2/Tier 3 gaps (Mainframe Modernization, HealthImaging, FinSpace, Resilience Hub, Omics, Payment Cryptography, Cloud WAN, Aurora DSQL, Bedrock AgentCore, WorkSpaces Core Managed Instances) have since shipped handlers and IAM grants and are now covered — see [COVERAGE.md](COVERAGE.md).
 
-- AWS Mainframe Modernization (M2)
-- AWS HealthImaging
-- Amazon FinSpace
-- AWS Resilience Hub
-- Amazon Omics
-- AWS Payment Cryptography
+**Recently added to the list, no handler yet:**
 
-**Tier 3 — newer services with low current adoption:**
+- **AWS End User Messaging** (`AmazonPinpoint`) — eligible since 2026-05-04. No `pinpoint`/`sms-voice` tagging grant.
+- **Amazon GameLift Streams** (`AmazonGameLiftStreams`) — eligible since 2026-06-17. Distinct from Amazon GameLift (builds/scripts/fleets), which **is** handled.
+- **AWS RTB Fabric** (`AWSRTBFabric`) — eligible since 2026-06-17.
 
-- AWS Cloud WAN
-- Aurora DSQL
-- Amazon Bedrock AgentCore (RunTime, BrowserCustom, CodeInterpreterCustom)
-- Amazon WorkSpaces Core Managed Instances
+**Long-standing gap:**
+
+- **Amazon Cloud Directory** (`AmazonCloudDirectory`) — `CreateDirectory` is handled only for AWS Directory Service (`ds.amazonaws.com`); Cloud Directory (`clouddirectory.amazonaws.com`) has no handler or grant.
 
 **Workaround:** tag affected resources manually via the AWS Resource Groups Tagging API (`tag-resources`) or the service-native console. Handler coverage is prioritized by customer demand — open a GitHub issue on this repo to request a specific service.
+
+### Eligible-but-no-dedicated-handler-needed
+
+- **Amazon Elastic VMware Service (Amazon EVS)** — on the list (added 2026-03-20) but has **no Product Service Code**. Per the list notes, MAP spend accrues only through the *"underlying use of Amazon EC2"* and the *EVS control plane is excluded*. Those EC2 resources are already auto-tagged, so no EVS-specific handler is required.
 
 ---
 
@@ -129,14 +129,16 @@ See the AWS documentation for [SSM Parameter Store Advanced tier](https://docs.a
 
 ---
 
-## In-Place Upgrade Not Supported
+## In-Place Upgrade Limitations
 
-In-place template upgrades (via `upgrade.sh` or `update-stack-set --template-body`) are not supported. The upgrade flow has been disabled because:
+In-place upgrades via `upgrade.sh` are supported for **upgrade-safe releases** (service coverage updates, bug fixes — no new CloudFormation parameters). The upgrade flow uses `UsePreviousValue=true` for all existing parameters, preserving scope configuration.
 
-1. **Scope blow-out risk:** New CFN parameters introduced in later template versions (e.g., `ScopedAccountIds`) default to `["ALL"]` when upgrading from an older template that didn't have those parameters. CloudFormation cannot "use previous value" for parameters that didn't previously exist, causing the scope to silently expand to all accounts.
-2. **SSM config overwrite:** The `MapConfig` SSM parameter is rewritten on every stack update because its value is computed via `!Sub` from CFN parameters. Placeholder defaults in the upgrade template overwrite the customer's real configuration.
+**When in-place upgrade is NOT safe:**
 
-**Recommended upgrade path:** Delete the existing deployment and redeploy with the latest `deploy.sh`. Existing `map-migrated` tags on resources are preserved — MAP credits stay intact. Enable backfill to catch resources created during the brief gap (~2-5 minutes).
+1. **New CFN parameters in the release:** CloudFormation cannot "use previous value" for parameters that didn't exist in the deployed stack. New parameters fall back to the template's `Default` value. If the default is expansive (e.g., `["ALL"]`), scope can silently blow out. These releases are marked **"Full redeploy required"** in the release notes.
+2. **Pre-#95 legacy stacks:** Deployments created before the `ScopedAccountIds` parameter existed cannot be upgraded in-place — scope was baked directly into SSM config with no CFN parameter to carry forward. The upgrade script detects this and refuses (unless `--force` is passed). Delete and redeploy is the only safe path.
+
+**Re-running `deploy.sh`** is always safe regardless of release type, because the configurator bakes the customer's exact values into the template defaults — no reliance on `UsePreviousValue`.
 
 See [INSTRUCTIONS.md](INSTRUCTIONS.md) for step-by-step upgrade guidance.
 

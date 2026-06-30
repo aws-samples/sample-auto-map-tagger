@@ -6,6 +6,16 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Added:**
+
+- **Upgrade flow re-enabled in the configurator UI.** Customers can now select "Update to latest template version" to generate an `upgrade.sh` that upgrades Lambda code, EventBridge rules, and IAM permissions without re-entering scope configuration. The script uses `UsePreviousValue=true` for all existing CloudFormation parameters, creates a change-set preview for single-account stacks (requires confirmation before executing), and shows a dry-run summary for StackSets. Includes a pre-#95 guard that refuses in-place upgrade on legacy stacks lacking the `ScopedAccountIds` parameter (delete + redeploy required for those).
+
+**Upgrade guidance for release authors (include in every release note):**
+
+> **Upgrade-safe** (use `upgrade.sh` OR re-run `deploy.sh`): Releases that only add new service coverage — no new CloudFormation parameters introduced.
+>
+> **Full redeploy required** (delete + `deploy.sh`): Releases that introduce new CloudFormation parameters or structural template changes. Stated explicitly in the release note when applicable.
+
 **Fixed:**
 
 - **Multi-region single-account deploy no longer collides on the staging bucket.** The S3 template-staging bucket was named `auto-map-tagger-{account-id}` (account only). Because the generated template exceeds the 50 KB inline limit, every deploy stages through S3, and a single-account deploy to 2+ regions had the second region's `head-bucket` find the first region's bucket, mismatch on location, and hard-fail that region (`DEPLOY_STATUS=FAILED`). The bucket name is now region-qualified — `auto-map-tagger-{account-id}-{region}` — across `deploy.sh`, `delete.sh`, and the editor/upgrade script, so each region stages independently. Reported by a partner (Megazone) internal test.

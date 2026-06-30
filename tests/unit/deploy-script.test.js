@@ -32,3 +32,23 @@ describe('deploy script — region-qualified staging bucket', () => {
     expect(src).toContain("REGIONS=\"${regions.join(' ')}\"");
   });
 });
+
+describe('deploy script — in-place update on existing stacks', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../../src/js/deploy/script-deploy.js'), 'utf8');
+
+  it('updates an existing stack in-place via update-stack', () => {
+    // deploy.sh bakes customer values as template defaults, so update-stack
+    // without --parameters is safe — CFN uses those baked defaults.
+    expect(src).toContain('Updating in-place');
+  });
+
+  it('handles "No updates are to be performed" gracefully', () => {
+    expect(src).toContain('No updates are to be performed');
+  });
+
+  it('preserves the create and rollback-recovery branches', () => {
+    expect(src).toContain('cloudformation create-stack');
+    expect(src).toContain('wait stack-delete-complete');
+  });
+});
