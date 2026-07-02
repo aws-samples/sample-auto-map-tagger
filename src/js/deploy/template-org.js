@@ -48,6 +48,13 @@ Parameters:
   PerAccountTemplateURL:
     Type: String
     Description: S3 URL of map-auto-tagger-accounts-${mpe}.yaml
+  AlertEmail:
+    Type: String
+    Default: '${config.alertEmail || ''}'
+    Description: Customer ops email for tagging failure alerts (leave empty to disable)
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
 
 Resources:
 
@@ -69,6 +76,7 @@ Resources:
               - Effect: Allow
                 Action:
                   - organizations:ListRoots
+                  - organizations:DescribeOrganization
                   - organizations:EnableAWSServiceAccess
                   - cloudformation:CreateStackSet
                   - cloudformation:DeleteStackSet
@@ -83,6 +91,15 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: '*'
+              - Sid: CentralAlertTopics
+                Effect: Allow
+                Action:
+                  - sns:CreateTopic
+                  - sns:DeleteTopic
+                  - sns:SetTopicAttributes
+                  - sns:Subscribe
+                  - sns:ListSubscriptionsByTopic
+                Resource: !Sub 'arn:aws:sns:*:\${AWS::AccountId}:auto-map-tagger-alerts-central-${mpe}'
 
   DeployFunction:
     Type: AWS::Lambda::Function
@@ -104,11 +121,56 @@ Resources:
               req = urllib.request.Request(event['ResponseURL'], data=body,
                   headers={'Content-Type': ''}, method='PUT')
               urllib.request.urlopen(req)
+          def central_topic_name(mpe):
+              # '-central-' distinguishes these from the per-account LOCAL
+              # topic name so a companion single-account deploy into this
+              # management account (the documented LIMITATIONS.md pattern)
+              # cannot collide on TopicName.
+              return f'auto-map-tagger-alerts-central-{mpe}'
+          def ensure_central_topics(mpe, regions, account_id, org_id, alert_email):
+              # One topic PER REGION: CloudWatch alarm actions accept
+              # cross-ACCOUNT topics but not cross-REGION ones, so every
+              # deployed region needs its own same-region central topic.
+              name = central_topic_name(mpe)
+              for region in regions:
+                  sns = boto3.client('sns', region_name=region)
+                  arn = sns.create_topic(Name=name)['TopicArn']  # idempotent
+                  policy = json.dumps({
+                      'Version': '2012-10-17',
+                      'Statement': [{
+                          'Sid': 'AllowOrgCloudWatchAlarmsPublish',
+                          'Effect': 'Allow',
+                          'Principal': {'Service': 'cloudwatch.amazonaws.com'},
+                          'Action': 'sns:Publish',
+                          'Resource': arn,
+                          # Scope the service-principal grant to this org —
+                          # without a Condition ANY AWS account's alarms
+                          # could publish into the customer's ops email
+                          # (topic names are guessable).
+                          'Condition': {'StringEquals': {'aws:SourceOrgID': org_id}},
+                      }],
+                  })
+                  sns.set_topic_attributes(TopicArn=arn,
+                      AttributeName='Policy', AttributeValue=policy)
+                  if alert_email:
+                      subs = sns.list_subscriptions_by_topic(TopicArn=arn).get('Subscriptions', [])
+                      if not any(s.get('Endpoint') == alert_email for s in subs):
+                          sns.subscribe(TopicArn=arn, Protocol='email', Endpoint=alert_email)
+                  print(f'Central topic ready: {arn}')
+          def delete_central_topics(mpe, regions, account_id):
+              name = central_topic_name(mpe)
+              for region in regions:
+                  try:
+                      arn = f'arn:aws:sns:{region}:{account_id}:{name}'
+                      boto3.client('sns', region_name=region).delete_topic(TopicArn=arn)
+                  except Exception as e:
+                      print(f'Central topic delete ({region}):', e)
           def handler(event, context):
               time.sleep(15)
               props = event.get('ResourceProperties', {})
               cf = boto3.client('cloudformation')
               stackset_name = props['StackSetName']
+              account_id = context.invoked_function_arn.split(':')[4]
               if event['RequestType'] == 'Delete':
                   try:
                       org = boto3.client('organizations', region_name='us-east-1')
@@ -126,6 +188,8 @@ Resources:
                       cf.delete_stack_set(StackSetName=stackset_name)
                   except Exception as e:
                       print('Delete cleanup:', e)
+                  delete_central_topics(props.get('MpeId', ''),
+                      props.get('Regions', ['ap-northeast-2']), account_id)
                   respond(event, context, 'SUCCESS')
                   return
               try:
@@ -148,6 +212,10 @@ Resources:
                       print('Service access already enabled or skipped:', e)
                   root_id = org.list_roots()['Roots'][0]['Id']
                   print('Root OU:', root_id)
+                  org_id = org.describe_organization()['Organization']['Id']
+                  regions = props.get('Regions', ['ap-northeast-2'])
+                  ensure_central_topics(props['MpeId'], regions, account_id,
+                      org_id, props.get('AlertEmail', ''))
                   # StackSet deploys Lambda to all org accounts.
                   # Account-level filtering is handled by scoped_account_ids in Lambda config.
                   targets = {'OrganizationalUnitIds': [root_id]}
@@ -175,6 +243,7 @@ Resources:
                               {'ParameterKey':'AgreementStartDate','ParameterValue':props['AgreementStartDate']},
                               {'ParameterKey':'AgreementEndDate','ParameterValue':props['AgreementEndDate']},
                               {'ParameterKey':'ScopeMode','ParameterValue':'account'},
+                              {'ParameterKey':'CentralAlertAccountId','ParameterValue':account_id},
                           ],
                           Capabilities=['CAPABILITY_NAMED_IAM'],
                           PermissionModel='SERVICE_MANAGED',
@@ -205,6 +274,16 @@ Resources:
                   print(traceback.format_exc())
                   respond(event, context, 'FAILED', reason=str(e))
 
+  # Central alert topics are created by the DeployFunction Lambda, NOT as
+  # CFN resources: CloudWatch alarm actions cannot target a topic in another
+  # REGION (cross-account is supported, cross-region is not), and a CFN
+  # template only creates resources in its own region. The Lambda creates
+  # one topic per deployed region — auto-map-tagger-alerts-central-${mpe} —
+  # so every per-account alarm has a same-region central topic to publish to.
+  # The '-central-' name segment also avoids colliding with the LOCAL topic
+  # (auto-map-tagger-alerts-${mpe}) when the customer follows LIMITATIONS.md
+  # and additionally deploys single-account into this management account.
+
   Deployment:
     Type: Custom::Deploy
     DependsOn: DeployFunction
@@ -216,6 +295,7 @@ Resources:
       AgreementStartDate: !Ref AgreementStartDate
       AgreementEndDate: !Ref AgreementEndDate
       ScopedAccounts: '${scopedAccountIdsJson}'
+      AlertEmail: !Ref AlertEmail
       Regions:
 ${regionsList}
 ${accountsNote}
@@ -224,6 +304,9 @@ Outputs:
   StackSetName:
     Value: !GetAtt Deployment.StackSetName
   RootOU:
-    Value: !GetAtt Deployment.RootId`;
+    Value: !GetAtt Deployment.RootId
+  CentralAlertTopicArn:
+    Description: Central alert topic in this (primary) region; one exists per deployed region
+    Value: !Sub 'arn:aws:sns:\${AWS::Region}:\${AWS::AccountId}:auto-map-tagger-alerts-central-${mpe}'`;
         }
 
