@@ -135,7 +135,7 @@ The script handles everything automatically:
 | **SQS queue** | Buffers events with 14-day retention and 5 retries |
 | **Dead Letter Queue** | Captures events that fail after all retries |
 | **SSM parameter** | Stores MPE ID, agreement start/end dates, and scope configuration |
-| **SNS topic** | Sends alert notifications on tagging failures |
+| **SNS topic** | Sends alert notifications on tagging failures. Multi-account deployments create **one central topic per deployed region in the management account** (`auto-map-tagger-alerts-central-<mpe>`) — one email confirmation per region instead of one per account × region; per-account alarms publish cross-account to the same-region central topic. Single-account deployments create a local per-account topic. |
 | **CloudWatch alarms** | Fires on Lambda errors or DLQ activity |
 | **S3 bucket** (multi-account only) | Stages CloudFormation templates for the StackSet. Retained after deployment — StackSets require a persistent template URL for new accounts. Contains only the per-account template (~40KB) with Block Public Access, AES-256 encryption, and HTTPS-only enforcement. |
 
