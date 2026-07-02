@@ -269,9 +269,26 @@ Parameters:
     Type: String
     Default: '${alertEmail}'
     Description: Customer ops email for tagging failure alerts (leave empty to disable)
+  CentralAlertAccountId:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^[0-9]{12}$'
+    Description: >-
+      Management-account ID hosting the central alert topics (multi-account
+      mode). If provided, alarms publish to the central topic
+      auto-map-tagger-alerts-central-<MpeId> in THIS region of that account
+      instead of creating a per-account topic. CloudWatch alarm actions
+      support cross-account topics but NOT cross-region ones, so the ARN is
+      constructed with the alarm's own region — the org deployer creates one
+      central topic per deployed region.
 
 Conditions:
   HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+  HasCentralTopic: !Not [!Equals [!Ref CentralAlertAccountId, '']]
+  CreateLocalTopic: !Not [!Condition HasCentralTopic]
+  CreateLocalSubscription: !And
+    - !Condition HasAlertEmail
+    - !Condition CreateLocalTopic
 
 Resources:
 
@@ -692,14 +709,17 @@ ${LAMBDA_HANDLER_CODE}
 
   AlertTopic:
     Type: AWS::SNS::Topic
+    Condition: CreateLocalTopic
     Properties:
       TopicName: auto-map-tagger-alerts-${mpe}
       DisplayName: MAP 2.0 Auto-Tagger Alerts
-      KmsMasterKeyId: alias/aws/sns
+      # Deliberately NOT KMS-encrypted — the AWS-managed SNS key cannot
+      # grant cloudwatch.amazonaws.com kms:GenerateDataKey, so alarm actions
+      # to a managed-key-encrypted topic fail 100% silently (CT6-003).
 
   AlertSubscription:
     Type: AWS::SNS::Subscription
-    Condition: HasAlertEmail
+    Condition: CreateLocalSubscription
     Properties:
       TopicArn: !Ref AlertTopic
       Protocol: email
@@ -721,7 +741,10 @@ ${LAMBDA_HANDLER_CODE}
       Threshold: 3
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If
+          - HasCentralTopic
+          - !Sub 'arn:aws:sns:\${AWS::Region}:\${CentralAlertAccountId}:auto-map-tagger-alerts-central-\${MpeId}'
+          - !Ref AlertTopic
 
   DLQAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -753,7 +776,10 @@ ${LAMBDA_HANDLER_CODE}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If
+          - HasCentralTopic
+          - !Sub 'arn:aws:sns:\${AWS::Region}:\${CentralAlertAccountId}:auto-map-tagger-alerts-central-\${MpeId}'
+          - !Ref AlertTopic
       TreatMissingData: notBreaching
 
   # CloudWatch alarm — fires when the Lambda cold-start peer-tagger detector
@@ -780,7 +806,10 @@ ${LAMBDA_HANDLER_CODE}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If
+          - HasCentralTopic
+          - !Sub 'arn:aws:sns:\${AWS::Region}:\${CentralAlertAccountId}:auto-map-tagger-alerts-central-\${MpeId}'
+          - !Ref AlertTopic
       TreatMissingData: notBreaching
 
   # CloudWatch alarm — slow trickle of permanent_actionable tagging failures
@@ -809,7 +838,10 @@ ${LAMBDA_HANDLER_CODE}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If
+          - HasCentralTopic
+          - !Sub 'arn:aws:sns:\${AWS::Region}:\${CentralAlertAccountId}:auto-map-tagger-alerts-central-\${MpeId}'
+          - !Ref AlertTopic
       TreatMissingData: notBreaching
 
 ${backfillResources}
@@ -822,7 +854,10 @@ Outputs:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
     Value: ${TEMPLATE_VERSION}
   AlertTopicArn:
-    Value: !Ref AlertTopic
+    Value: !If
+      - HasCentralTopic
+      - !Sub 'arn:aws:sns:\${AWS::Region}:\${CentralAlertAccountId}:auto-map-tagger-alerts-central-\${MpeId}'
+      - !Ref AlertTopic
   EventQueueUrl:
     Value: !Ref EventQueue
   EventDLQUrl:

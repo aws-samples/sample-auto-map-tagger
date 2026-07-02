@@ -1,7 +1,7 @@
         // Template version — single source of truth for the SemVer constant.
         // The deployable YAML and configurator.html are both generated from src/
         // (npm run build), so this constant flows into every artifact automatically.
-        const TEMPLATE_VERSION = 'v22.0.0';
+        const TEMPLATE_VERSION = 'v22.1.0';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -9,6 +9,14 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // Keep the newest entry's version in sync with TEMPLATE_VERSION above.
         const VERSION_HISTORY = [
+            {
+                version: 'v22.1.0',
+                date: '2026-07-03',
+                changes: [
+                    { tag: 'other', text: 'Centralized SNS alerting for multi-account deployments (PR #108): the org deployer creates one central alert topic per deployed region in the management account (auto-map-tagger-alerts-central-<mpe>) with a single email subscription — replacing one topic + confirmation email per account x region (150+ clicks for large orgs). Per-account alarms publish cross-account to the same-region central topic (CloudWatch alarm actions cannot cross regions). Topic publish grant is scoped to the customer organization via aws:SourceOrgID. Single-account deployments unchanged. New per-account CFN parameter CentralAlertAccountId (default empty = local topic).' },
+                    { tag: 'bugfix', text: 'Local alert topic no longer encrypted with the AWS-managed SNS KMS key (CT6-003): that key cannot grant cloudwatch.amazonaws.com kms:GenerateDataKey, so every alarm action against the topic failed silently — alerts never reached subscribers in v21/v22.0.0. Existing deployments pick up the fix via upgrade.sh or redeploy.' },
+                ],
+            },
             {
                 version: 'v22.0.0',
                 date: '2026-06-12',
