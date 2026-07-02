@@ -48,6 +48,13 @@ Parameters:
   PerAccountTemplateURL:
     Type: String
     Description: S3 URL of map-auto-tagger-accounts-${mpe}.yaml
+  AlertEmail:
+    Type: String
+    Default: '${config.alertEmail || ''}'
+    Description: Customer ops email for tagging failure alerts (leave empty to disable)
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
 
 Resources:
 
@@ -175,6 +182,7 @@ Resources:
                               {'ParameterKey':'AgreementStartDate','ParameterValue':props['AgreementStartDate']},
                               {'ParameterKey':'AgreementEndDate','ParameterValue':props['AgreementEndDate']},
                               {'ParameterKey':'ScopeMode','ParameterValue':'account'},
+                              {'ParameterKey':'CentralAlertTopicArn','ParameterValue':props.get('CentralAlertTopicArn','')},
                           ],
                           Capabilities=['CAPABILITY_NAMED_IAM'],
                           PermissionModel='SERVICE_MANAGED',
@@ -205,6 +213,35 @@ Resources:
                   print(traceback.format_exc())
                   respond(event, context, 'FAILED', reason=str(e))
 
+  CentralAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: auto-map-tagger-alerts-${mpe}
+      DisplayName: MAP 2.0 Auto-Tagger Alerts (central)
+
+  CentralAlertTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref CentralAlertTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudWatchAlarmsPublish
+            Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref CentralAlertTopic
+
+  CentralAlertSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref CentralAlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
   Deployment:
     Type: Custom::Deploy
     DependsOn: DeployFunction
@@ -216,6 +253,7 @@ Resources:
       AgreementStartDate: !Ref AgreementStartDate
       AgreementEndDate: !Ref AgreementEndDate
       ScopedAccounts: '${scopedAccountIdsJson}'
+      CentralAlertTopicArn: !Ref CentralAlertTopic
       Regions:
 ${regionsList}
 ${accountsNote}
@@ -224,6 +262,8 @@ Outputs:
   StackSetName:
     Value: !GetAtt Deployment.StackSetName
   RootOU:
-    Value: !GetAtt Deployment.RootId`;
+    Value: !GetAtt Deployment.RootId
+  CentralAlertTopicArn:
+    Value: !Ref CentralAlertTopic`;
         }
 

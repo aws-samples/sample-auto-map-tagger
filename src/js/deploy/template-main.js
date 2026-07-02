@@ -269,9 +269,18 @@ Parameters:
     Type: String
     Default: '${alertEmail}'
     Description: Customer ops email for tagging failure alerts (leave empty to disable)
+  CentralAlertTopicArn:
+    Type: String
+    Default: ''
+    Description: ARN of a central SNS topic for alerts (multi-account mode). If provided, alarms publish here instead of a per-account topic.
 
 Conditions:
   HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+  HasCentralTopic: !Not [!Equals [!Ref CentralAlertTopicArn, '']]
+  CreateLocalTopic: !Not [!Condition HasCentralTopic]
+  CreateLocalSubscription: !And
+    - !Condition HasAlertEmail
+    - !Condition CreateLocalTopic
 
 Resources:
 
@@ -692,6 +701,7 @@ ${LAMBDA_HANDLER_CODE}
 
   AlertTopic:
     Type: AWS::SNS::Topic
+    Condition: CreateLocalTopic
     Properties:
       TopicName: auto-map-tagger-alerts-${mpe}
       DisplayName: MAP 2.0 Auto-Tagger Alerts
@@ -699,7 +709,7 @@ ${LAMBDA_HANDLER_CODE}
 
   AlertSubscription:
     Type: AWS::SNS::Subscription
-    Condition: HasAlertEmail
+    Condition: CreateLocalSubscription
     Properties:
       TopicArn: !Ref AlertTopic
       Protocol: email
@@ -721,7 +731,7 @@ ${LAMBDA_HANDLER_CODE}
       Threshold: 3
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If [HasCentralTopic, !Ref CentralAlertTopicArn, !Ref AlertTopic]
 
   DLQAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -753,7 +763,7 @@ ${LAMBDA_HANDLER_CODE}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If [HasCentralTopic, !Ref CentralAlertTopicArn, !Ref AlertTopic]
       TreatMissingData: notBreaching
 
   # CloudWatch alarm — fires when the Lambda cold-start peer-tagger detector
@@ -780,7 +790,7 @@ ${LAMBDA_HANDLER_CODE}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If [HasCentralTopic, !Ref CentralAlertTopicArn, !Ref AlertTopic]
       TreatMissingData: notBreaching
 
   # CloudWatch alarm — slow trickle of permanent_actionable tagging failures
@@ -809,7 +819,7 @@ ${LAMBDA_HANDLER_CODE}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If [HasCentralTopic, !Ref CentralAlertTopicArn, !Ref AlertTopic]
       TreatMissingData: notBreaching
 
 ${backfillResources}
@@ -822,7 +832,7 @@ Outputs:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
     Value: ${TEMPLATE_VERSION}
   AlertTopicArn:
-    Value: !Ref AlertTopic
+    Value: !If [HasCentralTopic, !Ref CentralAlertTopicArn, !If [CreateLocalTopic, !Ref AlertTopic, '']]
   EventQueueUrl:
     Value: !Ref EventQueue
   EventDLQUrl:

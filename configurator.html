@@ -6830,9 +6830,18 @@ Parameters:
     Type: String
     Default: '${alertEmail}'
     Description: Customer ops email for tagging failure alerts (leave empty to disable)
+  CentralAlertTopicArn:
+    Type: String
+    Default: ''
+    Description: ARN of a central SNS topic for alerts (multi-account mode). If provided, alarms publish here instead of a per-account topic.
 
 Conditions:
   HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+  HasCentralTopic: !Not [!Equals [!Ref CentralAlertTopicArn, '']]
+  CreateLocalTopic: !Not [!Condition HasCentralTopic]
+  CreateLocalSubscription: !And
+    - !Condition HasAlertEmail
+    - !Condition CreateLocalTopic
 
 Resources:
 
@@ -9350,6 +9359,7 @@ ${permissionsList}
 
   AlertTopic:
     Type: AWS::SNS::Topic
+    Condition: CreateLocalTopic
     Properties:
       TopicName: auto-map-tagger-alerts-${mpe}
       DisplayName: MAP 2.0 Auto-Tagger Alerts
@@ -9357,7 +9367,7 @@ ${permissionsList}
 
   AlertSubscription:
     Type: AWS::SNS::Subscription
-    Condition: HasAlertEmail
+    Condition: CreateLocalSubscription
     Properties:
       TopicArn: !Ref AlertTopic
       Protocol: email
@@ -9379,7 +9389,7 @@ ${permissionsList}
       Threshold: 3
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If [HasCentralTopic, !Ref CentralAlertTopicArn, !Ref AlertTopic]
 
   DLQAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -9411,7 +9421,7 @@ ${permissionsList}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If [HasCentralTopic, !Ref CentralAlertTopicArn, !Ref AlertTopic]
       TreatMissingData: notBreaching
 
   # CloudWatch alarm — fires when the Lambda cold-start peer-tagger detector
@@ -9438,7 +9448,7 @@ ${permissionsList}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If [HasCentralTopic, !Ref CentralAlertTopicArn, !Ref AlertTopic]
       TreatMissingData: notBreaching
 
   # CloudWatch alarm — slow trickle of permanent_actionable tagging failures
@@ -9467,7 +9477,7 @@ ${permissionsList}
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
-        - !Ref AlertTopic
+        - !If [HasCentralTopic, !Ref CentralAlertTopicArn, !Ref AlertTopic]
       TreatMissingData: notBreaching
 
 ${backfillResources}
@@ -9480,7 +9490,7 @@ Outputs:
     Description: MAP 2.0 Auto-Tagger template version (pinned at deploy time)
     Value: ${TEMPLATE_VERSION}
   AlertTopicArn:
-    Value: !Ref AlertTopic
+    Value: !If [HasCentralTopic, !Ref CentralAlertTopicArn, !If [CreateLocalTopic, !Ref AlertTopic, '']]
   EventQueueUrl:
     Value: !Ref EventQueue
   EventDLQUrl:
@@ -9620,6 +9630,13 @@ Parameters:
   PerAccountTemplateURL:
     Type: String
     Description: S3 URL of map-auto-tagger-accounts-${mpe}.yaml
+  AlertEmail:
+    Type: String
+    Default: '${config.alertEmail || ''}'
+    Description: Customer ops email for tagging failure alerts (leave empty to disable)
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
 
 Resources:
 
@@ -9747,6 +9764,7 @@ Resources:
                               {'ParameterKey':'AgreementStartDate','ParameterValue':props['AgreementStartDate']},
                               {'ParameterKey':'AgreementEndDate','ParameterValue':props['AgreementEndDate']},
                               {'ParameterKey':'ScopeMode','ParameterValue':'account'},
+                              {'ParameterKey':'CentralAlertTopicArn','ParameterValue':props.get('CentralAlertTopicArn','')},
                           ],
                           Capabilities=['CAPABILITY_NAMED_IAM'],
                           PermissionModel='SERVICE_MANAGED',
@@ -9777,6 +9795,35 @@ Resources:
                   print(traceback.format_exc())
                   respond(event, context, 'FAILED', reason=str(e))
 
+  CentralAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: auto-map-tagger-alerts-${mpe}
+      DisplayName: MAP 2.0 Auto-Tagger Alerts (central)
+
+  CentralAlertTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics:
+        - !Ref CentralAlertTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudWatchAlarmsPublish
+            Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref CentralAlertTopic
+
+  CentralAlertSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref CentralAlertTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
   Deployment:
     Type: Custom::Deploy
     DependsOn: DeployFunction
@@ -9788,6 +9835,7 @@ Resources:
       AgreementStartDate: !Ref AgreementStartDate
       AgreementEndDate: !Ref AgreementEndDate
       ScopedAccounts: '${scopedAccountIdsJson}'
+      CentralAlertTopicArn: !Ref CentralAlertTopic
       Regions:
 ${regionsList}
 ${accountsNote}
@@ -9796,7 +9844,9 @@ Outputs:
   StackSetName:
     Value: !GetAtt Deployment.StackSetName
   RootOU:
-    Value: !GetAtt Deployment.RootId`;
+    Value: !GetAtt Deployment.RootId
+  CentralAlertTopicArn:
+    Value: !Ref CentralAlertTopic`;
         }
 
         function generateDeployScript(config, mainTemplate, perAccountTemplate) {
