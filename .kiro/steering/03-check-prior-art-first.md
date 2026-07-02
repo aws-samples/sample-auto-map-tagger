@@ -27,7 +27,7 @@
 ## Real traps this prevents (all from actual history)
 
 - **Re-adding the reconciliation Lambda** — removed in v22; it risked mass-mistagging on bad SSM config.
-- **Naively re-enabling the Edit/Upgrade flows** — disabled due to `!Sub`-based SSM incompatibility and a `["ALL"]` scope-reset bug.
+- **Naively re-enabling the Edit flow** — Edit stays disabled (its sed-on-template approach is incompatible with the `!Sub`-based SSM config). The Upgrade flow, by contrast, was **revived in #105** (hardened with `UsePreviousValue=true` + a pre-#95 guard that refuses in-place upgrade on legacy stacks lacking `ScopedAccountIds`). Don't re-enable Edit, and don't strip the upgrade guards.
 - **Trying to tag services AWS APIs can't tag** — IoT Things, Lambda Layers, Glue Tables (post-creation), CloudWatch Log Streams, API Gateway API Keys.
 - **Reintroducing the YAML monolith** — decoupled in v22 to kill the drift bug class.
 - **Removing `ci_get()`** (case-insensitive CloudTrail key access) — it exists because CloudTrail casing inconsistency caused silent tag loss.
