@@ -6,6 +6,24 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Added (PR #108 — v22.1.0):**
+
+- **Centralized SNS alerting for multi-account deployments.** Previously every account × region got its own SNS alert topic + email subscription — a large org deploy generated 150+ subscription-confirmation emails, each needing a manual click (reported by ngjinshan from a live org deploy). Now the org deployer Lambda creates **one central alert topic per deployed region** in the management account (`auto-map-tagger-alerts-central-<mpe>`) with a single email subscription per region, and per-account CloudWatch alarms publish cross-account to the same-region central topic. Per-region (not one global topic) because CloudWatch alarm actions support cross-*account* SNS targets but **not cross-*region*** ones — a single-region central topic would silently break every alarm in other regions.
+  - New per-account CFN parameter `CentralAlertAccountId` (default `''`): when set, alarms target `arn:aws:sns:<own-region>:<central-account>:auto-map-tagger-alerts-central-<mpe>` instead of creating a local topic. Single-account deployments leave it empty — behavior unchanged.
+  - The central topic's publish grant for `cloudwatch.amazonaws.com` is **scoped to the customer's organization** via an `aws:SourceOrgID` condition (an unconditioned service-principal grant would let any AWS account's alarms publish into the customer's ops email — topic names are guessable).
+  - The `-central-` name segment avoids a `TopicName` collision with the local topic when the customer follows the documented LIMITATIONS.md pattern of additionally deploying single-account into the management account.
+  - Central topics are created/deleted by the org `DeployFunction` (idempotent `sns:create_topic`), not as CFN resources, so they exist in every deployed region.
+
+**Fixed (PR #108 — v22.1.0):**
+
+- **Alert topic was silently undeliverable (CT6-003).** The local per-account alert topic was encrypted with the AWS-managed `alias/aws/sns` KMS key. CloudWatch cannot be granted `kms:GenerateDataKey` on an AWS-managed key, so **every alarm action against the topic failed silently** — 0 alert deliveries in v21.x and v22.0.0 regardless of subscription state. The managed-key encryption is removed; alarm→topic delivery works again. (Found in the CT6 chaos test; the release gate's `40-SNS-1` check guards the regression.)
+
+**Upgrade classification (v22.1.0):**
+
+> **Single-account:** upgrade-safe — `upgrade.sh` or re-run `deploy.sh`. The new parameter defaults to `''` (local topic, unchanged behavior) and the CT6-003 fix applies on update.
+>
+> **Multi-account:** `upgrade.sh` is **safe but does not enable centralization** — the new parameter isn't in existing stack instances, so accounts keep per-account topics (with the CT6-003 fix once instances update). To get centralized alerts on an existing org deployment, a **full redeploy is required (`delete.sh` + `deploy.sh`)** — re-running `deploy.sh` alone is NOT sufficient: the surviving management stack absorbs the update without re-driving the StackSet parameters (the known CT6-004 no-op path).
+
 **Added:**
 
 - **Upgrade flow re-enabled in the configurator UI.** Customers can now select "Update to latest template version" to generate an `upgrade.sh` that upgrades Lambda code, EventBridge rules, and IAM permissions without re-entering scope configuration. The script uses `UsePreviousValue=true` for all existing CloudFormation parameters, creates a change-set preview for single-account stacks (requires confirmation before executing), and shows a dry-run summary for StackSets. Includes a pre-#95 guard that refuses in-place upgrade on legacy stacks lacking the `ScopedAccountIds` parameter (delete + redeploy required for those).
