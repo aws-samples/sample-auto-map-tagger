@@ -7,7 +7,8 @@
     "build:yaml": "node scripts/build-yaml.js",
     "verify": "node scripts/verify-build.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sync-rules": "node scripts/sync-rules.js"
   },
   "repository": {
     "type": "git",

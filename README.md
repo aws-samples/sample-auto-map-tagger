@@ -121,7 +121,10 @@ npm install              # install dependencies (first time)
 npm run build            # assemble configurator.html from src/
 npm test                 # run unit tests (vitest)
 npm run verify           # sanity-check the built output
+npm run sync-rules       # sync AI agent rules (.kiro/steering -> .claude/rules)
 ```
+
+**AI agent rules:** Engineering rules for AI coding agents live in `.kiro/steering/` (Kiro) and are mirrored to `.claude/rules/` (Claude Code). Edit the `.kiro/steering/` copy, then run `npm run sync-rules` and commit both. See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for details.
 
 Source files live in `src/`. Edit there, run `npm run build`, open `configurator.html` to test.
 

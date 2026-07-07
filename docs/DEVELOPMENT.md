@@ -85,9 +85,25 @@ Edit `src/templates/lambda-handler.py` directly. It's valid standalone Python �
 ## Verification
 
 ```bash
-npm run build     # assemble configurator.html
-npm test          # 35 unit tests (services, i18n, build output, Lambda)
-npm run verify    # 13 sanity checks on the built HTML
+npm run build       # assemble configurator.html
+npm run build:yaml  # assemble configurator.yaml
+npm test            # unit tests (services, i18n, build output, Lambda)
+npm run verify      # sanity checks on the built HTML
 ```
 
 After every change, the built output should contain all functions, all i18n keys, all service definitions, and no unresolved placeholders.
+
+## AI Agent Rules (Kiro / Claude Code)
+
+Engineering rules for AI coding agents live as topic-scoped markdown files, mirrored across two folders so both tools load the same guidance:
+
+- `.kiro/steering/*.md` — auto-loaded by Kiro
+- `.claude/rules/*.md` — auto-loaded by Claude Code (see `CLAUDE.md` for the entry point)
+
+**`.kiro/steering/` is the canonical source.** `.claude/rules/` is a generated mirror.
+
+> **When you edit any agent rule, edit the file in `.kiro/steering/` and then run:**
+> ```bash
+> npm run sync-rules   # copies .kiro/steering/*.md -> .claude/rules/*.md
+> ```
+> Commit both folders together so Kiro and Claude Code stay in sync. (Symlinks are unreliable under `.kiro/`, so the rules are physically copied.)

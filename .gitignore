@@ -25,8 +25,13 @@ venv/
 *.swo
 *~
 
-# Kiro IDE (internal development tool)
-.kiro/
+# Kiro IDE (internal development tool) — ignore local settings but keep shared steering
+.kiro/*
+!.kiro/steering/
+
+# Claude Code — keep shared rules, ignore personal/local settings
+.claude/settings.local.json
+.claude/CLAUDE.local.md
 
 # Test artifacts
 /tmp/
