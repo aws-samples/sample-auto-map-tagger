@@ -1,6 +1,6 @@
 # 09 — Testing and Chaos Engineering
 
-> ⚠️ Mirrored in `.kiro/steering/` and `.claude/rules/`. Run `npm run sync-rules` after edits.
+> ⚠️ Canonical copy: `.kiro/steering/`. Edit there, then run `npm run sync-rules` — the sync is **one-way** (kiro → claude) and overwrites `.claude/rules/`.
 
 ## The F-finding taxonomy
 
@@ -8,19 +8,12 @@ Bugs found in chaos testing are catalogued as `F###` findings. **Every fix refer
 
 When you fix a chaos-test finding, follow the pattern: cite the F-number, add the regression test, note the version.
 
-## Chaos-testing discipline (CT waves)
-
-The project is hardened through chaos-test waves (CT2–CT5) run against **real AWS resources across a 9-account pool**. The final wave (CT5) ran 708 tests across 25 phases. The pattern:
-
-1. Create resources of every supported type (`create_resources.py`)
-2. Wait ~90 seconds
-3. Verify every resource received `map-migrated` (`verify_tags.py`)
-4. Tear down (`teardown.py`); `nightly_cleanup_guard.py` prevents orphans
+(Context: the project is hardened through multi-account chaos-test waves run against real AWS resources by the maintainers — that infrastructure is not in this repo, but the F-findings it produces are cited throughout the git history.)
 
 ## Unit tests (Vitest) — run every change
 
 ```bash
-npm test    # 35 tests: build output, service defs, i18n completeness, Lambda logic
+npm test    # build output, service defs, i18n completeness, Lambda logic
 ```
 
 ## CI lint layers — respect all of them

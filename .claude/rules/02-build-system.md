@@ -1,6 +1,6 @@
 # 02 — Build System
 
-> ⚠️ Mirrored in `.kiro/steering/` and `.claude/rules/`. Run `npm run sync-rules` after edits.
+> ⚠️ Canonical copy: `.kiro/steering/`. Edit there, then run `npm run sync-rules` — the sync is **one-way** (kiro → claude) and overwrites `.claude/rules/`.
 
 ## The one rule that prevents the most bugs
 
@@ -15,7 +15,7 @@
 4. Embeds `src/templates/lambda-handler.py` (indented for YAML embedding)
 5. Outputs the single self-contained `configurator.html`
 
-`build-yaml.js` generates `configurator.yaml` from the same sources — so drift between HTML and YAML is impossible by construction (this eliminated the F012 drift bug class in v22).
+**`npm run build` only produces the HTML.** The YAML is generated separately by `npm run build:yaml` (`scripts/build-yaml.js`, optionally with `--config '{...}'`), from the same `src/` sources — so drift between HTML and YAML is impossible by construction (this eliminated the F012 drift bug class in v22).
 
 ## Single source of truth
 
@@ -25,9 +25,12 @@
 ## The verify loop (run after every change)
 
 ```bash
-npm run build     # assemble configurator.html + configurator.yaml
-npm test          # 35 unit tests (services, i18n, build output, Lambda)
-npm run verify    # 13 sanity checks on built HTML (no unresolved placeholders, all functions present)
+npm run build       # assemble configurator.html
+npm run build:yaml  # assemble configurator.yaml
+npm test            # unit tests (services, i18n, build output, Lambda)
+npm run verify      # sanity checks on built HTML (no unresolved placeholders, all functions present)
 ```
+
+Don't hardcode test or check counts in docs — they rot on every PR.
 
 Always rebuild and run this loop before committing — a stale artifact fails CI.

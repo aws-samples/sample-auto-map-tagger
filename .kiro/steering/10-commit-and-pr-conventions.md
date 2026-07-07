@@ -1,6 +1,6 @@
 # 10 — Commit and PR Conventions
 
-> ⚠️ Mirrored in `.kiro/steering/` and `.claude/rules/`. Run `npm run sync-rules` after edits.
+> ⚠️ Canonical copy: `.kiro/steering/`. Edit there, then run `npm run sync-rules` — the sync is **one-way** (kiro → claude) and overwrites `.claude/rules/`.
 
 ## Conventional commits
 
@@ -32,4 +32,4 @@ Use imperative mood, capitalize the subject, no trailing period, keep the subjec
 
 ## Committing agent-rule changes
 
-The rules live in two mirrored folders (`.kiro/steering/`, `.claude/rules/`). Always edit and commit both together (via `npm run sync-rules`) so Kiro and Claude Code stay in sync.
+The rules live in two mirrored folders. **Edit only `.kiro/steering/` (the canonical copy)**, run `npm run sync-rules` to regenerate `.claude/rules/`, and commit both folders together. Never edit `.claude/rules/` directly — the sync is one-way and will overwrite it.

@@ -1,6 +1,6 @@
 # 03 — Check Prior Art First (mandatory pre-change ritual)
 
-> ⚠️ Mirrored in `.kiro/steering/` and `.claude/rules/`. Run `npm run sync-rules` after edits.
+> ⚠️ Canonical copy: `.kiro/steering/`. Edit there, then run `npm run sync-rules` — the sync is **one-way** (kiro → claude) and overwrites `.claude/rules/`.
 
 **This project has extensive accumulated learning — 200+ commits, multiple chaos-test waves, and features that were shipped then deliberately reverted. Before implementing ANY change, assume your idea may have already been tried, considered, or explicitly rejected. Check the institutional memory first.**
 
@@ -8,11 +8,11 @@
 
 | Source | Answers |
 |---|---|
-| `LIMITATIONS.md` | "Is this a known constraint we already decided we can't/won't solve?" (e.g., global services only emit CloudTrail events in us-east-1; long-provisioning resources exceed the retry budget) |
+| `docs/LIMITATIONS.md` | "Is this a known constraint we already decided we can't/won't solve?" (e.g., global services only emit CloudTrail events in us-east-1; long-provisioning resources exceed the retry budget) |
 | `CHANGELOG.md` | "Did we already ship, change, or **revert** this?" |
 | `docs/*.md` design docs | "Was this a locked design decision?" (e.g., `design-reconciliation.md` locked its open questions on a date — don't re-litigate) |
 | `git log` + commit messages | "Was this tried and fixed?" Search the F-taxonomy: `git -P log --oneline \| grep -i <keyword>` — find the F### finding, its fix, and rationale |
-| `COVERAGE.md` / `docs/MAP_included.md` | "Is this service already covered or intentionally excluded?" |
+| `docs/COVERAGE.md` / `docs/MAP_included.md` | "Is this service already covered or intentionally excluded?" |
 | `docs/MAP_TAGGING_GAP_ANALYSIS.md` | "Is this untaggable due to an AWS API limitation?" |
 | `tests/unit/` | "Is there a regression test guarding this behavior?" |
 

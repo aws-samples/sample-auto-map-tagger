@@ -1,6 +1,6 @@
 # 01 — Project Overview
 
-> ⚠️ These rules are mirrored in `.kiro/steering/` (Kiro) and `.claude/rules/` (Claude Code). Edit one, then run `npm run sync-rules` to sync the other.
+> ⚠️ Canonical copy: `.kiro/steering/`. Edit there, then run `npm run sync-rules` — the sync is **one-way** (kiro → claude) and overwrites `.claude/rules/`.
 
 ## What this project is
 
@@ -47,4 +47,4 @@ tests/unit/       Vitest unit tests
 
 ## Golden rule
 
-`configurator.html` and `configurator.yaml` are **generated build artifacts**. Never edit them directly — edit `src/` and run `npm run build`. See `02-build-system`.
+`configurator.html` and `configurator.yaml` are **generated build artifacts**. Never edit them directly — edit `src/` and run `npm run build` (HTML) / `npm run build:yaml` (YAML). See `02-build-system`.

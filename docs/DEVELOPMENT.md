@@ -85,9 +85,10 @@ Edit `src/templates/lambda-handler.py` directly. It's valid standalone Python â€
 ## Verification
 
 ```bash
-npm run build     # assemble configurator.html
-npm test          # 35 unit tests (services, i18n, build output, Lambda)
-npm run verify    # 13 sanity checks on the built HTML
+npm run build       # assemble configurator.html
+npm run build:yaml  # assemble configurator.yaml
+npm test            # unit tests (services, i18n, build output, Lambda)
+npm run verify      # sanity checks on the built HTML
 ```
 
 After every change, the built output should contain all functions, all i18n keys, all service definitions, and no unresolved placeholders.

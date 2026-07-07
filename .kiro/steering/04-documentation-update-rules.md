@@ -1,6 +1,6 @@
 # 04 — Documentation Update Rules
 
-> ⚠️ Mirrored in `.kiro/steering/` and `.claude/rules/`. Run `npm run sync-rules` after edits.
+> ⚠️ Canonical copy: `.kiro/steering/`. Edit there, then run `npm run sync-rules` — the sync is **one-way** (kiro → claude) and overwrites `.claude/rules/`.
 
 **Every change must leave the documentation consistent. Before finishing any change, check whether these docs need updating.**
 
@@ -9,13 +9,17 @@
 | Change | Docs to update |
 |---|---|
 | **Any user-visible or behavioral change** | `CHANGELOG.md` — categorized under Added / Fixed / Changed / Breaking, with the version |
-| **Added / removed / changed service coverage** | `COVERAGE.md` **and** `docs/MAP_included.md` |
-| **Discovered a new constraint or edge case** | `LIMITATIONS.md` |
+| **Added / removed / changed service coverage** | `docs/COVERAGE.md` **and** `docs/MAP_included.md` |
+| **Discovered a new constraint or edge case** | `docs/LIMITATIONS.md` |
 | **Changed the build, source structure, or extension process** | `docs/DEVELOPMENT.md` |
 | **Changed user-facing behavior or deployment steps** | `README.md` and/or `docs/INSTRUCTIONS.md` |
 | **Version bump** | `src/js/constants.js` (`TEMPLATE_VERSION`) + add examples to `VERSIONING.md` if the bump rule is illustrative |
 | **A service AWS cannot tag** | `docs/MAP_TAGGING_GAP_ANALYSIS.md` |
 | **Big feature** (new Lambda, new pipeline component, new CFN parameter) | Write a design doc in `docs/` **with locked open questions before coding** |
+
+## The claim bar: "supports X" requires live verification
+
+`docs/COVERAGE.md`, `CHANGELOG.md`, and release notes may **not** claim a service is supported until it has been live-verified (a real resource created and observed to receive the tag). "Handler exists + E2E green" is not the bar — two of three v20.3.0 Tier-1 coverage claims turned out to be live-broken. Until verified, mark the entry `UNVERIFIED` or list it as a `KNOWN GAP`.
 
 ## CHANGELOG discipline
 

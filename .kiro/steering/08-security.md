@@ -1,6 +1,6 @@
 # 08 — Security
 
-> ⚠️ Mirrored in `.kiro/steering/` and `.claude/rules/`. Run `npm run sync-rules` after edits.
+> ⚠️ Canonical copy: `.kiro/steering/`. Edit there, then run `npm run sync-rules` — the sync is **one-way** (kiro → claude) and overwrites `.claude/rules/`.
 > These are **hard constraints**. Treat violations as blocking.
 
 ## Data-safety hard rules (non-negotiable)
@@ -14,6 +14,14 @@ The configurator generates shell scripts that customers run **with their own AWS
 - **Single-quote containment** for any user-supplied value interpolated into shell (the `customerName` injection fix, U4/v20.5.2).
 - **`lint_shell_injection.py` must pass** — it guards the generated scripts.
 - **XSS hardening** on any HTML that renders user input (review-table XSS fix, v20.9.5).
+
+## Alerting and KMS
+
+- **Never use `alias/aws/sns` (the AWS-managed KMS key) on a topic that receives CloudWatch alarm actions** — CloudWatch cannot publish through AWS-managed keys, so the alarm silently never delivers (CT6-003, fixed in #108). Use a customer-managed key or no KMS on alert topics, and scope cross-account publishes with `aws:SourceOrgID`.
+
+## No outbound calls from the customer environment (hard rule)
+
+The deployed solution makes **no network calls out of the customer's account** — no telemetry, no update checks, no phoning home. This is a load-bearing design constraint (it's why GitHub Releases is the only update channel). Any feature that would add an outbound call is a design change requiring explicit human sign-off, not a normal PR.
 
 ## Least-privilege IAM
 
@@ -29,4 +37,4 @@ The configurator generates shell scripts that customers run **with their own AWS
 
 - **No secrets or credentials in the configurator** — it's a static client-side file.
 - **Report security issues via the AWS vulnerability reporting page, never a public GitHub issue** (see `CONTRIBUTING.md`).
-- **Respect SCP constraints** — the tagger cannot exceed org guardrails (documented in `LIMITATIONS.md`).
+- **Respect SCP constraints** — the tagger cannot exceed org guardrails (documented in `docs/LIMITATIONS.md`).

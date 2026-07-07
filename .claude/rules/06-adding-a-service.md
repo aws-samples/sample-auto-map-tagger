@@ -1,6 +1,6 @@
 # 06 — Adding an AWS Service
 
-> ⚠️ Mirrored in `.kiro/steering/` and `.claude/rules/`. Run `npm run sync-rules` after edits.
+> ⚠️ Canonical copy: `.kiro/steering/`. Edit there, then run `npm run sync-rules` — the sync is **one-way** (kiro → claude) and overwrites `.claude/rules/`.
 
 Full guide in `docs/DEVELOPMENT.md`. The recipe:
 
@@ -38,7 +38,12 @@ Full guide in `docs/DEVELOPMENT.md`. The recipe:
 - **Add a TRANSIENT_MARKER** for slow-provisioning services, or they get classified as permanent failures and DLQ prematurely.
 - **Check `MAP_included.md`** — only tag services on the MAP Included Services List (CFN stacks were deliberately removed in v22 because they're not MAP-eligible).
 - **Some resources are untaggable** by AWS API — see `docs/MAP_TAGGING_GAP_ANALYSIS.md` before adding a handler that can't work.
+- **Land every new handler with a real captured CloudTrail event fixture** — not a hand-written one. AWS changes event shapes without notice (#102); a golden-event corpus replayed in tests is the only static defense against that drift.
+
+## Tracking the MAP Included Services List
+
+The MAP Included Services List is revised periodically. On every revision: **diff the whole list against the handler inventory** (both directions — newly eligible services with no handler, and covered services that dropped off), and **pin the list edition date** in `docs/MAP_included.md`. Spot-checking individual services misses whole-service gaps (the 2026-06 class-0 audit found four eligible services with no handler at all).
 
 ## Update docs
 
-New coverage → update `COVERAGE.md` and `docs/MAP_included.md` (see `04-documentation-update-rules`).
+New coverage → update `docs/COVERAGE.md` and `docs/MAP_included.md` (see `04-documentation-update-rules`).
