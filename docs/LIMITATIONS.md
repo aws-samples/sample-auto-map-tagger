@@ -129,6 +129,16 @@ See the AWS documentation for [SSM Parameter Store Advanced tier](https://docs.a
 
 ---
 
+## Explicit account lists cap out at ~270 accounts (CloudFormation parameter limit)
+
+`ScopedAccountIds` is a CloudFormation **String** parameter carrying a JSON array of account IDs. CloudFormation caps any parameter value at **4,096 bytes** (AWS hard quota, not raisable). Each explicitly-listed account ID costs 15 bytes serialized (`"123456789012",`), so the list stops fitting at approximately **270 accounts**. Beyond that, stack/StackSet creation fails at CloudFormation validation — there is currently no configurator-side or preflight guard for this, so the failure surfaces only at deploy time.
+
+Note this is a *different* ceiling from the [SSM Advanced-tier threshold above](#ssm-parameter-store-advanced-tier-very-large-scopes): ~235 accounts triggers an automatic, harmless tier promotion; ~270 accounts is a hard deploy failure.
+
+**Mitigation:** scope mode `["ALL"]` (the default) is immune — it is a 5-byte string regardless of organization size, and new accounts joining the org are covered automatically. Explicit account lists are intended for partial-org MAP agreements and are comfortably safe up to ~200 accounts. A customer needing to *exclude* only a handful of accounts from a very large org should prefer `ALL` scope and handle exclusions by other means (e.g., an SCP denying the tagger role in excluded accounts) rather than enumerating 270+ included accounts.
+
+---
+
 ## In-Place Upgrade Limitations
 
 In-place upgrades via `upgrade.sh` are supported for **upgrade-safe releases** (service coverage updates, bug fixes — no new CloudFormation parameters). The upgrade flow uses `UsePreviousValue=true` for all existing parameters, preserving scope configuration.
