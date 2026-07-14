@@ -6,6 +6,10 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Added (tooling — no version bump):**
+
+- **`scripts/map-tagger.sh` day-2 account-scope helper.** Wraps the `update-stack-set` one-liner from `docs/INSTRUCTIONS.md`: takes plain account IDs and builds the escaped `ScopedAccountIds` JSON plus the full `UsePreviousValue` parameter list, with input validation (12-digit IDs or `ALL`). Full-replacement semantics matching the documented command. Not part of the deployed solution or generated artifacts, so no `TEMPLATE_VERSION` bump. README day-2 section now leads with the script, keeping the raw CLI command as a fallback.
+
 **Added (PR #108 — v22.1.0):**
 
 - **Centralized SNS alerting for multi-account deployments.** Previously every account × region got its own SNS alert topic + email subscription — a large org deploy generated 150+ subscription-confirmation emails, each needing a manual click (reported by ngjinshan from a live org deploy). Now the org deployer Lambda creates **one central alert topic per deployed region** in the management account (`auto-map-tagger-alerts-central-<mpe>`) with a single email subscription per region, and per-account CloudWatch alarms publish cross-account to the same-region central topic. Per-region (not one global topic) because CloudWatch alarm actions support cross-*account* SNS targets but **not cross-*region*** ones — a single-region central topic would silently break every alarm in other regions.
