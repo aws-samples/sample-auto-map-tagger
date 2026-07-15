@@ -1,0 +1,47 @@
+{
+  "eventVersion": "1.08",
+  "userIdentity": {
+    "type": "IAMUser",
+    "principalId": "AIDAEXAMPLEEXAMPLE",
+    "arn": "arn:aws:iam::347694270668:user/example-user",
+    "accountId": "347694270668",
+    "accessKeyId": "AKIAEXAMPLEEXAMPLE",
+    "userName": "example-user"
+  },
+  "eventTime": "2026-07-15T02:42:13Z",
+  "eventSource": "elasticbeanstalk.amazonaws.com",
+  "eventName": "CreateEnvironment",
+  "awsRegion": "ap-southeast-2",
+  "sourceIPAddress": "198.51.100.1",
+  "userAgent": "Boto3/1.42.96 md/Botocore#1.42.96 md/awscrt#0.31.1 ua/2.1 os/linux#6.1.166-197.305.amzn2023.aarch64 md/arch#aarch64 lang/python#3.9.25 md/pyimpl#CPython m/n,Z,b,D cfg/retry-mode#legacy Botocore/1.42.96",
+  "requestParameters": {
+    "applicationName": "ct5-p27b-07150059-ebapp-df2604",
+    "environmentName": "ct5-p27b-07150059-ebenv-bc1f02",
+    "solutionStackName": "64bit Amazon Linux 2023 v4.13.3 running Python 3.14",
+    "optionSettings": [
+      {
+        "namespace": "aws:autoscaling:launchconfiguration",
+        "optionName": "IamInstanceProfile",
+        "value": "aws-elasticbeanstalk-ec2-role"
+      },
+      {
+        "namespace": "aws:elasticbeanstalk:environment",
+        "optionName": "EnvironmentType",
+        "value": "SingleInstance"
+      }
+    ]
+  },
+  "responseElements": null,
+  "requestID": "70007a31-46c0-4c92-8244-caa999063e0e",
+  "eventID": "f9c80533-312d-4eac-8d50-601bae83c52c",
+  "readOnly": false,
+  "eventType": "AwsApiCall",
+  "managementEvent": true,
+  "recipientAccountId": "347694270668",
+  "eventCategory": "Management",
+  "tlsDetails": {
+    "tlsVersion": "TLSv1.3",
+    "cipherSuite": "TLS_AES_128_GCM_SHA256",
+    "clientProvidedHostHeader": "elasticbeanstalk.ap-southeast-2.amazonaws.com"
+  }
+}
