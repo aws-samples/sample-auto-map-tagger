@@ -6,6 +6,12 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Fixed (v22.1.0 — release-gate 2026-07-14 findings):**
+
+- **ElastiCache clusters created shortly before the tagger fired stayed permanently untagged.** The tag call (`AddTagsToResource`) landing ~30s after `CreateCacheCluster` can hit `CacheClusterNotFoundFault` while the cluster is still provisioning. That error code wasn't in the transient-marker list, so the classifier routed it permanent-actionable — one alert, zero retries, resource never tagged (live-traced via CloudTrail, gate check `P1-ECACHE-CL`). `CacheClusterNotFoundFault` is now classified transient and retries through SQS redelivery, which succeeds once provisioning settles.
+- **CloudWatch dashboards were never tagged — wrong ARN shape.** The handler built `arn:aws:cloudwatch:<region>:<account>:dashboard/<name>`, but real dashboard ARNs are account-global with an **empty region segment** (`arn:aws:cloudwatch::<account>:dashboard/<name>`). The native `cloudwatch:TagResource` call targeted an identifier that matches no resource, so every dashboard stayed untagged (gate check `P1-CW-DASH`, confirmed live via `get-dashboard`). The region segment is removed.
+- **Generated `delete.sh` no longer contains log-group-deletion code when "delete logs" is unchecked.** Previously the CloudWatch-Logs deletion block was always emitted and only disarmed by a `DELETE_LOGS=false` variable at the top of the script — one edited line away from destroying audit history the customer chose to keep. The configurator now omits the block entirely unless log deletion was selected (gate check `16D-3`).
+
 **Added (PR #108 — v22.1.0):**
 
 - **Centralized SNS alerting for multi-account deployments.** Previously every account × region got its own SNS alert topic + email subscription — a large org deploy generated 150+ subscription-confirmation emails, each needing a manual click (reported by ngjinshan from a live org deploy). Now the org deployer Lambda creates **one central alert topic per deployed region** in the management account (`auto-map-tagger-alerts-central-<mpe>`) with a single email subscription per region, and per-account CloudWatch alarms publish cross-account to the same-region central topic. Per-region (not one global topic) because CloudWatch alarm actions support cross-*account* SNS targets but **not cross-*region*** ones — a single-region central topic would silently break every alarm in other regions.

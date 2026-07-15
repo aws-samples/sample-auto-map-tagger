@@ -913,12 +913,18 @@ def extract_arn(detail, account_id, region):
         if plan_id:
             return f"arn:aws:backup:{region}:{account_id}:backup-plan:{plan_id}"
 
-    # CloudWatch Dashboard — RGTA rejects both regionless and regional
-    # ARNs. Include region so native cloudwatch:tag_resource dispatch works.
+    # CloudWatch Dashboard — tagged via native cloudwatch:tag_resource
+    # dispatch (RGTA rejects dashboard ARNs). The real ARN has an EMPTY
+    # region segment: arn:aws:cloudwatch::{account}:dashboard/{name}
+    # (dashboards are account-global; confirmed live via
+    # get-dashboard --query DashboardArn, release gate P1-CW-DASH
+    # 2026-07-14). A region-qualified ARN is accepted by nothing —
+    # tag_resource silently tagged a nonexistent resource identifier
+    # and the dashboard stayed untagged.
     elif event_name == 'PutDashboard':
         dashboard_name = ci_get(req, 'dashboardName')
         if dashboard_name:
-            return f"arn:aws:cloudwatch:{region}:{account_id}:dashboard/{dashboard_name}"
+            return f"arn:aws:cloudwatch::{account_id}:dashboard/{dashboard_name}"
 
     # EMR Cluster (RunJobFlow)
     elif event_name == 'RunJobFlow':
@@ -1883,6 +1889,17 @@ _TRANSIENT_MARKERS = (
     # not available" while the cluster is still settling. Retries
     # succeed once provisioning completes.
     'is either not present or not available',
+    # ElastiCache provisioning race, error-code form. Live-traced
+    # (release gate P1-ECACHE-CL, 2026-07-14): AddTagsToResource ~30s
+    # after CreateCacheCluster raises CacheClusterNotFoundFault while
+    # the cluster is still provisioning — the message wording does not
+    # always contain the §1.101 substring above, so match the error
+    # code itself (always present in the ClientError string). Without
+    # this the event classified permanent_actionable and the resource
+    # stayed permanently untagged. A genuinely-deleted cluster now
+    # burns the 5-redelivery budget before landing in EventDLQ —
+    # acceptable, the DLQ alarm still fires.
+    'CacheClusterNotFoundFault',
     # SSM ConcurrentUpdateException (§1.44). PutParameter bursts
     # (e.g. customer automation rotating config in parallel) return
     # "concurrently modified" when two writers touch the same
