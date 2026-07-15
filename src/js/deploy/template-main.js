@@ -500,15 +500,31 @@ ${permissionsList}
                   return f'shared VPC(s): {sorted(overlap)}'
               return ''
 
+          def _parse_scope_list(raw, drop=()):
+              # Custom-resource properties arrive as the JSON STRING the
+              # template baked in ('["vpc-0abc"]'), not a list. The old
+              # comma-split turned that into ['["vpc-0abc"]'] — bracket-
+              # wrapped garbage that never intersected the peer's clean
+              # set, so the VPC-overlap preflight NEVER fired (two same-VPC
+              # taggers deployed side by side; release-gate P3-C5-SAME-VPC,
+              # live-confirmed 2026-07-16). Parse JSON first; fall back to
+              # comma-split for hand-entered values.
+              if not isinstance(raw, str):
+                  return [v for v in (raw or []) if v not in drop]
+              try:
+                  vals = json.loads(raw)
+                  if not isinstance(vals, list):
+                      vals = [vals]
+              except (ValueError, TypeError):
+                  vals = raw.split(',')
+              return [s.strip() for s in (str(v) for v in vals)
+                      if s.strip() and s.strip() not in drop]
+
           def check_peers(props, account, region):
               own_mpe = props['MpeId']
               new_mode = props.get('ScopeMode', 'account')
-              new_accts = props.get('ScopedAccountIds') or ['ALL']
-              if isinstance(new_accts, str):
-                  new_accts = [s.strip() for s in new_accts.split(',') if s.strip()]
-              new_vpcs = props.get('ScopedVpcIds') or []
-              if isinstance(new_vpcs, str):
-                  new_vpcs = [s.strip() for s in new_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
+              new_accts = _parse_scope_list(props.get('ScopedAccountIds')) or ['ALL']
+              new_vpcs = _parse_scope_list(props.get('ScopedVpcIds'), drop=('NONE',))
               cfn = boto3.client('cloudformation')
               ssm = boto3.client('ssm')
               conflicts = []
