@@ -49,3 +49,21 @@ describe('lambda-handler.py — gate-confirmed regressions', () => {
     expect(py).not.toContain('arn:aws:cloudwatch:{region}:{account_id}:dashboard/');
   });
 });
+
+// Async-provisioning-lag transient markers, live-traced in the 2026-07-16
+// gate rerun: the tag call races the resource's provisioning window and
+// must retry via SQS rather than route permanent_actionable.
+describe('lambda-handler.py — provisioning-lag transient markers', () => {
+  const py = fs.readFileSync(path.join(__dirname, '../../src/templates/lambda-handler.py'), 'utf8');
+  const transientBlock = py.slice(
+    py.indexOf('_TRANSIENT_MARKERS = ('),
+    py.indexOf('_PERMANENT_IGNORABLE_MARKERS'));
+
+  it('classifies DynamoDB restore-in-progress as transient (P27B-DDB-RESTORE)', () => {
+    expect(transientBlock).toContain("'Table is being used'");
+  });
+
+  it('classifies Beanstalk env-launching as transient (P27B-BEANSTALK-ENV)', () => {
+    expect(transientBlock).toContain("'Must be Ready'");
+  });
+});

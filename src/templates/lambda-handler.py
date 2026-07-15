@@ -2010,6 +2010,19 @@ _TRANSIENT_MARKERS = (
     # "concurrently modified" when two writers touch the same
     # parameter. Retry after SQS redelivery resolves it.
     'concurrently modified',
+    # DynamoDB restore-in-progress (P27B-DDB-RESTORE, live-traced
+    # 2026-07-16): TagResource during RestoreTableFromBackup returns
+    # ResourceInUseException "Attempt to change a resource which is
+    # still in use: Table is being used". The restore completes in
+    # minutes; retry succeeds. Same async-provisioning-lag shape as
+    # ElastiCache above.
+    'Table is being used',
+    # Elastic Beanstalk environment launch (P27B-BEANSTALK-ENV,
+    # live-traced 2026-07-16): UpdateTagsForResource during the ~5-10
+    # min launch returns "Environment named <x> is in an invalid state
+    # for this operation. Must be Ready". Resolves when the env
+    # reaches Ready; retry within the SQS budget succeeds.
+    'Must be Ready',
 )
 _PERMANENT_IGNORABLE_MARKERS = (
     # Resource genuinely deleted between create and tag event.

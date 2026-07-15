@@ -17,6 +17,7 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 - **Elastic Beanstalk `CreateEnvironment` also ships `responseElements: null`** — ARN now constructed from `applicationName` + `environmentName`. (`P27B-BEANSTALK-ENV`)
 - **Alert-noise fixes for two documented-untaggable resources:** IoT `CreateThing` (AWS rejects `thing` in TagResource) moved to `_IGNORE_EVENTS`, and Glue `CreateTable` (tables taggable at creation only) now deliberately skips — both previously DLQ'd + SNS-alerted on every creation despite being known, documented gaps. No tag was ever possible for either.
 - All seven extractor fixes land with **golden-event regression tests replaying the real captured CloudTrail fixtures** (`tests/fixtures/`, credentials scrubbed) through the actual extractor code.
+- **Two more provisioning-lag transient markers** (found by the post-fix gate rerun once the extractor fixes let these events reach the tag call at all): DynamoDB restores return `ResourceInUseException: Table is being used` and Elastic Beanstalk environments return `...invalid state for this operation. Must be Ready` during their launch windows — both previously routed permanent-actionable (one alert, no retry, no tag). Both now retry via SQS redelivery, which succeeds once provisioning settles.
 
 **Fixed (v22.1.0 — Fargate/ECS RunTask silent tag loss):**
 
