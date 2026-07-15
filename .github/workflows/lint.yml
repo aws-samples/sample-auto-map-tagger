@@ -487,6 +487,14 @@ jobs:
       - name: Enforce no handler-coverage regressions vs baseline
         run: python3 .github/scripts/audit_handler_coverage.py --check
 
+      - name: Enforce subscription parity (subscribed event ⇒ extractor or baselined)
+        # Catches the RunTask/Fargate class: an event subscribed in
+        # src/js/services/*.js with no lambda-handler.py branch silently
+        # relies on the universal ARN scan, which can't reach ARNs inside
+        # lists. New subscriptions must add an extractor or consciously
+        # baseline the event in .github/subscription_parity_baseline.txt.
+        run: python3 .github/scripts/audit_handler_coverage.py --parity
+
       - name: Print full coverage report (for PR review)
         if: always()
         run: python3 .github/scripts/audit_handler_coverage.py --report

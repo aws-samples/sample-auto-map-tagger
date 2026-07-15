@@ -160,3 +160,4 @@ UNCOVERED RestoreTableFromBackup|dynamodb.amazonaws.com
 UNCOVERED RestoreTableToPointInTime|dynamodb.amazonaws.com
 COVERED   RunInstances
 COVERED   RunJobFlow
+COVERED   RunTask|ecs.amazonaws.com

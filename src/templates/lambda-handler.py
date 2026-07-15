@@ -283,8 +283,26 @@ def extract_arns_multi(detail, account_id, region):
     — AWS populates the attached EBS volume IDs AFTER the instance
     reaches pending/running, not in the RunInstances API response.
     We therefore describe_instances to fetch the volume IDs.
+
+    ECS RunTask: --count N launches N tasks in one call; each task ARN
+    sits in the responseElements.tasks LIST, which the universal ARN
+    scan cannot reach (it walks top-level keys + one-level dicts only)
+    — every Fargate task went silently untagged, and Fargate billing
+    attributes to TASKS, not services, so CreateService tagging never
+    covered this spend (Smileshark/NICE Zini finding, 2026-07-14).
     """
     event_name = detail.get('eventName', '')
+    event_source = detail.get('eventSource', '')
+    if event_name == 'RunTask' and event_source == 'ecs.amazonaws.com':
+        resp = detail.get('responseElements') or {}
+        task_arns = []
+        for task in resp.get('tasks') or []:
+            if not isinstance(task, dict):
+                continue
+            t_arn = ci_get(task, 'taskArn')
+            if t_arn and _is_wellformed_arn(t_arn):
+                task_arns.append(t_arn)
+        return task_arns or None
     if event_name != 'RunInstances':
         return None
     resp = detail.get('responseElements') or {}

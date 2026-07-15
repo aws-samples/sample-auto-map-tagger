@@ -75,6 +75,16 @@ There is no automatic detection or sidecar deploy for this case — selecting wh
 
 ---
 
+## Fargate tasks launched by ECS services need `propagateTags`
+
+Fargate billing attributes usage to **tasks**, not services — a tagged ECS service with untagged tasks shows zero tagged Fargate spend. The auto-tagger tags **standalone** tasks (direct `RunTask` API calls, e.g. one-off jobs, EventBridge Scheduler targets) via the `RunTask` CloudTrail event.
+
+Tasks launched **by an ECS service scheduler** (the normal `desiredCount` path) are a different story: the scheduler's internal launches do **not** emit a customer-visible `RunTask` management event (verified empirically 2026-07-15 — a `desiredCount=1` service launched tasks for 25+ minutes with zero RunTask events in CloudTrail), so no event-driven tagger can see them.
+
+**Mitigation (customer-side, one flag):** create or update services with `--propagate-tags SERVICE` (or `TASK_DEFINITION`). ECS then copies the service's tags — including the `map-migrated` tag this solution applies to the service — onto every task it launches, keeping Fargate spend attributed with no tagger involvement. Existing services can be updated in place: `aws ecs update-service --cluster <c> --service <s> --propagate-tags SERVICE` (applies to tasks launched after the update).
+
+---
+
 ## Unsupported MAP-eligible services (handler gap)
 
 The services below appear on the MAP Included Services List (edition **18 June 2026**) but are **not** yet handled by this Lambda. Resources created in these services during the MAP period will not be auto-tagged and must be tagged by another means.
