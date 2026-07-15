@@ -6,6 +6,18 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Fixed (v22.1.0 — phase-27 verification sweep, 7 extractor bugs + 2 alert-noise paths, all live-verified against real captured CloudTrail events 2026-07-15):**
+
+- **Redshift clusters were never tagged — the universal ARN scan tagged the wrong resource.** The real `CreateCluster` response carries `clusterNamespaceArn`; the suffix-match scan picked it up before the dedicated cluster branch could run, and namespaces reject tagging entirely → permanent-actionable alert + untagged cluster, every time. The Redshift branch now runs as an early exit ahead of the scans. (`P27C-REDSHIFT-CLUSTER`)
+- **GameLift fleets: the scan tagged the fleet's *script* instead of the fleet.** `fleetAttributes` nests both `scriptArn` and `fleetArn`, and the allowlist iterates `scriptArn` first; additionally the dedicated branch expected PascalCase `FleetAttributes` while the real event is camelCase. Fleet branch hoisted to an early exit with `ci_get`. (`P27D-GAMELIFT-FLEET`)
+- **EC2 Capacity Reservations silently skipped** — the ARN sits two levels deep under the `CreateCapacityReservationResponse` XML wrapper, beyond both scans' 1-level depth. Dedicated branch added. (`P27B-EC2-CAPRES`)
+- **EC2 `CreateSnapshots` (plural, multi-volume) silently skipped** — snapshot IDs sit at `CreateSnapshotsResponse.snapshotSet.item` (dict for one, list for several), no ARN field. Multi-resource extractor added. (`P27B-EC2-SNAPSHOTS`)
+- **EC2 `CopySnapshot` silently skipped** — flat response with `snapshotId` only, no ARN field. Constructed like `CreateSnapshot`. (`P27B-EC2-COPYSNAP`)
+- **DynamoDB restore events ship `responseElements: null`** — the `tableDescription.tableArn` path never fired for `RestoreTableFromBackup`/`RestoreTableToPointInTime`. Falls back to constructing the ARN from `requestParameters.targetTableName`. (`P27B-DDB-RESTORE`)
+- **Elastic Beanstalk `CreateEnvironment` also ships `responseElements: null`** — ARN now constructed from `applicationName` + `environmentName`. (`P27B-BEANSTALK-ENV`)
+- **Alert-noise fixes for two documented-untaggable resources:** IoT `CreateThing` (AWS rejects `thing` in TagResource) moved to `_IGNORE_EVENTS`, and Glue `CreateTable` (tables taggable at creation only) now deliberately skips — both previously DLQ'd + SNS-alerted on every creation despite being known, documented gaps. No tag was ever possible for either.
+- All seven extractor fixes land with **golden-event regression tests replaying the real captured CloudTrail fixtures** (`tests/fixtures/`, credentials scrubbed) through the actual extractor code.
+
 **Fixed (v22.1.0 — Fargate/ECS RunTask silent tag loss):**
 
 - **Standalone ECS/Fargate tasks were never tagged.** `RunTask` was subscribed (EventBridge rule + SQS delivery worked), but the Lambda had no RunTask extractor and the universal ARN scan cannot reach the task ARN — it lives in a **list** (`responseElements.tasks[].taskArn`), and the scan only walks top-level keys plus one-level dicts. `extract_arn` returned None → silent drop, no DLQ, no alert. Because Fargate billing attributes to *tasks* (not services), the already-working `CreateService` tagging never covered Fargate spend. Surfaced via a customer billing analysis (~$86–200/mo untagged Fargate spend). A dedicated multi-resource extractor now tags every task in the event (a single `RunTask --count N` call launches N tasks). Landed with a real captured CloudTrail fixture (golden-event test), per the #102 event-shape-drift lesson. **UNVERIFIED** pending live end-to-end tag observation — tracked in COVERAGE.md.

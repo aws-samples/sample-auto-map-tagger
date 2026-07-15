@@ -293,6 +293,26 @@ def extract_arns_multi(detail, account_id, region):
     """
     event_name = detail.get('eventName', '')
     event_source = detail.get('eventSource', '')
+    # EC2 CreateSnapshots (plural, multi-volume instance snapshot): the
+    # snapshot IDs sit under the EC2 XML wrapper at
+    # CreateSnapshotsResponse.snapshotSet.item — 2+ levels deep, and
+    # 'item' is a dict for one snapshot but a LIST for several. Both
+    # extract_arn scans are 1-level → silent skip (P27B-EC2-SNAPSHOTS,
+    # live-verified 2026-07-15). No ARN field either — construct.
+    if event_name == 'CreateSnapshots' and event_source == 'ec2.amazonaws.com':
+        resp = detail.get('responseElements') or {}
+        snap_set = (resp.get('CreateSnapshotsResponse') or {}).get('snapshotSet') or {}
+        items = snap_set.get('item')
+        if isinstance(items, dict):
+            items = [items]
+        arns = []
+        for it in items or []:
+            if not isinstance(it, dict):
+                continue
+            snap_id = ci_get(it, 'snapshotId')
+            if snap_id:
+                arns.append(f"arn:aws:ec2:{region}:{account_id}:snapshot/{snap_id}")
+        return arns or None
     if event_name == 'RunTask' and event_source == 'ecs.amazonaws.com':
         resp = detail.get('responseElements') or {}
         task_arns = []
@@ -460,6 +480,52 @@ def extract_arn(detail, account_id, region):
         if pg_arn:
             return pg_arn
 
+    # Redshift Cluster — MUST run before the universal scan. The real
+    # CreateCluster response carries clusterNamespaceArn
+    # (arn:...:namespace:<uuid>), which the suffix-match fallback picks
+    # up first; namespaces reject tagging ("Tagging is not supported for
+    # this type of resource: 'namespace'") → every provisioned Redshift
+    # cluster alerted + went untagged (release gate P27C-REDSHIFT-CLUSTER,
+    # live-verified 2026-07-15). §1.91 casing note applies (ci_get).
+    elif event_name == 'CreateCluster' and event_source == 'redshift.amazonaws.com':
+        cluster_id = ci_get(resp, 'clusterIdentifier')
+        if cluster_id:
+            return f"arn:aws:redshift:{region}:{account_id}:cluster:{cluster_id}"
+
+    # GameLift Fleet — MUST run before the universal scan. The real
+    # response nests BOTH fleetArn and scriptArn inside fleetAttributes;
+    # the allowlist iterates 'scriptArn' before 'fleetArn', so the scan
+    # tagged the fleet's *script* and the fleet itself went untagged
+    # (P27D-GAMELIFT-FLEET, live-verified 2026-07-15 — the script got
+    # tagged twice, the fleet never). Real event is camelCase
+    # fleetAttributes/fleetArn, not the boto3 PascalCase shape.
+    elif event_name == 'CreateFleet' and event_source == 'gamelift.amazonaws.com':
+        fleet_attrib = ci_get(resp, 'fleetAttributes') or {}
+        fleet_arn = ci_get(fleet_attrib, 'fleetArn')
+        if fleet_arn:
+            return fleet_arn
+
+    # EC2 Capacity Reservation — ARN sits 2 levels deep under the EC2
+    # XML wrapper (CreateCapacityReservationResponse.capacityReservation.
+    # capacityReservationArn); both scans are 1-level only → silent skip
+    # (P27B-EC2-CAPRES, live-verified 2026-07-15).
+    elif event_name == 'CreateCapacityReservation':
+        cr = (resp.get('CreateCapacityReservationResponse') or {}).get('capacityReservation') or {}
+        cr_arn = ci_get(cr, 'capacityReservationArn')
+        if cr_arn:
+            return cr_arn
+        cr_id = ci_get(cr, 'capacityReservationId') or ci_get(resp, 'capacityReservationId')
+        if cr_id:
+            return f"arn:aws:ec2:{region}:{account_id}:capacity-reservation/{cr_id}"
+
+    # EC2 CopySnapshot — response is flat {requestId, snapshotId}, no ARN
+    # field anywhere → both scans miss (P27B-EC2-COPYSNAP, live-verified
+    # 2026-07-15). Construct like the CreateSnapshot branch below.
+    elif event_name == 'CopySnapshot' and event_source == 'ec2.amazonaws.com':
+        snap_id = ci_get(resp, 'snapshotId')
+        if snap_id:
+            return f"arn:aws:ec2:{region}:{account_id}:snapshot/{snap_id}"
+
     # Universal ARN patterns
     arn_patterns = [
         'arn', 'Arn', 'ARN', 'resourceArn', 'ResourceArn', 'clusterArn', 'functionArn',
@@ -569,13 +635,17 @@ def extract_arn(detail, account_id, region):
                 if m:
                     return m
 
-    # Glue Table - must be before resources array check to avoid returning database ARN
-    # (Glue CreateTable CloudTrail resources array contains database ARN first)
+    # Glue Table — documented UNTAGGABLE post-creation (docs/
+    # MAP_TAGGING_GAP_ANALYSIS.md: Glue tables accept tags only at
+    # creation; the tag API rejects them afterward — RGTA fails with
+    # "Unknown error", P27B-GLUE-TABLE live-verified 2026-07-15). The old
+    # branch constructed the table ARN → permanent_actionable → DLQ +
+    # alert on every Glue table. Deliberate None; the branch must remain
+    # (not _IGNORE_EVENTS — 'CreateTable' is shared with DynamoDB, and
+    # this early return also stops the resources-array check below from
+    # tagging the parent DATABASE by mistake).
     if event_name == 'CreateTable' and event_source == 'glue.amazonaws.com':
-        db_name = req.get('databaseName')
-        tbl_name = req.get('tableInput', {}).get('name')
-        if db_name and tbl_name:
-            return f"arn:aws:glue:{region}:{account_id}:table/{db_name}/{tbl_name}"
+        return None
 
     # Check resources array (used by some services like Keyspaces)
     # Skip catalog ARNs for Glue (use database ARN instead)
@@ -865,8 +935,12 @@ def extract_arn(detail, account_id, region):
         return api.get('arn')
 
     # IoT
-    elif event_name == 'CreateThing':
-        return resp.get('thingArn')
+    # (CreateThing handler removed — IoT Things are documented UNTAGGABLE
+    # (docs/MAP_TAGGING_GAP_ANALYSIS.md: AWS rejects 'thing' as a resource
+    # type). The old branch returned the thing ARN, routing every IoT thing
+    # creation to permanent_actionable → DLQ + SNS alert noise
+    # (P27B-IOT-THING, live-verified 2026-07-15). CreateThing is now in
+    # _IGNORE_EVENTS.)
 
     # Service Catalog
     elif event_name == 'CreatePortfolio':
@@ -1116,6 +1190,13 @@ def extract_arn(detail, account_id, region):
         env_arn = ci_get(resp, 'EnvironmentArn')
         if env_arn:
             return env_arn
+        # Real CreateEnvironment events can ship responseElements: null
+        # (live-verified 2026-07-15, P27B-BEANSTALK-ENV) — construct the
+        # documented environment ARN from the request instead.
+        app_name = ci_get(req, 'applicationName')
+        env_name = ci_get(req, 'environmentName')
+        if app_name and env_name:
+            return f"arn:aws:elasticbeanstalk:{region}:{account_id}:environment/{app_name}/{env_name}"
 
     # Amazon GameLift Build
     elif event_name == 'CreateBuild' and event_source == 'gamelift.amazonaws.com':
@@ -1408,12 +1489,18 @@ def extract_arn(detail, account_id, region):
         if cluster_arn:
             return cluster_arn
 
-    # DynamoDB RestoreTableFromBackup / RestoreTableToPointInTime
+    # DynamoDB RestoreTableFromBackup / RestoreTableToPointInTime.
+    # The real CloudTrail event ships responseElements: null (live-verified
+    # 2026-07-15, P27B-DDB-RESTORE) — the tableDescription path never fires.
+    # Fall back to the request's target table name and construct the ARN.
     elif event_name in ('RestoreTableFromBackup', 'RestoreTableToPointInTime') and event_source == 'dynamodb.amazonaws.com':
         desc = resp.get('tableDescription', {})
         table_arn = desc.get('tableArn')
         if table_arn:
             return table_arn
+        table_name = ci_get(req, 'targetTableName')
+        if table_name:
+            return f"arn:aws:dynamodb:{region}:{account_id}:table/{table_name}"
 
     # ElastiCache Serverless
     elif event_name == 'CreateServerlessCache' and event_source == 'elasticache.amazonaws.com':
@@ -1961,6 +2048,13 @@ _IGNORE_EVENTS = frozenset([
     # API Gateway API Keys — ARN shape rejected by all tagging
     # APIs. Documented in docs/MAP_TAGGING_GAP_ANALYSIS.md.
     'CreateApiKey',
+    # IoT Things — AWS rejects 'thing' as a resource type in TagResource
+    # (InvalidRequestException). Documented in MAP_TAGGING_GAP_ANALYSIS.md.
+    # No service subscribes CreateThing, but the EventBridge rule matches
+    # source + name-prefix independently, so the event arrives whenever
+    # aws.iot is subscribed for its taggable events. Without this entry it
+    # DLQ'd + alerted on every thing creation. (P27B-IOT-THING, 2026-07-15)
+    'CreateThing',
     # Service Discovery HTTP Namespace — async operationId
     # resolution doesn't fit the SQS 180s VT. §1.87.
     'CreateHttpNamespace',
