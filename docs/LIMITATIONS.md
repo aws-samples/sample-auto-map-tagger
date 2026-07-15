@@ -64,10 +64,11 @@ MAP-eligible AWS global services emit CloudTrail management events exclusively t
 Affected services:
 
 - Amazon CloudFront (distributions)
-- Amazon Route 53 (hosted zones)
+- Amazon Route 53 (hosted zones **and health checks**)
 - AWS Global Accelerator (accelerators)
 - AWS WAF Classic (global)
 - AWS IAM (not MAP-eligible, but customers frequently ask)
+- **AWS Network Manager (global networks) — us-west-2, not us-east-1.** Network Manager is homed in us-west-2; its `CreateGlobalNetwork` CloudTrail events land there exclusively (verified empirically 2026-07-15). A us-east-1 companion stack does NOT cover it — Network Manager coverage needs a us-west-2 deployment.
 
 **Mitigation:** deploy a second instance of this stack in `us-east-1` using the **same `MpeId`**. The two instances tag disjoint resource sets (regional vs. global) and will not collide on the shared `map-migrated` tag value. Both stacks can share the same MAP period and account scope.
 
