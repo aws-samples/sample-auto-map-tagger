@@ -359,6 +359,7 @@ ${permissionsList}
                 Action:
                   - ec2:DescribeInstances
                   - ec2:DescribeVolumes
+                  - ec2:DescribeSubnets
                   - sts:GetCallerIdentity
                   - ssm:GetParameters
                   - cloudformation:DescribeStacks

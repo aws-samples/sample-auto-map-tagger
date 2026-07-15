@@ -240,6 +240,20 @@ def is_in_scope(config, account_id, detail):
             vpc_id = resp_els['vpcId']
         elif (detail.get('requestParameters') or {}).get('vpcId'):
             vpc_id = detail['requestParameters']['vpcId']
+        elif isinstance(resp_els.get('networkInterface'), dict) and resp_els['networkInterface'].get('vpcId'):
+            # CreateNetworkInterface nests vpcId one level down; the
+            # request carries only subnetId. Without this, ENIs in a
+            # scoped VPC resolved vpc_id=None → skipped as out-of-scope
+            # (P2B-ENI-IN, live-traced 2026-07-16).
+            vpc_id = resp_els['networkInterface']['vpcId']
+        elif (detail.get('requestParameters') or {}).get('subnetId'):
+            # Subnet-anchored creates (ENIs and friends): resolve the
+            # parent VPC from the subnet.
+            try:
+                resp = ec2.describe_subnets(SubnetIds=[detail['requestParameters']['subnetId']])
+                vpc_id = resp['Subnets'][0].get('VpcId')
+            except Exception:
+                pass
         elif 'volumeId' in detail:
             try:
                 resp = ec2.describe_volumes(VolumeIds=[detail['volumeId']])
