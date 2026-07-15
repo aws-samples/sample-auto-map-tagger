@@ -8929,7 +8929,13 @@ ${permissionsList}
                   existing.append({'Key': tag_key, 'Value': tag_value})
                   _retry_throttles(lambda: s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing}))
                   return True
-              elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
+              # ':agent-alias/' must be listed even though ':agent/' looks similar —
+              # the substring test is against the full ARN and alias ARNs are
+              # arn:...:agent-alias/<agentId>/<aliasId> (no ':agent/' segment).
+              # Without it, alias ARNs fell through to RGTA, which rejects them on
+              # ARN-regex validation → alert + untagged (P27B-BEDROCK-AGENT-ALIAS,
+              # live-traced 2026-07-16).
+              elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':agent-alias/',':flow/',':prompt/',':knowledge-base/']):
                   ba = boto3.client('bedrock-agent', region_name=arn.split(':')[3])
                   _retry_throttles(lambda: ba.tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
                   return True
