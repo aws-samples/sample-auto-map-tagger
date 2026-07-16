@@ -2912,7 +2912,7 @@ else
 fi
 echo ""
 
-# ── Step 4: Optional — CloudWatch Log Groups ────────────────
+${deleteLogs ? `# ── Step 4: Optional — CloudWatch Log Groups ────────────────
 if [ "\$DELETE_LOGS" = "true" ]; then
     echo "Step 4: Deleting CloudWatch Log Groups..."
     if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
@@ -2939,7 +2939,7 @@ if [ "\$DELETE_LOGS" = "true" ]; then
     echo ""
 fi
 
-# ── Summary ─────────────────────────────────────────────────
+` : ''}# ── Summary ─────────────────────────────────────────────────
 echo "  ┌──────────────────────────────────────────────────────┐"
 if [ \$FAILED -gt 0 ]; then
     echo "  │   ⚠️  Delete completed with failures                  │"
@@ -6928,6 +6928,7 @@ ${permissionsList}
                 Action:
                   - ec2:DescribeInstances
                   - ec2:DescribeVolumes
+                  - ec2:DescribeSubnets
                   - sts:GetCallerIdentity
                   - ssm:GetParameters
                   - cloudformation:DescribeStacks
@@ -7068,15 +7069,31 @@ ${permissionsList}
                   return f'shared VPC(s): {sorted(overlap)}'
               return ''
 
+          def _parse_scope_list(raw, drop=()):
+              # Custom-resource properties arrive as the JSON STRING the
+              # template baked in ('["vpc-0abc"]'), not a list. The old
+              # comma-split turned that into ['["vpc-0abc"]'] — bracket-
+              # wrapped garbage that never intersected the peer's clean
+              # set, so the VPC-overlap preflight NEVER fired (two same-VPC
+              # taggers deployed side by side; release-gate P3-C5-SAME-VPC,
+              # live-confirmed 2026-07-16). Parse JSON first; fall back to
+              # comma-split for hand-entered values.
+              if not isinstance(raw, str):
+                  return [v for v in (raw or []) if v not in drop]
+              try:
+                  vals = json.loads(raw)
+                  if not isinstance(vals, list):
+                      vals = [vals]
+              except (ValueError, TypeError):
+                  vals = raw.split(',')
+              return [s.strip() for s in (str(v) for v in vals)
+                      if s.strip() and s.strip() not in drop]
+
           def check_peers(props, account, region):
               own_mpe = props['MpeId']
               new_mode = props.get('ScopeMode', 'account')
-              new_accts = props.get('ScopedAccountIds') or ['ALL']
-              if isinstance(new_accts, str):
-                  new_accts = [s.strip() for s in new_accts.split(',') if s.strip()]
-              new_vpcs = props.get('ScopedVpcIds') or []
-              if isinstance(new_vpcs, str):
-                  new_vpcs = [s.strip() for s in new_vpcs.split(',') if s.strip() and s.strip() != 'NONE']
+              new_accts = _parse_scope_list(props.get('ScopedAccountIds')) or ['ALL']
+              new_vpcs = _parse_scope_list(props.get('ScopedVpcIds'), drop=('NONE',))
               cfn = boto3.client('cloudformation')
               ssm = boto3.client('ssm')
               conflicts = []
@@ -7428,6 +7445,20 @@ ${permissionsList}
                       vpc_id = resp_els['vpcId']
                   elif (detail.get('requestParameters') or {}).get('vpcId'):
                       vpc_id = detail['requestParameters']['vpcId']
+                  elif isinstance(resp_els.get('networkInterface'), dict) and resp_els['networkInterface'].get('vpcId'):
+                      # CreateNetworkInterface nests vpcId one level down; the
+                      # request carries only subnetId. Without this, ENIs in a
+                      # scoped VPC resolved vpc_id=None → skipped as out-of-scope
+                      # (P2B-ENI-IN, live-traced 2026-07-16).
+                      vpc_id = resp_els['networkInterface']['vpcId']
+                  elif (detail.get('requestParameters') or {}).get('subnetId'):
+                      # Subnet-anchored creates (ENIs and friends): resolve the
+                      # parent VPC from the subnet.
+                      try:
+                          resp = ec2.describe_subnets(SubnetIds=[detail['requestParameters']['subnetId']])
+                          vpc_id = resp['Subnets'][0].get('VpcId')
+                      except Exception:
+                          pass
                   elif 'volumeId' in detail:
                       try:
                           resp = ec2.describe_volumes(VolumeIds=[detail['volumeId']])
@@ -7471,8 +7502,46 @@ ${permissionsList}
               — AWS populates the attached EBS volume IDs AFTER the instance
               reaches pending/running, not in the RunInstances API response.
               We therefore describe_instances to fetch the volume IDs.
+          
+              ECS RunTask: --count N launches N tasks in one call; each task ARN
+              sits in the responseElements.tasks LIST, which the universal ARN
+              scan cannot reach (it walks top-level keys + one-level dicts only)
+              — every Fargate task went silently untagged, and Fargate billing
+              attributes to TASKS, not services, so CreateService tagging never
+              covered this spend (Smileshark/NICE Zini finding, 2026-07-14).
               """
               event_name = detail.get('eventName', '')
+              event_source = detail.get('eventSource', '')
+              # EC2 CreateSnapshots (plural, multi-volume instance snapshot): the
+              # snapshot IDs sit under the EC2 XML wrapper at
+              # CreateSnapshotsResponse.snapshotSet.item — 2+ levels deep, and
+              # 'item' is a dict for one snapshot but a LIST for several. Both
+              # extract_arn scans are 1-level → silent skip (P27B-EC2-SNAPSHOTS,
+              # live-verified 2026-07-15). No ARN field either — construct.
+              if event_name == 'CreateSnapshots' and event_source == 'ec2.amazonaws.com':
+                  resp = detail.get('responseElements') or {}
+                  snap_set = (resp.get('CreateSnapshotsResponse') or {}).get('snapshotSet') or {}
+                  items = snap_set.get('item')
+                  if isinstance(items, dict):
+                      items = [items]
+                  arns = []
+                  for it in items or []:
+                      if not isinstance(it, dict):
+                          continue
+                      snap_id = ci_get(it, 'snapshotId')
+                      if snap_id:
+                          arns.append(f"arn:aws:ec2:{region}:{account_id}:snapshot/{snap_id}")
+                  return arns or None
+              if event_name == 'RunTask' and event_source == 'ecs.amazonaws.com':
+                  resp = detail.get('responseElements') or {}
+                  task_arns = []
+                  for task in resp.get('tasks') or []:
+                      if not isinstance(task, dict):
+                          continue
+                      t_arn = ci_get(task, 'taskArn')
+                      if t_arn and _is_wellformed_arn(t_arn):
+                          task_arns.append(t_arn)
+                  return task_arns or None
               if event_name != 'RunInstances':
                   return None
               resp = detail.get('responseElements') or {}
@@ -7630,6 +7699,52 @@ ${permissionsList}
                   if pg_arn:
                       return pg_arn
           
+              # Redshift Cluster — MUST run before the universal scan. The real
+              # CreateCluster response carries clusterNamespaceArn
+              # (arn:...:namespace:<uuid>), which the suffix-match fallback picks
+              # up first; namespaces reject tagging ("Tagging is not supported for
+              # this type of resource: 'namespace'") → every provisioned Redshift
+              # cluster alerted + went untagged (release gate P27C-REDSHIFT-CLUSTER,
+              # live-verified 2026-07-15). §1.91 casing note applies (ci_get).
+              elif event_name == 'CreateCluster' and event_source == 'redshift.amazonaws.com':
+                  cluster_id = ci_get(resp, 'clusterIdentifier')
+                  if cluster_id:
+                      return f"arn:aws:redshift:{region}:{account_id}:cluster:{cluster_id}"
+          
+              # GameLift Fleet — MUST run before the universal scan. The real
+              # response nests BOTH fleetArn and scriptArn inside fleetAttributes;
+              # the allowlist iterates 'scriptArn' before 'fleetArn', so the scan
+              # tagged the fleet's *script* and the fleet itself went untagged
+              # (P27D-GAMELIFT-FLEET, live-verified 2026-07-15 — the script got
+              # tagged twice, the fleet never). Real event is camelCase
+              # fleetAttributes/fleetArn, not the boto3 PascalCase shape.
+              elif event_name == 'CreateFleet' and event_source == 'gamelift.amazonaws.com':
+                  fleet_attrib = ci_get(resp, 'fleetAttributes') or {}
+                  fleet_arn = ci_get(fleet_attrib, 'fleetArn')
+                  if fleet_arn:
+                      return fleet_arn
+          
+              # EC2 Capacity Reservation — ARN sits 2 levels deep under the EC2
+              # XML wrapper (CreateCapacityReservationResponse.capacityReservation.
+              # capacityReservationArn); both scans are 1-level only → silent skip
+              # (P27B-EC2-CAPRES, live-verified 2026-07-15).
+              elif event_name == 'CreateCapacityReservation':
+                  cr = (resp.get('CreateCapacityReservationResponse') or {}).get('capacityReservation') or {}
+                  cr_arn = ci_get(cr, 'capacityReservationArn')
+                  if cr_arn:
+                      return cr_arn
+                  cr_id = ci_get(cr, 'capacityReservationId') or ci_get(resp, 'capacityReservationId')
+                  if cr_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:capacity-reservation/{cr_id}"
+          
+              # EC2 CopySnapshot — response is flat {requestId, snapshotId}, no ARN
+              # field anywhere → both scans miss (P27B-EC2-COPYSNAP, live-verified
+              # 2026-07-15). Construct like the CreateSnapshot branch below.
+              elif event_name == 'CopySnapshot' and event_source == 'ec2.amazonaws.com':
+                  snap_id = ci_get(resp, 'snapshotId')
+                  if snap_id:
+                      return f"arn:aws:ec2:{region}:{account_id}:snapshot/{snap_id}"
+          
               # Universal ARN patterns
               arn_patterns = [
                   'arn', 'Arn', 'ARN', 'resourceArn', 'ResourceArn', 'clusterArn', 'functionArn',
@@ -7739,13 +7854,17 @@ ${permissionsList}
                           if m:
                               return m
           
-              # Glue Table - must be before resources array check to avoid returning database ARN
-              # (Glue CreateTable CloudTrail resources array contains database ARN first)
+              # Glue Table — documented UNTAGGABLE post-creation (docs/
+              # MAP_TAGGING_GAP_ANALYSIS.md: Glue tables accept tags only at
+              # creation; the tag API rejects them afterward — RGTA fails with
+              # "Unknown error", P27B-GLUE-TABLE live-verified 2026-07-15). The old
+              # branch constructed the table ARN → permanent_actionable → DLQ +
+              # alert on every Glue table. Deliberate None; the branch must remain
+              # (not _IGNORE_EVENTS — 'CreateTable' is shared with DynamoDB, and
+              # this early return also stops the resources-array check below from
+              # tagging the parent DATABASE by mistake).
               if event_name == 'CreateTable' and event_source == 'glue.amazonaws.com':
-                  db_name = req.get('databaseName')
-                  tbl_name = req.get('tableInput', {}).get('name')
-                  if db_name and tbl_name:
-                      return f"arn:aws:glue:{region}:{account_id}:table/{db_name}/{tbl_name}"
+                  return None
           
               # Check resources array (used by some services like Keyspaces)
               # Skip catalog ARNs for Glue (use database ARN instead)
@@ -8035,8 +8154,12 @@ ${permissionsList}
                   return api.get('arn')
           
               # IoT
-              elif event_name == 'CreateThing':
-                  return resp.get('thingArn')
+              # (CreateThing handler removed — IoT Things are documented UNTAGGABLE
+              # (docs/MAP_TAGGING_GAP_ANALYSIS.md: AWS rejects 'thing' as a resource
+              # type). The old branch returned the thing ARN, routing every IoT thing
+              # creation to permanent_actionable → DLQ + SNS alert noise
+              # (P27B-IOT-THING, live-verified 2026-07-15). CreateThing is now in
+              # _IGNORE_EVENTS.)
           
               # Service Catalog
               elif event_name == 'CreatePortfolio':
@@ -8101,12 +8224,18 @@ ${permissionsList}
                   if plan_id:
                       return f"arn:aws:backup:{region}:{account_id}:backup-plan:{plan_id}"
           
-              # CloudWatch Dashboard — RGTA rejects both regionless and regional
-              # ARNs. Include region so native cloudwatch:tag_resource dispatch works.
+              # CloudWatch Dashboard — tagged via native cloudwatch:tag_resource
+              # dispatch (RGTA rejects dashboard ARNs). The real ARN has an EMPTY
+              # region segment: arn:aws:cloudwatch::{account}:dashboard/{name}
+              # (dashboards are account-global; confirmed live via
+              # get-dashboard --query DashboardArn, release gate P1-CW-DASH
+              # 2026-07-14). A region-qualified ARN is accepted by nothing —
+              # tag_resource silently tagged a nonexistent resource identifier
+              # and the dashboard stayed untagged.
               elif event_name == 'PutDashboard':
                   dashboard_name = ci_get(req, 'dashboardName')
                   if dashboard_name:
-                      return f"arn:aws:cloudwatch:{region}:{account_id}:dashboard/{dashboard_name}"
+                      return f"arn:aws:cloudwatch::{account_id}:dashboard/{dashboard_name}"
           
               # EMR Cluster (RunJobFlow)
               elif event_name == 'RunJobFlow':
@@ -8280,6 +8409,13 @@ ${permissionsList}
                   env_arn = ci_get(resp, 'EnvironmentArn')
                   if env_arn:
                       return env_arn
+                  # Real CreateEnvironment events can ship responseElements: null
+                  # (live-verified 2026-07-15, P27B-BEANSTALK-ENV) — construct the
+                  # documented environment ARN from the request instead.
+                  app_name = ci_get(req, 'applicationName')
+                  env_name = ci_get(req, 'environmentName')
+                  if app_name and env_name:
+                      return f"arn:aws:elasticbeanstalk:{region}:{account_id}:environment/{app_name}/{env_name}"
           
               # Amazon GameLift Build
               elif event_name == 'CreateBuild' and event_source == 'gamelift.amazonaws.com':
@@ -8572,12 +8708,18 @@ ${permissionsList}
                   if cluster_arn:
                       return cluster_arn
           
-              # DynamoDB RestoreTableFromBackup / RestoreTableToPointInTime
+              # DynamoDB RestoreTableFromBackup / RestoreTableToPointInTime.
+              # The real CloudTrail event ships responseElements: null (live-verified
+              # 2026-07-15, P27B-DDB-RESTORE) — the tableDescription path never fires.
+              # Fall back to the request's target table name and construct the ARN.
               elif event_name in ('RestoreTableFromBackup', 'RestoreTableToPointInTime') and event_source == 'dynamodb.amazonaws.com':
                   desc = resp.get('tableDescription', {})
                   table_arn = desc.get('tableArn')
                   if table_arn:
                       return table_arn
+                  table_name = ci_get(req, 'targetTableName')
+                  if table_name:
+                      return f"arn:aws:dynamodb:{region}:{account_id}:table/{table_name}"
           
               # ElastiCache Serverless
               elif event_name == 'CreateServerlessCache' and event_source == 'elasticache.amazonaws.com':
@@ -8818,7 +8960,13 @@ ${permissionsList}
                   existing.append({'Key': tag_key, 'Value': tag_value})
                   _retry_throttles(lambda: s3.put_bucket_tagging(Bucket=bucket, Tagging={'TagSet': existing}))
                   return True
-              elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':flow/',':prompt/',':knowledge-base/']):
+              # ':agent-alias/' must be listed even though ':agent/' looks similar —
+              # the substring test is against the full ARN and alias ARNs are
+              # arn:...:agent-alias/<agentId>/<aliasId> (no ':agent/' segment).
+              # Without it, alias ARNs fell through to RGTA, which rejects them on
+              # ARN-regex validation → alert + untagged (P27B-BEDROCK-AGENT-ALIAS,
+              # live-traced 2026-07-16).
+              elif ':bedrock:' in arn and any(r in arn for r in [':agent/',':agent-alias/',':flow/',':prompt/',':knowledge-base/']):
                   ba = boto3.client('bedrock-agent', region_name=arn.split(':')[3])
                   _retry_throttles(lambda: ba.tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
                   return True
@@ -9071,11 +9219,35 @@ ${permissionsList}
               # not available" while the cluster is still settling. Retries
               # succeed once provisioning completes.
               'is either not present or not available',
+              # ElastiCache provisioning race, error-code form. Live-traced
+              # (release gate P1-ECACHE-CL, 2026-07-14): AddTagsToResource ~30s
+              # after CreateCacheCluster raises CacheClusterNotFoundFault while
+              # the cluster is still provisioning — the message wording does not
+              # always contain the §1.101 substring above, so match the error
+              # code itself (always present in the ClientError string). Without
+              # this the event classified permanent_actionable and the resource
+              # stayed permanently untagged. A genuinely-deleted cluster now
+              # burns the 5-redelivery budget before landing in EventDLQ —
+              # acceptable, the DLQ alarm still fires.
+              'CacheClusterNotFoundFault',
               # SSM ConcurrentUpdateException (§1.44). PutParameter bursts
               # (e.g. customer automation rotating config in parallel) return
               # "concurrently modified" when two writers touch the same
               # parameter. Retry after SQS redelivery resolves it.
               'concurrently modified',
+              # DynamoDB restore-in-progress (P27B-DDB-RESTORE, live-traced
+              # 2026-07-16): TagResource during RestoreTableFromBackup returns
+              # ResourceInUseException "Attempt to change a resource which is
+              # still in use: Table is being used". The restore completes in
+              # minutes; retry succeeds. Same async-provisioning-lag shape as
+              # ElastiCache above.
+              'Table is being used',
+              # Elastic Beanstalk environment launch (P27B-BEANSTALK-ENV,
+              # live-traced 2026-07-16): UpdateTagsForResource during the ~5-10
+              # min launch returns "Environment named <x> is in an invalid state
+              # for this operation. Must be Ready". Resolves when the env
+              # reaches Ready; retry within the SQS budget succeeds.
+              'Must be Ready',
           )
           _PERMANENT_IGNORABLE_MARKERS = (
               # Resource genuinely deleted between create and tag event.
@@ -9114,6 +9286,13 @@ ${permissionsList}
               # API Gateway API Keys — ARN shape rejected by all tagging
               # APIs. Documented in docs/MAP_TAGGING_GAP_ANALYSIS.md.
               'CreateApiKey',
+              # IoT Things — AWS rejects 'thing' as a resource type in TagResource
+              # (InvalidRequestException). Documented in MAP_TAGGING_GAP_ANALYSIS.md.
+              # No service subscribes CreateThing, but the EventBridge rule matches
+              # source + name-prefix independently, so the event arrives whenever
+              # aws.iot is subscribed for its taggable events. Without this entry it
+              # DLQ'd + alerted on every thing creation. (P27B-IOT-THING, 2026-07-15)
+              'CreateThing',
               # Service Discovery HTTP Namespace — async operationId
               # resolution doesn't fit the SQS 180s VT. §1.87.
               'CreateHttpNamespace',

@@ -8,6 +8,7 @@
 UNCOVERED ActivateGateway|storagegateway.amazonaws.com
 COVERED   AllocateAddress
 UNCOVERED ConnectDirectory|ds.amazonaws.com
+UNCOVERED CopySnapshot|ec2.amazonaws.com
 COVERED   CreateAccelerator
 UNCOVERED CreateAddon
 COVERED   CreateAgent|bedrock.amazonaws.com
@@ -25,6 +26,7 @@ COVERED   CreateBackupPlan
 COVERED   CreateBucket
 UNCOVERED CreateBuild|gamelift.amazonaws.com
 COVERED   CreateCacheCluster
+UNCOVERED CreateCapacityReservation
 UNCOVERED CreateCarrierGateway
 UNCOVERED CreateCertificateAuthority
 COVERED   CreateCluster|cloudhsm.amazonaws.com
@@ -120,6 +122,7 @@ COVERED   CreateSnapshot|ec2.amazonaws.com
 COVERED   CreateSnapshot|elasticache.amazonaws.com
 COVERED   CreateSnapshot|fsx.amazonaws.com
 COVERED   CreateSnapshot|redshift-serverless.amazonaws.com
+UNCOVERED CreateSnapshots|ec2.amazonaws.com
 UNCOVERED CreateSourceServer|drs.amazonaws.com
 COVERED   CreateStack
 UNCOVERED CreateStackSet
@@ -131,7 +134,6 @@ COVERED   CreateTable|timestream.amazonaws.com
 UNCOVERED CreateTapePool
 COVERED   CreateTargetGroup
 COVERED   CreateTask
-UNCOVERED CreateThing
 COVERED   CreateTopicRule|iot.amazonaws.com
 COVERED   CreateTransitGateway
 UNCOVERED CreateTransitGatewayVpcAttachment
@@ -160,3 +162,4 @@ UNCOVERED RestoreTableFromBackup|dynamodb.amazonaws.com
 UNCOVERED RestoreTableToPointInTime|dynamodb.amazonaws.com
 COVERED   RunInstances
 COVERED   RunJobFlow
+COVERED   RunTask|ecs.amazonaws.com

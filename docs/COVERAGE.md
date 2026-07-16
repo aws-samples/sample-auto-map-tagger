@@ -25,6 +25,7 @@ All services below have an explicit handler in the Lambda function **and** the c
 | EC2 | Instances, EBS volumes, ENIs, AMIs, snapshots, key pairs, placement groups, launch templates | EC2 CreateTags (fallback from RGTA) |
 | Lambda | Functions (universal ARN scan — no explicit handler) | RGTA |
 | ECS | Clusters, services | RGTA |
+| ECS/Fargate tasks | Standalone `RunTask` launches (**UNVERIFIED** — extractor added 2026-07-15 for the Fargate silent-loss gap; awaiting live tag observation). Service-scheduler-launched tasks emit no RunTask event and are NOT coverable — see LIMITATIONS.md "Fargate tasks launched by ECS services need `propagateTags`" | RGTA |
 | EKS | Clusters, node groups, add-ons | RGTA |
 | Auto Scaling | Auto Scaling groups | ASG-specific `create_or_update_tags` |
 | EMR | Clusters (RunJobFlow) | RGTA |

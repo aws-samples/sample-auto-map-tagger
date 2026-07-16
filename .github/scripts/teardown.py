@@ -583,8 +583,19 @@ def delete_record(record: dict) -> None:
         # ARN forms we record:
         #   cluster:         arn:aws:ecs:<r>:<a>:cluster/<name>
         #   service:         arn:aws:ecs:<r>:<a>:service/<cluster>/<name>
+        #   task:            arn:aws:ecs:<r>:<a>:task/<cluster>/<id>
         #   task-definition: arn:aws:ecs:<r>:<a>:task-definition/<family>:<rev>
-        if ":service/" in arn:
+        if ":task/" in arn:
+            # Standalone RunTask task (Fargate). stop_task is sufficient —
+            # a STOPPED task costs nothing and ECS expires it; the cluster
+            # delete below only needs it out of RUNNING.
+            parts = arn.split(":task/")[-1].split("/")
+            cluster = parts[0] if len(parts) == 2 else "default"
+            safe_delete(ecs.stop_task,
+                        cluster=cluster, task=arn,
+                        reason="e2e teardown",
+                        resource_desc=arn)
+        elif ":service/" in arn:
             # Delete requires force=True when desiredCount>0 or tasks running.
             # ours is desiredCount=0, but force is harmless and idempotent.
             parts = arn.split(":service/")[-1].split("/")
@@ -1143,6 +1154,9 @@ def _deletion_priority(record: dict) -> int:
         return DELETION_PRIORITY.get("ec2-networking", 10)
     # ECS Service must delete before its Cluster (both service=ecs, priority 3).
     if service == "ecs" and ":service/" in arn:
+        return 2
+    # ECS standalone task must stop before its Cluster deletes.
+    if service == "ecs" and ":task/" in arn:
         return 2
     # CodeDeploy DeploymentGroup must delete before its parent Application.
     if service == "codedeploy" and ":deploymentgroup:" in arn:

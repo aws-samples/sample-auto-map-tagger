@@ -64,14 +64,25 @@ MAP-eligible AWS global services emit CloudTrail management events exclusively t
 Affected services:
 
 - Amazon CloudFront (distributions)
-- Amazon Route 53 (hosted zones)
+- Amazon Route 53 (hosted zones **and health checks**)
 - AWS Global Accelerator (accelerators)
 - AWS WAF Classic (global)
 - AWS IAM (not MAP-eligible, but customers frequently ask)
+- **AWS Network Manager (global networks) — us-west-2, not us-east-1.** Network Manager is homed in us-west-2; its `CreateGlobalNetwork` CloudTrail events land there exclusively (verified empirically 2026-07-15). A us-east-1 companion stack does NOT cover it — Network Manager coverage needs a us-west-2 deployment.
 
 **Mitigation:** deploy a second instance of this stack in `us-east-1` using the **same `MpeId`**. The two instances tag disjoint resource sets (regional vs. global) and will not collide on the shared `map-migrated` tag value. Both stacks can share the same MAP period and account scope.
 
 There is no automatic detection or sidecar deploy for this case — selecting whether to deploy the `us-east-1` companion stack is a deploy-time decision for the customer.
+
+---
+
+## Fargate tasks launched by ECS services need `propagateTags`
+
+Fargate billing attributes usage to **tasks**, not services — a tagged ECS service with untagged tasks shows zero tagged Fargate spend. The auto-tagger tags **standalone** tasks (direct `RunTask` API calls, e.g. one-off jobs, EventBridge Scheduler targets) via the `RunTask` CloudTrail event.
+
+Tasks launched **by an ECS service scheduler** (the normal `desiredCount` path) are a different story: the scheduler's internal launches do **not** emit a customer-visible `RunTask` management event (verified empirically 2026-07-15 — a `desiredCount=1` service launched tasks for 25+ minutes with zero RunTask events in CloudTrail), so no event-driven tagger can see them.
+
+**Mitigation (customer-side, one flag):** create or update services with `--propagate-tags SERVICE` (or `TASK_DEFINITION`). ECS then copies the service's tags — including the `map-migrated` tag this solution applies to the service — onto every task it launches, keeping Fargate spend attributed with no tagger involvement. Existing services can be updated in place: `aws ecs update-service --cluster <c> --service <s> --propagate-tags SERVICE` (applies to tasks launched after the update).
 
 ---
 

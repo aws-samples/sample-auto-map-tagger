@@ -343,6 +343,55 @@ def create(
         except Exception as exc:
             log.error("ECS Service creation failed: %s", exc)
 
+    # ── ECS Fargate standalone task (RunTask) ─────────────────────────────────
+    # CloudTrail event: RunTask [ecs.amazonaws.com]. The Fargate silent-loss
+    # class (2026-07-14): the task ARN sits in a LIST
+    # (responseElements.tasks[].taskArn) that the universal ARN scan can't
+    # reach — this exercises the dedicated extractor. desiredCount=0 on the
+    # service above never fires RunTask, so an explicit run_task is the only
+    # way to produce the event. busybox sleeps so the task stays RUNNING
+    # through the tag-verify poll; teardown stops it (stopped Fargate tasks
+    # cost nothing and expire on their own).
+    if cluster_ready and subnet_ids and sg_id:
+        try:
+            td_run = ecs.register_task_definition(
+                family=prefix("ecs-runtask"),
+                networkMode="awsvpc",
+                requiresCompatibilities=["FARGATE"],
+                cpu="256",
+                memory="512",
+                containerDefinitions=[{
+                    "name": "sleeper",
+                    "image": "public.ecr.aws/docker/library/busybox:latest",
+                    "command": ["sh", "-c", "sleep 1800"],
+                    "essential": True,
+                }],
+            )
+            run_resp = ecs.run_task(
+                cluster=cluster_name,
+                taskDefinition=td_run["taskDefinition"]["taskDefinitionArn"],
+                count=1,
+                launchType="FARGATE",
+                networkConfiguration={
+                    "awsvpcConfiguration": {
+                        "subnets": subnet_ids[:2] if len(subnet_ids) >= 2 else subnet_ids,
+                        "securityGroups": [sg_id],
+                        # Public IP so the busybox pull succeeds without NAT;
+                        # a failed pull stops the task before the verify poll.
+                        "assignPublicIp": "ENABLED",
+                    },
+                },
+                tags=[{"key": PRE_TAG_KEY, "value": tag_value}],
+            )
+            for t in run_resp.get("tasks", []):
+                task_arn = t["taskArn"]
+                rec(task_arn, "ecs", task_arn.split("/")[-1])
+                log.info("ECS standalone task (RunTask): %s", task_arn)
+            for f in run_resp.get("failures", []):
+                log.error("ECS RunTask failure: %s", f)
+        except Exception as exc:
+            log.error("ECS RunTask failed: %s", exc)
+
     # ── EKS cluster ───────────────────────────────────────────────────────────
     eks_name = prefix("eks")
     try:

@@ -1,0 +1,85 @@
+{
+  "eventVersion": "1.11",
+  "userIdentity": {
+    "type": "IAMUser",
+    "principalId": "AIDAEXAMPLEEXAMPLE",
+    "arn": "arn:aws:iam::347694270668:user/example-user",
+    "accountId": "347694270668",
+    "accessKeyId": "AKIAEXAMPLEEXAMPLE",
+    "userName": "example-user"
+  },
+  "eventTime": "2026-07-15T02:57:53Z",
+  "eventSource": "redshift.amazonaws.com",
+  "eventName": "CreateCluster",
+  "awsRegion": "ap-southeast-2",
+  "sourceIPAddress": "198.51.100.1",
+  "userAgent": "Boto3/1.42.96 md/Botocore#1.42.96 md/awscrt#0.31.1 ua/2.1 os/linux#6.1.166-197.305.amzn2023.aarch64 md/arch#aarch64 lang/python#3.9.25 md/pyimpl#CPython m/n,Z,b,D cfg/retry-mode#legacy Botocore/1.42.96",
+  "requestParameters": {
+    "clusterIdentifier": "ct5-p27c-07150257-rs-ef53",
+    "clusterType": "single-node",
+    "nodeType": "ra3.xlplus",
+    "masterUsername": "ct5admin",
+    "masterUserPassword": "HIDDEN_DUE_TO_SECURITY_REASONS",
+    "publiclyAccessible": false
+  },
+  "responseElements": {
+    "clusterIdentifier": "ct5-p27c-07150257-rs-ef53",
+    "nodeType": "ra3.xlplus",
+    "clusterStatus": "creating",
+    "clusterAvailabilityStatus": "Modifying",
+    "masterUsername": "ct5admin",
+    "dBName": "dev",
+    "automatedSnapshotRetentionPeriod": 1,
+    "manualSnapshotRetentionPeriod": -1,
+    "clusterSecurityGroups": [],
+    "vpcSecurityGroups": [
+      {
+        "vpcSecurityGroupId": "sg-002140d890b692ec4",
+        "status": "active"
+      }
+    ],
+    "clusterParameterGroups": [
+      {
+        "parameterGroupName": "default.redshift-2.0",
+        "parameterApplyStatus": "in-sync"
+      }
+    ],
+    "clusterSubnetGroupName": "default",
+    "vpcId": "vpc-0b0cfe37af77d2e13",
+    "preferredMaintenanceWindow": "tue:12:30-tue:13:00",
+    "pendingModifiedValues": {
+      "masterUserPassword": "HIDDEN_DUE_TO_SECURITY_REASONS"
+    },
+    "clusterVersion": "1.0",
+    "allowVersionUpgrade": true,
+    "numberOfNodes": 1,
+    "publiclyAccessible": false,
+    "encrypted": true,
+    "tags": [],
+    "kmsKeyId": "AWS_OWNED_KMS_KEY",
+    "enhancedVpcRouting": false,
+    "iamRoles": [],
+    "maintenanceTrackName": "current",
+    "deferredMaintenanceWindows": [],
+    "nextMaintenanceWindowStartTime": "2026-07-21T12:30:00Z",
+    "clusterNamespaceArn": "arn:aws:redshift:ap-southeast-2:347694270668:namespace:763d425c-0055-4de7-b8c3-5ca8a79de9ca",
+    "aquaConfiguration": {
+      "aquaStatus": "disabled",
+      "aquaConfigurationStatus": "auto"
+    },
+    "isMaintenanceWindowActivated": true,
+    "multiAZ": "Disabled"
+  },
+  "requestID": "38b09842-3e9f-4713-a252-dc3e12bff397",
+  "eventID": "b75fdf38-1798-4af2-a3f2-2b2b4de98396",
+  "readOnly": false,
+  "eventType": "AwsApiCall",
+  "managementEvent": true,
+  "recipientAccountId": "347694270668",
+  "eventCategory": "Management",
+  "tlsDetails": {
+    "tlsVersion": "TLSv1.3",
+    "cipherSuite": "TLS_AES_128_GCM_SHA256",
+    "clientProvidedHostHeader": "redshift.ap-southeast-2.amazonaws.com"
+  }
+}

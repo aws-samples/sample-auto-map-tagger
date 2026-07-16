@@ -304,7 +304,7 @@ else
 fi
 echo ""
 
-# ── Step 4: Optional — CloudWatch Log Groups ────────────────
+${deleteLogs ? `# ── Step 4: Optional — CloudWatch Log Groups ────────────────
 if [ "\$DELETE_LOGS" = "true" ]; then
     echo "Step 4: Deleting CloudWatch Log Groups..."
     if [ \${#SCOPE_MPES[@]} -gt 0 ]; then
@@ -331,7 +331,7 @@ if [ "\$DELETE_LOGS" = "true" ]; then
     echo ""
 fi
 
-# ── Summary ─────────────────────────────────────────────────
+` : ''}# ── Summary ─────────────────────────────────────────────────
 echo "  ┌──────────────────────────────────────────────────────┐"
 if [ \$FAILED -gt 0 ]; then
     echo "  │   ⚠️  Delete completed with failures                  │"

@@ -1,0 +1,114 @@
+{
+  "eventVersion": "1.11",
+  "userIdentity": {
+    "type": "IAMUser",
+    "principalId": "AIDAEXAMPLEEXAMPLE",
+    "arn": "arn:aws:iam::713881816336:user/admin",
+    "accountId": "713881816336",
+    "accessKeyId": "AKIAEXAMPLEEXAMPLE",
+    "userName": "admin"
+  },
+  "eventTime": "2026-07-15T07:49:26Z",
+  "eventSource": "ecs.amazonaws.com",
+  "eventName": "RunTask",
+  "awsRegion": "ap-northeast-2",
+  "sourceIPAddress": "198.51.100.1",
+  "userAgent": "aws-cli/2.33.5 md/awscrt#0.29.1 ua/2.1 os/macos#25.5.0 md/arch#arm64 lang/python#3.13.11 md/pyimpl#CPython m/E,Z,b,n cfg/retry-mode#standard md/installer#exe sid/190c9a469410 md/prompt#off md/command#ecs.run-task",
+  "requestParameters": {
+    "cluster": "e2e-test-cluster-1773939156",
+    "count": 1,
+    "enableECSManagedTags": false,
+    "enableExecuteCommand": false,
+    "launchType": "FARGATE",
+    "networkConfiguration": {
+      "awsvpcConfiguration": {
+        "subnets": [
+          "subnet-0c6872753fe9ba498"
+        ],
+        "assignPublicIp": "ENABLED"
+      }
+    },
+    "taskDefinition": "map-tagger-runtask-fixture",
+    "clientToken": "584efbcc-7c6b-4a92-bc98-27b267f31873",
+    "dryrun": false
+  },
+  "responseElements": {
+    "tasks": [
+      {
+        "attachments": [
+          {
+            "id": "7bced07e-0541-443d-a06f-cf1020aef093",
+            "type": "ElasticNetworkInterface",
+            "status": "PRECREATED",
+            "details": [
+              {
+                "name": "subnetId",
+                "value": "subnet-0c6872753fe9ba498"
+              }
+            ]
+          }
+        ],
+        "attributes": [
+          {
+            "name": "ecs.cpu-architecture",
+            "value": "x86_64"
+          }
+        ],
+        "availabilityZone": "ap-northeast-2a",
+        "clusterArn": "arn:aws:ecs:ap-northeast-2:713881816336:cluster/e2e-test-cluster-1773939156",
+        "containers": [
+          {
+            "containerArn": "arn:aws:ecs:ap-northeast-2:713881816336:container/e2e-test-cluster-1773939156/1c5845a4cc8149d98f219eee5c8849d2/5ab61fa1-f1f6-4f91-8dae-ca58bedf2766",
+            "taskArn": "arn:aws:ecs:ap-northeast-2:713881816336:task/e2e-test-cluster-1773939156/1c5845a4cc8149d98f219eee5c8849d2",
+            "name": "sleeper",
+            "image": "public.ecr.aws/docker/library/busybox:latest",
+            "lastStatus": "PENDING",
+            "networkInterfaces": [],
+            "cpu": "0"
+          }
+        ],
+        "cpu": "256",
+        "createdAt": "2026-07-15T07:49:26Z",
+        "desiredStatus": "RUNNING",
+        "enableExecuteCommand": false,
+        "group": "family:map-tagger-runtask-fixture",
+        "lastStatus": "PROVISIONING",
+        "launchType": "FARGATE",
+        "memory": "512",
+        "overrides": {
+          "containerOverrides": [
+            {
+              "name": "sleeper"
+            }
+          ],
+          "inferenceAcceleratorOverrides": []
+        },
+        "platformVersion": "1.4.0",
+        "platformFamily": "Linux",
+        "tags": [],
+        "taskArn": "arn:aws:ecs:ap-northeast-2:713881816336:task/e2e-test-cluster-1773939156/1c5845a4cc8149d98f219eee5c8849d2",
+        "taskDefinitionArn": "arn:aws:ecs:ap-northeast-2:713881816336:task-definition/map-tagger-runtask-fixture:1",
+        "version": 1,
+        "ephemeralStorage": {
+          "sizeInGiB": 20
+        },
+        "fargateEphemeralStorage": {
+          "sizeInGiB": 20
+        }
+      }
+    ],
+    "failures": []
+  },
+  "requestID": "dd46c6e9-b6ab-4ce0-8ea4-aab769d6ea80",
+  "eventID": "c2f9e49e-59a5-4231-8d61-810589b3131c",
+  "readOnly": false,
+  "eventType": "AwsApiCall",
+  "managementEvent": true,
+  "recipientAccountId": "713881816336",
+  "eventCategory": "Management",
+  "tlsDetails": {
+    "tlsVersion": "TLSv1.3",
+    "cipherSuite": "TLS_AES_128_GCM_SHA256",
+    "clientProvidedHostHeader": "ecs.ap-northeast-2.amazonaws.com"
+  }
+}
