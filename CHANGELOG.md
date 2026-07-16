@@ -6,6 +6,10 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Fixed (v22.1.0 — delete-form MPE-ID truncation, regression since PR #94):**
+
+- **Deleting a deployment whose MPE ID is longer than 10 characters, using the FIRST (and often only) row of the delete form's "specific MPE" scope, silently deleted nothing.** PR #94 (2026-04) removed the 10-character `maxlength` limit so MPE IDs up to 44 characters could be entered — but it only fixed the JS template used when a customer clicks "add another MPE" for a *second* row. The static HTML row baked into the page for the *first* row still had `maxlength="10"`, so any customer typing a longer MPE ID there had it silently truncated. The generated `delete.sh` then scoped to a `map-auto-tagger-mig<truncated>` stack name that matched nothing, exited successfully having deleted nothing, and gave no indication the real deployment survived. Found via the 2026-07-16 release-gate run (`32B-2/3/6/8/10/11`) — traced to the generated script's `SCOPE_MPES` value, then to two markup copies of this input having drifted apart. Fixed the static copy to match; added a regression test asserting both copies (and the built artifact) stay in sync.
+
 **Fixed (v22.1.0 — phase-27 verification sweep, 7 extractor bugs + 2 alert-noise paths, all live-verified against real captured CloudTrail events 2026-07-15):**
 
 - **Redshift clusters were never tagged — the universal ARN scan tagged the wrong resource.** The real `CreateCluster` response carries `clusterNamespaceArn`; the suffix-match scan picked it up before the dedicated cluster branch could run, and namespaces reject tagging entirely → permanent-actionable alert + untagged cluster, every time. The Redshift branch now runs as an early exit ahead of the scans. (`P27C-REDSHIFT-CLUSTER`)
