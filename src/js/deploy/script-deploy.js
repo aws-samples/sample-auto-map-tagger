@@ -971,7 +971,15 @@ if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
         break
       elif [ "\$FAILED" -gt 0 ]; then
         DEPLOY_STATUS="FAILED — \$FAILED account(s) failed in StackSet"
-        echo "  ❌ \$FAILED account(s) failed. Check CloudFormation StackSet for details."
+        echo "  ❌ \$FAILED account(s) failed:"
+        # StatusReason surfaces the actual failure (e.g. the per-account
+        # CloudTrail preflight's message) so the customer sees WHY without
+        # a separate console/CLI dig into the StackSet.
+        aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+            --region "\$REGION" --query "Summaries[?Status=='CANCELLED'||Status=='FAILED'].[Account,Region,StatusReason]" \\
+            --output text 2>/dev/null | while IFS=\$'\\t' read -r FAIL_ACCT FAIL_REGION FAIL_REASON; do
+          echo "     - \$FAIL_ACCT (\$FAIL_REGION): \${FAIL_REASON:-No reason reported — check CloudFormation StackSet for details.}"
+        done
         break
       fi
       sleep 30
