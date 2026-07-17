@@ -52,3 +52,23 @@ describe('deploy script — in-place update on existing stacks', () => {
     expect(src).toContain('wait stack-delete-complete');
   });
 });
+
+// Regression guard: when a StackSet instance fails (e.g. the per-account
+// CloudTrail preflight in template-main.js rejects an account), deploy.sh
+// used to only report a count ("N account(s) failed") and point the
+// customer at the CloudFormation console. That forced a separate dig to
+// find out WHY. deploy.sh now queries StatusReason per failed instance and
+// prints it inline, surfacing the preflight's actual message directly.
+describe('deploy script — StackSet failure reason surfaced inline', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../../src/js/deploy/script-deploy.js'), 'utf8');
+
+  it('queries StatusReason for failed/cancelled StackSet instances', () => {
+    expect(src).toContain("Summaries[?Status=='CANCELLED'||Status=='FAILED'].[Account,Region,StatusReason]");
+  });
+
+  it('prints the reason per failed account instead of just a count', () => {
+    expect(src).toContain('FAIL_ACCT (\\$FAIL_REGION)');
+    expect(src).toContain('FAIL_REASON');
+  });
+});

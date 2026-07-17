@@ -438,6 +438,12 @@ ${permissionsList}
                 Action:
                   - ssm:GetParameter
                 Resource: !Sub arn:aws:ssm:\${AWS::Region}:\${AWS::AccountId}:parameter/auto-map-tagger/*/config
+              - Sid: CheckCloudTrailCoverage
+                Effect: Allow
+                Action:
+                  - cloudtrail:DescribeTrails
+                  - cloudtrail:GetTrailStatus
+                Resource: '*'
               - Sid: Logging
                 Effect: Allow
                 Action:
@@ -561,6 +567,26 @@ ${permissionsList}
                           conflicts.append(f'{name} (MPE {peer_mpe}): {reason}')
               return conflicts
 
+          def cloudtrail_covers_region(region):
+              # Runs INSIDE the target account (single-account stack, or a
+              # StackSet instance in a linked account) — so this sees exactly
+              # what that account has, whether it's a local trail, a
+              # multi-region trail homed elsewhere, or an org trail shadowed
+              # in from the management account. No org-trail special-casing
+              # needed: describe_trails() already reflects all three.
+              ct = boto3.client('cloudtrail', region_name=region)
+              trails = ct.describe_trails(includeShadowTrails=True).get('trailList', [])
+              for t in trails:
+                  if not (t.get('HomeRegion') == region or t.get('IsMultiRegionTrail')):
+                      continue
+                  try:
+                      status = ct.get_trail_status(Name=t['TrailARN'])
+                  except Exception:
+                      continue
+                  if status.get('IsLogging'):
+                      return True
+              return False
+
           def handler(event, context):
               try:
                   rt = event.get('RequestType', '')
@@ -585,6 +611,18 @@ ${permissionsList}
                       # stack not found — genuine first deploy, proceed to check
                   account = context.invoked_function_arn.split(':')[4]
                   region = os.environ.get('AWS_REGION', '')
+                  if not cloudtrail_covers_region(region):
+                      reason = (
+                          f'No active CloudTrail trail covers {region} in account {account} — '
+                          'the auto-tagger EventBridge rule matches "AWS API Call via CloudTrail" '
+                          'events, so with no trail logging here, resources will be created '
+                          'silently with NO tag and NO error. Stack creation blocked. '
+                          'Fix: create a trail that logs this region (a single-region trail here, '
+                          'a multi-region trail homed anywhere, or an AWS Organizations trail from '
+                          'the management account all satisfy this), then retry.'
+                      )
+                      print(f'PreflightNoCloudTrail: {reason}')
+                      return respond(event, context, 'FAILED', reason)
                   conflicts = check_peers(props, account, region)
                   if conflicts:
                       reason = (
