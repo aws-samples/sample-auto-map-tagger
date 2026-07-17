@@ -85,6 +85,12 @@ NATIVE_IAM_REQUIREMENTS = {
     # plan-PR #57). cloudformation:ListStacks has no resource-level IAM;
     # scope is implicitly the caller's account.
     "cloudformation": ["cloudformation:ListStacks"],
+    # cloudtrail: read-only coverage check in the per-account PreflightFunction
+    # (PR #112). Blocks the tagger's creation if no active trail covers the
+    # account/region, else the CloudTrail-driven EventBridge rule never fires
+    # and resources are tagged silently-never. These two actions are granted in
+    # the PreflightRole (see template-main.js) and are not tagging-dispatch.
+    "cloudtrail": ["cloudtrail:DescribeTrails", "cloudtrail:GetTrailStatus"],
 }
 
 
