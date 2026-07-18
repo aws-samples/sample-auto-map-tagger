@@ -7397,6 +7397,12 @@ ${permissionsList}
                       # None — is_in_scope() hard-rejects that, so nothing tags.
                       # Invalidate cache so the next invocation retries SSM
                       # immediately rather than waiting for TTL expiry.
+                      # config_error marks this as "config broken", NOT "resource
+                      # out of scope" — _process_event routes those events to
+                      # transient so they retry and, if the config stays broken,
+                      # exhaust into the DLQ and fire the DLQ alarm instead of
+                      # being silently acked (CT6-005: a malformed day-2 SSM edit
+                      # used to silently lose every in-window tag with no signal).
                       _config = None
                       _config_ts = 0.0
                       print(f'CONFIG_UNREACHABLE: {e}')
@@ -7406,6 +7412,7 @@ ${permissionsList}
                           'scoped_account_ids': ['ALL'],
                           'scoped_vpc_ids': ['NONE'],
                           'agreement_start_date': None,
+                          'config_error': f'config unreachable/unparseable: {str(e)[:200]}',
                       }
                   # Whitespace strip for customer-edited SSM values. CFN
                   # CommaDelimitedList strips on deploy; SSM-stored config may
@@ -9415,6 +9422,31 @@ ${permissionsList}
               acks and 'transient' / 'permanent_actionable' as retriable
               (batchItemFailures).
               """
+              # CT6-005: a broken config is NOT "resource out of scope". Acking
+              # events while the config is unreachable/malformed silently loses
+              # every in-window tag with zero operator signal (no DLQ, no alarm).
+              # Classify as transient instead: SQS redelivers; if the customer
+              # fixes the config within the retry budget the tags land, otherwise
+              # the events exhaust into EventDLQ and the DLQ alarm fires — the
+              # customer fixes the config and redrives the DLQ. Tagging stays
+              # fail-closed throughout (nothing tags while the config is broken).
+              def _config_broken():
+                  if config.get('config_error'):
+                      return config['config_error']
+                  if not config.get('mpe_id'):
+                      return 'mpe_id missing from config'
+                  asd = config.get('agreement_start_date')
+                  try:
+                      datetime.strptime(asd, '%Y-%m-%d')
+                  except (ValueError, TypeError):
+                      return f"invalid agreement_start_date: '{asd}'"
+                  return None
+          
+              broken = _config_broken()
+              if broken:
+                  print(f'CONFIG_BROKEN (transient, will retry via SQS): {broken}')
+                  return ('transient', broken)
+          
               if not is_after_agreement(config):
                   print('Before agreement start date, skipping.')
                   return ('skipped', None)
