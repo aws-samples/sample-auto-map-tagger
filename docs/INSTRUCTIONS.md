@@ -249,9 +249,18 @@ aws cloudformation list-stack-set-operations \
 aws cloudformation delete-stack-set \
   --stack-set-name map-auto-tagger-mig1234567890 \
   --region <REGION>
+
+# 4. Delete the management-account admin stack too — the parent stack that
+#    created the StackSet. If it survives, a later deploy.sh run against the
+#    same MPE sees an existing identical stack, performs a no-op update, and
+#    CloudFormation never re-runs the StackSet deployment — leaving ZERO
+#    taggers org-wide. (deploy.sh now detects and refuses this, but delete
+#    the stack here so the re-deploy just works.)
+aws cloudformation delete-stack --stack-name map-auto-tagger-mig1234567890 --region <REGION>
+aws cloudformation wait stack-delete-complete --stack-name map-auto-tagger-mig1234567890 --region <REGION>
 ```
 
-Tags already applied to existing resources are not removed — MAP credits stay intact. StackSet admin/execution IAM roles (shared org scaffolding) are never touched.
+Tags already applied to existing resources are not removed — MAP credits stay intact. StackSet admin/execution **IAM roles** (shared org scaffolding) are never touched — but the admin *stack* in the management account is part of this deployment and must be deleted (step 4); the two are not the same thing.
 
 ---
 

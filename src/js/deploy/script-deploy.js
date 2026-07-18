@@ -929,12 +929,33 @@ elif [ "\$STACK_STATUS" = "ROLLBACK_COMPLETE" ]; then
       --capabilities CAPABILITY_NAMED_IAM \\
       --region "\$REGION" > /dev/null
 else
-    aws cloudformation update-stack \\
+    # A surviving admin stack (e.g. left behind by a v21→v22 migration that
+    # removed the StackSet but not this stack) with an identical template
+    # yields "No updates are to be performed" — and CloudFormation only
+    # re-invokes the StackSet-creating custom resource on a property change,
+    # so a swallowed no-op here deploys NOTHING org-wide while the script
+    # prints success (CT6-004 defect 2). Refuse the no-op path explicitly.
+    UPDATE_ERR=\$(aws cloudformation update-stack \\
       --stack-name "\$STACK_NAME" \\
       --template-url "\$ORG_TEMPLATE_URL" \\
       --parameters "\$ORG_PARAMS" \\
       --capabilities CAPABILITY_NAMED_IAM \\
-      --region "\$REGION" > /dev/null 2>&1 || true
+      --region "\$REGION" 2>&1 > /dev/null) || {
+        if echo "\$UPDATE_ERR" | grep -q "No updates are to be performed"; then
+            echo "  ❌ Management stack \$STACK_NAME already exists with an identical configuration."
+            echo "     CloudFormation will NOT re-run the StackSet deployment on a no-op update,"
+            echo "     so this run would deploy nothing to your member accounts."
+            echo "     If you are re-deploying after removing a previous version's StackSet"
+            echo "     (e.g. a v21→v22 migration), delete the leftover management stack first:"
+            echo "       aws cloudformation delete-stack --stack-name \$STACK_NAME --region \$REGION"
+            echo "       aws cloudformation wait stack-delete-complete --stack-name \$STACK_NAME --region \$REGION"
+            echo "     then re-run this script."
+            DEPLOY_STATUS="FAILED — no-op update on existing management stack (StackSet not re-deployed)"
+        else
+            echo "  ❌ update-stack failed: \$UPDATE_ERR"
+            DEPLOY_STATUS="FAILED — update-stack error"
+        fi
+    }
 fi
 
 echo "  ${t('d_deploying')}"
@@ -994,10 +1015,25 @@ if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
       sleep 30
       SS_WAIT=\$((SS_WAIT + 30))
     done
-    # If the 1200s wait expired without reaching all-CURRENT or any FAILED, the StackSet
-    # is still rolling out. Mark as SUCCESS — stack create completed; continued rollout
-    # is tracked by CloudFormation itself and visible via list-stack-instances.
-    if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then DEPLOY_STATUS="SUCCESS"; fi
+    # If the 1200s wait expired without reaching all-CURRENT or any FAILED:
+    # distinguish "still rolling out" (TOTAL>0 — CloudFormation tracks the
+    # rest, call it success) from "no instances ever appeared" (TOTAL==0 —
+    # the StackSet deployed to nothing; e.g. its target OUs are empty, or a
+    # stale StackSetName Output points at a deleted StackSet after a partial
+    # v21→v22 migration). The old catch-all flipped TOTAL==0 to SUCCESS
+    # after 1200s — "Setup Complete!" with zero taggers org-wide (CT6-004
+    # defect 3). Zero instances is a failure, loudly.
+    if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
+        if [ "\$TOTAL" -gt 0 ] 2>/dev/null; then
+            DEPLOY_STATUS="SUCCESS"
+        else
+            DEPLOY_STATUS="FAILED — StackSet \$STACKSET_NAME has ZERO stack instances after \${SS_WAIT}s"
+            echo "  ❌ StackSet \$STACKSET_NAME never created any stack instances."
+            echo "     No member account received a tagger. Check that the target OU(s)"
+            echo "     contain accounts, and that the StackSet exists:"
+            echo "       aws cloudformation list-stack-instances --stack-set-name \$STACKSET_NAME --region \$REGION"
+        fi
+    fi
   else
     DEPLOY_STATUS="SUCCESS"
   fi
