@@ -6,6 +6,10 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Fixed (v22.1.0 — backfill wait always timed out, found by the 2026-07-18 release gate):**
+
+- **`deploy.sh`'s backfill wait never saw the completion sentinel and always spun to its 1200s timeout.** The wait polls the backfill Lambda's log group for "Backfill complete" — but anchored the CloudWatch `--start-time` at the *wait loop's* start. The backfill custom resource runs *during* stack creation, so its completion line is usually emitted before the stack wait returns and the loop begins; the anchor filtered the already-written line out, and every backfill-enabled deploy reported a timeout for a backfill that had long finished (and burned 20 idle minutes doing it). The anchor is now `SCRIPT_START_MS`, captured at script start, in both the single-account and org deploy paths.
+
 **Fixed (v22.1.0 — multi-mode deploy could include a stray single-mode region, follow-up to CT6-006):**
 
 - **Switching deploy mode from single-account to multi-account could silently carry a region the validator never saw.** `getConfig()`'s multi-account branch collected every `.region-select` on the page — including the single-account list, which mode-switching hides but never clears. A region picked in single mode then leaked into the multi-account deploy's region set, while the MPE-length validator (`maxMpeLenForConfig()`, which correctly reads only the multi list) never accounted for it — so a long stray region could re-open the exact CT6-006 IAM role-name overflow in that one region. The multi-account branch is now scoped to `#regionList` only, making the validator and the deployed config read the same selector. Found by post-merge adversarial review of #115.

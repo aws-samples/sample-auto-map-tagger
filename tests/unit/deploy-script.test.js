@@ -72,3 +72,20 @@ describe('deploy script — StackSet failure reason surfaced inline', () => {
     expect(src).toContain('FAIL_REASON');
   });
 });
+
+describe('deploy script — backfill wait anchors sentinel search at script start (gate 32B-1)', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../../src/js/deploy/script-deploy.js'), 'utf8');
+
+  it('SCRIPT_START_MS captured at both script tops', () => {
+    expect(src.match(/SCRIPT_START_MS=\\\$\(\( \\\$\(date \+%s\) \* 1000 \)\)/g) || []).toHaveLength(2);
+  });
+
+  it('both backfill waits filter logs from SCRIPT start, not loop start', () => {
+    // The backfill custom resource completes DURING stack creation; anchoring
+    // the CloudWatch filter at wait-loop start excluded the already-emitted
+    // 'Backfill complete' line → every backfill deploy spun the full 1200s.
+    expect(src.match(/BACKFILL_WAIT_START_MS=\\\$SCRIPT_START_MS/g) || []).toHaveLength(2);
+    expect(src).not.toMatch(/BACKFILL_WAIT_START_MS=\\\$\(\( \\\$\(date/);
+  });
+});
