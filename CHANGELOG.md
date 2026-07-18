@@ -6,6 +6,10 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Fixed (v22.1.0 — delete.sh false-failure exit code, found by the 2026-07-18 release gate):**
+
+- **A fully successful `delete.sh` run exited 1 whenever "also delete CloudWatch logs" was selected.** The script's final line was a bare `[ "$DELETE_LOGS" != "true" ] && echo "...(audit history)"` — with log deletion enabled the test is false, the `&&` list short-circuits with status 1, and since it is the last command that becomes the whole script's exit code. Every log-deleting delete printed "✅ Delete complete" and then reported failure to any caller checking `$?` (CI wrappers, customer automation). Rewritten as an `if` statement (always ends status 0). Deletes with log deletion *disabled* were unaffected, which is why this survived: the E2E suite's delete checks ran with logs retained.
+
 **Fixed (v22.1.0 — multi-mode deploy could include a stray single-mode region, follow-up to CT6-006):**
 
 - **Switching deploy mode from single-account to multi-account could silently carry a region the validator never saw.** `getConfig()`'s multi-account branch collected every `.region-select` on the page — including the single-account list, which mode-switching hides but never clears. A region picked in single mode then leaked into the multi-account deploy's region set, while the MPE-length validator (`maxMpeLenForConfig()`, which correctly reads only the multi list) never accounted for it — so a long stray region could re-open the exact CT6-006 IAM role-name overflow in that one region. The multi-account branch is now scoped to `#regionList` only, making the validator and the deployed config read the same selector. Found by post-merge adversarial review of #115.

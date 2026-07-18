@@ -29,3 +29,18 @@ describe('delete script — log-group block emitted only when requested', () => 
     expect(outside).not.toContain('delete-log-group');
   });
 });
+
+describe('delete script — success path exits 0 with delete-logs enabled (gate 32B)', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../../src/js/delete/delete-flow.js'), 'utf8');
+
+  it('the trailing preserved-logs note is an if-statement, not a bare && list', () => {
+    // A bare `[ ... ] && echo` as the script's LAST command makes a fully
+    // successful delete exit 1 whenever DELETE_LOGS=true (the false test
+    // short-circuits and its status becomes the script exit code). Found
+    // by the 2026-07-18 release gate: every 32B delete "failed" with a
+    // "✅ Delete complete" banner.
+    expect(src).toMatch(/if \[ "\\\$DELETE_LOGS" != "true" \]; then/);
+    expect(src).not.toMatch(/\[ "\\\$DELETE_LOGS" != "true" \] && echo/);
+  });
+});
