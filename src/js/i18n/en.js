@@ -131,6 +131,7 @@ const en_translations = {
             rv_res_sns:'Amazon SNS Topic + Amazon CloudWatch Alarm', rv_res_sns_desc:'Notifies on tagging errors (>3 failures in 5 min)',
             rv_res_custom:'Custom Resource (Lambda)', rv_res_custom_desc:'Auto-discovers root OU ID at deploy time — customer does nothing',
             err_mpe_invalid:"MAP Engagement ID must be 1–44 characters, uppercase English letters (A–Z) and digits (0–9) only, with at least one letter and one number",
+            err_mpe_derived_length:"For the selected regions and options, the MAP Engagement ID can be at most {max} characters — AWS IAM role names derived from it are limited to 64 characters",
             ui_landing_title:'What would you like to do?',
             ui_landing_subtitle:'Select an option to get started',
             ui_mode_deploy_title:'Deploy new MAP Auto-Tagger',
