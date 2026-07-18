@@ -10346,6 +10346,7 @@ MPE="${mpe}"
 CUSTOMER=${customerDisplay}
 REPORT_FILE="${reportFile}"
 DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
+SCRIPT_START_MS=\$(( \$(date +%s) * 1000 ))
 PREFLIGHT_LOG=""
 DEPLOY_STATUS="NOT STARTED"
 TEMPLATE_REF=""
@@ -10768,7 +10769,13 @@ echo "${t('d_backfill_waiting')}"
 echo "  ${t('d_backfill_wait_info')}"
 echo ""
 BACKFILL_RESULT="${t('d_backfill_timeout')}"
-BACKFILL_WAIT_START_MS=\$(( \$(date +%s) * 1000 ))
+# Anchor the sentinel search at SCRIPT start, not wait-loop start. The
+# backfill custom resource runs DURING stack creation, so its 'Backfill
+# complete' line usually lands BEFORE the stack wait returns and this
+# loop begins. A wait-loop-start anchor filters that line out -> every
+# backfill deploy spun the full 1200s and reported timeout on a backfill
+# that had long finished (release gate 32B-1, 2026-07-18).
+BACKFILL_WAIT_START_MS=\$SCRIPT_START_MS
 WAIT=0
 # Backfill is a Custom::Backfill CustomResource (one-shot during stack create),
 # NOT an EventBridge rule — so we poll the backfill Lambda's CloudWatch log
@@ -10874,6 +10881,7 @@ STACK_NAME="map-auto-tagger-${mpe}"
 CUSTOMER=${customerDisplay}
 REPORT_FILE="${reportFile}"
 DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
+SCRIPT_START_MS=\$(( \$(date +%s) * 1000 ))
 PREFLIGHT_LOG=""
 DEPLOY_STATUS="NOT STARTED"
 
@@ -11352,7 +11360,13 @@ if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
   echo "  ${t('d_backfill_wait_info')}"
   echo ""
   BACKFILL_RESULT="${t('d_backfill_timeout')}"
-  BACKFILL_WAIT_START_MS=\$(( \$(date +%s) * 1000 ))
+  # Anchor the sentinel search at SCRIPT start, not wait-loop start. The
+# backfill custom resource runs DURING stack creation, so its 'Backfill
+# complete' line usually lands BEFORE the stack wait returns and this
+# loop begins. A wait-loop-start anchor filters that line out -> every
+# backfill deploy spun the full 1200s and reported timeout on a backfill
+# that had long finished (release gate 32B-1, 2026-07-18).
+BACKFILL_WAIT_START_MS=\$SCRIPT_START_MS
   WAIT=0
   # See rationale in the single-account branch — backfill is a Custom::Backfill
   # CustomResource, not an EventBridge rule. Poll the Lambda's log group directly.
