@@ -228,13 +228,22 @@ NEW_VPC_LIST="${(config.scopedVpcIds && config.scopedVpcIds[0] !== 'NONE') ? con
 # by the Lambda at runtime; single-account deploys set it to ALL and rely on the
 # Lambda's per-account identity at tag time.)
 for CHECK_REGION in \$REGIONS; do
+    # Match BOTH direct deploys (map-auto-tagger-<mpe>) and StackSet instance
+    # stacks (StackSet-map-auto-tagger-<mpe>-<uuid>) — a tagger that arrived
+    # via StackSet AutoDeployment is just as much a competing peer, and the
+    # prefix-only check used to miss it entirely (CT6-007).
     EXISTING_STACKS=\$(aws cloudformation list-stacks --region "\$CHECK_REGION" \\
         --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE \\
-        --query "StackSummaries[?starts_with(StackName, \\\`map-auto-tagger-\\\`)].StackName" \\
+        --query "StackSummaries[?starts_with(StackName, \\\`map-auto-tagger-\\\`) || starts_with(StackName, \\\`StackSet-map-auto-tagger-\\\`)].StackName" \\
         --output text 2>/dev/null || echo "")
     LAMBDA_CONFLICT=0
     for EXISTING in \$EXISTING_STACKS; do
-        EXISTING_MPE="\${EXISTING#map-auto-tagger-}"
+        EXISTING_MPE="\${EXISTING#StackSet-}"
+        EXISTING_MPE="\${EXISTING_MPE#map-auto-tagger-}"
+        # StackSet instance names carry a trailing UUID: strip it so the SSM
+        # config lookup below uses the bare MpeId (same strip the runtime
+        # peer detector does; PR #85 learned this the hard way).
+        EXISTING_MPE=\$(echo "\$EXISTING_MPE" | sed -E 's/-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\$//')
         # Only treat as a peer deploy if the suffix matches the MpeId pattern
         # (AllowedPattern: ^mig[a-zA-Z0-9]+\$). Skips test harness / E2E stacks.
         case "\$EXISTING_MPE" in mig*) ;; *) continue ;; esac

@@ -198,18 +198,57 @@
             return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
         }
 
+        // CT6-006: MPE-derived IAM role names must stay within AWS's 64-char
+        // RoleName limit. The template derives region-qualified names — the
+        // binding one is 'map-auto-tagger-backfill-mig<id>-<region>' (or
+        // '...-role-...' when backfill is off), and org deploys also create
+        // 'auto-map-tagger-deploy-role-mig<id>'. #96 raised the UI MaxLength
+        // 20→44 without auditing these; an MPE fine in the UI then died in
+        // CloudFormation with ROLLBACK_COMPLETE (region-dependent, e.g.
+        // ap-northeast-2 caps lower than us-east-1). Returns the max allowed
+        // user-entered MPE length for the CURRENT config, so validation can
+        // fail fast with the actual number.
+        function maxMpeLenForConfig() {
+            const currentMode = (document.querySelector('input[name="deployMode"]:checked') || {}).value;
+            const regionSel = currentMode === 'multi' ? '#regionList .region-select' : '#singleRegionList .region-select';
+            const regions = getValues(regionSel).filter(v => v);
+            if (regions.length === 0) regions.push('ap-northeast-2'); // getConfig()'s single-mode default
+            const maxRegionLen = Math.max(...regions.map(r => r.length));
+            const backfill = document.getElementById('includeBackfill');
+            const rolePrefixLen = (backfill && backfill.checked)
+                ? 'map-auto-tagger-backfill-'.length   // 25 — longest region-qualified prefix
+                : 'map-auto-tagger-role-'.length;      // 21
+            // RoleName = <prefix> + 'mig' + <id> + '-' + <region>  ≤ 64
+            let max = 64 - rolePrefixLen - 3 - 1 - maxRegionLen;
+            if (currentMode === 'multi') {
+                // org deploy role: 'auto-map-tagger-deploy-role-' + 'mig' + <id> ≤ 64
+                max = Math.min(max, 64 - 'auto-map-tagger-deploy-role-'.length - 3);
+            }
+            return max;
+        }
+
         function validate() {
             let valid = true;
             const mpeId = document.getElementById('mpeId').value.trim();
             const date = document.getElementById('agreementDate').value;
 
+            const mpeErr = document.getElementById('mpeId-error');
+            const mpeMax = maxMpeLenForConfig();
             if (!/^[A-Z0-9]+$/.test(mpeId) || mpeId.length < 1 || mpeId.length > 44) {
                 document.getElementById('mpeId').classList.add('error');
-                document.getElementById('mpeId-error').style.display = 'block';
+                mpeErr.setAttribute('data-i18n', 'err_mpe_invalid');
+                mpeErr.textContent = t('err_mpe_invalid');
+                mpeErr.style.display = 'block';
+                valid = false;
+            } else if (mpeId.length > mpeMax) {
+                document.getElementById('mpeId').classList.add('error');
+                mpeErr.setAttribute('data-i18n', 'err_mpe_derived_length');
+                mpeErr.textContent = t('err_mpe_derived_length').replace('{max}', mpeMax);
+                mpeErr.style.display = 'block';
                 valid = false;
             } else {
                 document.getElementById('mpeId').classList.remove('error');
-                document.getElementById('mpeId-error').style.display = 'none';
+                mpeErr.style.display = 'none';
             }
 
             if (!date || !isValidCalendarDate(date)) {
