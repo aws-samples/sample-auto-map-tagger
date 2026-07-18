@@ -6,6 +6,10 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Fixed (v22.1.0 — multi-mode deploy could include a stray single-mode region, follow-up to CT6-006):**
+
+- **Switching deploy mode from single-account to multi-account could silently carry a region the validator never saw.** `getConfig()`'s multi-account branch collected every `.region-select` on the page — including the single-account list, which mode-switching hides but never clears. A region picked in single mode then leaked into the multi-account deploy's region set, while the MPE-length validator (`maxMpeLenForConfig()`, which correctly reads only the multi list) never accounted for it — so a long stray region could re-open the exact CT6-006 IAM role-name overflow in that one region. The multi-account branch is now scoped to `#regionList` only, making the validator and the deployed config read the same selector. Found by post-merge adversarial review of #115.
+
 **Fixed (v22.1.0 — backfill 15-min timeout stalled stack creation, release-gate 32B-5/32B-7):**
 
 - **A long backfill window could permanently stall stack creation.** With an old `agreementStartDate` and the full event-type list, the backfill custom-resource Lambda's CloudTrail sweep exceeded its hard 900s timeout. The process was killed *before* the CloudFormation callback was delivered, so CFN retried the custom resource 3× and the whole stack creation hung until manual intervention (reproduced twice in the release gate, org-mode deploys). The backfill now runs under an explicit time budget derived from the Lambda's real remaining time: lookups stop with reserved runway for the SQS enqueue loop and the CFN response, the enqueue loop has its own later cutoff, and a cut-off run responds `SUCCESS` with a `PARTIAL` flag in the CFN Reason (naming how many event types were cut off and how many found events weren't enqueued) so operators know a manual tag sweep may be needed. Backfill is best-effort by design — a truncated backfill that responds beats a complete one that never does.
