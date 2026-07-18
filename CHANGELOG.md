@@ -6,6 +6,10 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Fixed (v22.1.0 — build hardening, same PR):**
+
+- **`npm run verify` now parses the built inline JS bundle.** A backtick inside a JS comment in any `src/` file silently terminates the template literal it lands in at build time, breaking every configurator function while all source-level tests stay green (this PR's first revision did exactly that — caught only by a live browser probe). The verify gate now `new Function()`s the whole bundle.
+
 **Fixed (v22.1.0 — delete.sh false-failure exit code, found by the 2026-07-18 release gate):**
 
 - **A fully successful `delete.sh` run exited 1 whenever "also delete CloudWatch logs" was selected.** The script's final line was a bare `[ "$DELETE_LOGS" != "true" ] && echo "...(audit history)"` — with log deletion enabled the test is false, the `&&` list short-circuits with status 1, and since it is the last command that becomes the whole script's exit code. Every log-deleting delete printed "✅ Delete complete" and then reported failure to any caller checking `$?` (CI wrappers, customer automation). Rewritten as an `if` statement (always ends status 0). Deletes with log deletion *disabled* were unaffected, which is why this survived: the E2E suite's delete checks ran with logs retained.
