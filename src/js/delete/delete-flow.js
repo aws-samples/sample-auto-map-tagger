@@ -346,7 +346,14 @@ else
     echo "  └──────────────────────────────────────────────────────┘"
     echo ""
     echo "  Preserved: map-migrated tags on AWS resources, StackSet admin IAM roles"
-    [ "\$DELETE_LOGS" != "true" ] && echo "             CloudWatch Log Groups (audit history)"
+    # NOTE: this conditional echo is the LAST command in the script — a bare
+    # '[ ... ] && echo' here made the whole script exit 1 on a fully
+    # successful delete whenever DELETE_LOGS=true (the test is false, the &&
+    # short-circuits, and the list's status becomes the script's exit code).
+    # The if-form always ends status 0.
+    if [ "\$DELETE_LOGS" != "true" ]; then
+        echo "             CloudWatch Log Groups (audit history)"
+    fi
 fi
 `;
 
