@@ -51,6 +51,12 @@ Tags are always applied eventually — this is a latency variance, not a reliabi
 
 ---
 
+## Backfill is bounded by the Lambda 15-minute ceiling (may be PARTIAL)
+
+The optional deploy-time backfill sweeps CloudTrail from the agreement start date for every subscribed event type inside a single Lambda invocation, which has a hard 900-second limit. An old agreement start date combined with a large event history can exceed that budget. The backfill stops itself before the ceiling (so stack creation always completes) and reports `PARTIAL` in the CloudFormation custom-resource Reason, naming how many event types were cut off. Resources created before deployment in the cut-off types stay untagged — apply tags to those manually. CloudTrail `LookupEvents` is also limited to the trailing 90 days, so a backfill can never reach further back than that regardless of the agreement date.
+
+---
+
 ## Upgrading from a Previous Version
 
 Prior versions used fixed resource names (`map-auto-tagger`, `/auto-map-tagger/config`). The current version uses MPE-ID-namespaced names (`map-auto-tagger-mig111`, `/auto-map-tagger/mig111/config`). CloudFormation treats these as entirely new resources — running `deploy.sh` on an existing deployment will deploy a **second stack alongside the old one**, with both Lambdas running simultaneously.
