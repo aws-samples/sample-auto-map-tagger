@@ -2044,9 +2044,16 @@ _TRANSIENT_MARKERS = (
     # reaches Ready; retry within the SQS budget succeeds.
     'Must be Ready',
 )
-_PERMANENT_IGNORABLE_MARKERS = (
-    # Resource genuinely deleted between create and tag event.
-    # Retrying will not find it; alerting is noise.
+# Not-found errors are AMBIGUOUS: the resource may be genuinely deleted
+# (permanent — retrying is pointless, alerting is noise) OR still
+# provisioning moments after its Create event (transient — DynamoDB
+# returns "Requested resource not found" for TagResource on a CREATING
+# table; P3-C11 burst run 2026-07-18 left 7/100 tables permanently
+# untagged this way). _classify_error disambiguates by EVENT AGE: within
+# _CREATE_RACE_GRACE_S of the CloudTrail eventTime these classify
+# transient (SQS redelivers); past it they classify permanent_ignorable
+# (genuinely deleted, ack silently).
+_NOT_FOUND_MARKERS = (
     'ResourceNotFoundException',
     'Requested resource not found',
     'NoSuchBucket',
@@ -2054,6 +2061,14 @@ _PERMANENT_IGNORABLE_MARKERS = (
     'DBInstanceNotFound',
     'DBClusterNotFoundFault',
     'InvalidVolume.NotFound',
+)
+# Must stay BELOW the SQS retry lifetime (maxReceiveCount 5 x 180s VT =
+# 900s): a genuinely-deleted resource's redeliveries age past the grace
+# and get acked as permanent_ignorable BEFORE the receive budget runs
+# out, so deletions never land in EventDLQ / fire the alarm.
+_CREATE_RACE_GRACE_S = 600
+
+_PERMANENT_IGNORABLE_MARKERS = _NOT_FOUND_MARKERS + (
     # Bedrock system-defined inference profiles fire CreateInferenceProfile but the tag API returns this error. Application profiles (same event) tag normally; we silently ack the system ones.
     'System-defined Inference Profile is not taggable',
     'UPDATE_ROLLBACK_FAILED',
@@ -2096,9 +2111,32 @@ _IGNORE_EVENTS = frozenset([
     'PutQueryDefinition',
 ])
 
-def _classify_error(msg):
+def _event_age_seconds(event_time):
+    """Seconds since the CloudTrail eventTime (ISO 8601, always UTC Z).
+    Returns None when the timestamp is missing/unparseable — callers must
+    then take the SAFE branch for that marker class."""
+    if not event_time:
+        return None
+    try:
+        ts = datetime.strptime(event_time, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - ts).total_seconds()
+    except (ValueError, TypeError):
+        return None
+
+def _classify_error(msg, event_time=None):
     if any(m in msg for m in _TRANSIENT_MARKERS):
         return 'transient'
+    if any(m in msg for m in _NOT_FOUND_MARKERS):
+        # Create-race disambiguation: not-found right after the Create
+        # event means the resource is still provisioning — retry. Only
+        # a not-found on an OLD event means genuinely deleted. Unknown
+        # age retries too (transient is the safe branch: a real deletion
+        # exhausts SQS redelivery into the DLQ instead of silently
+        # losing a live resource's tag).
+        age = _event_age_seconds(event_time)
+        if age is None or age < _CREATE_RACE_GRACE_S:
+            return 'transient'
+        return 'permanent_ignorable'
     if any(m in msg for m in _PERMANENT_IGNORABLE_MARKERS):
         return 'permanent_ignorable'
     return 'permanent_actionable'
@@ -2155,6 +2193,10 @@ def _process_event(eb_event, config):
         print(f'Skipping non-taggable event: {event_name}')
         return ('skipped', None)
 
+    # CloudTrail eventTime — feeds the classifier's create-race
+    # disambiguation (not-found soon after Create = still provisioning).
+    event_time = detail.get('eventTime', '')
+
     # Events that emit multiple resources in a single CloudTrail event
     # (RunInstances → instances + attached EBS volumes + ENIs). AWS
     # does not publish separate CreateVolume / CreateNetworkInterface
@@ -2166,7 +2208,7 @@ def _process_event(eb_event, config):
         # so the classifier can route to permanent_actionable instead
         # of burning the 30s describe_instances budget.
         err_msg = str(e)
-        cls = _classify_error(err_msg)
+        cls = _classify_error(err_msg, event_time)
         _emit_class_metric(cls, config['mpe_id'])
         if cls == 'transient':
             return ('transient', err_msg)
@@ -2196,7 +2238,7 @@ def _process_event(eb_event, config):
             continue
         except Exception as e:
             err_msg = str(e)
-            cls = _classify_error(err_msg)
+            cls = _classify_error(err_msg, event_time)
             _emit_class_metric(cls, tag_value)
 
             if cls == 'transient':
