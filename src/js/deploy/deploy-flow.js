@@ -348,7 +348,13 @@
                 const singleRegions = getValues('#singleRegionList .region-select');
                 config.regions = [...new Set(singleRegions.length > 0 ? singleRegions : ['ap-northeast-2'])];
             } else if (deployMode === 'multi') {
-                config.regions = [...new Set(getValues('.region-select'))];
+                // Scope to the multi-mode list ONLY. The bare '.region-select'
+                // also matched #singleRegionList, which selectDeployMode() hides
+                // but never clears — a single→multi mode switch left a stray
+                // region in the deploy AND out of maxMpeLenForConfig()'s cap
+                // (the validator reads #regionList), re-opening the CT6-006
+                // role-name overflow for that one region.
+                config.regions = [...new Set(getValues('#regionList .region-select'))];
                 config.useAccountScope = document.getElementById('useAccountScope').checked;
                 const ssIds = document.querySelectorAll('.stackset-account-id');
                 const ssLabels = document.querySelectorAll('.stackset-account-label');

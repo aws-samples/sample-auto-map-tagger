@@ -70,3 +70,25 @@ describe('i18n — err_mpe_derived_length present in every locale', () => {
     });
   }
 });
+
+describe('deploy flow — region selectors agree between validator and getConfig (review-115 nit)', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '../../src/js/deploy/deploy-flow.js'), 'utf8');
+
+  it('multi-mode getConfig scopes regions to #regionList only', () => {
+    // A bare '.region-select' also matches the hidden-but-never-cleared
+    // single-mode list; a single→multi mode switch then deploys a stray
+    // region the MPE-length validator (which reads #regionList) never
+    // accounted for — re-opening the CT6-006 overflow for that region.
+    expect(src).toContain("getValues('#regionList .region-select')");
+    expect(src).not.toMatch(/config\.regions = \[\.\.\.new Set\(getValues\('\.region-select'\)\)\]/);
+  });
+
+  it('validator and getConfig use the SAME multi-mode selector', () => {
+    const validatorSel = src.match(/maxMpeLenForConfig[^]*?'([^']*region-select[^']*)'/)[1]
+      .split(':')[0];
+    // both must anchor on #regionList in multi mode
+    expect(src.slice(src.indexOf('function maxMpeLenForConfig'))).toContain("'#regionList .region-select'");
+    expect(src.slice(src.indexOf("deployMode === 'multi'"))).toContain("'#regionList .region-select'");
+  });
+});
