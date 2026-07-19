@@ -4,7 +4,9 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ---
 
-## Unreleased
+## v22.1.0 — 2026-07-19
+
+Certified by the full 36-phase release gate at `4b72b9b` (two complete gate runs 2026-07-18/19; zero product blockers after triage — residual FAILs are test-environment artifacts, documented in the gate reports). Highlights: centralized per-region SNS alerts, all six CT6 chaos blockers closed (CT6-002…007), the create-race not-found class fixed, per-account CloudTrail preflight, SCP preflight fixed for role/SSO callers, backfill time-budget + wait-sentinel fixes, delete.sh exit-code fix, and 13 tag-loss handler fixes with a golden-event replay + coverage gate (158/158 handler branches accounted).
 
 **Fixed (v22.1.0 — SCP preflight silently skipped for role/SSO callers, found by the 2026-07-19 release-gate rerun):**
 
