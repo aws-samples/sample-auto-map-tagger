@@ -6,6 +6,10 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ## Unreleased
 
+**Fixed (v22.1.0 — SCP preflight silently skipped for role/SSO callers, found by the 2026-07-19 release-gate rerun):**
+
+- **`deploy.sh`'s SCP check (tag:TagResources explicit-deny detection) never ran for any caller operating under an assumed role — i.e. most real deployers (SSO, instance roles, cross-account admin roles).** The check passed `aws sts get-caller-identity`'s ARN straight to `iam simulate-principal-policy`; for role sessions that is an STS `assumed-role/.../session` ARN, which the API rejects with `InvalidInput` — swallowed by `2>/dev/null`, leaving `SCP_RESULT` empty and printing "✅ No security policies are blocking the tagging service." An organization whose SCP denies `tag:TagResources` passed preflight and deployed a tagger that could never tag. The batched IAM preflight 20 lines below already converted assumed-role → role ARNs; the SCP check (both single-account and org paths) now shares that `SIM_ARN` derivation. Behaviorally proven: stubbed assumed-role caller + SCP deny → old script passes silently, new script fails preflight with the SCP message. Found by gate check 33-3's first genuine execution (a harness credential bug had masked it in all prior runs). Regression test `tests/unit/preflight-scp-arn.test.js`.
+
 **Fixed (v22.1.0 — build hardening, same PR):**
 
 - **`npm run verify` now parses the built inline JS bundle.** A backtick inside a JS comment in any `src/` file silently terminates the template literal it lands in at build time, breaking every configurator function while all source-level tests stay green (this PR's first revision did exactly that — caught only by a live browser probe). The verify gate now `new Function()`s the whole bundle.

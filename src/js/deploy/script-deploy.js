@@ -95,8 +95,22 @@ else
     PREFLIGHT_LOG="\${PREFLIGHT_LOG}${t('d_log_pass')} ${t('d_ok_perms')}\\n"
 fi
 
+# simulate-principal-policy needs an IAM user/role ARN, NOT the assumed-role
+# session ARN returned by get-caller-identity (arn:aws:sts::...:assumed-role/
+# Foo/session) — passing the session ARN fails with InvalidInput, which the
+# 2>/dev/null below swallowed, so this check silently never fired for role/SSO
+# callers. Convert assumed-role → role ARN (same conversion as the batched IAM
+# check); pass through for IAM users.
+CALLER_ARN=\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
+if [[ "\$CALLER_ARN" == *":assumed-role/"* ]]; then
+    SIM_ACCT=\$(echo "\$CALLER_ARN" | cut -d: -f5)
+    SIM_ROLE=\$(echo "\$CALLER_ARN" | sed 's|.*:assumed-role/||' | cut -d/ -f1)
+    SIM_ARN="arn:aws:iam::\${SIM_ACCT}:role/\${SIM_ROLE}"
+else
+    SIM_ARN="\$CALLER_ARN"
+fi
 SCP_RESULT=\$(aws iam simulate-principal-policy \\
-    --policy-source-arn "\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)" \\
+    --policy-source-arn "\$SIM_ARN" \\
     --action-names "tag:TagResources" \\
     --query 'EvaluationResults[0].EvalDecision' \\
     --output text 2>/dev/null) || SCP_RESULT=""
@@ -116,17 +130,7 @@ fi
 # granted by the Lambda's own role). explicitDeny means an SCP blocks the action.
 # implicitDeny means the principal has no policy granting it. Both fail deploy.
 # Single batched simulate-principal-policy call ≈ 200ms for all checks combined.
-CALLER_ARN=\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
-# simulate-principal-policy needs an IAM user/role ARN, NOT the assumed-role session
-# ARN returned by get-caller-identity (e.g. arn:aws:sts::...:assumed-role/Foo/session).
-# Convert assumed-role → role ARN for SSO / role callers; pass through for IAM users.
-if [[ "\$CALLER_ARN" == *":assumed-role/"* ]]; then
-    SIM_ACCT=\$(echo "\$CALLER_ARN" | cut -d: -f5)
-    SIM_ROLE=\$(echo "\$CALLER_ARN" | sed 's|.*:assumed-role/||' | cut -d/ -f1)
-    SIM_ARN="arn:aws:iam::\${SIM_ACCT}:role/\${SIM_ROLE}"
-else
-    SIM_ARN="\$CALLER_ARN"
-fi
+# SIM_ARN derived above (SCP check) — reused for the batched simulation.
 IAM_CHECK_ACTIONS=( \\
   "cloudformation:CreateStack" \\
   "cloudformation:UpdateStack" \\
@@ -663,8 +667,22 @@ for CHECK_REGION in ${regionArgs}; do
     fi
 done
 
+# simulate-principal-policy needs an IAM user/role ARN, NOT the assumed-role
+# session ARN returned by get-caller-identity (arn:aws:sts::...:assumed-role/
+# Foo/session) — passing the session ARN fails with InvalidInput, which the
+# 2>/dev/null below swallowed, so this check silently never fired for role/SSO
+# callers. Convert assumed-role → role ARN (same conversion as the batched IAM
+# check); pass through for IAM users.
+CALLER_ARN=\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
+if [[ "\$CALLER_ARN" == *":assumed-role/"* ]]; then
+    SIM_ACCT=\$(echo "\$CALLER_ARN" | cut -d: -f5)
+    SIM_ROLE=\$(echo "\$CALLER_ARN" | sed 's|.*:assumed-role/||' | cut -d/ -f1)
+    SIM_ARN="arn:aws:iam::\${SIM_ACCT}:role/\${SIM_ROLE}"
+else
+    SIM_ARN="\$CALLER_ARN"
+fi
 SCP_RESULT=\$(aws iam simulate-principal-policy \\
-    --policy-source-arn "\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)" \\
+    --policy-source-arn "\$SIM_ARN" \\
     --action-names "tag:TagResources" \\
     --query 'EvaluationResults[0].EvalDecision' \\
     --output text 2>/dev/null) || SCP_RESULT=""
@@ -682,17 +700,7 @@ fi
 # ── Deploy-time IAM actions (multi-account path) ────────────────
 # Multi-account adds StackSets + Organizations actions on top of the
 # single-account set. Single batched simulate-principal-policy call.
-CALLER_ARN=\$(aws sts get-caller-identity --query Arn --output text 2>/dev/null || echo "")
-# simulate-principal-policy needs an IAM user/role ARN, NOT the assumed-role session
-# ARN returned by get-caller-identity (e.g. arn:aws:sts::...:assumed-role/Foo/session).
-# Convert assumed-role → role ARN for SSO / role callers; pass through for IAM users.
-if [[ "\$CALLER_ARN" == *":assumed-role/"* ]]; then
-    SIM_ACCT=\$(echo "\$CALLER_ARN" | cut -d: -f5)
-    SIM_ROLE=\$(echo "\$CALLER_ARN" | sed 's|.*:assumed-role/||' | cut -d/ -f1)
-    SIM_ARN="arn:aws:iam::\${SIM_ACCT}:role/\${SIM_ROLE}"
-else
-    SIM_ARN="\$CALLER_ARN"
-fi
+# SIM_ARN derived above (SCP check) — reused for the batched simulation.
 IAM_CHECK_ACTIONS=( \\
   "cloudformation:CreateStack" \\
   "cloudformation:UpdateStack" \\
