@@ -123,7 +123,14 @@ aws cloudformation describe-stack-set --stack-set-name map-auto-tagger-mig<MPE_I
 
 ### Update account scope
 
-Run as a **single line** in CloudShell from the management account. List **all** accounts that should be in scope (this is a full replacement — any account not listed will be removed from scope):
+**Simplest:** use the `scripts/map-tagger.sh` helper — pass plain account IDs and it builds the escaped JSON and full parameter list for you:
+
+```bash
+./scripts/map-tagger.sh <MPE_ID> <REGION> 111111111111 222222222222 333333333333
+./scripts/map-tagger.sh <MPE_ID> <REGION> ALL     # tag all org accounts
+```
+
+Or run the raw command as a **single line** in CloudShell from the management account. List **all** accounts that should be in scope (this is a full replacement — any account not listed will be removed from scope):
 
 ```bash
 aws cloudformation update-stack-set --stack-set-name map-auto-tagger-mig<MPE_ID> --use-previous-template --parameters 'ParameterKey=ScopedAccountIds,ParameterValue="[\"111111111111\",\"222222222222\",\"333333333333\"]"' 'ParameterKey=MpeId,UsePreviousValue=true' 'ParameterKey=AgreementStartDate,UsePreviousValue=true' 'ParameterKey=AgreementEndDate,UsePreviousValue=true' 'ParameterKey=ScopeMode,UsePreviousValue=true' 'ParameterKey=ScopedVpcIds,UsePreviousValue=true' 'ParameterKey=TagNonVpcServices,UsePreviousValue=true' 'ParameterKey=AlertEmail,UsePreviousValue=true' --capabilities CAPABILITY_NAMED_IAM --region <REGION>
@@ -298,7 +305,9 @@ To modify which accounts are tagged, update the `ScopedAccountIds` CloudFormatio
 aws cloudformation describe-stack-set --stack-set-name map-auto-tagger-mig<MPE_ID> --region <REGION> --query "StackSet.Parameters[?ParameterKey=='ScopedAccountIds'].ParameterValue" --output text
 ```
 
-**Update scope** — run as a single line in CloudShell from the management account. List **all** accounts that should be in scope (this is a full replacement):
+**Simplest:** `./scripts/map-tagger.sh <MPE_ID> <REGION> 111111111111 222222222222 333333333333` (use `ALL` to tag every org account) — it builds the escaped JSON and parameter list for you.
+
+**Update scope** — or run as a single line in CloudShell from the management account. List **all** accounts that should be in scope (this is a full replacement):
 
 ```bash
 aws cloudformation update-stack-set --stack-set-name map-auto-tagger-mig<MPE_ID> --use-previous-template --parameters 'ParameterKey=ScopedAccountIds,ParameterValue="[\"111111111111\",\"222222222222\",\"333333333333\"]"' 'ParameterKey=MpeId,UsePreviousValue=true' 'ParameterKey=AgreementStartDate,UsePreviousValue=true' 'ParameterKey=AgreementEndDate,UsePreviousValue=true' 'ParameterKey=ScopeMode,UsePreviousValue=true' 'ParameterKey=ScopedVpcIds,UsePreviousValue=true' 'ParameterKey=TagNonVpcServices,UsePreviousValue=true' 'ParameterKey=AlertEmail,UsePreviousValue=true' --capabilities CAPABILITY_NAMED_IAM --region <REGION>
