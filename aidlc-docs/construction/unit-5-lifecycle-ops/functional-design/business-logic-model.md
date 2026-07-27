@@ -1,83 +1,124 @@
-# Business Logic Model — Unit 5: Lifecycle Operations
+# Business Logic Model — unit-5-lifecycle-ops
 
-## Upgrade Flow
+**Date**: 2026-03-25 | **Stories**: US-5, US-8, US-9, US-10
+**Traceability**: FR-2, FR-8, FR-13, FR-14, FR-15; NFR-6, NFR-7
 
-### Upgrade-Safe Path (most releases)
-```
-1. SA downloads latest configurator.html
-2. Selects "Update to latest template version"
-3. Enters region + MPE ID only
-4. Generates upgrade.sh
-5. Script produces a CFN change-set (preview) — shows exactly what changes
-6. On apply: stack updated in-place
-7. Scope config (accounts, VPCs, dates) preserved automatically from SSM
-```
+This unit designs the behavior of the three generated lifecycle scripts. The
+scripts run in the customer's shell with the customer's credentials; every flow
+therefore follows one meta-pattern: **preflight (read-only) → mutate (loud
+failures) → verify (against expected counts)**.
 
-### Full-Redeploy Path (breaking changes — new parameters)
-```
-1. Release note states "Full redeploy required"
-2. delete stack → wait for completion → run deploy.sh fresh
-3. Existing map-migrated tags preserved (credits intact)
-4. Enable backfill to catch resources created during the ~2-5 min gap
-```
+## 1. Deploy Flow (`deploy.sh` — US-5)
 
-## Delete Flow
-
-```
-1. SA selects Delete tab, chooses region + scope (all or specific MPEs)
-2. Types "DELETE" to confirm
-3. Generate delete.sh / delete-<mpe>.sh
-4. Script:
-   a. Remove EventBridge rules, SQS, Lambda, IAM, SSM, alarms
-   b. PRESERVE map-migrated tags on already-tagged resources
-   c. Remove S3 staging bucket ONLY if no other MAP deployments remain
+```mermaid
+flowchart TD
+    A["Parse + validate embedded config"] --> B["PREFLIGHT (read-only)"]
+    B --> B1["Peer-tagger collision check"]
+    B --> B2["Scope-intersection check across engagements"]
+    B --> B3["IAM capability check"]
+    B --> B4["Stack-state check (name free / compatible)"]
+    B1 & B2 & B3 & B4 --> C{"all pass?"}
+    C -->|no| R["REFUSE: named reason, zero side effects"]
+    C -->|yes| D["Stage template to region-qualified S3 staging bucket"]
+    D --> E{"target mode?"}
+    E -->|org| F["Create StackSet (service-managed perms, AutoDeployment) + stack instances"]
+    E -->|single| G["Create plain stack"]
+    F --> H["Count expected stack instances FIRST"]
+    G --> H2["Waiter: stack CREATE_COMPLETE"]
+    H --> I["Poll instance status against expected count"]
+    I & H2 --> J["POST-VERIFY: outputs present, SSM config readable, version matches"]
+    J --> K["Report success with per-step summary"]
 ```
 
-**Critical rule**: Deletion never removes `map-migrated` tags from resources — MAP credits must stay intact.
+Flow rules:
 
-## Scope Management (Day-2)
+- **Preflight is read-only** — describe/list/get calls only. A refusal leaves
+  the account byte-identical (US-10 AC-2).
+- **Every state-mutating CLI call fails loudly.** No mutating call may be
+  wrapped in `>/dev/null 2>&1 || true` — a swallowed failure is a silent partial
+  deploy (US-5 AC-3). Only truly cosmetic calls may ignore errors, with an
+  inline comment saying why.
+- **Count-then-poll**: for StackSet deployment, the script first counts the
+  expected instances (in-scope accounts × regions), then polls completion
+  *against that count*. A poll that exits on "no instances in progress" cannot
+  distinguish "nothing was created" from "everything finished" (BR-L-05).
+- **Org and single-account modes produce identical runtime behavior** — same
+  pipeline, same namespacing, same config (US-5 AC-2).
 
-### Add/Remove Accounts
-```
-aws cloudformation update-stack-set \
-  --stack-set-name map-auto-tagger-mig<MPE> \
-  --use-previous-template \
-  --parameters ParameterKey=ScopedAccountIds,ParameterValue='["111","222"]' \
-               ...UsePreviousValue for other params
-```
-Full-replacement semantics: the account list provided replaces the existing list entirely.
+## 2. Delete Flow (`delete.sh` — US-9)
 
-### Retrieve Current Config
-```
-aws ssm get-parameter \
-  --name /auto-map-tagger/<MPE>/config \
-  --query Parameter.Value --output text
-# Returns: MPE, dates, scope mode, account IDs, VPC IDs
-```
-
-## Backfill
-
-For resources created during a deployment gap (upgrade/redeploy window):
-```
-1. Enable backfill mode
-2. Scan existing untagged resources in scope
-3. Apply map-migrated tags retroactively (within the current agreement window)
+```mermaid
+flowchart TD
+    A["Confirm engagement identity (MPE ID) with operator"] --> B["Enumerate TEARDOWN SCOPE: closed allowlist of solution infrastructure only"]
+    B --> C["Delete stack instances / stack (waiters, loud failures)"]
+    C --> D["Delete StackSet (org mode)"]
+    D --> E["Remove staging bucket + namespaced leftovers in scope"]
+    E --> F["VERIFY: every enumerated item gone; report anything remaining"]
 ```
 
-## StackSet Operations (CI/ops scripts)
+Flow rules:
 
-| Script | Purpose |
-|---|---|
-| `deploy_stackset.py` | Create/update StackSet + instances |
-| `wait_stackset.py` | Poll operation until complete |
-| `delete_stackset.py` | Remove StackSet + instances |
-| `sweep_iam_roles.py` | Clean orphaned IAM roles |
+- **Structurally no tag path.** The delete flow contains no untag / RemoveTags /
+  DeleteTags call of any kind — customer resources are simply outside the
+  teardown enumeration. This is the design's answer to NFR-6: the guarantee is
+  the absence of the code path, verified by a regression test that scans
+  generated output for tag-removal APIs (US-9 AC-2).
+- **Teardown scope is an allowlist**, not a query: EventBridge rules, SQS
+  queues + DLQ, Lambda, IAM roles/policies, SSM parameters, alarms, SNS topic,
+  staging bucket — all under the `map-auto-tagger-<mpeId>` namespace of *this*
+  engagement only. Other engagements' resources are untouched (FR-9).
+- **Operational data is preserved deliberately** — log groups keep their
+  retention/deletion policy; teardown must not silently destroy data the
+  customer may need.
+- **Count-then-verify** applies here too: enumerate what will be deleted first,
+  then verify each enumerated item is gone; report leftovers explicitly rather
+  than exiting on an empty in-progress list.
 
-## Operation Safety
+## 3. Upgrade Flow (`upgrade.sh` — US-8)
 
-| Operation | Safety Measure |
-|---|---|
-| Upgrade | Change-set preview before apply |
-| Delete | `DELETE` typed confirmation; tags preserved |
-| Scope change | Full-replacement list shown before apply |
-| Redeploy | Backfill covers the gap |
+```mermaid
+flowchart TD
+    A["PREFLIGHT: stack exists, state upgradeable, version comparison"] --> B{"compatible?"}
+    B -->|no| R["REFUSE with explanation (state / legacy-shape guard)"]
+    B -->|yes| C["Read deployed stack's current parameter set"]
+    C --> D["Build update call: UsePreviousValue=true for every existing parameter"]
+    D --> E["New-in-template parameters fall through to template Defaults"]
+    E --> F["Execute stack / StackSet update, waiters, loud failures"]
+    F --> G["POST-VERIFY: version output updated, previous parameter values intact"]
+```
+
+Flow rules:
+
+- **The deployed stack is the source of truth for configured values.** The
+  upgrade never re-sends values from the newly generated script for parameters
+  the stack already has — `UsePreviousValue=true` for each (FR-13, US-8 AC-1).
+- **New parameters must have safe defaults** — this is the release-classification
+  corollary: a new parameter without a safe default makes the release
+  "full redeploy required," and `upgrade.sh` cannot be used for it.
+- **Preflight refuses incompatible stacks** — wrong state (e.g., mid-rollback)
+  or a legacy parameter shape the update path can't handle safely produce a
+  refusal with an explanation, never a best-effort attempt (US-8 AC-2).
+
+## 4. Preflight Suite (shared — US-10)
+
+Four checks, all read-only, all before any mutation, in both deploy and upgrade:
+
+| Check | Question it answers | Refusal message names |
+|---|---|---|
+| Peer-tagger collision | Is another auto-tagger (this solution, different MPE, or a third-party tagger) already active here? | The conflicting engagement/stack |
+| Scope intersection | Does this engagement's account/VPC scope overlap another engagement's scope? | Both engagements and the overlapping accounts |
+| IAM capability | Can the caller create the roles/stacks this operation needs? | The missing capability/action |
+| Stack state | Is the target name free (deploy) / the stack updateable (upgrade)? | The stack and its current state |
+
+Aggregation rule: run **all** checks and report **all** failures together (an
+operator should not fix one refusal only to hit the next), then exit non-zero
+having mutated nothing.
+
+## 5. Generation-Time Safety (with unit-1)
+
+Script *content* is produced by generator modules (`script-deploy.js`,
+`delete-flow.js`, upgrade flow) that unit-1 assembles and invokes. Every
+user-supplied value interpolated into script text passes single-quote
+containment (NFR-7); the shell-injection lint gates all generated script
+content in CI. Division of ownership: unit-1 owns interpolation mechanics and
+download; unit-5 owns what the scripts *do*.
