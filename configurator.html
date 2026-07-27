@@ -10132,7 +10132,7 @@ ${permissionsList}
         IaC itself. Then re-tag the affected resources manually to resume
         credit capture (this alarm is alert-only; the tagger never re-tags
         automatically). To list affected resources, open CloudWatch Logs
-        Insights against log group /aws/lambda/map-auto-tagger-\${MpeId} and
+        Insights against log group /aws/lambda/map-auto-tagger-${mpe} and
         run: filter @message like /TAG_DRIFT_DETECTED/
         | parse @message "TAG_DRIFT_DETECTED arn=* removed_by=* event=*" as arn, removed_by, event_name
         | sort @timestamp desc
