@@ -17,6 +17,10 @@ All notable changes to the MAP 2.0 Auto-Tagger.
   - Configurator Step 1 gains a **"Using Terraform / IaC?"** card with a checkbox ("Customer manages resources with Terraform (or other IaC)") carrying the `ignore_tags` guidance; checking it surfaces a reminder box on the Step 3 download screen (all 7 languages). `docs/INSTRUCTIONS.md` gains a drift-alarm response runbook. Detection limits documented in `docs/LIMITATIONS.md` (best-effort event-name list, VPC-scope caveat).
   - Regression tests: `tests/unit/lambda-tag-drift.test.js` (12 scenarios through the real handler) + `tests/unit/tag-drift-template.test.js` (rule/queue-policy/alarm wiring in both built artifacts).
 
+**Changed (v22.2.0 — UI copy audience fix, same PR):**
+
+- Configurator copy that addressed an internal operator *about* the customer now addresses the reader directly (customers/partners use the configurator themselves): "Customer Prerequisites" → "Prerequisites", "Customer Deployment Instructions" → "Deployment Instructions", and the SCP advisory's "If the customer's organization uses SCPs… The customer must exempt…" → "If your organization uses SCPs… Exempt…". All 7 locales.
+
 ---
 
 ## v22.1.0 — 2026-07-19
