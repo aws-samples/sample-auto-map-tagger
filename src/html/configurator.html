@@ -339,6 +339,18 @@
                 </label>
             </div>
 
+            <!-- IaC / Terraform coexistence check -->
+            <div class="card" style="border-left:4px solid #7d3ac1;">
+                <h2><span data-i18n="ui_iac_title">🏗️ Using Terraform / IaC?</span></h2>
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="usesIac" style="margin-top:3px;flex-shrink:0;">
+                    <div>
+                        <strong data-i18n="ui_iac_check_label">Resources in this environment are managed with Terraform (or other IaC)</strong>
+                        <p class="hint" style="margin-top:4px;" data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Add ignore_tags { keys = ["map-migrated"] } to your Terraform AWS provider block, or declare the tag in your IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</p>
+                    </div>
+                </label>
+            </div>
+
             <!-- Service coverage summary -->
             <div class="card">
                 <h2 data-i18n="ui_coverage_title">What Gets Tagged</h2>
@@ -406,7 +418,7 @@
 
                     <div id="downloadButtons" style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;"></div>
 
-                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Customer Deployment Instructions</h3>
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Deployment Instructions</h3>
                     <div class="preview-box" id="instructions" style="color:#d4d4d4;"></div>
 
                     <div style="margin-top:40px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -424,7 +436,7 @@
                     <div id="deployHint"></div>
 
                     <div class="info-box" style="border-left:4px solid #d13212;background:#fdf3f1;margin:0;">
-                        <strong data-i18n="ui_prereq_title">Customer Prerequisites</strong> — <span data-i18n="ui_prereq_subtitle">the generated deploy.sh verifies these automatically before deploying:</span>
+                        <strong data-i18n="ui_prereq_title">Prerequisites</strong> — <span data-i18n="ui_prereq_subtitle">the generated deploy.sh verifies these automatically before deploying:</span>
                         <ul style="margin:8px 0 0;padding-left:20px;">
                             <li data-i18n="ui_prereq_cloudtrail">CloudTrail must be enabled in the target region(s)</li>
                             <li data-i18n="ui_prereq_perms">Deployer must have AWS CloudFormation permissions (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)</li>
@@ -434,11 +446,18 @@
 
                     <div class="info-box" style="border-left:4px solid #f90;background:#fffbf0;margin:0;">
                         <strong data-i18n="ui_scp_title">⚠️ Service Control Policy (SCP) Advisory</strong><br>
-                        <span data-i18n="ui_scp_intro">If the customer's organization uses SCPs, verify the following before deployment:</span>
+                        <span data-i18n="ui_scp_intro">If your organization uses SCPs, verify the following before deployment:</span>
                         <ul style="margin:8px 0 0;padding-left:20px;">
                             <li data-i18n="ui_scp_tagging"></li>
                             <li data-i18n="ui_scp_mandatory"></li>
                         </ul>
+                    </div>
+
+                    <!-- Shown only when the "uses Terraform/IaC" box was checked in Step 1
+                         (generateAndDownload toggles it) — a reminder, not a repeat advisory. -->
+                    <div class="info-box" id="iacDriftReminder" style="border-left:4px solid #7d3ac1;background:#f9f5fd;margin:0;display:none;">
+                        <strong data-i18n="ui_iac_reminder_title">🏗️ Reminder — this deployment was flagged as Terraform / IaC-managed</strong><br>
+                        <span data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Add ignore_tags { keys = ["map-migrated"] } to your Terraform AWS provider block, or declare the tag in your IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</span>
                     </div>
                 </div>
             </div>

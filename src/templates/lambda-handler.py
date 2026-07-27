@@ -2118,6 +2118,157 @@ _IGNORE_EVENTS = frozenset([
     'PutQueryDefinition',
 ])
 
+# ── IaC tag-drift detection (L2, alert-only) ────────────────────────────
+# A customer's 'terraform apply' with default_tags/tags_all silently strips
+# tags the tagger applied out-of-band (the resource's declared tag set is
+# reconciled to what the IaC knows about). The untag events ARE visible in
+# CloudTrail; a dedicated EventBridge rule (TagDriftEventRule — exact names,
+# not prefixes) routes them through the same SQS pipeline. This branch
+# detects the strip and raises a LOUD one-time signal (TAG_DRIFT_DETECTED
+# log line + MapAutoTagger/TagDriftDetected metric → TagDriftAlarm → SNS)
+# carrying the customer-side fix. Deliberately NO auto-restore: event-
+# reactive re-tagging ping-pongs with IaC (AMS Resource Tagger lesson) and
+# CloudTrail→EventBridge→Lambda is outside AWS's recursion guard — we'd own
+# 100% of loop prevention. Alert-only is loop-safe by construction: the
+# only writes here are PutMetricData and stdout.
+#
+# NOTE: dispatch is 'event_name in _UNTAG_EVENTS' (a named frozenset), not
+# per-event == literals — lint_event_prefixes.py extracts 'event_name =='
+# literals to demand EventBridge verb prefixes, and Untag*/Delete*/Remove*
+# prefixes on the creation rule would flood SQS with every deletion in the
+# account.
+_UNTAG_EVENTS = frozenset([
+    'UntagResource', 'UntagResources', 'DeleteTags',
+    'RemoveTagsFromResource', 'RemoveTags', 'DeleteBucketTagging',
+])
+
+# EC2 resource-id prefix → ARN resource type, for DeleteTags events whose
+# requestParameters carry bare ids (resourcesSet.items[].resourceId).
+_EC2_ID_ARN_TYPES = {
+    'i-': 'instance', 'vol-': 'volume', 'sg-': 'security-group',
+    'subnet-': 'subnet', 'vpc-': 'vpc', 'eni-': 'network-interface',
+    'snap-': 'snapshot', 'igw-': 'internet-gateway', 'rtb-': 'route-table',
+    'nat-': 'natgateway', 'eipalloc-': 'elastic-ip', 'dopt-': 'dhcp-options',
+}
+
+def _removed_tag_keys(detail):
+    """Tag keys removed by an untag event, or None when the event removes
+    an unknowable/complete set (DeleteBucketTagging drops the whole TagSet;
+    unknown shapes are treated conservatively as 'may include ours')."""
+    if detail.get('eventName') == 'DeleteBucketTagging':
+        return None
+    rp = detail.get('requestParameters') or {}
+    keys = ci_get(rp, 'tagKeys')
+    if isinstance(keys, list) and keys:
+        return [k for k in keys if isinstance(k, str)]
+    # EC2 DeleteTags: tagSet.items[].key
+    tag_set = ci_get(rp, 'tagSet') or {}
+    items = tag_set.get('items') if isinstance(tag_set, dict) else None
+    if isinstance(items, list) and items:
+        return [i.get('key') for i in items if isinstance(i, dict) and i.get('key')]
+    # ELB RemoveTags / EMR RemoveTagsFromResource variants: tags[].key
+    tags = ci_get(rp, 'tags')
+    if isinstance(tags, list) and tags:
+        out = [t.get('key') or t.get('Key') for t in tags if isinstance(t, dict)]
+        out = [k for k in out if k]
+        if out:
+            return out
+    return None
+
+def _untag_candidate_arns(detail, account_id, region):
+    """Resource ARNs an untag event acted on. Best-effort across the
+    dominant shapes; unknown shapes return [] (skip quietly — detection
+    is best-effort, the LIMITATIONS doc says so)."""
+    rp = detail.get('requestParameters') or {}
+    arns = []
+    arn_list = ci_get(rp, 'resourceARNList')
+    if isinstance(arn_list, list):
+        arns.extend(a for a in arn_list if isinstance(a, str) and a.startswith('arn:'))
+    for key in ('resourceArn', 'resource', 'resourceName', 'resourceId'):
+        v = ci_get(rp, key)
+        if isinstance(v, str) and v.startswith('arn:'):
+            arns.append(v)
+    # EC2 DeleteTags: bare ids in resourcesSet.items[].resourceId
+    rset = ci_get(rp, 'resourcesSet') or {}
+    items = rset.get('items') if isinstance(rset, dict) else None
+    if isinstance(items, list):
+        for item in items:
+            rid = (item or {}).get('resourceId', '')
+            if not isinstance(rid, str):
+                continue
+            for prefix, rtype in _EC2_ID_ARN_TYPES.items():
+                if rid.startswith(prefix):
+                    arns.append(f'arn:aws:ec2:{region}:{account_id}:{rtype}/{rid}')
+                    break
+    bucket = ci_get(rp, 'bucketName')
+    if isinstance(bucket, str) and bucket:
+        arns.append(f'arn:aws:s3:::{bucket}')
+    return list(dict.fromkeys(arns))
+
+def _emit_drift_metric(mpe_id):
+    try:
+        boto3.client('cloudwatch').put_metric_data(
+            Namespace='MapAutoTagger',
+            MetricData=[{
+                'MetricName': 'TagDriftDetected',
+                'Dimensions': [{'Name': 'MpeId', 'Value': mpe_id}],
+                'Value': 1,
+                'Unit': 'Count',
+            }],
+        )
+    except Exception as mx:
+        print(f'Could not emit TagDriftDetected metric: {mx}')
+
+def _handle_untag_event(detail, config, account_id, region):
+    """Alert-only drift detection for one untag event. ALWAYS returns
+    ('skipped', None): drift events must never retry into the DLQ — the
+    operator signal is the metric/alarm, and redelivering an untag event
+    can't change what already happened."""
+    event_name = detail.get('eventName', '')
+    keys = _removed_tag_keys(detail)
+    # keys=None means "unknown/complete removal" — check. Otherwise only
+    # react when map-migrated is among the removed keys (only ever act on
+    # ABSENCE of our tag; never on other tags' churn).
+    if keys is not None and 'map-migrated' not in keys:
+        return ('skipped', None)
+    principal = ((detail.get('userIdentity') or {}).get('arn') or '')
+    if 'map-auto-tagger' in principal or 'map-preflight-role' in principal:
+        # Self/peer-tagger activity (or a customer assuming our role to
+        # remediate) — never alert on our own plumbing.
+        return ('skipped', None)
+    arns = _untag_candidate_arns(detail, account_id, region)
+    if not arns:
+        print(f'DRIFT_SKIP: no resource ARN extractable from {event_name}')
+        return ('skipped', None)
+    # Verify-read before alerting: the event says the tag WAS removed, but
+    # it may have been re-applied since (tagger re-tag, customer fix, or
+    # the ignore_tags fix already deployed). Best-effort — a failed read
+    # skips quietly rather than false-alarming or retrying into the DLQ.
+    try:
+        rgta = boto3.client('resourcegroupstaggingapi', region_name=region) if region else tagging
+        resp = _retry_throttles(lambda: rgta.get_resources(ResourceARNList=arns))
+    except Exception as e:
+        print(f'DRIFT_VERIFY_FAILED (best-effort, skipping): {e}')
+        return ('skipped', None)
+    tagged_now = set()
+    for m in resp.get('ResourceTagMappingList', []):
+        if any(t.get('Key') == 'map-migrated' for t in m.get('Tags', [])):
+            tagged_now.add(m.get('ResourceARN'))
+    for arn in arns:
+        if arn in tagged_now:
+            continue
+        print(
+            f'TAG_DRIFT_DETECTED arn={arn} removed_by={principal or "unknown"} '
+            f'event={event_name} — map-migrated was removed out-of-band '
+            f'(typically Terraform default_tags/tags_all reconciliation). '
+            f'Alert-only: the tagger never re-tags automatically. Fix: '
+            f'add ignore_tags {{ keys = ["map-migrated"] }} to your AWS provider '
+            f'block, or declare the tag in your IaC. Re-tag the resource '
+            f'manually to recover this credit.'
+        )
+        _emit_drift_metric(config['mpe_id'])
+    return ('skipped', None)
+
 def _event_age_seconds(event_time):
     """Seconds since the CloudTrail eventTime (ISO 8601, always UTC Z).
     Returns None when the timestamp is missing/unparseable — callers must
@@ -2221,6 +2372,16 @@ def _process_event(eb_event, config):
         return ('skipped', None)
 
     event_name = detail.get('eventName', '')
+
+    # IaC tag-drift detection (alert-only). Must dispatch BEFORE the
+    # _IGNORE_EVENTS check — the untag names sit in _IGNORE_EVENTS to keep
+    # the CREATION path loop-safe, but events arriving via TagDriftEventRule
+    # need the drift branch, not a silent ack. Runs after the scope /
+    # agreement / errorCode guards above, so out-of-scope or out-of-window
+    # untag churn never alerts.
+    if event_name in _UNTAG_EVENTS:
+        return _handle_untag_event(detail, config, account_id, region)
+
     if event_name in _IGNORE_EVENTS:
         print(f'Skipping non-taggable event: {event_name}')
         return ('skipped', None)
