@@ -4,6 +4,21 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ---
 
+## v22.2.0 — 2026-07-27
+
+**Added (MINOR — safe in-place update; new resources only, no new parameters. Existing deployments pick this up via `upgrade.sh` or a re-run of `deploy.sh`):**
+
+- **IaC tag-drift detection with a loud, actionable alert — and deliberately NO auto-restore.** A customer's `terraform apply` whose provider uses `default_tags`/`tags_all` reconciles each resource's tag set to what the IaC declares — silently stripping the out-of-band `map-migrated` tag the tagger applied. The untag events (`UntagResource`, `UntagResources`, `DeleteTags`, `RemoveTagsFromResource`, `RemoveTags`, `DeleteBucketTagging`) were previously invisible: all sat in `_IGNORE_EVENTS` and the EventBridge rule only matched creation prefixes. Now:
+  - A second EventBridge rule (`TagDriftEventRule`) subscribes those six **exact** event names (never prefixes — `Delete*`/`Remove*` prefixes would route every deletion in the account into SQS) into the existing SQS→Lambda pipeline.
+  - The Lambda's drift branch filters for `map-migrated` among the removed keys, skips self/peer-tagger principals, **verify-reads** current tag state via `tag:GetResources` (suppressing false alarms when the tag was re-applied), and on confirmed absence logs `TAG_DRIFT_DETECTED` + emits `MapAutoTagger/TagDriftDetected`.
+  - The new `TagDriftAlarm` (≥1 in 5 min) notifies through the existing local/central SNS topic; its description carries the customer-side fix — Terraform provider `ignore_tags { keys = ["map-migrated"] }` (or declare the tag in the IaC) — plus a Logs Insights query listing affected ARNs and who removed them.
+  - **Auto-restore was researched and rejected** (industry anti-pattern): event-reactive re-tagging ping-pongs with IaC on every apply, and the CloudTrail→EventBridge→Lambda loop sits outside AWS Lambda's recursive-loop detection. Drift processing is alert-only, read-only (plus one metric), always acks (never retries/DLQs — the alarm is the operator signal), and only ever acts on **absence** of our tag.
+  - Loop safety: the tagger's own `TagResource` events remain in `_IGNORE_EVENTS` on the creation path; the drift branch's only writes are `PutMetricData` and stdout. No new IAM permissions (`tag:GetResources` + namespaced `PutMetricData` already granted).
+  - Configurator now shows a **"Using Terraform / IaC?"** advisory box (all 7 languages) with the `ignore_tags` one-liner, and `docs/INSTRUCTIONS.md` gains a drift-alarm response runbook. Detection limits documented in `docs/LIMITATIONS.md` (best-effort event-name list, VPC-scope caveat).
+  - Regression tests: `tests/unit/lambda-tag-drift.test.js` (12 scenarios through the real handler) + `tests/unit/tag-drift-template.test.js` (rule/queue-policy/alarm wiring in both built artifacts).
+
+---
+
 ## v22.1.0 — 2026-07-19
 
 Certified by the full 36-phase release gate at `4b72b9b` (two complete gate runs 2026-07-18/19; zero product blockers after triage — residual FAILs are test-environment artifacts, documented in the gate reports). Highlights: centralized per-region SNS alerts, all six CT6 chaos blockers closed (CT6-002…007), the create-race not-found class fixed, per-account CloudTrail preflight, SCP preflight fixed for role/SSO callers, backfill time-budget + wait-sentinel fixes, delete.sh exit-code fix, and 13 tag-loss handler fixes with a golden-event replay + coverage gate (158/158 handler branches accounted).

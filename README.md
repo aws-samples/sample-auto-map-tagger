@@ -48,6 +48,36 @@ See [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) for single-account deployments and d
 
 ---
 
+## Using Terraform or Other IaC?
+
+Terraform providers configured with `default_tags`/`tags_all` **silently remove
+the `map-migrated` tag on the next `terraform apply`** — the provider reconciles
+each managed resource's tags to what the IaC declares, stripping tags applied
+out-of-band by this tool. (CloudFormation generally leaves out-of-band resource
+tags alone.) Prevent it with one of:
+
+```hcl
+# Coexistence one-liner — Terraform ignores the tagger's tag entirely:
+provider "aws" {
+  ignore_tags {
+    keys = ["map-migrated"]
+  }
+}
+```
+
+…or declare `map-migrated = "<MPE_ID>"` in the IaC itself (e.g. in
+`default_tags`), making the IaC the tag's owner. Organizations can additionally
+validate the tag at plan time with AWS Organizations Tag Policies.
+
+If the tag is removed out-of-band anyway, the deployed tagger detects it and
+fires the `TagDriftAlarm` CloudWatch alarm (via the SNS alert topic) with the
+fix above and a query listing the affected resources — see the
+[drift-alarm runbook](docs/INSTRUCTIONS.md#responding-to-a-tag-drift-alarm-map-auto-tagger-tag-drift-mpe_id).
+Detection is alert-only: the tagger **never re-tags automatically** (see
+[LIMITATIONS.md](docs/LIMITATIONS.md#iac-terraform-tag-drift--detection-is-best-effort-and-never-auto-restores)).
+
+---
+
 ## Removing a Deployment
 
 1. Open `configurator.html` → **Delete existing deployment** tab

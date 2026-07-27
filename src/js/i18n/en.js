@@ -112,6 +112,8 @@ const en_translations = {
             ui_cost_note:'Estimated monthly cost: ', ui_cost_note2:' per account (AWS Lambda invocations + Amazon CloudWatch). No AWS Config required.',
             ui_scp_tagging:"Tagging SCPs — verify SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh runs a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
             ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution does not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
+            ui_iac_title:'🏗️ Using Terraform / IaC?',
+            ui_iac_drift:"Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Have the customer add ignore_tags { keys = [\"map-migrated\"] } to the Terraform AWS provider block, or declare the tag in their IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).",
             rv_not_specified:'(not specified)', rv_none:'(none)', rv_none_specified:'(none specified)',
             rv_yes:'Yes', rv_no:'No', rv_disabled:'Disabled', rv_enabled:'Enabled',
             rv_multi_method:'Multi-Account Method', rv_stackset:'StackSet (per-account Lambda)', rv_central:'Central Lambda (cross-account)',

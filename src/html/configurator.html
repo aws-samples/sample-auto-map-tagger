@@ -440,6 +440,11 @@
                             <li data-i18n="ui_scp_mandatory"></li>
                         </ul>
                     </div>
+
+                    <div class="info-box" style="border-left:4px solid #7d3ac1;background:#f9f5fd;margin:0;">
+                        <strong data-i18n="ui_iac_title">🏗️ Using Terraform / IaC?</strong><br>
+                        <span data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Have the customer add ignore_tags { keys = ["map-migrated"] } to the Terraform AWS provider block, or declare the tag in their IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</span>
+                    </div>
                 </div>
             </div>
 

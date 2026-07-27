@@ -180,6 +180,55 @@ aws logs filter-log-events \
   --filter-pattern "Failed"
 ```
 
+### Responding to a Tag Drift alarm (`map-auto-tagger-tag-drift-<MPE_ID>`)
+
+This alarm means the `map-migrated` tag was **removed from an already-tagged
+resource out-of-band** — almost always a `terraform apply` whose provider uses
+`default_tags`/`tags_all` (tags not declared in the IaC are stripped on
+reconciliation). Untagged usage stops earning MAP credit and tags cannot be
+back-dated, so respond promptly. The tagger is **alert-only here: it never
+re-applies a removed tag** (automatic restore would fight the customer's IaC
+on every apply).
+
+1. **List the affected resources and who removed the tag** — CloudWatch Logs
+   Insights against `/aws/lambda/map-auto-tagger-<MPE_ID>`:
+
+   ```
+   filter @message like /TAG_DRIFT_DETECTED/
+   | parse @message "TAG_DRIFT_DETECTED arn=* removed_by=* event=*" as arn, removed_by, event_name
+   | sort @timestamp desc
+   | display @timestamp, arn, removed_by, event_name
+   ```
+
+2. **Fix the cause in the customer's IaC** (pick one):
+   - Add to the Terraform AWS provider block — coexistence one-liner:
+
+     ```hcl
+     provider "aws" {
+       ignore_tags {
+         keys = ["map-migrated"]
+       }
+     }
+     ```
+
+   - Or declare the `map-migrated` tag (with the MPE ID as value) in the IaC
+     itself (`default_tags` is the natural place), making the IaC the tag's
+     owner.
+   - If the removal was a deliberate untag (check `removed_by`), confirm with
+     the resource owner instead.
+
+3. **Re-tag the affected resources manually** to resume credit capture, e.g.:
+
+   ```bash
+   aws resourcegroupstaggingapi tag-resources \
+     --resource-arn-list <arn> \
+     --tags map-migrated=mig1234567890
+   ```
+
+The alarm auto-clears (`TreatMissingData: notBreaching`) once no new drift
+events arrive in a 5-minute window. If it keeps re-firing for the same
+resources, the IaC fix from step 2 hasn't been applied yet.
+
 ---
 
 ## Update the MAP Engagement ID

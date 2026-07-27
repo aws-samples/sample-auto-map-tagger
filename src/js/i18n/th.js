@@ -111,6 +111,8 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             ui_cost_note:'ค่าใช้จ่ายรายเดือนโดยประมาณ: ', ui_cost_note2:' / บัญชี (การเรียก Lambda + CloudWatch) ไม่ต้องใช้ AWS Config',
             ui_scp_tagging:'SCP การติด Tag — ตรวจสอบให้แน่ใจว่า SCP ไม่ปฏิเสธ tag:TagResources, ec2:CreateTags หรือการดำเนินการติด Tag อื่นๆ สำหรับ Lambda execution role deploy.sh จะรันการตรวจสอบ IAM simulation หลังการติดตั้ง แต่ SCP ต้องตรวจสอบด้วยตนเองใน AWS Organizations Console',
             ui_scp_mandatory:'SCP บังคับติด Tag — หากSCP กำหนดให้ต้องมี Tag ตั้งแต่ตอนสร้าง Resource โซลูชันนี้จะไม่สามารถตอบสนองข้อกำหนดดังกล่าวได้ (Tag ถูกนำไปใช้ 60-90 วินาทีหลังสร้าง) ลูกค้าต้องยกเว้น Tag key map-migrated จากการบังคับใช้หรือกำหนดระยะเวลาผ่อนผัน',
+            ui_iac_title:'🏗️ ใช้ Terraform / IaC อยู่หรือไม่?',
+            ui_iac_drift:'การปรับสถานะ default_tags/tags_all ของ Terraform จะลบ Tag map-migrated แบบเงียบๆ ในการ apply ครั้งถัดไป (Tag ที่ไม่ได้ประกาศใน IaC จะถูกลบ) แนะนำให้ลูกค้าเพิ่ม ignore_tags { keys = ["map-migrated"] } ในบล็อก Terraform AWS provider หรือประกาศ Tag นี้ใน IaC ของตน โดยทั่วไป CloudFormation จะไม่ลบ Tag ที่ติดจากภายนอก ตัวติด Tag จะตรวจจับการลบ Tag จากภายนอกและแจ้งเตือนผ่าน CloudWatch alarm พร้อมวิธีแก้ไขนี้ (แจ้งเตือนเท่านั้น — จะไม่ติด Tag ใหม่อัตโนมัติ)',
             rv_not_specified:'(ไม่ระบุ)', rv_none:'(ไม่มี)', rv_none_specified:'(ไม่ระบุ)',
             rv_yes:'ใช่', rv_no:'ไม่', rv_disabled:'ปิดใช้งาน', rv_enabled:'เปิดใช้งาน',
             rv_multi_method:'วิธีการหลายบัญชี', rv_stackset:'StackSet (Lambda ต่อบัญชี)', rv_central:'Lambda กลาง (ข้ามบัญชี)',

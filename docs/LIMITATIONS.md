@@ -37,6 +37,20 @@ Two scenarios require manual verification before deployment:
 
 ---
 
+## IaC (Terraform) tag drift — detection is best-effort, and never auto-restores
+
+Terraform providers using `default_tags`/`tags_all` reconcile each managed resource's tag set to what the IaC declares: the next `terraform apply` after the tagger runs **silently removes** the out-of-band `map-migrated` tag. (CloudFormation generally leaves undeclared out-of-band resource tags alone; stack-level tag propagation is the exception.) The durable fix is customer-side — add `ignore_tags { keys = ["map-migrated"] }` to the Terraform AWS provider block, or declare the tag in the IaC itself. Organizations can also enforce the tag at plan time with AWS Organizations Tag Policies IaC validation.
+
+Since v22.2.0 the tagger detects this drift and raises `TagDriftAlarm` with that fix in the alarm text. Scope and limits of the detection:
+
+1. **Alert-only, by design.** The tagger never re-applies a removed tag. Event-reactive restore ping-pongs with IaC on every apply (each side "fixing" the other forever), and the CloudTrail→EventBridge→Lambda path is outside AWS Lambda's recursive-loop detection. After fixing the IaC, re-tag affected resources manually (the alarm description includes a Logs Insights query listing them).
+2. **Subscribed event names are the dominant six** — `UntagResource`, `UntagResources`, `DeleteTags`, `RemoveTagsFromResource`, `RemoveTags`, `DeleteBucketTagging`. The long tail of service-specific spellings (e.g. Kinesis `RemoveTagsFromStream`, SQS `UntagQueue`, ElastiCache `RemoveTagsFromResource` variants routed through other APIs) is not subscribed; drift through those APIs goes undetected. The Terraform provider overwhelmingly untags through the six covered names.
+3. **Verify-read is best-effort.** Before alerting, the Lambda reads current tag state (`tag:GetResources`) to suppress false alarms (tag already re-applied). If that read fails, the event is skipped quietly — no alert, no retry. Drift events never enter the DLQ.
+4. **VPC-scope deployments detect less.** Untag events usually carry no VPC association, so in `vpc` scope mode most drift events fail the scope check before the drift branch runs. Account-scope deployments (the norm) are fully covered.
+5. **Legitimate untags also alert.** The event cannot distinguish a Terraform strip from a deliberate `aws untag-resource`. The alarm includes the removing principal so operators can triage intent.
+
+---
+
 ## EventBridge 256KB Event Limit
 
 CloudTrail events exceeding 256KB are silently dropped by EventBridge and will never trigger the Lambda. This is an AWS platform hard limit. Extremely rare in practice — only possible for unusually complex resource creation events. No workaround exists.
