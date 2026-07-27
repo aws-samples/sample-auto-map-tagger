@@ -339,6 +339,18 @@
                 </label>
             </div>
 
+            <!-- IaC / Terraform coexistence check -->
+            <div class="card" style="border-left:4px solid #7d3ac1;">
+                <h2><span data-i18n="ui_iac_title">🏗️ Using Terraform / IaC?</span></h2>
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="usesIac" style="margin-top:3px;flex-shrink:0;">
+                    <div>
+                        <strong data-i18n="ui_iac_check_label">Customer manages resources with Terraform (or other IaC)</strong>
+                        <p class="hint" style="margin-top:4px;" data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Have the customer add ignore_tags { keys = ["map-migrated"] } to the Terraform AWS provider block, or declare the tag in their IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</p>
+                    </div>
+                </label>
+            </div>
+
             <!-- Service coverage summary -->
             <div class="card">
                 <h2 data-i18n="ui_coverage_title">What Gets Tagged</h2>
@@ -441,8 +453,10 @@
                         </ul>
                     </div>
 
-                    <div class="info-box" style="border-left:4px solid #7d3ac1;background:#f9f5fd;margin:0;">
-                        <strong data-i18n="ui_iac_title">🏗️ Using Terraform / IaC?</strong><br>
+                    <!-- Shown only when the "uses Terraform/IaC" box was checked in Step 1
+                         (generateAndDownload toggles it) — a reminder, not a repeat advisory. -->
+                    <div class="info-box" id="iacDriftReminder" style="border-left:4px solid #7d3ac1;background:#f9f5fd;margin:0;display:none;">
+                        <strong data-i18n="ui_iac_reminder_title">🏗️ Reminder — you flagged this customer as using Terraform / IaC</strong><br>
                         <span data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Have the customer add ignore_tags { keys = ["map-migrated"] } to the Terraform AWS provider block, or declare the tag in their IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</span>
                     </div>
                 </div>

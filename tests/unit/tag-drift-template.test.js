@@ -90,4 +90,24 @@ describe('tag-drift template wiring (built artifacts)', () => {
       });
     });
   }
+
+  describe('configurator.html — Step 1 IaC checkbox + Step 3 reminder wiring', () => {
+    it('Step 1 has the usesIac checkbox with the advisory text', () => {
+      expect(html).toContain('id="usesIac"');
+      expect(html).toContain('ui_iac_check_label');
+    });
+
+    it('Step 3 reminder starts hidden and is toggled from config.usesIac', () => {
+      const reminder = html.indexOf('id="iacDriftReminder"');
+      expect(reminder).toBeGreaterThan(-1);
+      expect(html.slice(reminder, reminder + 200)).toContain('display:none');
+      // generateAndDownload must drive the reminder off the captured config
+      expect(html).toContain("getElementById('iacDriftReminder')");
+      expect(html).toMatch(/config\.usesIac\s*\?\s*'block'\s*:\s*'none'/);
+    });
+
+    it('getConfig captures the checkbox as usesIac', () => {
+      expect(html).toMatch(/usesIac:\s*document\.getElementById\('usesIac'\)\.checked/);
+    });
+  });
 });

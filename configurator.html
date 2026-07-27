@@ -521,6 +521,18 @@
                 </label>
             </div>
 
+            <!-- IaC / Terraform coexistence check -->
+            <div class="card" style="border-left:4px solid #7d3ac1;">
+                <h2><span data-i18n="ui_iac_title">🏗️ Using Terraform / IaC?</span></h2>
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="usesIac" style="margin-top:3px;flex-shrink:0;">
+                    <div>
+                        <strong data-i18n="ui_iac_check_label">Customer manages resources with Terraform (or other IaC)</strong>
+                        <p class="hint" style="margin-top:4px;" data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Have the customer add ignore_tags { keys = ["map-migrated"] } to the Terraform AWS provider block, or declare the tag in their IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</p>
+                    </div>
+                </label>
+            </div>
+
             <!-- Service coverage summary -->
             <div class="card">
                 <h2 data-i18n="ui_coverage_title">What Gets Tagged</h2>
@@ -623,8 +635,10 @@
                         </ul>
                     </div>
 
-                    <div class="info-box" style="border-left:4px solid #7d3ac1;background:#f9f5fd;margin:0;">
-                        <strong data-i18n="ui_iac_title">🏗️ Using Terraform / IaC?</strong><br>
+                    <!-- Shown only when the "uses Terraform/IaC" box was checked in Step 1
+                         (generateAndDownload toggles it) — a reminder, not a repeat advisory. -->
+                    <div class="info-box" id="iacDriftReminder" style="border-left:4px solid #7d3ac1;background:#f9f5fd;margin:0;display:none;">
+                        <strong data-i18n="ui_iac_reminder_title">🏗️ Reminder — you flagged this customer as using Terraform / IaC</strong><br>
                         <span data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Have the customer add ignore_tags { keys = ["map-migrated"] } to the Terraform AWS provider block, or declare the tag in their IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</span>
                     </div>
                 </div>
@@ -3393,6 +3407,7 @@ ${t('d_instr_idempotent')}`;
                 scopedVpcIds: useVpcScope ? [...new Set(getValues('.vpc-input').map(v => v.trim()).filter(v => v))] : ['NONE'],
                 tagNonVpcServices,
                 includeBackfill: document.getElementById('includeBackfill').checked,
+                usesIac: document.getElementById('usesIac').checked,
             };
 
             if (deployMode === 'single') {
@@ -3648,6 +3663,8 @@ const en_translations = {
             ui_scp_tagging:"Tagging SCPs — verify SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh runs a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
             ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution does not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
             ui_iac_title:'🏗️ Using Terraform / IaC?',
+            ui_iac_check_label:'Customer manages resources with Terraform (or other IaC)',
+            ui_iac_reminder_title:'🏗️ Reminder — you flagged this customer as using Terraform / IaC',
             ui_iac_drift:"Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Have the customer add ignore_tags { keys = [\"map-migrated\"] } to the Terraform AWS provider block, or declare the tag in their IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).",
             rv_not_specified:'(not specified)', rv_none:'(none)', rv_none_specified:'(none specified)',
             rv_yes:'Yes', rv_no:'No', rv_disabled:'Disabled', rv_enabled:'Enabled',
@@ -4017,6 +4034,8 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             ui_scp_tagging:'태그 SCP — SCP가 Lambda 실행 역할에 대해 tag:TagResources, ec2:CreateTags 또는 기타 태그 지정 작업을 거부하지 않는지 확인하세요. deploy.sh가 배포 후 IAM 시뮬레이션 검사를 실행하지만 SCP는 AWS Organizations 콘솔에서 수동으로 확인해야 합니다.',
             ui_scp_mandatory:'필수 태그 SCP — SCP가 리소스 생성 시 태그를 요구하는 경우 이 솔루션은 해당 요구 사항을 충족하지 않습니다 (태그는 생성 후 60~90초 후에 적용됨). 고객은 map-migrated 태그 키를 생성 시 적용 요건에서 제외하거나 유예 기간을 설정해야 합니다.',
             ui_iac_title:'🏗️ Terraform / IaC를 사용 중이신가요?',
+            ui_iac_check_label:'고객이 Terraform(또는 기타 IaC)으로 리소스를 관리합니다',
+            ui_iac_reminder_title:'🏗️ 리마인더 — 이 고객을 Terraform / IaC 사용으로 표시하셨습니다',
             ui_iac_drift:'Terraform의 default_tags/tags_all 재조정은 다음 apply 시 map-migrated 태그를 조용히 제거합니다 (IaC에 선언되지 않은 태그는 제거됨). 고객이 Terraform AWS provider 블록에 ignore_tags { keys = ["map-migrated"] }를 추가하거나 IaC에 해당 태그를 선언하도록 안내하세요. CloudFormation은 일반적으로 외부에서 적용된 태그를 유지합니다. 태거는 외부 태그 제거를 감지하여 이 해결 방법이 포함된 CloudWatch 경보를 발생시킵니다 (경보 전용 — 자동으로 다시 태그하지 않음).',
             rv_not_specified:'(미지정)', rv_none:'(없음)', rv_none_specified:'(지정되지 않음)',
             rv_yes:'예', rv_no:'아니오', rv_disabled:'비활성화', rv_enabled:'활성화',
@@ -4361,6 +4380,8 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             ui_scp_tagging:'タグ付けSCP — SCPがLambda実行ロールに対してtag:TagResources、ec2:CreateTagsなどのタグ付けアクションを拒否していないことを確認してください。deploy.shはデプロイ後にIAMシミュレーションチェックを実行しますが、SCPはAWS Organizationsコンソールで手動確認が必要です。',
             ui_scp_mandatory:'必須タグSCP — SCPがリソース作成時にタグの存在を要求する場合、このソリューションはその要件を満たしません（タグは作成後60〜90秒後に適用）。お客様はmap-migratedタグキーを作成時要件から除外するか、猶予期間を設定する必要があります。',
             ui_iac_title:'🏗️ Terraform / IaCをご利用ですか？',
+            ui_iac_check_label:'お客様がTerraform（または他のIaC）でリソースを管理している',
+            ui_iac_reminder_title:'🏗️ リマインダー — このお客様はTerraform / IaC利用としてマークされています',
             ui_iac_drift:'Terraformのdefault_tags/tags_allの調整により、次回のapply時にmap-migratedタグが暗黙的に削除されます（IaCに宣言されていないタグは除去されます）。お客様にTerraform AWSプロバイダーブロックへ ignore_tags { keys = ["map-migrated"] } を追加するか、IaC内でタグを宣言するようご案内ください。CloudFormationは通常、外部で適用されたタグを保持します。タガーは外部からのタグ削除を検出し、この修正方法を含むCloudWatchアラームを発報します（アラートのみ — 自動再タグ付けは行いません）。',
             rv_not_specified:'(未指定)', rv_none:'(なし)', rv_none_specified:'(未指定)',
             rv_yes:'はい', rv_no:'いいえ', rv_disabled:'無効', rv_enabled:'有効',
@@ -4705,6 +4726,8 @@ ui_instr_single_title:'部署说明 — 单账户',
             ui_scp_tagging:'标签SCP — 确保SCP不拒绝Lambda执行角色的tag:TagResources、ec2:CreateTags或其他标签操作。deploy.sh将运行部署后IAM模拟检查，但SCP需要在AWS Organizations控制台中手动验证。',
             ui_scp_mandatory:'强制标签SCP — 如果SCP要求在资源创建时必须存在标签，此解决方案将无法满足该要求（标签在创建后60-90秒应用）。客户必须豁免map-migrated标签键或设置宽限期。',
             ui_iac_title:'🏗️ 正在使用Terraform / IaC？',
+            ui_iac_check_label:'客户使用Terraform（或其他IaC）管理资源',
+            ui_iac_reminder_title:'🏗️ 提醒 — 您已将此客户标记为使用Terraform / IaC',
             ui_iac_drift:'Terraform的default_tags/tags_all协调会在下次apply时静默删除map-migrated标签（未在IaC中声明的标签会被清除）。请让客户在Terraform AWS provider块中添加 ignore_tags { keys = ["map-migrated"] }，或在其IaC中声明该标签。CloudFormation通常会保留带外应用的标签。标记器会检测带外标签删除并触发包含此修复方法的CloudWatch告警（仅告警 — 绝不自动重新标记）。',
             rv_not_specified:'(未指定)', rv_none:'(无)', rv_none_specified:'(未指定)',
             rv_yes:'是', rv_no:'否', rv_disabled:'已禁用', rv_enabled:'已启用',
@@ -5049,6 +5072,8 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             ui_scp_tagging:'SCP Tagging — pastikan SCP tidak menolak tag:TagResources, ec2:CreateTags, atau tindakan tagging lainnya untuk peran eksekusi Lambda. deploy.sh akan menjalankan pemeriksaan simulasi IAM pasca-deployment, tetapi SCP memerlukan verifikasi manual di konsol AWS Organizations.',
             ui_scp_mandatory:'SCP Tagging Wajib — jika SCP mengharuskan tag ada saat resource dibuat, solusi ini tidak akan memenuhi persyaratan tersebut (tag diterapkan 60-90 detik setelah pembuatan). Pelanggan harus mengecualikan kunci tag map-migrated atau menggunakan masa tenggang.',
             ui_iac_title:'🏗️ Menggunakan Terraform / IaC?',
+            ui_iac_check_label:'Pelanggan mengelola resource dengan Terraform (atau IaC lain)',
+            ui_iac_reminder_title:'🏗️ Pengingat — Anda menandai pelanggan ini menggunakan Terraform / IaC',
             ui_iac_drift:'Rekonsiliasi default_tags/tags_all Terraform secara diam-diam menghapus tag map-migrated pada apply berikutnya (tag yang tidak dideklarasikan dalam IaC akan dihapus). Minta pelanggan menambahkan ignore_tags { keys = ["map-migrated"] } ke blok Terraform AWS provider, atau mendeklarasikan tag tersebut dalam IaC mereka. CloudFormation umumnya membiarkan tag yang diterapkan di luar IaC. Tagger mendeteksi penghapusan tag di luar IaC dan memicu alarm CloudWatch berisi perbaikan ini (hanya peringatan — tidak pernah menandai ulang secara otomatis).',
             rv_not_specified:'(tidak ditentukan)', rv_none:'(tidak ada)', rv_none_specified:'(tidak ditentukan)',
             rv_yes:'Ya', rv_no:'Tidak', rv_disabled:'Dinonaktifkan', rv_enabled:'Diaktifkan',
@@ -5393,6 +5418,8 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             ui_scp_tagging:'SCP การติด Tag — ตรวจสอบให้แน่ใจว่า SCP ไม่ปฏิเสธ tag:TagResources, ec2:CreateTags หรือการดำเนินการติด Tag อื่นๆ สำหรับ Lambda execution role deploy.sh จะรันการตรวจสอบ IAM simulation หลังการติดตั้ง แต่ SCP ต้องตรวจสอบด้วยตนเองใน AWS Organizations Console',
             ui_scp_mandatory:'SCP บังคับติด Tag — หากSCP กำหนดให้ต้องมี Tag ตั้งแต่ตอนสร้าง Resource โซลูชันนี้จะไม่สามารถตอบสนองข้อกำหนดดังกล่าวได้ (Tag ถูกนำไปใช้ 60-90 วินาทีหลังสร้าง) ลูกค้าต้องยกเว้น Tag key map-migrated จากการบังคับใช้หรือกำหนดระยะเวลาผ่อนผัน',
             ui_iac_title:'🏗️ ใช้ Terraform / IaC อยู่หรือไม่?',
+            ui_iac_check_label:'ลูกค้าจัดการ Resource ด้วย Terraform (หรือ IaC อื่นๆ)',
+            ui_iac_reminder_title:'🏗️ คำเตือน — คุณระบุว่าลูกค้ารายนี้ใช้ Terraform / IaC',
             ui_iac_drift:'การปรับสถานะ default_tags/tags_all ของ Terraform จะลบ Tag map-migrated แบบเงียบๆ ในการ apply ครั้งถัดไป (Tag ที่ไม่ได้ประกาศใน IaC จะถูกลบ) แนะนำให้ลูกค้าเพิ่ม ignore_tags { keys = ["map-migrated"] } ในบล็อก Terraform AWS provider หรือประกาศ Tag นี้ใน IaC ของตน โดยทั่วไป CloudFormation จะไม่ลบ Tag ที่ติดจากภายนอก ตัวติด Tag จะตรวจจับการลบ Tag จากภายนอกและแจ้งเตือนผ่าน CloudWatch alarm พร้อมวิธีแก้ไขนี้ (แจ้งเตือนเท่านั้น — จะไม่ติด Tag ใหม่อัตโนมัติ)',
             rv_not_specified:'(ไม่ระบุ)', rv_none:'(ไม่มี)', rv_none_specified:'(ไม่ระบุ)',
             rv_yes:'ใช่', rv_no:'ไม่', rv_disabled:'ปิดใช้งาน', rv_enabled:'เปิดใช้งาน',
@@ -5737,6 +5764,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             ui_scp_tagging:'SCP gắn tag — đảm bảo SCP không từ chối tag:TagResources, ec2:CreateTags hoặc các hành động gắn tag khác cho Lambda execution role. deploy.sh sẽ chạy kiểm tra IAM simulation sau khi triển khai, nhưng SCP cần xác minh thủ công trong AWS Organizations Console.',
             ui_scp_mandatory:'SCP gắn tag bắt buộc — nếu SCP yêu cầu tag phải có khi tạo resource, giải pháp này sẽ không đáp ứng yêu cầu đó (tag được áp dụng 60-90 giây sau khi tạo). Khách hàng phải miễn trừ tag key map-migrated hoặc sử dụng khoảng thời gian ân hạn.',
             ui_iac_title:'🏗️ Đang dùng Terraform / IaC?',
+            ui_iac_check_label:'Khách hàng quản lý resource bằng Terraform (hoặc IaC khác)',
+            ui_iac_reminder_title:'🏗️ Nhắc nhở — bạn đã đánh dấu khách hàng này dùng Terraform / IaC',
             ui_iac_drift:'Việc đồng bộ default_tags/tags_all của Terraform sẽ âm thầm xóa tag map-migrated ở lần apply tiếp theo (tag không được khai báo trong IaC sẽ bị gỡ). Hãy hướng dẫn khách hàng thêm ignore_tags { keys = ["map-migrated"] } vào khối Terraform AWS provider, hoặc khai báo tag này trong IaC của họ. CloudFormation thường giữ nguyên các tag được gắn ngoài luồng. Trình gắn tag phát hiện việc xóa tag ngoài luồng và phát cảnh báo CloudWatch kèm cách khắc phục này (chỉ cảnh báo — không bao giờ tự động gắn lại tag).',
             rv_not_specified:'(chưa chỉ định)', rv_none:'(không có)', rv_none_specified:'(chưa chỉ định)',
             rv_yes:'Có', rv_no:'Không', rv_disabled:'Đã tắt', rv_enabled:'Đã bật',
@@ -11777,6 +11806,10 @@ echo ""
 
             document.getElementById('instructions').textContent = instructions;
             document.getElementById('templatePreview').textContent = mainTemplate;
+            // IaC drift reminder: only shown to users who flagged the customer
+            // as Terraform/IaC-managed in Step 1 (the full advisory lives there).
+            document.getElementById('iacDriftReminder').style.display =
+                config.usesIac ? 'block' : 'none';
             setStep(3);
             applyTranslations();
         }

@@ -342,6 +342,7 @@
                 scopedVpcIds: useVpcScope ? [...new Set(getValues('.vpc-input').map(v => v.trim()).filter(v => v))] : ['NONE'],
                 tagNonVpcServices,
                 includeBackfill: document.getElementById('includeBackfill').checked,
+                usesIac: document.getElementById('usesIac').checked,
             };
 
             if (deployMode === 'single') {
