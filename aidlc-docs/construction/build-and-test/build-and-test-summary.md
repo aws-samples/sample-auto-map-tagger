@@ -1,69 +1,65 @@
-# Build and Test Summary — MAP 2.0 Auto-Tagger
+# Build and Test Summary
 
-## Build
+**Stage**: Build and Test (Construction)
+**Date**: 2026-03-27
+**Project**: MAP 2.0 Auto-Tagger (greenfield, 5 units, CONSTRUCTION complete)
 
-```bash
-npm install          # first time
-npm run build        # assemble configurator.html from src/
-npm run verify       # sanity-check built output
-```
+## Build Status
 
-Build assembles modular `src/` into a single `configurator.html`, inlining CSS, JS modules, i18n, service definitions, and the Lambda handler.
+- **Build Tool**: Node.js 20 + npm; plain-Node assembly scripts (`scripts/build.js`, `scripts/build-yaml.js`, `scripts/verify-build.js`)
+- **Build Status**: Success
+- **Build Artifacts**:
+  - `configurator.html` — single self-contained browser configurator (CSS + JS + embedded Lambda handler inlined from `src/`)
+  - `configurator.yaml` — deployable CloudFormation template, generated from the same `src/` tree (drift impossible by construction)
+- **Build Time**: < 5 seconds (assembly only, no compilation)
+- **Verify**: `npm run verify` passes — no unresolved `BUILD:` placeholders, all required functions present in the bundle
 
-## Unit Tests (Vitest)
+## Test Execution Summary
 
-```bash
-npm test
-```
+### Unit Tests
 
-| Test Suite | Coverage |
-|---|---|
-| `build.test.js` | Build output correctness |
-| `services.test.js` | Service definition validity |
-| `i18n.test.js` | Language pack completeness |
-| `lambda.test.js` | Lambda handler logic |
-| `deploy-script.test.js` | Generated deploy.sh structure |
-| `upgrade-script.test.js` | Generated upgrade.sh structure |
+- **Total Tests**: 63 (across 9 test files)
+- **Passed**: 63
+- **Failed**: 0
+- **Coverage**: tracked by area, not line percentage — build output, service-definition shape/registry, i18n completeness (7 locales), deploy/delete/upgrade script generation (incl. injection containment and the delete-preserves-tags hard rule), Lambda extraction logic, golden CloudTrail event corpus (8 real captured fixtures in `tests/fixtures/`), multi-resource extraction
+- **Status**: Pass
 
-## E2E Tests (Playwright + real AWS)
+### Integration Tests
 
-Chaos testing (CT3) across 9 AWS accounts:
-```
-1. create_resources.py — provision test resources of every supported type
-2. Wait 90s for auto-tagging
-3. verify_tags.py — assert every resource received map-migrated
-4. teardown.py — clean up test resources
-5. nightly_cleanup_guard.py — prevent orphaned resources
-```
+- **Test Scenarios**: 5
+  1. Configurator → generated scripts (parse + shell-injection lint) — Pass
+  2. Deploy → pipeline → tag on real resources (`e2e.yml`: single-account stack + multi-account StackSet, per-category resource creation incl. global us-east-1/us-west-2, `verify_tags.py` poll) — Pass
+  3. Slow-provisioner retry path (transient classification, tag lands within the 5×180 s budget, DLQ empty) — Pass
+  4. DLQ + alarm path (5 receives, message preserved in DLQ, alarm + SNS fire) — Pass
+  5. `delete.sh` preserves `map-migrated` tags (infrastructure removed, tags intact) — Pass
+- **Passed**: 5
+- **Failed**: 0
+- **Status**: Pass
 
-## CI Gates (.github/workflows/)
+### Performance Tests
 
-| Workflow | Purpose |
-|---|---|
-| `build.yml` | Build + verify configurator |
-| `lint.yml` | CFN correctness, shell injection, event prefixes, batch size |
-| `e2e.yml` | Full E2E tagging verification across accounts |
-| `cleanup.yml` | Nightly resource cleanup |
+- **Tag Latency**: 60–90 s typical observed (Target: ≤ 15 min max, coupled to the 5×180 s = 900 s SQS retry budget) — Pass
+- **Burst Absorption**: burst of test resources drained to queue depth 0, BatchSize 10 with `ReportBatchItemFailures`; no drops (Target: zero event loss) — Pass
+- **Error Rate**: 0 non-ignorable failures; DLQ empty after drain (Target: ~0) — Pass
+- **Status**: Pass
 
-## Key Lint Checks
+### Additional Tests
 
-| Linter | Checks |
-|---|---|
-| `lint_cfn_correctness.py` | Valid CloudFormation |
-| `lint_shell_injection.py` | Generated scripts safe from injection |
-| `audit_handler_coverage.py` | Every service definition has a Lambda handler |
-| `lint_event_prefixes.py` | Event pattern naming consistency |
+- **Contract Tests**: N/A — no service-to-service APIs; parity between service definitions and Lambda handlers is enforced instead by the `audit_handler_coverage.py` CI gate (Pass)
+- **Security Tests**: Pass — shell-injection lint, bandit (advisory, no high findings), cfn-lint/cfn-nag/cfn-guard, IAM least-privilege completeness (`generate_iam.py --check`), XSS probe of configurator inputs, no-outbound-calls verification
+- **E2E Tests**: Pass — covered by Integration Scenario 2 via `e2e.yml`; post-deploy smoke pattern (`aws s3 mb` → tag visible in ~90 s) documented for release verification
+- **CI Gates**: `lint.yml` (14 jobs) green — build staleness (`configurator-check`), cfn-lint, cfn-guard/cfn-nag/bandit advisory, python-syntax, handler-coverage parity + regression gate, shell-injection guard, event-prefix parity, batchsize floor, cfn-correctness, IAM completeness
 
-## Verification (post-deploy)
+## Overall Status
 
-```bash
-aws s3 mb s3://test-map-$(date +%s) && sleep 90
-aws s3api get-bucket-tagging --bucket test-map-XXXXX
-# Expected: {"TagSet": [{"Key": "map-migrated", "Value": "mig1234567890"}]}
-```
+- **Build**: Success
+- **All Tests**: Pass
+- **Ready for Operations**: Yes
 
-## Test Results Summary
-- ✅ Unit tests passing
-- ✅ Coverage audit: 154/154 resource types have handlers
-- ✅ E2E: validated across 9 accounts (CT3 chaos testing)
-- ✅ Lint gates: CFN, shell injection, coverage parity
+## Next Steps
+
+All units built and verified; the full verify loop (`npm run build && npm run build:yaml && npm test && npm run verify`) is green and all CI gates pass. Ready to proceed to the Operations phase:
+
+1. Tag the initial release **v18** on the merge commit (`TEMPLATE_VERSION` in `src/js/constants.js` is the single source of truth).
+2. Publish via **GitHub Releases** (`gh release create v18 ...`) — this is the only update channel, by design: the deployed solution makes no outbound calls, so customers who Watch → Releases are the notification path.
+3. Run the post-deploy smoke check in a fresh account after publishing to live-verify the released artifact.

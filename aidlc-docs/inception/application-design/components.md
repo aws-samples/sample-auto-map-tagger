@@ -1,112 +1,79 @@
 # Components — MAP 2.0 Auto-Tagger
 
-## Configurator Components (Frontend)
-
-### FC-1: AppShell
-**Purpose**: Application entry point and flow orchestration
-**Responsibilities**:
-- Initialize the configurator on load
-- Route between deploy/delete/upgrade/editor flows
-- Bootstrap i18n engine and load default language
-- Wire shared UI utilities
-
-### FC-2: DeployFlow
-**Purpose**: Deployment configuration and script generation
-**Responsibilities**:
-- Render deployment form (MPE ID, dates, scope, accounts, VPCs, alert email)
-- Validate all inputs before generation
-- Invoke TemplateGenerator for the correct CFN template
-- Produce and download self-contained `deploy.sh`
-
-### FC-3: DeleteFlow
-**Purpose**: Clean removal script generation
-**Responsibilities**:
-- Select region and scope (all deployments or specific MPEs)
-- Require `DELETE` confirmation
-- Generate `delete.sh` / `delete-<mpe>.sh`
-- Ensure generated script preserves existing tags
-
-### FC-4: UpgradeFlow
-**Purpose**: Upgrade script generation
-**Responsibilities**:
-- Accept region + MPE ID (upgrade-safe path)
-- Generate `upgrade.sh` with change-set preview
-- Preserve existing scope configuration
-
-### FC-5: EditorFlow
-**Purpose**: Edit existing deployment configuration
-**Responsibilities**:
-- Load and modify existing config
-- Regenerate scripts with updated settings
-
-### FC-6: TemplateGenerator
-**Purpose**: Emit CloudFormation templates
-**Responsibilities**:
-- Generate single-account template (`template-main.js`)
-- Generate org/StackSet template (`template-org.js`)
-- Embed EventBridge rules, SQS, Lambda, IAM, SSM, CloudWatch, SNS
-- Inject scope parameters
-
-### FC-7: I18nEngine
-**Purpose**: Multi-language string resolution
-**Responsibilities**:
-- Load language packs (en, ja, ko, th, vi, id, zh)
-- Resolve UI strings by key
-- Switch language at runtime
-
-### FC-8: ServiceRegistry
-**Purpose**: Aggregate service definitions
-**Responsibilities**:
-- Load all 85 service `.js` files
-- Build the event pattern set (154 resource types)
-- Expose registry to template generation
+Components are bounded per capability, split along the two-plane boundary (approved in `application-design-plan.md`, Q1). Method signatures in `component-methods.md`; dependencies in `component-dependency.md`.
 
 ---
 
-## Runtime Components (Backend)
+## Configuration Plane (client-side, browser)
 
-### BC-1: TaggerHandler
-**Purpose**: Process resource creation events and apply tags
-**Responsibilities**:
-- Poll SQS for buffered CloudTrail events
-- Parse event, identify service and resource
-- Delegate to ArnExtractor for the ARN
-- Call Resource Groups Tagging API to apply `map-migrated`
-- Handle retries; route persistent failures to DLQ
+### C1. Configurator UI
+- **Purpose**: Collect and validate everything needed to produce a deployment package, entirely in the browser.
+- **Responsibilities**:
+  - Multi-step wizard: mode selection → engagement details (MPE ID, agreement dates) → scope (accounts/VPCs, non-VPC switch) → review → generate.
+  - Client-side validation of every field (MPE ID format, date ordering, account-ID/VPC-ID syntax).
+  - Locale selection and fully localized rendering via the i18n Engine.
+  - Zero network requests; no data leaves the page (NFR-11).
+- **Interfaces**: DOM events in; validated configuration object out (to Script Generator and Template Generator); string lookups to i18n Engine.
 
-### BC-2: ArnExtractor
-**Purpose**: Per-service ARN extraction
-**Responsibilities**:
-- Map CloudTrail event shape to a resource ARN
-- Handle 154 resource types with service-specific logic
-- Handle dependent resources (EBS, snapshots, replicas)
+### C2. Script Generator
+- **Purpose**: Produce `deploy.sh`, `delete.sh`, `upgrade.sh` from a validated configuration.
+- **Responsibilities**:
+  - Interpolate configuration into script templates with single-quote containment for every user-supplied value (NFR-7).
+  - Embed preflight logic (peer-tagger collision, scope intersection, IAM, stack-state checks) into deploy/upgrade scripts.
+  - Guarantee `delete.sh` contains no tag-removal code path (NFR-6).
+- **Interfaces**: configuration object in; script text artifacts out (to browser download).
+
+### C3. Template Generator
+- **Purpose**: Produce the CloudFormation template(s) — single-account and StackSets org mode — from the same configuration.
+- **Responsibilities**:
+  - Assemble pipeline resources (EventBridge rules from the Service Definition Registry, SQS/DLQ, Lambda, alarms, SNS, SSM parameter, IAM) with `map-auto-tagger-<mpeId>` namespacing.
+  - Embed the Auto-Tagger Lambda source into the template.
+  - Derive least-privilege IAM from covered service definitions (NFR-5).
+  - Stamp the template version from the single version constant.
+- **Interfaces**: configuration object + service definitions in; CloudFormation YAML out.
+
+### C4. i18n Engine
+- **Purpose**: Localize every UI string across 7 locales (en, id, ja, ko, th, vi, zh).
+- **Responsibilities**: key-based lookup with fallback to English; locale completeness enforced by test; no hardcoded UI strings outside locale files.
+- **Interfaces**: `t(key, locale)` lookups in; localized strings out.
+
+### C5. Service Definition Registry
+- **Purpose**: Single declarative source of truth for coverage — which services, which create events, which permissions.
+- **Responsibilities**:
+  - One definition module per covered service: `{ source, events[], permissions[] }`.
+  - Aggregate registry consumed by the Template Generator (EventBridge patterns, IAM) and by the parity audit against the Lambda's handlers.
+  - Track the MAP Included Services List edition it implements.
+- **Interfaces**: static definitions out (to Template Generator, IAM generation, coverage audit).
 
 ---
 
-## Infrastructure Components
+## Runtime Plane (customer AWS account)
 
-### IC-1: EventBridgeRules
-- Match resource creation events from CloudTrail
-- Filter by scope (account, VPC, org)
-- Route matched events to SQS
+### C6. Auto-Tagger Lambda
+- **Purpose**: Turn a resource-creation CloudTrail event into a `map-migrated` tag on the created resource(s).
+- **Responsibilities**:
+  - **ARN Extractors**: per-service extraction of created resource ARN(s) — direct-from-response, constructed, multi-resource, and dependent-resource patterns; case-insensitive key access; ARN well-formedness validation (NFR-3).
+  - **Scope Evaluator**: enforce account/VPC scope and agreement date window from config (FR-7).
+  - **Error Classifier**: three-path classification (actionable/ignorable/transient) with transient markers for slow provisioners and both throttle spellings (NFR-2).
+  - **Tag Applier**: idempotent tag application via Resource Groups Tagging API or native service APIs (NFR-1).
+- **Interfaces**: SQS event batches in; tag API calls out; SSM config reads; structured logs/metrics out.
 
-### IC-2: SqsQueue + DLQ
-- Buffer events (14-day retention)
-- 5 retries with 180s visibility timeout
-- Dead Letter Queue for failed events
+### C7. Preflight Component
+- **Purpose**: Validate before any mutation during deploy/upgrade.
+- **Responsibilities**: detect peer taggers with overlapping scope; scope-intersection check across engagements; IAM capability verification; stack-state compatibility check (FR-15). Implemented within generated scripts plus supporting runtime checks (PeerTaggerDetected alarm).
+- **Interfaces**: AWS read-only describe/list calls in; go/no-go verdict with explanation out.
 
-### IC-3: LambdaFunction
-- Host TaggerHandler (Python)
-- SQS event source mapping
+### C8. Event Pipeline
+- **Purpose**: Reliable delivery of create events from CloudTrail to the Lambda.
+- **Responsibilities**: EventBridge rules (one pattern per covered service, from the registry); SQS main queue (14-day retention, 180s visibility, maxReceiveCount 5); DLQ for exhausted messages (FR-5, FR-6).
+- **Interfaces**: CloudTrail events in; SQS batches out to Auto-Tagger Lambda; exhausted messages to DLQ.
 
-### IC-4: IamRoles
-- Least-privilege tagging permissions
-- Cross-account roles for StackSet
+### C9. Alerting Component
+- **Purpose**: Surface failures to humans fast enough to fix leakage.
+- **Responsibilities**: CloudWatch alarms — TaggerError, DLQFillingUp, TrickleFailure, PeerTaggerDetected — each publishing to the engagement's SNS topic (FR-12).
+- **Interfaces**: CloudWatch metrics in; SNS notifications out.
 
-### IC-5: SsmParameters
-- Store scope config (MPE, dates, accounts, VPCs, scope mode)
-- Read by Lambda at runtime
-
-### IC-6: CloudWatchSns
-- DLQ depth alarm
-- SNS topic + email subscription for alerts
+### C10. Config Store
+- **Purpose**: Single runtime configuration source per engagement.
+- **Responsibilities**: SSM parameter `/auto-map-tagger/{mpe_id}/config` (JSON: mpe_id, agreement dates, scope_mode, scoped_account_ids ALL-or-list, scoped_vpc_ids, tag_non_vpc_services); version parameter for observability (FR-10, NFR-12).
+- **Interfaces**: written at deploy/upgrade; read (cached, defensively parsed) by the Auto-Tagger Lambda and Preflight.

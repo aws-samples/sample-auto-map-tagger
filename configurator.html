@@ -521,6 +521,18 @@
                 </label>
             </div>
 
+            <!-- IaC / Terraform coexistence check -->
+            <div class="card" style="border-left:4px solid #7d3ac1;">
+                <h2><span data-i18n="ui_iac_title">🏗️ Using Terraform / IaC?</span></h2>
+                <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;">
+                    <input type="checkbox" id="usesIac" style="margin-top:3px;flex-shrink:0;">
+                    <div>
+                        <strong data-i18n="ui_iac_check_label">Resources in this environment are managed with Terraform (or other IaC)</strong>
+                        <p class="hint" style="margin-top:4px;" data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Add ignore_tags { keys = ["map-migrated"] } to your Terraform AWS provider block, or declare the tag in your IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</p>
+                    </div>
+                </label>
+            </div>
+
             <!-- Service coverage summary -->
             <div class="card">
                 <h2 data-i18n="ui_coverage_title">What Gets Tagged</h2>
@@ -588,7 +600,7 @@
 
                     <div id="downloadButtons" style="margin:16px 0;display:flex;gap:12px;flex-wrap:wrap;"></div>
 
-                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Customer Deployment Instructions</h3>
+                    <h3 style="margin:20px 0 8px;font-size:14px;" data-i18n="ui_deploy_instructions">Deployment Instructions</h3>
                     <div class="preview-box" id="instructions" style="color:#d4d4d4;"></div>
 
                     <div style="margin-top:40px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -606,7 +618,7 @@
                     <div id="deployHint"></div>
 
                     <div class="info-box" style="border-left:4px solid #d13212;background:#fdf3f1;margin:0;">
-                        <strong data-i18n="ui_prereq_title">Customer Prerequisites</strong> — <span data-i18n="ui_prereq_subtitle">the generated deploy.sh verifies these automatically before deploying:</span>
+                        <strong data-i18n="ui_prereq_title">Prerequisites</strong> — <span data-i18n="ui_prereq_subtitle">the generated deploy.sh verifies these automatically before deploying:</span>
                         <ul style="margin:8px 0 0;padding-left:20px;">
                             <li data-i18n="ui_prereq_cloudtrail">CloudTrail must be enabled in the target region(s)</li>
                             <li data-i18n="ui_prereq_perms">Deployer must have AWS CloudFormation permissions (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)</li>
@@ -616,11 +628,18 @@
 
                     <div class="info-box" style="border-left:4px solid #f90;background:#fffbf0;margin:0;">
                         <strong data-i18n="ui_scp_title">⚠️ Service Control Policy (SCP) Advisory</strong><br>
-                        <span data-i18n="ui_scp_intro">If the customer's organization uses SCPs, verify the following before deployment:</span>
+                        <span data-i18n="ui_scp_intro">If your organization uses SCPs, verify the following before deployment:</span>
                         <ul style="margin:8px 0 0;padding-left:20px;">
                             <li data-i18n="ui_scp_tagging"></li>
                             <li data-i18n="ui_scp_mandatory"></li>
                         </ul>
+                    </div>
+
+                    <!-- Shown only when the "uses Terraform/IaC" box was checked in Step 1
+                         (generateAndDownload toggles it) — a reminder, not a repeat advisory. -->
+                    <div class="info-box" id="iacDriftReminder" style="border-left:4px solid #7d3ac1;background:#f9f5fd;margin:0;display:none;">
+                        <strong data-i18n="ui_iac_reminder_title">🏗️ Reminder — this deployment was flagged as Terraform / IaC-managed</strong><br>
+                        <span data-i18n="ui_iac_drift">Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Add ignore_tags { keys = ["map-migrated"] } to your Terraform AWS provider block, or declare the tag in your IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).</span>
                     </div>
                 </div>
             </div>
@@ -1152,7 +1171,7 @@
         // Template version — single source of truth for the SemVer constant.
         // The deployable YAML and configurator.html are both generated from src/
         // (npm run build), so this constant flows into every artifact automatically.
-        const TEMPLATE_VERSION = 'v22.1.0';
+        const TEMPLATE_VERSION = 'v22.2.0';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1160,6 +1179,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // Keep the newest entry's version in sync with TEMPLATE_VERSION above.
         const VERSION_HISTORY = [
+            {
+                version: 'v22.2.0',
+                date: '2026-07-27',
+                changes: [
+                    { tag: 'other', text: 'IaC tag-drift detection (alert-only): a new EventBridge rule subscribes untag events (UntagResource, DeleteTags, DeleteBucketTagging, ...); when the map-migrated tag is removed out-of-band — typically Terraform default_tags/tags_all reconciliation stripping tags not declared in the IaC — the Lambda verify-reads the resource and, on confirmed absence, raises the new TagDriftAlarm with the exact customer-side fix (Terraform ignore_tags { keys = ["map-migrated"] } or declare the tag in IaC). Deliberately NO auto-restore: event-reactive re-tagging ping-pongs with IaC. Configurator now shows a "Using Terraform / IaC?" advisory (all 7 languages).' },
+                ],
+            },
             {
                 version: 'v22.1.0',
                 date: '2026-07-19',
@@ -3381,6 +3407,7 @@ ${t('d_instr_idempotent')}`;
                 scopedVpcIds: useVpcScope ? [...new Set(getValues('.vpc-input').map(v => v.trim()).filter(v => v))] : ['NONE'],
                 tagNonVpcServices,
                 includeBackfill: document.getElementById('includeBackfill').checked,
+                usesIac: document.getElementById('usesIac').checked,
             };
 
             if (deployMode === 'single') {
@@ -3621,20 +3648,24 @@ const en_translations = {
             ui_review_title:'Review Configuration', ui_review_subtitle:'Verify settings before generating the template',
             ui_what_deployed:'What Gets Deployed',
             ui_template_ready:'Template Ready', ui_template_ready_subtitle:'Share this with the customer along with the deployment instructions below',
-            ui_prereq_title:'Customer Prerequisites', ui_prereq_subtitle:'the generated deploy.sh verifies these automatically before deploying:',
+            ui_prereq_title:'Prerequisites', ui_prereq_subtitle:'the generated deploy.sh verifies these automatically before deploying:',
             ui_prereq_cloudtrail:'CloudTrail must be enabled in the target region(s)',
             ui_prereq_perms:'Deployer must have AWS CloudFormation permissions (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
             ui_prereq_org:'Management account must have AWS Organizations enabled with CloudFormation StackSets trusted access',
             ui_scp_title:'⚠️ Service Control Policy (SCP) Advisory',
-            ui_scp_intro:'If the customer\'s organization uses SCPs, verify the following before deployment:',
-            ui_deploy_instructions:'Customer Deployment Instructions',
+            ui_scp_intro:'If your organization uses SCPs, verify the following before deployment:',
+            ui_deploy_instructions:'Deployment Instructions',
             ui_template_preview:'Template Preview',
             ui_download_template:'Download CloudFormation Template',
             ui_download_template_note:'Optional — for customers who would like to review the CloudFormation code before deploying.',
             ui_start_over:'Start Over',
             ui_cost_note:'Estimated monthly cost: ', ui_cost_note2:' per account (AWS Lambda invocations + Amazon CloudWatch). No AWS Config required.',
             ui_scp_tagging:"Tagging SCPs — verify SCPs do not deny tag:TagResources, ec2:CreateTags, or other tagging actions for Lambda execution roles. The deploy.sh runs a post-deployment IAM simulation check, but SCPs require manual verification in the AWS Organizations console.",
-            ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution does not satisfy that requirement (tags are applied 60-90 seconds after creation). The customer must exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
+            ui_scp_mandatory:"Mandatory tagging SCPs — if SCPs require tags at resource creation time, this solution does not satisfy that requirement (tags are applied 60-90 seconds after creation). Exempt the tag key map-migrated from creation-time enforcement, or use a grace period.",
+            ui_iac_title:'🏗️ Using Terraform / IaC?',
+            ui_iac_check_label:'Resources in this environment are managed with Terraform (or other IaC)',
+            ui_iac_reminder_title:'🏗️ Reminder — this deployment was flagged as Terraform / IaC-managed',
+            ui_iac_drift:"Terraform's default_tags/tags_all reconciliation silently removes the map-migrated tag on the next apply (tags not declared in the IaC are stripped). Add ignore_tags { keys = [\"map-migrated\"] } to your Terraform AWS provider block, or declare the tag in your IaC. CloudFormation generally leaves out-of-band tags alone. The tagger detects out-of-band removal and raises a CloudWatch alarm with this fix (alert-only — it never re-tags automatically).",
             rv_not_specified:'(not specified)', rv_none:'(none)', rv_none_specified:'(none specified)',
             rv_yes:'Yes', rv_no:'No', rv_disabled:'Disabled', rv_enabled:'Enabled',
             rv_multi_method:'Multi-Account Method', rv_stackset:'StackSet (per-account Lambda)', rv_central:'Central Lambda (cross-account)',
@@ -3991,17 +4022,21 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             ui_review_title:'구성 검토', ui_review_subtitle:'템플릿 생성 전 설정을 확인하세요',
             ui_what_deployed:'배포될 항목',
             ui_template_ready:'템플릿 준비 완료', ui_template_ready_subtitle:'아래 배포 지침과 함께 고객에게 공유하세요',
-            ui_prereq_title:'고객 사전 요구 사항', ui_prereq_subtitle:'생성된 deploy.sh가 배포 전 자동으로 확인합니다:',
+            ui_prereq_title:'사전 요구 사항', ui_prereq_subtitle:'생성된 deploy.sh가 배포 전 자동으로 확인합니다:',
             ui_prereq_cloudtrail:'대상 리전에서 CloudTrail이 활성화되어 있어야 합니다',
             ui_prereq_perms:'배포자에게 AWS CloudFormation 권한이 있어야 합니다 (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
             ui_prereq_org:'관리 계정에 AWS Organizations 및 CloudFormation StackSets 신뢰 액세스가 활성화되어 있어야 합니다',
             ui_scp_title:'⚠️ 서비스 제어 정책(SCP) 주의사항',
-            ui_scp_intro:'고객의 조직에 SCP가 있는 경우 배포 전 다음 사항을 확인하세요:',
-            ui_deploy_instructions:'고객 배포 지침',
+            ui_scp_intro:'조직에서 SCP를 사용하는 경우 배포 전 다음 사항을 확인하세요:',
+            ui_deploy_instructions:'배포 지침',
             ui_template_preview:'템플릿 미리보기', ui_download_template:'CloudFormation 템플릿 다운로드', ui_download_template_note:'선택 사항 — 배포 전에 CloudFormation 코드를 검토하려는 고객을 위한 옵션입니다.', ui_start_over:'처음부터 다시',
             ui_cost_note:'예상 월 비용: ', ui_cost_note2:' / 계정 (Lambda 호출 + CloudWatch). AWS Config 불필요.',
             ui_scp_tagging:'태그 SCP — SCP가 Lambda 실행 역할에 대해 tag:TagResources, ec2:CreateTags 또는 기타 태그 지정 작업을 거부하지 않는지 확인하세요. deploy.sh가 배포 후 IAM 시뮬레이션 검사를 실행하지만 SCP는 AWS Organizations 콘솔에서 수동으로 확인해야 합니다.',
-            ui_scp_mandatory:'필수 태그 SCP — SCP가 리소스 생성 시 태그를 요구하는 경우 이 솔루션은 해당 요구 사항을 충족하지 않습니다 (태그는 생성 후 60~90초 후에 적용됨). 고객은 map-migrated 태그 키를 생성 시 적용 요건에서 제외하거나 유예 기간을 설정해야 합니다.',
+            ui_scp_mandatory:'필수 태그 SCP — SCP가 리소스 생성 시 태그를 요구하는 경우 이 솔루션은 해당 요구 사항을 충족하지 않습니다 (태그는 생성 후 60~90초 후에 적용됨). map-migrated 태그 키를 생성 시 적용 요건에서 제외하거나 유예 기간을 설정하세요.',
+            ui_iac_title:'🏗️ Terraform / IaC를 사용 중이신가요?',
+            ui_iac_check_label:'이 환경의 리소스를 Terraform(또는 기타 IaC)으로 관리합니다',
+            ui_iac_reminder_title:'🏗️ 리마인더 — 이 배포는 Terraform / IaC 관리 환경으로 표시되었습니다',
+            ui_iac_drift:'Terraform의 default_tags/tags_all 재조정은 다음 apply 시 map-migrated 태그를 조용히 제거합니다 (IaC에 선언되지 않은 태그는 제거됨). Terraform AWS provider 블록에 ignore_tags { keys = ["map-migrated"] }를 추가하거나 IaC에 해당 태그를 선언하세요. CloudFormation은 일반적으로 외부에서 적용된 태그를 유지합니다. 태거는 외부 태그 제거를 감지하여 이 해결 방법이 포함된 CloudWatch 경보를 발생시킵니다 (경보 전용 — 자동으로 다시 태그하지 않음).',
             rv_not_specified:'(미지정)', rv_none:'(없음)', rv_none_specified:'(지정되지 않음)',
             rv_yes:'예', rv_no:'아니오', rv_disabled:'비활성화', rv_enabled:'활성화',
             rv_multi_method:'다중 계정 방법', rv_stackset:'StackSet (계정별 Lambda)', rv_central:'중앙 Lambda (교차 계정)',
@@ -4333,17 +4368,21 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             ui_review_title:'設定の確認', ui_review_subtitle:'テンプレートを生成する前に設定を確認してください',
             ui_what_deployed:'デプロイされる内容',
             ui_template_ready:'テンプレート準備完了', ui_template_ready_subtitle:'デプロイ手順と一緒にお客様に共有してください',
-            ui_prereq_title:'お客様の前提条件', ui_prereq_subtitle:'生成されたdeploy.shがデプロイ前に自動的に確認します:',
+            ui_prereq_title:'前提条件', ui_prereq_subtitle:'生成されたdeploy.shがデプロイ前に自動的に確認します:',
             ui_prereq_cloudtrail:'ターゲットリージョンでCloudTrailが有効になっていること',
             ui_prereq_perms:'デプロイ担当者にAWS CloudFormation権限があること (IAM、AWS Lambda、Amazon EventBridge、AWS Systems Manager、Amazon SNS、Amazon SQS、Amazon CloudWatch)',
             ui_prereq_org:'管理アカウントにAWS OrganizationsおよびCloudFormation StackSetsの信頼アクセスが有効になっていること',
             ui_scp_title:'⚠️ サービスコントロールポリシー(SCP)に関する注意',
-            ui_scp_intro:'お客様の組織がSCPを使用している場合は、デプロイ前に以下を確認してください:',
-            ui_deploy_instructions:'お客様のデプロイ手順',
+            ui_scp_intro:'組織でSCPを使用している場合は、デプロイ前に以下を確認してください:',
+            ui_deploy_instructions:'デプロイ手順',
             ui_template_preview:'テンプレートプレビュー', ui_download_template:'CloudFormationテンプレートをダウンロード', ui_download_template_note:'オプション — デプロイ前にCloudFormationコードを確認したいお客様向けです。', ui_start_over:'最初からやり直す',
             ui_cost_note:'推定月額費用: ', ui_cost_note2:' / アカウント（Lambda呼び出し + CloudWatch）。AWS Config不要。',
             ui_scp_tagging:'タグ付けSCP — SCPがLambda実行ロールに対してtag:TagResources、ec2:CreateTagsなどのタグ付けアクションを拒否していないことを確認してください。deploy.shはデプロイ後にIAMシミュレーションチェックを実行しますが、SCPはAWS Organizationsコンソールで手動確認が必要です。',
-            ui_scp_mandatory:'必須タグSCP — SCPがリソース作成時にタグの存在を要求する場合、このソリューションはその要件を満たしません（タグは作成後60〜90秒後に適用）。お客様はmap-migratedタグキーを作成時要件から除外するか、猶予期間を設定する必要があります。',
+            ui_scp_mandatory:'必須タグSCP — SCPがリソース作成時にタグの存在を要求する場合、このソリューションはその要件を満たしません（タグは作成後60〜90秒後に適用）。map-migratedタグキーを作成時要件から除外するか、猶予期間を設定してください。',
+            ui_iac_title:'🏗️ Terraform / IaCをご利用ですか？',
+            ui_iac_check_label:'この環境のリソースをTerraform（または他のIaC）で管理している',
+            ui_iac_reminder_title:'🏗️ リマインダー — このデプロイはTerraform / IaC管理環境としてマークされています',
+            ui_iac_drift:'Terraformのdefault_tags/tags_allの調整により、次回のapply時にmap-migratedタグが暗黙的に削除されます（IaCに宣言されていないタグは除去されます）。Terraform AWSプロバイダーブロックに ignore_tags { keys = ["map-migrated"] } を追加するか、IaC内でタグを宣言してください。CloudFormationは通常、外部で適用されたタグを保持します。タガーは外部からのタグ削除を検出し、この修正方法を含むCloudWatchアラームを発報します（アラートのみ — 自動再タグ付けは行いません）。',
             rv_not_specified:'(未指定)', rv_none:'(なし)', rv_none_specified:'(未指定)',
             rv_yes:'はい', rv_no:'いいえ', rv_disabled:'無効', rv_enabled:'有効',
             rv_multi_method:'マルチアカウント方式', rv_stackset:'StackSet（アカウントごとのLambda）', rv_central:'中央Lambda（クロスアカウント）',
@@ -4675,17 +4714,21 @@ ui_instr_single_title:'部署说明 — 单账户',
             ui_review_title:'配置审核', ui_review_subtitle:'生成模板前请验证设置',
             ui_what_deployed:'将要部署的内容',
             ui_template_ready:'模板已就绪', ui_template_ready_subtitle:'请连同以下部署说明一起分享给客户',
-            ui_prereq_title:'客户前提条件', ui_prereq_subtitle:'生成的deploy.sh将在部署前自动验证：',
+            ui_prereq_title:'前提条件', ui_prereq_subtitle:'生成的deploy.sh将在部署前自动验证：',
             ui_prereq_cloudtrail:'目标区域中必须启用CloudTrail',
             ui_prereq_perms:'部署者必须拥有AWS CloudFormation权限（IAM、AWS Lambda、Amazon EventBridge、AWS Systems Manager、Amazon SNS、Amazon SQS、Amazon CloudWatch）',
             ui_prereq_org:'管理账户必须启用AWS Organizations和CloudFormation StackSets受信任访问',
             ui_scp_title:'⚠️ 服务控制策略（SCP）提示',
-            ui_scp_intro:'如果客户的组织使用了SCP，请在部署前验证以下内容：',
-            ui_deploy_instructions:'客户部署说明',
+            ui_scp_intro:'如果您的组织使用了SCP，请在部署前验证以下内容：',
+            ui_deploy_instructions:'部署说明',
             ui_template_preview:'模板预览', ui_download_template:'下载 CloudFormation 模板', ui_download_template_note:'可选 — 适用于希望在部署前查看 CloudFormation 代码的客户。', ui_start_over:'重新开始',
             ui_cost_note:'预计每月费用：', ui_cost_note2:'/ 账户（Lambda调用 + CloudWatch）。无需AWS Config。',
             ui_scp_tagging:'标签SCP — 确保SCP不拒绝Lambda执行角色的tag:TagResources、ec2:CreateTags或其他标签操作。deploy.sh将运行部署后IAM模拟检查，但SCP需要在AWS Organizations控制台中手动验证。',
-            ui_scp_mandatory:'强制标签SCP — 如果SCP要求在资源创建时必须存在标签，此解决方案将无法满足该要求（标签在创建后60-90秒应用）。客户必须豁免map-migrated标签键或设置宽限期。',
+            ui_scp_mandatory:'强制标签SCP — 如果SCP要求在资源创建时必须存在标签，此解决方案将无法满足该要求（标签在创建后60-90秒应用）。请豁免map-migrated标签键或设置宽限期。',
+            ui_iac_title:'🏗️ 正在使用Terraform / IaC？',
+            ui_iac_check_label:'此环境的资源使用Terraform（或其他IaC）管理',
+            ui_iac_reminder_title:'🏗️ 提醒 — 此部署已标记为Terraform / IaC管理环境',
+            ui_iac_drift:'Terraform的default_tags/tags_all协调会在下次apply时静默删除map-migrated标签（未在IaC中声明的标签会被清除）。请在您的Terraform AWS provider块中添加 ignore_tags { keys = ["map-migrated"] }，或在您的IaC中声明该标签。CloudFormation通常会保留带外应用的标签。标记器会检测带外标签删除并触发包含此修复方法的CloudWatch告警（仅告警 — 绝不自动重新标记）。',
             rv_not_specified:'(未指定)', rv_none:'(无)', rv_none_specified:'(未指定)',
             rv_yes:'是', rv_no:'否', rv_disabled:'已禁用', rv_enabled:'已启用',
             rv_multi_method:'多账户方法', rv_stackset:'StackSet（每账户Lambda）', rv_central:'中央Lambda（跨账户）',
@@ -5017,17 +5060,21 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             ui_review_title:'Tinjau Konfigurasi', ui_review_subtitle:'Verifikasi pengaturan sebelum menghasilkan template',
             ui_what_deployed:'Yang Akan Di-deploy',
             ui_template_ready:'Template Siap', ui_template_ready_subtitle:'Bagikan ini beserta instruksi deployment di bawah kepada pelanggan',
-            ui_prereq_title:'Prasyarat Pelanggan', ui_prereq_subtitle:'deploy.sh yang dihasilkan akan memverifikasi ini secara otomatis sebelum deployment:',
+            ui_prereq_title:'Prasyarat', ui_prereq_subtitle:'deploy.sh yang dihasilkan akan memverifikasi ini secara otomatis sebelum deployment:',
             ui_prereq_cloudtrail:'CloudTrail harus diaktifkan di region target',
             ui_prereq_perms:'Deployer harus memiliki izin AWS CloudFormation (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
             ui_prereq_org:'Akun manajemen harus mengaktifkan AWS Organizations dan trusted access CloudFormation StackSets',
             ui_scp_title:'⚠️ Peringatan Kebijakan Kontrol Layanan (SCP)',
-            ui_scp_intro:'Jika organisasi pelanggan menggunakan SCP, verifikasi hal berikut sebelum deployment:',
-            ui_deploy_instructions:'Instruksi Deployment Pelanggan',
+            ui_scp_intro:'Jika organisasi Anda menggunakan SCP, verifikasi hal berikut sebelum deployment:',
+            ui_deploy_instructions:'Instruksi Deployment',
             ui_template_preview:'Pratinjau Template', ui_download_template:'Unduh Template CloudFormation', ui_download_template_note:'Opsional — untuk pelanggan yang ingin meninjau kode CloudFormation sebelum deployment.', ui_start_over:'Mulai Ulang',
             ui_cost_note:'Estimasi biaya bulanan: ', ui_cost_note2:' / akun (invokasi Lambda + CloudWatch). Tidak memerlukan AWS Config.',
             ui_scp_tagging:'SCP Tagging — pastikan SCP tidak menolak tag:TagResources, ec2:CreateTags, atau tindakan tagging lainnya untuk peran eksekusi Lambda. deploy.sh akan menjalankan pemeriksaan simulasi IAM pasca-deployment, tetapi SCP memerlukan verifikasi manual di konsol AWS Organizations.',
-            ui_scp_mandatory:'SCP Tagging Wajib — jika SCP mengharuskan tag ada saat resource dibuat, solusi ini tidak akan memenuhi persyaratan tersebut (tag diterapkan 60-90 detik setelah pembuatan). Pelanggan harus mengecualikan kunci tag map-migrated atau menggunakan masa tenggang.',
+            ui_scp_mandatory:'SCP Tagging Wajib — jika SCP mengharuskan tag ada saat resource dibuat, solusi ini tidak akan memenuhi persyaratan tersebut (tag diterapkan 60-90 detik setelah pembuatan). Kecualikan kunci tag map-migrated atau gunakan masa tenggang.',
+            ui_iac_title:'🏗️ Menggunakan Terraform / IaC?',
+            ui_iac_check_label:'Resource di lingkungan ini dikelola dengan Terraform (atau IaC lain)',
+            ui_iac_reminder_title:'🏗️ Pengingat — deployment ini ditandai sebagai lingkungan yang dikelola Terraform / IaC',
+            ui_iac_drift:'Rekonsiliasi default_tags/tags_all Terraform secara diam-diam menghapus tag map-migrated pada apply berikutnya (tag yang tidak dideklarasikan dalam IaC akan dihapus). Tambahkan ignore_tags { keys = ["map-migrated"] } ke blok Terraform AWS provider Anda, atau deklarasikan tag tersebut dalam IaC Anda. CloudFormation umumnya membiarkan tag yang diterapkan di luar IaC. Tagger mendeteksi penghapusan tag di luar IaC dan memicu alarm CloudWatch berisi perbaikan ini (hanya peringatan — tidak pernah menandai ulang secara otomatis).',
             rv_not_specified:'(tidak ditentukan)', rv_none:'(tidak ada)', rv_none_specified:'(tidak ditentukan)',
             rv_yes:'Ya', rv_no:'Tidak', rv_disabled:'Dinonaktifkan', rv_enabled:'Diaktifkan',
             rv_multi_method:'Metode Multi-Akun', rv_stackset:'StackSet (Lambda per akun)', rv_central:'Lambda Pusat (lintas akun)',
@@ -5359,17 +5406,21 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             ui_review_title:'ตรวจสอบการกำหนดค่า', ui_review_subtitle:'ตรวจสอบการตั้งค่าก่อนสร้างเทมเพลต',
             ui_what_deployed:'สิ่งที่จะถูกติดตั้ง',
             ui_template_ready:'เทมเพลตพร้อมแล้ว', ui_template_ready_subtitle:'แชร์สิ่งนี้พร้อมคำแนะนำการติดตั้งด้านล่างให้กับลูกค้า',
-            ui_prereq_title:'ข้อกำหนดเบื้องต้นของลูกค้า', ui_prereq_subtitle:'deploy.sh ที่สร้างขึ้นจะตรวจสอบสิ่งเหล่านี้โดยอัตโนมัติก่อนติดตั้ง:',
+            ui_prereq_title:'ข้อกำหนดเบื้องต้น', ui_prereq_subtitle:'deploy.sh ที่สร้างขึ้นจะตรวจสอบสิ่งเหล่านี้โดยอัตโนมัติก่อนติดตั้ง:',
             ui_prereq_cloudtrail:'ต้องเปิดใช้งาน CloudTrail ใน Region เป้าหมาย',
             ui_prereq_perms:'ผู้ติดตั้งต้องมีสิทธิ์ AWS CloudFormation (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
             ui_prereq_org:'บัญชีจัดการต้องเปิดใช้งาน AWS Organizations และ CloudFormation StackSets trusted access',
             ui_scp_title:'⚠️ คำเตือนเกี่ยวกับนโยบายควบคุมบริการ (SCP)',
-            ui_scp_intro:'หากองค์กรของลูกค้าใช้ SCP โปรดตรวจสอบสิ่งต่อไปนี้ก่อนติดตั้ง:',
-            ui_deploy_instructions:'คำแนะนำการติดตั้งสำหรับลูกค้า',
+            ui_scp_intro:'หากองค์กรของคุณใช้ SCP โปรดตรวจสอบสิ่งต่อไปนี้ก่อนติดตั้ง:',
+            ui_deploy_instructions:'คำแนะนำการติดตั้ง',
             ui_template_preview:'ตัวอย่างเทมเพลต', ui_download_template:'ดาวน์โหลด CloudFormation Template', ui_download_template_note:'ไม่บังคับ — สำหรับลูกค้าที่ต้องการตรวจสอบโค้ด CloudFormation ก่อนการ deploy', ui_start_over:'เริ่มต้นใหม่',
             ui_cost_note:'ค่าใช้จ่ายรายเดือนโดยประมาณ: ', ui_cost_note2:' / บัญชี (การเรียก Lambda + CloudWatch) ไม่ต้องใช้ AWS Config',
             ui_scp_tagging:'SCP การติด Tag — ตรวจสอบให้แน่ใจว่า SCP ไม่ปฏิเสธ tag:TagResources, ec2:CreateTags หรือการดำเนินการติด Tag อื่นๆ สำหรับ Lambda execution role deploy.sh จะรันการตรวจสอบ IAM simulation หลังการติดตั้ง แต่ SCP ต้องตรวจสอบด้วยตนเองใน AWS Organizations Console',
-            ui_scp_mandatory:'SCP บังคับติด Tag — หากSCP กำหนดให้ต้องมี Tag ตั้งแต่ตอนสร้าง Resource โซลูชันนี้จะไม่สามารถตอบสนองข้อกำหนดดังกล่าวได้ (Tag ถูกนำไปใช้ 60-90 วินาทีหลังสร้าง) ลูกค้าต้องยกเว้น Tag key map-migrated จากการบังคับใช้หรือกำหนดระยะเวลาผ่อนผัน',
+            ui_scp_mandatory:'SCP บังคับติด Tag — หากSCP กำหนดให้ต้องมี Tag ตั้งแต่ตอนสร้าง Resource โซลูชันนี้จะไม่สามารถตอบสนองข้อกำหนดดังกล่าวได้ (Tag ถูกนำไปใช้ 60-90 วินาทีหลังสร้าง) โปรดยกเว้น Tag key map-migrated จากการบังคับใช้หรือกำหนดระยะเวลาผ่อนผัน',
+            ui_iac_title:'🏗️ ใช้ Terraform / IaC อยู่หรือไม่?',
+            ui_iac_check_label:'Resource ในสภาพแวดล้อมนี้จัดการด้วย Terraform (หรือ IaC อื่นๆ)',
+            ui_iac_reminder_title:'🏗️ คำเตือน — การติดตั้งนี้ถูกระบุว่าเป็นสภาพแวดล้อมที่จัดการด้วย Terraform / IaC',
+            ui_iac_drift:'การปรับสถานะ default_tags/tags_all ของ Terraform จะลบ Tag map-migrated แบบเงียบๆ ในการ apply ครั้งถัดไป (Tag ที่ไม่ได้ประกาศใน IaC จะถูกลบ) เพิ่ม ignore_tags { keys = ["map-migrated"] } ในบล็อก Terraform AWS provider ของคุณ หรือประกาศ Tag นี้ใน IaC ของคุณ โดยทั่วไป CloudFormation จะไม่ลบ Tag ที่ติดจากภายนอก ตัวติด Tag จะตรวจจับการลบ Tag จากภายนอกและแจ้งเตือนผ่าน CloudWatch alarm พร้อมวิธีแก้ไขนี้ (แจ้งเตือนเท่านั้น — จะไม่ติด Tag ใหม่อัตโนมัติ)',
             rv_not_specified:'(ไม่ระบุ)', rv_none:'(ไม่มี)', rv_none_specified:'(ไม่ระบุ)',
             rv_yes:'ใช่', rv_no:'ไม่', rv_disabled:'ปิดใช้งาน', rv_enabled:'เปิดใช้งาน',
             rv_multi_method:'วิธีการหลายบัญชี', rv_stackset:'StackSet (Lambda ต่อบัญชี)', rv_central:'Lambda กลาง (ข้ามบัญชี)',
@@ -5701,17 +5752,21 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             ui_review_title:'Xem xét cấu hình', ui_review_subtitle:'Xác minh cài đặt trước khi tạo template',
             ui_what_deployed:'Những gì sẽ được triển khai',
             ui_template_ready:'Template đã sẵn sàng', ui_template_ready_subtitle:'Chia sẻ cùng với hướng dẫn triển khai bên dưới cho khách hàng',
-            ui_prereq_title:'Điều kiện tiên quyết của khách hàng', ui_prereq_subtitle:'deploy.sh được tạo sẽ tự động xác minh trước khi triển khai:',
+            ui_prereq_title:'Điều kiện tiên quyết', ui_prereq_subtitle:'deploy.sh được tạo sẽ tự động xác minh trước khi triển khai:',
             ui_prereq_cloudtrail:'CloudTrail phải được bật trong region đích',
             ui_prereq_perms:'Người triển khai phải có quyền AWS CloudFormation (IAM, AWS Lambda, Amazon EventBridge, AWS Systems Manager, Amazon SNS, Amazon SQS, Amazon CloudWatch)',
             ui_prereq_org:'Tài khoản quản lý phải bật AWS Organizations và trusted access CloudFormation StackSets',
             ui_scp_title:'⚠️ Lưu ý về Chính sách kiểm soát dịch vụ (SCP)',
-            ui_scp_intro:'Nếu tổ chức của khách hàng sử dụng SCP, hãy xác minh những điều sau trước khi triển khai:',
-            ui_deploy_instructions:'Hướng dẫn triển khai cho khách hàng',
+            ui_scp_intro:'Nếu tổ chức của bạn sử dụng SCP, hãy xác minh những điều sau trước khi triển khai:',
+            ui_deploy_instructions:'Hướng dẫn triển khai',
             ui_template_preview:'Xem trước template', ui_download_template:'Tải xuống CloudFormation Template', ui_download_template_note:'Tùy chọn — dành cho khách hàng muốn xem lại mã CloudFormation trước khi triển khai.', ui_start_over:'Bắt đầu lại',
             ui_cost_note:'Chi phí hàng tháng ước tính: ', ui_cost_note2:' / tài khoản (lời gọi Lambda + CloudWatch). Không cần AWS Config.',
             ui_scp_tagging:'SCP gắn tag — đảm bảo SCP không từ chối tag:TagResources, ec2:CreateTags hoặc các hành động gắn tag khác cho Lambda execution role. deploy.sh sẽ chạy kiểm tra IAM simulation sau khi triển khai, nhưng SCP cần xác minh thủ công trong AWS Organizations Console.',
-            ui_scp_mandatory:'SCP gắn tag bắt buộc — nếu SCP yêu cầu tag phải có khi tạo resource, giải pháp này sẽ không đáp ứng yêu cầu đó (tag được áp dụng 60-90 giây sau khi tạo). Khách hàng phải miễn trừ tag key map-migrated hoặc sử dụng khoảng thời gian ân hạn.',
+            ui_scp_mandatory:'SCP gắn tag bắt buộc — nếu SCP yêu cầu tag phải có khi tạo resource, giải pháp này sẽ không đáp ứng yêu cầu đó (tag được áp dụng 60-90 giây sau khi tạo). Hãy miễn trừ tag key map-migrated hoặc sử dụng khoảng thời gian ân hạn.',
+            ui_iac_title:'🏗️ Đang dùng Terraform / IaC?',
+            ui_iac_check_label:'Resource trong môi trường này được quản lý bằng Terraform (hoặc IaC khác)',
+            ui_iac_reminder_title:'🏗️ Nhắc nhở — bản triển khai này được đánh dấu là môi trường quản lý bằng Terraform / IaC',
+            ui_iac_drift:'Việc đồng bộ default_tags/tags_all của Terraform sẽ âm thầm xóa tag map-migrated ở lần apply tiếp theo (tag không được khai báo trong IaC sẽ bị gỡ). Thêm ignore_tags { keys = ["map-migrated"] } vào khối Terraform AWS provider của bạn, hoặc khai báo tag này trong IaC của bạn. CloudFormation thường giữ nguyên các tag được gắn ngoài luồng. Trình gắn tag phát hiện việc xóa tag ngoài luồng và phát cảnh báo CloudWatch kèm cách khắc phục này (chỉ cảnh báo — không bao giờ tự động gắn lại tag).',
             rv_not_specified:'(chưa chỉ định)', rv_none:'(không có)', rv_none_specified:'(chưa chỉ định)',
             rv_yes:'Có', rv_no:'Không', rv_disabled:'Đã tắt', rv_enabled:'Đã bật',
             rv_multi_method:'Phương thức đa tài khoản', rv_stackset:'StackSet (Lambda mỗi tài khoản)', rv_central:'Lambda trung tâm (đa tài khoản)',
@@ -9457,6 +9512,157 @@ ${permissionsList}
               'PutQueryDefinition',
           ])
           
+          # ── IaC tag-drift detection (L2, alert-only) ────────────────────────────
+          # A customer's 'terraform apply' with default_tags/tags_all silently strips
+          # tags the tagger applied out-of-band (the resource's declared tag set is
+          # reconciled to what the IaC knows about). The untag events ARE visible in
+          # CloudTrail; a dedicated EventBridge rule (TagDriftEventRule — exact names,
+          # not prefixes) routes them through the same SQS pipeline. This branch
+          # detects the strip and raises a LOUD one-time signal (TAG_DRIFT_DETECTED
+          # log line + MapAutoTagger/TagDriftDetected metric → TagDriftAlarm → SNS)
+          # carrying the customer-side fix. Deliberately NO auto-restore: event-
+          # reactive re-tagging ping-pongs with IaC (AMS Resource Tagger lesson) and
+          # CloudTrail→EventBridge→Lambda is outside AWS's recursion guard — we'd own
+          # 100% of loop prevention. Alert-only is loop-safe by construction: the
+          # only writes here are PutMetricData and stdout.
+          #
+          # NOTE: dispatch is 'event_name in _UNTAG_EVENTS' (a named frozenset), not
+          # per-event == literals — lint_event_prefixes.py extracts 'event_name =='
+          # literals to demand EventBridge verb prefixes, and Untag*/Delete*/Remove*
+          # prefixes on the creation rule would flood SQS with every deletion in the
+          # account.
+          _UNTAG_EVENTS = frozenset([
+              'UntagResource', 'UntagResources', 'DeleteTags',
+              'RemoveTagsFromResource', 'RemoveTags', 'DeleteBucketTagging',
+          ])
+          
+          # EC2 resource-id prefix → ARN resource type, for DeleteTags events whose
+          # requestParameters carry bare ids (resourcesSet.items[].resourceId).
+          _EC2_ID_ARN_TYPES = {
+              'i-': 'instance', 'vol-': 'volume', 'sg-': 'security-group',
+              'subnet-': 'subnet', 'vpc-': 'vpc', 'eni-': 'network-interface',
+              'snap-': 'snapshot', 'igw-': 'internet-gateway', 'rtb-': 'route-table',
+              'nat-': 'natgateway', 'eipalloc-': 'elastic-ip', 'dopt-': 'dhcp-options',
+          }
+          
+          def _removed_tag_keys(detail):
+              """Tag keys removed by an untag event, or None when the event removes
+              an unknowable/complete set (DeleteBucketTagging drops the whole TagSet;
+              unknown shapes are treated conservatively as 'may include ours')."""
+              if detail.get('eventName') == 'DeleteBucketTagging':
+                  return None
+              rp = detail.get('requestParameters') or {}
+              keys = ci_get(rp, 'tagKeys')
+              if isinstance(keys, list) and keys:
+                  return [k for k in keys if isinstance(k, str)]
+              # EC2 DeleteTags: tagSet.items[].key
+              tag_set = ci_get(rp, 'tagSet') or {}
+              items = tag_set.get('items') if isinstance(tag_set, dict) else None
+              if isinstance(items, list) and items:
+                  return [i.get('key') for i in items if isinstance(i, dict) and i.get('key')]
+              # ELB RemoveTags / EMR RemoveTagsFromResource variants: tags[].key
+              tags = ci_get(rp, 'tags')
+              if isinstance(tags, list) and tags:
+                  out = [t.get('key') or t.get('Key') for t in tags if isinstance(t, dict)]
+                  out = [k for k in out if k]
+                  if out:
+                      return out
+              return None
+          
+          def _untag_candidate_arns(detail, account_id, region):
+              """Resource ARNs an untag event acted on. Best-effort across the
+              dominant shapes; unknown shapes return [] (skip quietly — detection
+              is best-effort, the LIMITATIONS doc says so)."""
+              rp = detail.get('requestParameters') or {}
+              arns = []
+              arn_list = ci_get(rp, 'resourceARNList')
+              if isinstance(arn_list, list):
+                  arns.extend(a for a in arn_list if isinstance(a, str) and a.startswith('arn:'))
+              for key in ('resourceArn', 'resource', 'resourceName', 'resourceId'):
+                  v = ci_get(rp, key)
+                  if isinstance(v, str) and v.startswith('arn:'):
+                      arns.append(v)
+              # EC2 DeleteTags: bare ids in resourcesSet.items[].resourceId
+              rset = ci_get(rp, 'resourcesSet') or {}
+              items = rset.get('items') if isinstance(rset, dict) else None
+              if isinstance(items, list):
+                  for item in items:
+                      rid = (item or {}).get('resourceId', '')
+                      if not isinstance(rid, str):
+                          continue
+                      for prefix, rtype in _EC2_ID_ARN_TYPES.items():
+                          if rid.startswith(prefix):
+                              arns.append(f'arn:aws:ec2:{region}:{account_id}:{rtype}/{rid}')
+                              break
+              bucket = ci_get(rp, 'bucketName')
+              if isinstance(bucket, str) and bucket:
+                  arns.append(f'arn:aws:s3:::{bucket}')
+              return list(dict.fromkeys(arns))
+          
+          def _emit_drift_metric(mpe_id):
+              try:
+                  boto3.client('cloudwatch').put_metric_data(
+                      Namespace='MapAutoTagger',
+                      MetricData=[{
+                          'MetricName': 'TagDriftDetected',
+                          'Dimensions': [{'Name': 'MpeId', 'Value': mpe_id}],
+                          'Value': 1,
+                          'Unit': 'Count',
+                      }],
+                  )
+              except Exception as mx:
+                  print(f'Could not emit TagDriftDetected metric: {mx}')
+          
+          def _handle_untag_event(detail, config, account_id, region):
+              """Alert-only drift detection for one untag event. ALWAYS returns
+              ('skipped', None): drift events must never retry into the DLQ — the
+              operator signal is the metric/alarm, and redelivering an untag event
+              can't change what already happened."""
+              event_name = detail.get('eventName', '')
+              keys = _removed_tag_keys(detail)
+              # keys=None means "unknown/complete removal" — check. Otherwise only
+              # react when map-migrated is among the removed keys (only ever act on
+              # ABSENCE of our tag; never on other tags' churn).
+              if keys is not None and 'map-migrated' not in keys:
+                  return ('skipped', None)
+              principal = ((detail.get('userIdentity') or {}).get('arn') or '')
+              if 'map-auto-tagger' in principal or 'map-preflight-role' in principal:
+                  # Self/peer-tagger activity (or a customer assuming our role to
+                  # remediate) — never alert on our own plumbing.
+                  return ('skipped', None)
+              arns = _untag_candidate_arns(detail, account_id, region)
+              if not arns:
+                  print(f'DRIFT_SKIP: no resource ARN extractable from {event_name}')
+                  return ('skipped', None)
+              # Verify-read before alerting: the event says the tag WAS removed, but
+              # it may have been re-applied since (tagger re-tag, customer fix, or
+              # the ignore_tags fix already deployed). Best-effort — a failed read
+              # skips quietly rather than false-alarming or retrying into the DLQ.
+              try:
+                  rgta = boto3.client('resourcegroupstaggingapi', region_name=region) if region else tagging
+                  resp = _retry_throttles(lambda: rgta.get_resources(ResourceARNList=arns))
+              except Exception as e:
+                  print(f'DRIFT_VERIFY_FAILED (best-effort, skipping): {e}')
+                  return ('skipped', None)
+              tagged_now = set()
+              for m in resp.get('ResourceTagMappingList', []):
+                  if any(t.get('Key') == 'map-migrated' for t in m.get('Tags', [])):
+                      tagged_now.add(m.get('ResourceARN'))
+              for arn in arns:
+                  if arn in tagged_now:
+                      continue
+                  print(
+                      f'TAG_DRIFT_DETECTED arn={arn} removed_by={principal or "unknown"} '
+                      f'event={event_name} — map-migrated was removed out-of-band '
+                      f'(typically Terraform default_tags/tags_all reconciliation). '
+                      f'Alert-only: the tagger never re-tags automatically. Fix: '
+                      f'add ignore_tags {{ keys = ["map-migrated"] }} to your AWS provider '
+                      f'block, or declare the tag in your IaC. Re-tag the resource '
+                      f'manually to recover this credit.'
+                  )
+                  _emit_drift_metric(config['mpe_id'])
+              return ('skipped', None)
+          
           def _event_age_seconds(event_time):
               """Seconds since the CloudTrail eventTime (ISO 8601, always UTC Z).
               Returns None when the timestamp is missing/unparseable — callers must
@@ -9560,6 +9766,16 @@ ${permissionsList}
                   return ('skipped', None)
           
               event_name = detail.get('eventName', '')
+          
+              # IaC tag-drift detection (alert-only). Must dispatch BEFORE the
+              # _IGNORE_EVENTS check — the untag names sit in _IGNORE_EVENTS to keep
+              # the CREATION path loop-safe, but events arriving via TagDriftEventRule
+              # need the drift branch, not a silent ack. Runs after the scope /
+              # agreement / errorCode guards above, so out-of-scope or out-of-window
+              # untag churn never alerts.
+              if event_name in _UNTAG_EVENTS:
+                  return _handle_untag_event(detail, config, account_id, region)
+          
               if event_name in _IGNORE_EVENTS:
                   print(f'Skipping non-taggable event: {event_name}')
                   return ('skipped', None)
@@ -9703,7 +9919,34 @@ ${permissionsList}
         - Arn: !GetAtt EventQueue.Arn
           Id: MapAutoTaggerQueue
 
-  # Permission for EventBridge to send to SQS
+  # IaC tag-drift detection rule (L2, alert-only). Subscribes the EXACT
+  # untag event names — deliberately NOT prefixes: Untag*/Delete*/Remove*
+  # prefixes would route every deletion in the account into SQS. Shares
+  # the SQS pipeline; the Lambda's drift branch verify-reads and raises
+  # TagDriftDetected on confirmed out-of-band map-migrated removal
+  # (typically Terraform default_tags reconciliation). No auto-restore.
+  TagDriftEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: map-auto-tagger-drift-rule-${mpe}
+      Description: MAP 2.0 auto-tagger -- IaC tag-drift detection (untag events, alert-only)
+      State: ENABLED
+      EventPattern:
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventName:
+            - UntagResource
+            - UntagResources
+            - DeleteTags
+            - RemoveTagsFromResource
+            - RemoveTags
+            - DeleteBucketTagging
+      Targets:
+        - Arn: !GetAtt EventQueue.Arn
+          Id: MapAutoTaggerDriftQueue
+
+  # Permission for EventBridge to send to SQS (both rules)
   EventQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
@@ -9718,7 +9961,9 @@ ${permissionsList}
             Resource: !GetAtt EventQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: !GetAtt AutoTagEventRule.Arn
+                aws:SourceArn:
+                  - !GetAtt AutoTagEventRule.Arn
+                  - !GetAtt TagDriftEventRule.Arn
 
   # SQS queue -- buffers CloudTrail events for up to 14 days
   # Replaces direct EventBridge -> Lambda invocation to avoid 24h retry limit
@@ -9888,6 +10133,47 @@ ${permissionsList}
       Period: 3600
       EvaluationPeriods: 24
       DatapointsToAlarm: 6
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !If
+          - HasCentralTopic
+          - !Sub 'arn:aws:sns:\${AWS::Region}:\${CentralAlertAccountId}:auto-map-tagger-alerts-central-\${MpeId}'
+          - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # CloudWatch alarm — fires when the Lambda's drift branch confirms an
+  # out-of-band removal of map-migrated (IaC tag drift, L2). Alert-only:
+  # the tagger NEVER re-applies the tag automatically (event-reactive
+  # restore ping-pongs with IaC). The description carries the customer-
+  # side fix so the operator can act from the notification alone.
+  TagDriftAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-tag-drift-${mpe}
+      AlarmDescription: >
+        The map-migrated tag was removed from an already-tagged resource
+        out-of-band — typically a Terraform apply whose default_tags/tags_all
+        reconciliation strips tags not declared in the IaC. Untagged usage
+        stops earning MAP credit and tags cannot be back-dated, so act now.
+        Fix (pick one): add ignore_tags { keys = ["map-migrated"] } to the
+        Terraform AWS provider block, or declare the map-migrated tag in the
+        IaC itself. Then re-tag the affected resources manually to resume
+        credit capture (this alarm is alert-only; the tagger never re-tags
+        automatically). To list affected resources, open CloudWatch Logs
+        Insights against log group /aws/lambda/map-auto-tagger-${mpe} and
+        run: filter @message like /TAG_DRIFT_DETECTED/
+        | parse @message "TAG_DRIFT_DETECTED arn=* removed_by=* event=*" as arn, removed_by, event_name
+        | sort @timestamp desc
+        | display @timestamp, arn, removed_by, event_name
+      Namespace: MapAutoTagger
+      MetricName: TagDriftDetected
+      Dimensions:
+        - Name: MpeId
+          Value: '${mpe}'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:
@@ -11520,6 +11806,10 @@ echo ""
 
             document.getElementById('instructions').textContent = instructions;
             document.getElementById('templatePreview').textContent = mainTemplate;
+            // IaC drift reminder: only shown to users who flagged the customer
+            // as Terraform/IaC-managed in Step 1 (the full advisory lives there).
+            document.getElementById('iacDriftReminder').style.display =
+                config.usesIac ? 'block' : 'none';
             setStep(3);
             applyTranslations();
         }

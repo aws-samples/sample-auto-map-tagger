@@ -1,109 +1,90 @@
 # Units of Work — MAP 2.0 Auto-Tagger
 
-## Unit 1: Configurator
-
-**Responsibility**: Browser-based self-service UI that generates deployment/delete/upgrade scripts
-
-**Deliverables**:
-- `src/html/configurator.html` — HTML skeleton
-- `src/css/styles.css` — styling
-- `src/js/app.js` — entry point
-- `src/js/deploy/` — deploy flow + script generation
-- `src/js/delete/`, `src/js/upgrade/`, `src/js/editor/` — other flows
-- `src/js/i18n/` — 7 language packs + engine
-- `src/js/shared/ui.js` — shared utilities
-- `scripts/build.js` — assembles single-file `configurator.html`
-
-**Key Decisions**:
-- Vanilla JS (no framework) for portability
-- Single-file build output
-- 7 languages (en, ja, ko, th, vi, id, zh)
+Decomposition approach: **Domain-Based** (approved in `unit-of-work-plan.md`). Five units, each a logical module in a single repository. Dependency order and story assignments in the companion documents.
 
 ---
 
-## Unit 2: Lambda Tagger
+## unit-1-configurator
+**Domain**: Browser configuration application
+**Components**: C1 Configurator UI, C2 Script Generator (generation orchestration), C3 Template Generator (assembly orchestration), C4 i18n Engine
+**Responsibilities**:
+- Multi-step wizard collecting MPE ID, agreement dates, scope (accounts/VPCs, non-VPC switch), locale — all validation client-side, zero network requests.
+- Orchestrate generation and browser download of the full deployment package.
+- i18n engine + 7 locale files (en, id, ja, ko, th, vi, zh) with test-enforced completeness.
+- Build pipeline: modular `src/` → single self-contained `configurator.html` (inline CSS/JS, embedded Lambda handler); staleness-checked in CI.
+**Key stories**: US-1, US-2, US-3, US-17, US-18
 
-**Responsibility**: Event processing engine that extracts ARNs and applies tags
+## unit-2-lambda-tagger
+**Domain**: Runtime tagging engine
+**Components**: C6 Auto-Tagger Lambda
+**Responsibilities**:
+- Python 3.12 handler: SQS batch consumption with partial batch response.
+- Per-service ARN extractors (direct, constructed, multi-resource, dependent-resource patterns) with `ci_get` case-insensitive access and ARN well-formedness validation.
+- Scope evaluation (account/VPC/date window) against SSM config.
+- Three-path error classifier (actionable/ignorable/transient; transient markers for slow provisioners; both throttle spellings).
+- Idempotent tag application via Resource Groups Tagging API / native APIs.
+**Key stories**: US-6, US-13
 
-**Deliverables**:
-- `src/templates/lambda-handler.py` — SQS handler + 154 ARN extractors
-- Tag application via Resource Groups Tagging API
-- Scope filtering from SSM config
-- Retry/DLQ handling
+## unit-3-infrastructure
+**Domain**: Cloud infrastructure templates
+**Components**: C8 Event Pipeline, C9 Alerting, C10 Config Store, plus the CFN resource definitions for C6
+**Responsibilities**:
+- CloudFormation templates: single-account and StackSets org mode (AutoDeployment, service-managed permissions, delegated admin).
+- EventBridge rules derived from service definitions; SQS main queue (14-day retention, 180s visibility, maxReceiveCount 5) + DLQ.
+- Alarms (TaggerError, DLQFillingUp, TrickleFailure, PeerTaggerDetected) + SNS topic.
+- SSM config parameter `/auto-map-tagger/{mpe_id}/config` and version parameter.
+- Least-privilege IAM derived from service-definition permissions; `map-auto-tagger-<mpeId>` namespacing throughout.
+**Key stories**: US-4, US-7, US-11, US-12, US-14, US-15
 
-**Key Decisions**:
-- Python 3 (boto3 maturity)
-- Per-service ARN extraction handlers
-- Idempotent tagging (safe on retries)
+## unit-4-service-definitions
+**Domain**: Coverage contract
+**Components**: C5 Service Definition Registry
+**Responsibilities**:
+- One definition module per covered service: `{source, events[], permissions[]}` — target: the MAP Included Services List (~80 services, 150+ create events), with the list edition pinned.
+- Aggregate registry consumed by unit-3 (event patterns, IAM) and unit-1 (embedding).
+- Handler-coverage parity audit: CI fails if any definition lacks a unit-2 extractor or vice versa.
+- Golden-event fixture corpus: each covered service lands with a real captured CloudTrail event.
+**Key stories**: US-16
 
----
-
-## Unit 3: Infrastructure
-
-**Responsibility**: CloudFormation templates and the event pipeline
-
-**Deliverables**:
-- `src/js/deploy/template-main.js` — single-account CFN
-- `src/js/deploy/template-org.js` — StackSet CFN
-- EventBridge rules, SQS + DLQ, Lambda, IAM roles, SSM parameters, CloudWatch alarms, SNS
-- `.github/scripts/generate_iam.py` — least-privilege IAM generation
-
-**Key Decisions**:
-- Embedded CFN (self-contained deploy.sh)
-- SQS buffer (14-day retention, 5 retries, 180s visibility)
-- StackSet for multi-account
-
----
-
-## Unit 4: Service Definitions
-
-**Responsibility**: Define event patterns and coverage for 154 resource types
-
-**Deliverables**:
-- `src/js/services/*.js` — 85 service definition files
-- `src/js/services/index.js` — registry aggregation
-- `.github/scripts/audit_handler_coverage.py` — coverage parity audit
-
-**Key Decisions**:
-- One `.js` per service (independent addition)
-- Standard definition format
-- Automated audit ensures every service has a Lambda handler
-
----
-
-## Unit 5: Lifecycle Operations
-
-**Responsibility**: Day-2 operations — upgrade, delete, scope management, backfill
-
-**Deliverables**:
-- Delete flow + `delete.sh` generation (tag-preserving)
-- Upgrade flow + `upgrade.sh` (change-set preview)
-- Scope management via StackSet update + SSM
-- `.github/scripts/deploy_stackset.py`, `delete_stackset.py`, `wait_stackset.py`
-- Backfill capability
-
-**Key Decisions**:
-- Upgrade-safe vs full-redeploy paths
-- Tag preservation on delete (credits intact)
-- Full-replacement account list semantics
+## unit-5-lifecycle-ops
+**Domain**: Deployment lifecycle and day-2 operations
+**Components**: C2 Script Generator (script content), C7 Preflight
+**Responsibilities**:
+- `deploy.sh` / `upgrade.sh` / `delete.sh` script logic: preflight → CFN operation → post-verification, with no silenced state-mutating failures.
+- Preflight suite: peer-tagger collision, scope intersection across engagements, IAM capability, stack-state compatibility.
+- Upgrade semantics: preserve existing stack parameter values; new parameters take safe defaults.
+- Delete safety: infrastructure removal only — structurally no tag-removal code path; guarded by a hard regression test.
+- Shell-injection lint gating all generated script content.
+**Key stories**: US-5, US-8, US-9, US-10
 
 ---
 
-## Code Organization
+## Code Organization Strategy (Greenfield)
 
-```
-sample-auto-map-tagger/
-├── configurator.html          # Unit 1: built output
+Single repository, monolith layout with build-assembled artifacts (approved in `unit-of-work-plan.md`, Q4):
+
+```text
+<WORKSPACE-ROOT>/
 ├── src/
-│   ├── html/, css/            # Unit 1
+│   ├── html/configurator.html      # unit-1: HTML skeleton (BUILD:CSS / BUILD:JS placeholders)
+│   ├── css/styles.css              # unit-1: all styles
 │   ├── js/
-│   │   ├── deploy/            # Unit 1 + Unit 3 (templates)
-│   │   ├── delete/, upgrade/  # Unit 5
-│   │   ├── editor/            # Unit 1/5
-│   │   ├── i18n/              # Unit 1
-│   │   └── services/          # Unit 4
-│   └── templates/
-│       └── lambda-handler.py  # Unit 2
-├── scripts/build.js           # Unit 1
-└── .github/scripts/           # Unit 3 + Unit 5 (ops)
+│   │   ├── constants.js            # TEMPLATE_VERSION — single source of truth
+│   │   ├── app.js                  # unit-1: entry (generateAndDownload, downloadFile)
+│   │   ├── shared/ui.js            # unit-1: selectMode, step navigation
+│   │   ├── i18n/                   # unit-1: engine.js + 7 locale files
+│   │   ├── services/               # unit-4: per-service definitions + index.js registry
+│   │   ├── deploy/                 # unit-1/3: deploy-flow, template-main, template-org, script-deploy
+│   │   ├── delete/                 # unit-5: delete-flow
+│   │   └── upgrade/ editor/        # unit-5: lifecycle flows
+│   └── templates/lambda-handler.py # unit-2: standalone Python handler, embedded at build
+├── scripts/                        # build.js, verify-build.js, build-yaml.js
+├── .github/scripts/                # audit_handler_coverage, generate_iam, lint_* (units 4/5 gates)
+├── tests/unit/                     # vitest suites (all units)
+├── docs/                           # COVERAGE, LIMITATIONS, INSTRUCTIONS, DEVELOPMENT, ...
+└── configurator.html               # BUILT ARTIFACT — generated, never hand-edited
 ```
+
+- Units are directory-scoped modules, not deployables; the build (`npm run build`, `npm run build:yaml`) assembles them into the two distribution artifacts.
+- The Lambda handler stays a standalone, independently testable Python file that the build embeds — unit-2 develops and tests it without the browser plane.
+- CI gates enforce cross-unit contracts: handler-coverage parity (unit-4↔unit-2), IAM completeness (unit-4↔unit-3), build staleness (unit-1), shell-injection lint (unit-5).

@@ -1,7 +1,7 @@
         // Template version — single source of truth for the SemVer constant.
         // The deployable YAML and configurator.html are both generated from src/
         // (npm run build), so this constant flows into every artifact automatically.
-        const TEMPLATE_VERSION = 'v22.1.0';
+        const TEMPLATE_VERSION = 'v22.2.0';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -9,6 +9,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // Keep the newest entry's version in sync with TEMPLATE_VERSION above.
         const VERSION_HISTORY = [
+            {
+                version: 'v22.2.0',
+                date: '2026-07-27',
+                changes: [
+                    { tag: 'other', text: 'IaC tag-drift detection (alert-only): a new EventBridge rule subscribes untag events (UntagResource, DeleteTags, DeleteBucketTagging, ...); when the map-migrated tag is removed out-of-band — typically Terraform default_tags/tags_all reconciliation stripping tags not declared in the IaC — the Lambda verify-reads the resource and, on confirmed absence, raises the new TagDriftAlarm with the exact customer-side fix (Terraform ignore_tags { keys = ["map-migrated"] } or declare the tag in IaC). Deliberately NO auto-restore: event-reactive re-tagging ping-pongs with IaC. Configurator now shows a "Using Terraform / IaC?" advisory (all 7 languages).' },
+                ],
+            },
             {
                 version: 'v22.1.0',
                 date: '2026-07-19',

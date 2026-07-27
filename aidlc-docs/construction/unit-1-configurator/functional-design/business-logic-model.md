@@ -1,86 +1,135 @@
-# Business Logic Model — Unit 1: Configurator
+# Business Logic Model — unit-1-configurator
 
-## Deploy Script Generation Flow
+**Date**: 2026-03-25 | **Stories**: US-1, US-2, US-3, US-17, US-18
+**Traceability**: FR-1, FR-2, FR-11; NFR-7, NFR-10, NFR-11
 
-```
-1. SA opens configurator.html, selects Deploy tab
-2. Fills form:
-   - MPE ID (MAP Engagement ID)
-   - Agreement start/end dates
-   - Scope mode (account | organization)
-   - Scoped account IDs (list)
-   - Scoped VPC IDs (optional)
-   - Tag non-VPC services (boolean)
-   - Alert email
-3. On "Generate & Download":
-   a. Validate all inputs
-   b. Select template (main for single-account, org for StackSet)
-   c. TemplateGenerator embeds CFN + Lambda code + event patterns
-   d. Wrap CFN into a deploy.sh with AWS CLI commands
-   e. Trigger browser download
-```
+This document models the business logic the configurator will implement. It is
+technology-agnostic except where the single-file / no-network constraints are
+themselves the business rule.
 
-## Input Validation Rules
+## 1. Wizard Step Flow
 
-| Field | Rule |
-|---|---|
-| MPE ID | Numeric, matches MAP engagement format |
-| Start date | Valid ISO date, before end date |
-| End date | Valid ISO date, after start date |
-| Account IDs | 12-digit numbers, valid list |
-| VPC IDs | `vpc-` prefix format (if provided) |
-| Alert email | Valid email format |
+The configurator will present a linear, gated wizard. Each step validates before
+"Next" is enabled; "Back" never destroys entered data.
 
-## Template Selection Logic
-
-```
-if scope_mode == "organization":
-    template = buildOrgTemplate(config)      # StackSet
-else:
-    template = buildMainTemplate(config)     # single-account Stack
+```mermaid
+stateDiagram-v2
+    [*] --> ModeSelect
+    ModeSelect --> EngagementDetails : "mode chosen (deploy / delete / upgrade)"
+    EngagementDetails --> ScopeDefinition : "MPE ID + dates valid"
+    ScopeDefinition --> Review : "scope valid"
+    Review --> Download : "user confirms summary"
+    Download --> [*] : "artifacts downloaded"
+    EngagementDetails --> EngagementDetails : "field invalid → localized error"
+    ScopeDefinition --> ScopeDefinition : "field invalid → localized error"
+    Review --> EngagementDetails : "user edits"
 ```
 
-## Generated deploy.sh Structure
+| Step | Purpose | Gate to proceed |
+|---|---|---|
+| Mode Select | Choose lifecycle mode: deploy / delete / upgrade | A mode is selected |
+| Engagement Details | MPE ID, agreement start/end dates, customer name, locale | All fields pass validation rules (see `business-rules.md`) |
+| Scope Definition | Deployment target (single-account vs org), account scope (ALL vs explicit list), optional VPC list, non-VPC-services switch | Scope rules pass |
+| Review | Read-only summary of every entered value (US-1 AC-3) | Explicit user confirmation |
+| Download | Generate + download all artifacts | — (terminal) |
 
-```bash
-#!/bin/bash
-# Self-contained MAP Auto-Tagger deployment
-# MPE: <MPE_ID>, generated <timestamp>
+Delete and upgrade modes will reuse the same wizard skeleton with a reduced field
+set (they need the MPE ID and target identity, not a full scope re-entry).
 
-# 1. Create S3 staging bucket (for Lambda code)
-# 2. Upload embedded Lambda package
-# 3. Deploy CloudFormation (embedded template)
-# 4. Write scope config to SSM
-# 5. Print verification instructions
-```
+## 2. Configuration Object Lifecycle
 
-## i18n Resolution
-
-```javascript
-// Every UI string resolved via engine
-i18n.t("deploy.form.mpe_label")  // → "MAP Engagement ID" (en) / "MAP参加ID" (ja)
-```
-
-Languages loaded lazily; default is browser locale → fallback to `en`.
-
-## Build Process (scripts/build.js)
+A single in-memory `Configuration` object (see `domain-entities.md`) is the only
+state store. It lives in browser memory only — never persisted, never transmitted
+(NFR-11, US-18).
 
 ```
-1. Read HTML skeleton (src/html/configurator.html)
-2. Inline CSS (src/css/styles.css)
-3. Bundle JS modules (app.js + flows + i18n + services)
-4. Inline Lambda handler (src/templates/lambda-handler.py) as embedded string
-5. Output single configurator.html
-6. verify-build.js sanity-checks the output
+DRAFT ──(per-field validation on blur)──▶ DRAFT (annotated with field errors)
+DRAFT ──(step gate passes)──▶ DRAFT (step N complete)
+DRAFT ──(all steps complete + review confirmed)──▶ CONFIRMED
+CONFIRMED ──(final revalidation passes)──▶ input to generation pipeline
+CONFIRMED ──(final revalidation fails)──▶ back to DRAFT at offending step
 ```
 
-## Delete Script Generation
+Rules of the lifecycle:
+
+- Only a `CONFIRMED` and revalidated configuration may enter the generation
+  pipeline. Generators will assume their input is valid; the boundary is the
+  revalidation, not the generator.
+- Editing any field from the Review step returns the object to `DRAFT` and
+  invalidates the confirmation.
+- Locale is part of the configuration but changing it never invalidates other
+  fields — it only re-renders labels/errors through the i18n engine.
+
+## 3. Script / Template Generation Pipeline
+
+On confirmed generation (US-2), a single orchestration function
+(`generateAndDownload()` in `app.js`) will run:
 
 ```
-1. SA selects Delete tab, chooses region + scope
-2. Types "DELETE" to confirm
-3. Generate delete.sh:
-   - Remove all map-auto-tagger-* stacks/stacksets (or scoped MPEs)
-   - Preserve existing map-migrated tags (do NOT untag resources)
-   - Remove S3 staging bucket only if no other deployments remain
+Configuration (CONFIRMED)
+   │  final revalidation (defense-in-depth)
+   ▼
+For each artifact kind:
+   1. select generator      deploy.sh ← script-deploy.js
+                            delete.sh ← delete-flow.js
+                            upgrade.sh ← upgrade flow
+                            CFN template ← template-main.js | template-org.js
+   2. interpolate config    every user-supplied value passes the
+                            single-quote-containment transform (NFR-7)
+   3. stamp version         TEMPLATE_VERSION from constants.js (US-2 AC-3)
+   ▼
+GeneratedArtifact[] → downloadFile() per artifact (browser Blob download)
 ```
+
+- Template selection: org mode → `template-org.js` (StackSets), single-account →
+  `template-main.js`. The scripts embed or reference the selected template.
+- The embedded Lambda handler (unit-2's `lambda-handler.py`) and the service
+  registry (unit-4) are compiled into the generators **at build time**, not at
+  generation time — the browser never fetches anything.
+- Script *content* logic (preflight sequences, waiters, teardown ordering) is
+  unit-5's design; unit-1 owns the orchestration, interpolation safety, version
+  stamping, and download mechanics.
+
+## 4. i18n Engine Model
+
+- `engine.js` will expose `t(key, params?)` performing key lookup in the active
+  locale dictionary, falling back to `en`, and interpolating named params.
+- All 7 locale dictionaries ship inside the single HTML artifact.
+- Every user-visible string — labels, buttons, help text, and **validation error
+  messages** (US-1 AC-2) — must be emitted through `t()`. Hardcoded UI strings
+  are a defect.
+- Completeness is a build-time contract: a test will diff each locale's key set
+  against `en` and fail on any missing key (US-3 AC-2).
+
+## 5. Build-Time Assembly Model
+
+The shipped `configurator.html` is a **generated artifact** (US-17). The build
+(`scripts/build.js`) will assemble it deterministically:
+
+```
+src/html/configurator.html   skeleton with <!-- BUILD:CSS --> / <!-- BUILD:JS --> placeholders
+        │
+        ├── inline src/css/styles.css at BUILD:CSS
+        ├── concatenate src/js/** in dependency order at BUILD:JS
+        │     constants.js → i18n → services (unit-4) → shared/ui → deploy/delete/upgrade flows → app.js
+        └── embed src/templates/lambda-handler.py (unit-2), indented for YAML embedding
+        ▼
+configurator.html  (single file, no external references)
+```
+
+- `scripts/verify-build.js` will sanity-check the output: no unresolved
+  `BUILD:` placeholders, all entry functions present, no external URL references.
+- CI will rebuild from `src/` and fail if the committed artifact differs
+  (staleness check, US-17 AC-2). Hand-editing the artifact is thereby
+  structurally detectable.
+- The YAML distribution (`configurator.yaml`) will be built by a separate script
+  from the **same** `src/` modules, so HTML/YAML drift is impossible by
+  construction.
+
+## 6. Privacy Model (US-18)
+
+- The artifact contains no `fetch`/`XMLHttpRequest`/analytics/CDN reference; the
+  verify script and code review enforce this as a blocking check.
+- All processing is synchronous, local, in-memory. Closing the tab discards all
+  customer data. This property is auditable by inspecting one file — which is
+  itself the reason for the single-file constraint (NFR-10 serves NFR-11).

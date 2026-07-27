@@ -1,56 +1,94 @@
 # Story Generation Plan — MAP 2.0 Auto-Tagger
 
-## Planning Questions
+## Objective
+Convert the approved requirements (`aidlc-docs/inception/requirements/requirements.md`) into INVEST user stories with personas and testable acceptance criteria.
 
-### Question 1
-How should stories be organized?
+## Execution Checklist
 
-A) User Journey-Based
-B) Feature-Based (configurator, tagging, failure handling, scope, lifecycle, extensibility)
-C) Persona-Based
-D) Other
+### Phase A — Preparation
+- [x] Load requirements.md and requirement-verification-questions.md (with answers)
+- [x] Identify stakeholder types from business context (partner consultant, platform engineer, FinOps manager, maintainer)
+- [x] Confirm story breakdown approach with user (questions below)
+
+### Phase B — Persona Development
+- [x] Generate personas.md with user archetypes and characteristics
+- [x] Document goals, pain points, and technical proficiency per persona
+- [x] Map each persona to the requirement areas it drives
+
+### Phase C — Story Generation
+- [x] Generate stories.md with user stories following INVEST criteria
+- [x] Ensure stories are Independent, Negotiable, Valuable, Estimable, Small, Testable
+- [x] Include Given/When/Then acceptance criteria for each story
+- [x] Assign priority (Must/Should/Could) per story
+- [x] Map personas to relevant user stories
+- [x] Trace each story to the FR/NFR it realizes
+
+### Phase D — Validation
+- [x] Verify every functional requirement is covered by at least one story
+- [x] Verify hard-rule NFRs (tag preservation, no outbound calls, injection safety) appear as explicit acceptance criteria
+- [x] Verify stories are unit-assignable (no story spans multiple units)
+
+## Clarifying Questions
+
+## Question 1
+Which user personas should the stories cover?
+
+A) Only the partner consultant who configures the solution
+
+B) Consultant + customer platform engineer
+
+C) Four personas: partner/ProServe migration consultant (configures), customer cloud platform engineer (deploys/operates), customer FinOps/migration program manager (tracks credit capture), solution maintainer/contributor (extends coverage)
+
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: C
+
+## Question 2
+What story granularity is appropriate?
+
+A) Epic-level only (5-6 large stories)
+
+B) Feature-level: one story per user-visible capability (~15-20 stories), each independently testable within one unit of work
+
+C) Task-level (~50+ fine-grained stories)
+
+X) Other (please describe after [Answer]: tag below)
 
 [Answer]: B
 
-### Question 2
-What granularity?
+## Question 3
+How should the stories be organized?
 
-A) Coarse
-B) Medium (sub-features per capability)
-C) Fine
-D) Other
+A) User Journey-Based — follow workflows end to end
 
-[Answer]: B
+B) Feature-Based — organized around system capabilities
 
-### Question 3
-Distinct user roles?
+C) Persona-Based — grouped by user type and their needs
 
-A) One role
-B) Deployer (SA/CSM) + Beneficiary (customer engineer) + Outcome owner (FinOps)
-C) Other
+D) Epic-Based — hierarchical epics with sub-stories
 
-[Answer]: B. Three personas but SA/CSM is the primary interactive user.
+X) Other (please describe after [Answer]: tag below)
 
-### Question 4
-Priority of the configurator UI vs the tagging engine?
+[Answer]: C
 
-A) Configurator first
-B) Tagging engine first (it's the core value); configurator wraps it
-C) Both equal priority
-D) Other
+## Question 4
+What acceptance criteria format should be used?
 
-[Answer]: B. Tagging engine is the core value. But both are MVP.
+A) Given/When/Then (Gherkin-style) — testable, maps directly to automated tests
 
----
+B) Checklist of conditions
 
-## Story Generation Steps
+C) Free-form narrative
 
-- [x] Step 1: Define personas (SA/CSM, customer engineer, FinOps)
-- [x] Step 2: Configurator stories (generate script, i18n, deployment modes)
-- [x] Step 3: Automatic tagging stories (tag resources, coverage, slow resources)
-- [x] Step 4: Failure handling stories (DLQ alerts, verification)
-- [x] Step 5: Scope management stories (add/remove accounts, retrieve config)
-- [x] Step 6: Lifecycle stories (upgrade, clean removal)
-- [x] Step 7: Extensibility stories (add new service)
-- [x] Step 8: Validate against INVEST
-- [x] Step 9: Write stories.md and personas.md
+X) Other (please describe after [Answer]: tag below)
+
+[Answer]: A
+
+## Approach Trade-offs Considered
+- **User Journey-Based**: strong for E2E flows but blurs persona ownership across the two planes.
+- **Feature-Based**: clean capability mapping but hides who benefits, weakening prioritization.
+- **Persona-Based (selected)**: four sharply distinct personas with little overlap make persona grouping the natural unit-assignment and prioritization axis; journeys are preserved inside each persona's story sequence.
+- **Epic-Based**: unnecessary hierarchy at this scale (~18 stories).
+
+## Status
+All checklist items complete. All questions answered; no ambiguities detected. Plan approved 2026-03-24 (see audit.md).

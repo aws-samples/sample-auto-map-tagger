@@ -47,6 +47,10 @@
 
             document.getElementById('instructions').textContent = instructions;
             document.getElementById('templatePreview').textContent = mainTemplate;
+            // IaC drift reminder: only shown to users who flagged the customer
+            // as Terraform/IaC-managed in Step 1 (the full advisory lives there).
+            document.getElementById('iacDriftReminder').style.display =
+                config.usesIac ? 'block' : 'none';
             setStep(3);
             applyTranslations();
         }
