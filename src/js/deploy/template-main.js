@@ -734,7 +734,34 @@ ${LAMBDA_HANDLER_CODE}
         - Arn: !GetAtt EventQueue.Arn
           Id: MapAutoTaggerQueue
 
-  # Permission for EventBridge to send to SQS
+  # IaC tag-drift detection rule (L2, alert-only). Subscribes the EXACT
+  # untag event names — deliberately NOT prefixes: Untag*/Delete*/Remove*
+  # prefixes would route every deletion in the account into SQS. Shares
+  # the SQS pipeline; the Lambda's drift branch verify-reads and raises
+  # TagDriftDetected on confirmed out-of-band map-migrated removal
+  # (typically Terraform default_tags reconciliation). No auto-restore.
+  TagDriftEventRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: map-auto-tagger-drift-rule-${mpe}
+      Description: MAP 2.0 auto-tagger -- IaC tag-drift detection (untag events, alert-only)
+      State: ENABLED
+      EventPattern:
+        detail-type:
+          - AWS API Call via CloudTrail
+        detail:
+          eventName:
+            - UntagResource
+            - UntagResources
+            - DeleteTags
+            - RemoveTagsFromResource
+            - RemoveTags
+            - DeleteBucketTagging
+      Targets:
+        - Arn: !GetAtt EventQueue.Arn
+          Id: MapAutoTaggerDriftQueue
+
+  # Permission for EventBridge to send to SQS (both rules)
   EventQueuePolicy:
     Type: AWS::SQS::QueuePolicy
     Properties:
@@ -749,7 +776,9 @@ ${LAMBDA_HANDLER_CODE}
             Resource: !GetAtt EventQueue.Arn
             Condition:
               ArnEquals:
-                aws:SourceArn: !GetAtt AutoTagEventRule.Arn
+                aws:SourceArn:
+                  - !GetAtt AutoTagEventRule.Arn
+                  - !GetAtt TagDriftEventRule.Arn
 
   # SQS queue -- buffers CloudTrail events for up to 14 days
   # Replaces direct EventBridge -> Lambda invocation to avoid 24h retry limit
@@ -919,6 +948,47 @@ ${LAMBDA_HANDLER_CODE}
       Period: 3600
       EvaluationPeriods: 24
       DatapointsToAlarm: 6
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !If
+          - HasCentralTopic
+          - !Sub 'arn:aws:sns:\${AWS::Region}:\${CentralAlertAccountId}:auto-map-tagger-alerts-central-\${MpeId}'
+          - !Ref AlertTopic
+      TreatMissingData: notBreaching
+
+  # CloudWatch alarm — fires when the Lambda's drift branch confirms an
+  # out-of-band removal of map-migrated (IaC tag drift, L2). Alert-only:
+  # the tagger NEVER re-applies the tag automatically (event-reactive
+  # restore ping-pongs with IaC). The description carries the customer-
+  # side fix so the operator can act from the notification alone.
+  TagDriftAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: map-auto-tagger-tag-drift-${mpe}
+      AlarmDescription: >
+        The map-migrated tag was removed from an already-tagged resource
+        out-of-band — typically a Terraform apply whose default_tags/tags_all
+        reconciliation strips tags not declared in the IaC. Untagged usage
+        stops earning MAP credit and tags cannot be back-dated, so act now.
+        Fix (pick one): add ignore_tags { keys = ["map-migrated"] } to the
+        Terraform AWS provider block, or declare the map-migrated tag in the
+        IaC itself. Then re-tag the affected resources manually to resume
+        credit capture (this alarm is alert-only; the tagger never re-tags
+        automatically). To list affected resources, open CloudWatch Logs
+        Insights against log group /aws/lambda/map-auto-tagger-\${MpeId} and
+        run: filter @message like /TAG_DRIFT_DETECTED/
+        | parse @message "TAG_DRIFT_DETECTED arn=* removed_by=* event=*" as arn, removed_by, event_name
+        | sort @timestamp desc
+        | display @timestamp, arn, removed_by, event_name
+      Namespace: MapAutoTagger
+      MetricName: TagDriftDetected
+      Dimensions:
+        - Name: MpeId
+          Value: '${mpe}'
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
       Threshold: 1
       ComparisonOperator: GreaterThanOrEqualToThreshold
       AlarmActions:

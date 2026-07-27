@@ -2119,7 +2119,7 @@ _IGNORE_EVENTS = frozenset([
 ])
 
 # ── IaC tag-drift detection (L2, alert-only) ────────────────────────────
-# A customer's `terraform apply` with default_tags/tags_all silently strips
+# A customer's 'terraform apply' with default_tags/tags_all silently strips
 # tags the tagger applied out-of-band (the resource's declared tag set is
 # reconciled to what the IaC knows about). The untag events ARE visible in
 # CloudTrail; a dedicated EventBridge rule (TagDriftEventRule — exact names,
@@ -2132,8 +2132,8 @@ _IGNORE_EVENTS = frozenset([
 # 100% of loop prevention. Alert-only is loop-safe by construction: the
 # only writes here are PutMetricData and stdout.
 #
-# NOTE: dispatch is `event_name in _UNTAG_EVENTS` (a named frozenset), not
-# per-event `==` literals — lint_event_prefixes.py extracts `event_name ==`
+# NOTE: dispatch is 'event_name in _UNTAG_EVENTS' (a named frozenset), not
+# per-event == literals — lint_event_prefixes.py extracts 'event_name =='
 # literals to demand EventBridge verb prefixes, and Untag*/Delete*/Remove*
 # prefixes on the creation rule would flood SQS with every deletion in the
 # account.
