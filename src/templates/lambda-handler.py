@@ -2261,9 +2261,9 @@ def _handle_untag_event(detail, config, account_id, region):
             f'TAG_DRIFT_DETECTED arn={arn} removed_by={principal or "unknown"} '
             f'event={event_name} — map-migrated was removed out-of-band '
             f'(typically Terraform default_tags/tags_all reconciliation). '
-            f'Alert-only: the tagger never re-tags automatically. Customer fix: '
-            f'add ignore_tags {{ keys = ["map-migrated"] }} to the AWS provider '
-            f'block, or declare the tag in the IaC. Re-tag the resource '
+            f'Alert-only: the tagger never re-tags automatically. Fix: '
+            f'add ignore_tags {{ keys = ["map-migrated"] }} to your AWS provider '
+            f'block, or declare the tag in your IaC. Re-tag the resource '
             f'manually to recover this credit.'
         )
         _emit_drift_metric(config['mpe_id'])

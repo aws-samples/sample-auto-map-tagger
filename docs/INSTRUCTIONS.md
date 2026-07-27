@@ -187,8 +187,8 @@ resource out-of-band** — almost always a `terraform apply` whose provider uses
 `default_tags`/`tags_all` (tags not declared in the IaC are stripped on
 reconciliation). Untagged usage stops earning MAP credit and tags cannot be
 back-dated, so respond promptly. The tagger is **alert-only here: it never
-re-applies a removed tag** (automatic restore would fight the customer's IaC
-on every apply).
+re-applies a removed tag** (automatic restore would fight your IaC on every
+apply).
 
 1. **List the affected resources and who removed the tag** — CloudWatch Logs
    Insights against `/aws/lambda/map-auto-tagger-<MPE_ID>`:
@@ -200,7 +200,7 @@ on every apply).
    | display @timestamp, arn, removed_by, event_name
    ```
 
-2. **Fix the cause in the customer's IaC** (pick one):
+2. **Fix the cause in your IaC** (pick one):
    - Add to the Terraform AWS provider block — coexistence one-liner:
 
      ```hcl

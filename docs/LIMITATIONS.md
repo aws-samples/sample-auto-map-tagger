@@ -39,7 +39,7 @@ Two scenarios require manual verification before deployment:
 
 ## IaC (Terraform) tag drift — detection is best-effort, and never auto-restores
 
-Terraform providers using `default_tags`/`tags_all` reconcile each managed resource's tag set to what the IaC declares: the next `terraform apply` after the tagger runs **silently removes** the out-of-band `map-migrated` tag. (CloudFormation generally leaves undeclared out-of-band resource tags alone; stack-level tag propagation is the exception.) The durable fix is customer-side — add `ignore_tags { keys = ["map-migrated"] }` to the Terraform AWS provider block, or declare the tag in the IaC itself. Organizations can also enforce the tag at plan time with AWS Organizations Tag Policies IaC validation.
+Terraform providers using `default_tags`/`tags_all` reconcile each managed resource's tag set to what the IaC declares: the next `terraform apply` after the tagger runs **silently removes** the out-of-band `map-migrated` tag. (CloudFormation generally leaves undeclared out-of-band resource tags alone; stack-level tag propagation is the exception.) The durable fix lives in the IaC itself — add `ignore_tags { keys = ["map-migrated"] }` to the Terraform AWS provider block, or declare the tag in the IaC. Organizations can also enforce the tag at plan time with AWS Organizations Tag Policies IaC validation.
 
 Since v22.2.0 the tagger detects this drift and raises `TagDriftAlarm` with that fix in the alarm text. Scope and limits of the detection:
 
