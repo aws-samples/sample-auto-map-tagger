@@ -183,6 +183,7 @@ For the full source structure, build process, and extension guide, see [DEVELOPM
 | [INSTRUCTIONS.md](docs/INSTRUCTIONS.md) | Deployment steps, day-2 operations, monitoring, upgrade path, FAQ |
 | [COVERAGE.md](docs/COVERAGE.md) | Supported services (154 resource types) and E2E test coverage matrix |
 | [LIMITATIONS.md](docs/LIMITATIONS.md) | Hard constraints — management account, SCPs, latency, upgrade gotcha |
+| [DESIGN-INVARIANTS.md](docs/DESIGN-INVARIANTS.md) | Rules the solution must never violate, and the incident behind each one |
 | [MAP_TAGGING_GAP_ANALYSIS.md](docs/MAP_TAGGING_GAP_ANALYSIS.md) | What can't be tagged and why (AWS API limitations, customer-side config) |
 | [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
 
