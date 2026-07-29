@@ -186,6 +186,7 @@ For the full source structure, build process, and extension guide, see [DEVELOPM
 | [DESIGN-INVARIANTS.md](docs/DESIGN-INVARIANTS.md) | Rules the solution must never violate, and the incident behind each one |
 | [MAP_TAGGING_GAP_ANALYSIS.md](docs/MAP_TAGGING_GAP_ANALYSIS.md) | What can't be tagged and why (AWS API limitations, customer-side config) |
 | [CHANGELOG.md](CHANGELOG.md) | Version history and release notes |
+| [aidlc-docs/](aidlc-docs/) | AI-DLC brownfield pass over this codebase — dated snapshot, 2026-07-07 |
 
 ---
 
