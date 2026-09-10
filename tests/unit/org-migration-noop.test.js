@@ -44,10 +44,15 @@ describe('org deploy — StackSet poll fails on zero instances (CT6-004 defect 3
     expect(deploySrc).toContain('never created any stack instances');
   });
 
-  it('TOTAL>0 timeout still resolves SUCCESS (rollout continues in CFN)', () => {
-    const block = deploySrc.slice(deploySrc.indexOf('NOT STARTED" ]; then'),
-                                  deploySrc.indexOf('has ZERO stack instances'));
-    expect(block).toContain('"\\$TOTAL" -gt 0');
+  it('timeout with instances present resolves INCOMPLETE, never blanket SUCCESS', () => {
+    // A prior version of this test asserted the opposite — that TOTAL>0 on
+    // timeout resolves SUCCESS — enshrining the exact defect that declared a
+    // rollout stuck at 4/32 "active across all accounts" (customer incident
+    // 2026-09-04). Timeout classification is INCOMPLETE; SUCCESS requires the
+    // StackSet operation to have SUCCEEDED with no failed instances (see the
+    // behavioral scenarios in deploy-script-stackset-wait.test.js).
+    expect(deploySrc).toContain('DEPLOY_STATUS="INCOMPLETE — StackSet rollout not finished');
+    expect(deploySrc).not.toMatch(/-gt 0 \] 2>\/dev\/null; then\s*\n\s*DEPLOY_STATUS="SUCCESS"/);
   });
 });
 
