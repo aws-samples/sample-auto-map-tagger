@@ -35,6 +35,21 @@
             document.getElementById('multi-account-options').classList.toggle('hidden', mode !== 'multi');
             document.getElementById('single-account-options').classList.toggle('hidden', mode !== 'single');
             document.getElementById('prereq-multi').style.display = mode === 'multi' ? 'block' : 'none';
+            // Backfill exists only in the single-account template — neither org
+            // template (management or per-account) deploys the backfill Lambda,
+            // so a multi-account "backfill" would silently never run while the
+            // generated script waits on a Lambda that doesn't exist (gate
+            // finding 32B-5/7, 2026-09-10). Refuse the combination visibly.
+            const backfillBox = document.getElementById('includeBackfill');
+            const backfillMultiNote = document.getElementById('backfill-multi-note');
+            if (backfillBox) {
+                backfillBox.disabled = mode === 'multi';
+                if (mode === 'multi') backfillBox.checked = false;
+            }
+            if (backfillMultiNote) {
+                backfillMultiNote.textContent = t('ui_backfill_multi_note');
+                backfillMultiNote.style.display = mode === 'multi' ? 'block' : 'none';
+            }
             updateUsEast1Warning();
         }
 
@@ -341,7 +356,10 @@
                 scopeMode: useVpcScope ? 'vpc' : 'account',
                 scopedVpcIds: useVpcScope ? [...new Set(getValues('.vpc-input').map(v => v.trim()).filter(v => v))] : ['NONE'],
                 tagNonVpcServices,
-                includeBackfill: document.getElementById('includeBackfill').checked,
+                // Force-false for multi-account regardless of checkbox state:
+                // org templates contain no backfill Lambda (see selectDeployMode).
+                includeBackfill: deployMode !== 'multi'
+                    && document.getElementById('includeBackfill').checked,
                 usesIac: document.getElementById('usesIac').checked,
             };
 
@@ -422,7 +440,9 @@
                 rows.push([t('ui_tagging_scope'), t('rv_all_resources')]);
             }
 
-            rows.push([t('ui_backfill_title'), config.includeBackfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
+            rows.push([t('ui_backfill_title'), config.deployMode === 'multi'
+                ? t('rv_backfill_not_multi')
+                : (config.includeBackfill ? t('rv_backfill_enabled') : t('rv_disabled'))]);
 
             // Safe DOM construction: v may contain user-controlled values
             // (customer name, email, account IDs, VPC IDs) so use textContent

@@ -65,6 +65,12 @@ Tags are always applied eventually — this is a latency variance, not a reliabi
 
 ---
 
+## Backfill is single-account only (not available for multi-account deployments)
+
+The backfill Lambda exists only in the single-account template — neither the multi-account management template nor the per-account StackSet template deploys it. The configurator disables the backfill option when multi-account mode is selected and says so. To tag resources that existed before deployment in an organization, run a **single-account deployment with backfill enabled in each target account before the organization rollout** (the competing-tagger preflight refuses a second tagger with overlapping scope in the same account, so do the backfill deploys first and delete those stacks — existing tags survive deletion — before deploying the StackSet). Before v22.2.1 the configurator accepted the org+backfill combination and generated a script that waited on the nonexistent backfill Lambda — the wait either killed the deploy (exit 254) or reported a spurious backfill timeout, while pre-existing resources silently never got tagged.
+
+---
+
 ## Backfill is bounded by the Lambda 15-minute ceiling (may be PARTIAL)
 
 The optional deploy-time backfill sweeps CloudTrail from the agreement start date for every subscribed event type inside a single Lambda invocation, which has a hard 900-second limit. An old agreement start date combined with a large event history can exceed that budget. The backfill stops itself before the ceiling (so stack creation always completes) and reports `PARTIAL` in the CloudFormation custom-resource Reason, naming how many event types were cut off. Resources created before deployment in the cut-off types stay untagged — apply tags to those manually. CloudTrail `LookupEvents` is also limited to the trailing 90 days, so a backfill can never reach further back than that regardless of the agreement date.

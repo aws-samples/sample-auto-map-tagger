@@ -92,11 +92,14 @@ describe('deploy script — backfill wait anchors sentinel search at script star
     expect(src.match(/SCRIPT_START_MS=\\\$\(\( \\\$\(date \+%s\) \* 1000 \)\)/g) || []).toHaveLength(2);
   });
 
-  it('both backfill waits filter logs from SCRIPT start, not loop start', () => {
+  it('the backfill wait filters logs from SCRIPT start, not loop start', () => {
     // The backfill custom resource completes DURING stack creation; anchoring
     // the CloudWatch filter at wait-loop start excluded the already-emitted
     // 'Backfill complete' line → every backfill deploy spun the full 1200s.
-    expect(src.match(/BACKFILL_WAIT_START_MS=\\\$SCRIPT_START_MS/g) || []).toHaveLength(2);
+    // Exactly ONE wait exists (single-account): the org branch's wait was
+    // removed with the org+backfill refusal (gate 32B-5/7, 2026-09-10) —
+    // org templates deploy no backfill Lambda, so there is nothing to wait on.
+    expect(src.match(/BACKFILL_WAIT_START_MS=\\\$SCRIPT_START_MS/g) || []).toHaveLength(1);
     expect(src).not.toMatch(/BACKFILL_WAIT_START_MS=\\\$\(\( \\\$\(date/);
   });
 });
