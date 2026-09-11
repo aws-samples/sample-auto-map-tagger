@@ -482,6 +482,9 @@ WAIT=0
 # DISABLED, but no such rule is ever created; every deploy silently hit the
 # 1200s timeout before the CloudWatch poll ran.
 while [ \$WAIT -lt 1200 ]; do
+  # '|| true': a single failed poll (throttle, transient 5xx — aws CLI exit
+  # 254) must not kill the whole deploy under set -e; the loop just retries.
+  # The org deploy died exactly this way (gate finding 32B-5/7, 2026-09-10).
   COMPLETE=\$(aws logs filter-log-events \\
     --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
     --region "\$REGION" \\
@@ -489,7 +492,7 @@ while [ \$WAIT -lt 1200 ]; do
     --start-time "\$BACKFILL_WAIT_START_MS" \\
     --max-items 1 \\
     --query 'events[0].message' \\
-    --output text 2>/dev/null)
+    --output text 2>/dev/null || true)
   if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
     BACKFILL_RESULT="\$COMPLETE"
     echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
@@ -1078,44 +1081,14 @@ if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
     DEPLOY_STATUS="SUCCESS"
   fi
 fi
-${config.includeBackfill ? `
-# ── Backfill wait ────────────────────────────
-if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
-  echo ""
-  echo "${t('d_backfill_waiting')}"
-  echo "  ${t('d_backfill_wait_info')}"
-  echo ""
-  BACKFILL_RESULT="${t('d_backfill_timeout')}"
-  # Anchor the sentinel search at SCRIPT start, not wait-loop start. The
-# backfill custom resource runs DURING stack creation, so its 'Backfill
-# complete' line usually lands BEFORE the stack wait returns and this
-# loop begins. A wait-loop-start anchor filters that line out -> every
-# backfill deploy spun the full 1200s and reported timeout on a backfill
-# that had long finished (release gate 32B-1, 2026-07-18).
-BACKFILL_WAIT_START_MS=\$SCRIPT_START_MS
-  WAIT=0
-  # See rationale in the single-account branch — backfill is a Custom::Backfill
-  # CustomResource, not an EventBridge rule. Poll the Lambda's log group directly.
-  while [ \$WAIT -lt 1200 ]; do
-    COMPLETE=\$(aws logs filter-log-events \\
-      --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
-      --region "\$REGION" \\
-      --filter-pattern '"Backfill complete"' \\
-      --start-time "\$BACKFILL_WAIT_START_MS" \\
-      --max-items 1 \\
-      --query 'events[0].message' \\
-      --output text 2>/dev/null)
-    if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
-      BACKFILL_RESULT="\$COMPLETE"
-      echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
-      break
-    fi
-    sleep 30
-    WAIT=\$((WAIT + 30))
-    echo "  ${t('d_backfill_in_progress')} (\${WAIT}s)"
-  done
-  echo ""
-fi` : ''}
+
+# NOTE: no backfill wait in multi-account mode — neither the management nor
+# the per-account org template deploys a backfill Lambda, so there is nothing
+# to wait for. A prior version emitted the single-account wait here anyway:
+# it polled a log group that can never exist, and the unguarded aws call
+# killed the whole deploy under set -e with exit 254 (gate finding 32B-5/7,
+# 2026-09-10). The configurator now refuses backfill for multi-account
+# deployments at the UI and config level as well.
 # ── Step 3: Report ───────────────────────────
 echo ""
 echo "${t('d_step3')}"
@@ -1139,7 +1112,6 @@ echo "${t('d_step3')}"
     echo "------------------"
     echo "  - Auto-tagger: ${regions.join(', ')}"
     echo "  - EventBridge, DLQ, CloudWatch alarm, SSM config"
-    ${config.includeBackfill ? `echo "  - Backfill Lambda"` : ''}
     echo ""
     echo "${t('r_verify')}"
     echo "--------------"
@@ -1147,10 +1119,6 @@ echo "${t('d_step3')}"
     echo "  ${t('r_verify2')}"
     echo "  ${t('r_verify3')} \$MPE"
     echo ""
-    ${config.includeBackfill ? `echo "${t('r_backfill_result')}"
-    echo "----------------"
-    echo "  \$BACKFILL_RESULT"
-    echo ""` : ''}
   else
     echo "${t('r_action')}"
     echo "  ${t('r_action_desc')}"

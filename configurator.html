@@ -517,6 +517,7 @@
                         <p class="hint" style="margin-top:4px;" data-i18n="ui_backfill_desc">Deploys a one-time Lambda that queries CloudTrail history from your agreement start date and tags all matching resources that were created before this solution was deployed. Runs automatically ~5 minutes after deployment. Results appear in CloudWatch Logs (map-auto-tagger-backfill).</p>
                         <p class="hint" style="margin-top:4px;color:#d13212;" data-i18n="ui_backfill_note">Note: CloudTrail history is limited to the last 90 days. Resources created before that window must be tagged manually.</p>
                         <p class="hint" id="backfill-scope-note" style="margin-top:4px;display:none;" data-i18n="ui_backfill_scope_note"></p>
+                        <p class="hint" id="backfill-multi-note" style="margin-top:4px;display:none;color:#d13212;" data-i18n="ui_backfill_multi_note"></p>
                     </div>
                 </label>
             </div>
@@ -3107,6 +3108,21 @@ ${t('d_instr_idempotent')}`;
             document.getElementById('multi-account-options').classList.toggle('hidden', mode !== 'multi');
             document.getElementById('single-account-options').classList.toggle('hidden', mode !== 'single');
             document.getElementById('prereq-multi').style.display = mode === 'multi' ? 'block' : 'none';
+            // Backfill exists only in the single-account template — neither org
+            // template (management or per-account) deploys the backfill Lambda,
+            // so a multi-account "backfill" would silently never run while the
+            // generated script waits on a Lambda that doesn't exist (gate
+            // finding 32B-5/7, 2026-09-10). Refuse the combination visibly.
+            const backfillBox = document.getElementById('includeBackfill');
+            const backfillMultiNote = document.getElementById('backfill-multi-note');
+            if (backfillBox) {
+                backfillBox.disabled = mode === 'multi';
+                if (mode === 'multi') backfillBox.checked = false;
+            }
+            if (backfillMultiNote) {
+                backfillMultiNote.textContent = t('ui_backfill_multi_note');
+                backfillMultiNote.style.display = mode === 'multi' ? 'block' : 'none';
+            }
             updateUsEast1Warning();
         }
 
@@ -3413,7 +3429,10 @@ ${t('d_instr_idempotent')}`;
                 scopeMode: useVpcScope ? 'vpc' : 'account',
                 scopedVpcIds: useVpcScope ? [...new Set(getValues('.vpc-input').map(v => v.trim()).filter(v => v))] : ['NONE'],
                 tagNonVpcServices,
-                includeBackfill: document.getElementById('includeBackfill').checked,
+                // Force-false for multi-account regardless of checkbox state:
+                // org templates contain no backfill Lambda (see selectDeployMode).
+                includeBackfill: deployMode !== 'multi'
+                    && document.getElementById('includeBackfill').checked,
                 usesIac: document.getElementById('usesIac').checked,
             };
 
@@ -3494,7 +3513,9 @@ ${t('d_instr_idempotent')}`;
                 rows.push([t('ui_tagging_scope'), t('rv_all_resources')]);
             }
 
-            rows.push([t('ui_backfill_title'), config.includeBackfill ? t('rv_backfill_enabled') : t('rv_disabled')]);
+            rows.push([t('ui_backfill_title'), config.deployMode === 'multi'
+                ? t('rv_backfill_not_multi')
+                : (config.includeBackfill ? t('rv_backfill_enabled') : t('rv_disabled'))]);
 
             // Safe DOM construction: v may contain user-controlled values
             // (customer name, email, account IDs, VPC IDs) so use textContent
@@ -3679,6 +3700,8 @@ const en_translations = {
             rv_target_accounts:'Target Accounts', rv_tag_non_vpc:'Tag non-VPC services',
             rv_all_resources:'All resources in target account(s)',
             rv_backfill_enabled:'Enabled — tags existing resources since agreement start date (~5 min after deploy)',
+            rv_backfill_not_multi:'Not available for multi-account deployments',
+            ui_backfill_multi_note:'Backfill is available for single-account deployments only — multi-account (organization) deployments do not include the backfill Lambda. To tag pre-existing resources, run a single-account deployment with backfill in each target account.',
             rv_desc_single:"One CloudFormation stack. Deploy directly in the customer's account:",
             rv_desc_stackset:'Two files generated. Deploy the management account template once — it auto-discovers your org structure and provisions the specified accounts:',
             rv_desc_central:'Central Lambda in one account + cross-account IAM role in each member account:',
@@ -4050,6 +4073,8 @@ ui_instr_single_title:'배포 지침 — 단일 계정',
             rv_target_accounts:'대상 계정', rv_tag_non_vpc:'비VPC 서비스 태그 지정',
             rv_all_resources:'대상 계정의 모든 리소스',
             rv_backfill_enabled:'활성화됨 — 협약 시작일 이후 기존 리소스 태그 지정 (~5분 후)',
+            rv_backfill_not_multi:'멀티 계정 배포에서는 사용 불가',
+            ui_backfill_multi_note:'백필은 단일 계정 배포에서만 사용할 수 있습니다 — 멀티 계정(조직) 배포에는 백필 Lambda가 포함되지 않습니다. 기존 리소스에 태그를 지정하려면 각 대상 계정에서 백필을 포함한 단일 계정 배포를 실행하세요.',
             rv_desc_single:'CloudFormation 스택 1개. 고객 계정에 직접 배포:',
             rv_desc_stackset:'파일 2개 생성. 관리 계정 템플릿을 한 번 배포하면 조직 구조를 자동 감지하여 지정된 계정에 프로비저닝합니다:',
             rv_desc_central:'하나의 계정에 중앙 Lambda + 각 멤버 계정에 교차 계정 IAM 역할:',
@@ -4396,6 +4421,8 @@ ui_instr_single_title:'デプロイ手順 — シングルアカウント',
             rv_target_accounts:'対象アカウント', rv_tag_non_vpc:'非VPCサービスのタグ付け',
             rv_all_resources:'対象アカウントのすべてのリソース',
             rv_backfill_enabled:'有効 — 契約開始日以降の既存リソースにタグ付け（デプロイ後約5分）',
+            rv_backfill_not_multi:'マルチアカウントデプロイでは利用不可',
+            ui_backfill_multi_note:'バックフィルはシングルアカウントデプロイでのみ利用できます — マルチアカウント（組織）デプロイにはバックフィル Lambda が含まれません。既存リソースにタグ付けするには、対象アカウントごとにバックフィルを有効にしたシングルアカウントデプロイを実行してください。',
             rv_desc_single:'CloudFormationスタック1つ。お客様のアカウントに直接デプロイ：',
             rv_desc_stackset:'ファイル2つを生成。管理アカウントテンプレートを1回デプロイするだけで、組織構造を自動検出して指定アカウントにプロビジョニングします：',
             rv_desc_central:'1つのアカウントに中央Lambda + 各メンバーアカウントにクロスアカウントIAMロール：',
@@ -4742,6 +4769,8 @@ ui_instr_single_title:'部署说明 — 单账户',
             rv_target_accounts:'目标账户', rv_tag_non_vpc:'标记非VPC服务',
             rv_all_resources:'目标账户中的所有资源',
             rv_backfill_enabled:'已启用 — 标记协议开始日期后的现有资源（部署后约5分钟）',
+            rv_backfill_not_multi:'多账户部署不可用',
+            ui_backfill_multi_note:'回填仅适用于单账户部署 — 多账户（组织）部署不包含回填 Lambda。要为已有资源打标签，请在每个目标账户中运行启用回填的单账户部署。',
             rv_desc_single:'一个CloudFormation堆栈。直接在客户账户中部署：',
             rv_desc_stackset:'生成两个文件。部署一次管理账户模板 — 自动发现组织结构并配置指定账户：',
             rv_desc_central:'一个账户中的中央Lambda + 每个成员账户中的跨账户IAM角色：',
@@ -5088,6 +5117,8 @@ ui_instr_single_title:'INSTRUKSI DEPLOYMENT — Satu Akun',
             rv_target_accounts:'Akun Target', rv_tag_non_vpc:'Tag layanan non-VPC',
             rv_all_resources:'Semua resource di akun target',
             rv_backfill_enabled:'Diaktifkan — memberi tag resource yang ada sejak tanggal mulai perjanjian (~5 menit setelah deployment)',
+            rv_backfill_not_multi:'Tidak tersedia untuk deployment multi-akun',
+            ui_backfill_multi_note:'Backfill hanya tersedia untuk deployment satu akun — deployment multi-akun (organisasi) tidak menyertakan Lambda backfill. Untuk memberi tag resource yang sudah ada, jalankan deployment satu akun dengan backfill di setiap akun target.',
             rv_desc_single:'Satu CloudFormation stack. Deploy langsung di akun pelanggan:',
             rv_desc_stackset:'Dua file dihasilkan. Deploy template akun manajemen sekali — otomatis menemukan struktur org dan menyediakan akun yang ditentukan:',
             rv_desc_central:'Lambda pusat di satu akun + peran IAM lintas akun di setiap akun anggota:',
@@ -5434,6 +5465,8 @@ ui_instr_single_title:'คำแนะนำการติดตั้ง — �
             rv_target_accounts:'บัญชีเป้าหมาย', rv_tag_non_vpc:'ติด Tag บริการที่ไม่ใช่ VPC',
             rv_all_resources:'ทรัพยากรทั้งหมดในบัญชีเป้าหมาย',
             rv_backfill_enabled:'เปิดใช้งาน — ติด Tag ทรัพยากรที่มีอยู่ตั้งแต่วันที่เริ่มต้นข้อตกลง (~5 นาทีหลังติดตั้ง)',
+            rv_backfill_not_multi:'ไม่พร้อมใช้งานสำหรับการติดตั้งแบบหลายบัญชี',
+            ui_backfill_multi_note:'Backfill ใช้ได้เฉพาะการติดตั้งแบบบัญชีเดียวเท่านั้น — การติดตั้งแบบหลายบัญชี (องค์กร) ไม่มี Lambda สำหรับ backfill หากต้องการติด Tag ทรัพยากรที่มีอยู่ ให้รันการติดตั้งแบบบัญชีเดียวพร้อม backfill ในแต่ละบัญชีเป้าหมาย',
             rv_desc_single:'CloudFormation stack หนึ่งรายการ ติดตั้งโดยตรงในบัญชีของลูกค้า:',
             rv_desc_stackset:'สร้างไฟล์สองไฟล์ ติดตั้งเทมเพลตบัญชีจัดการครั้งเดียว — ระบบจะค้นหาโครงสร้างองค์กรโดยอัตโนมัติและจัดเตรียมบัญชีที่ระบุ:',
             rv_desc_central:'Lambda กลางในบัญชีเดียว + IAM Role ข้ามบัญชีในแต่ละบัญชีสมาชิก:',
@@ -5780,6 +5813,8 @@ ui_instr_single_title:'HƯỚNG DẪN TRIỂN KHAI — Một tài khoản',
             rv_target_accounts:'Tài khoản mục tiêu', rv_tag_non_vpc:'Gắn tag dịch vụ không thuộc VPC',
             rv_all_resources:'Tất cả resource trong tài khoản mục tiêu',
             rv_backfill_enabled:'Đã bật — gắn tag resource hiện có từ ngày bắt đầu thỏa thuận (~5 phút sau triển khai)',
+            rv_backfill_not_multi:'Không khả dụng cho triển khai nhiều tài khoản',
+            ui_backfill_multi_note:'Backfill chỉ khả dụng cho triển khai một tài khoản — triển khai nhiều tài khoản (organization) không bao gồm Lambda backfill. Để gắn tag các resource hiện có, hãy chạy triển khai một tài khoản có backfill trong từng tài khoản đích.',
             rv_desc_single:'Một CloudFormation stack. Triển khai trực tiếp vào tài khoản của khách hàng:',
             rv_desc_stackset:'Tạo hai file. Triển khai template tài khoản quản lý một lần — tự động phát hiện cấu trúc org và cấp phát cho các tài khoản đã chỉ định:',
             rv_desc_central:'Lambda trung tâm trong một tài khoản + IAM role đa tài khoản trong mỗi tài khoản thành viên:',
@@ -11089,6 +11124,9 @@ WAIT=0
 # DISABLED, but no such rule is ever created; every deploy silently hit the
 # 1200s timeout before the CloudWatch poll ran.
 while [ \$WAIT -lt 1200 ]; do
+  # '|| true': a single failed poll (throttle, transient 5xx — aws CLI exit
+  # 254) must not kill the whole deploy under set -e; the loop just retries.
+  # The org deploy died exactly this way (gate finding 32B-5/7, 2026-09-10).
   COMPLETE=\$(aws logs filter-log-events \\
     --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
     --region "\$REGION" \\
@@ -11096,7 +11134,7 @@ while [ \$WAIT -lt 1200 ]; do
     --start-time "\$BACKFILL_WAIT_START_MS" \\
     --max-items 1 \\
     --query 'events[0].message' \\
-    --output text 2>/dev/null)
+    --output text 2>/dev/null || true)
   if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
     BACKFILL_RESULT="\$COMPLETE"
     echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
@@ -11685,44 +11723,14 @@ if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
     DEPLOY_STATUS="SUCCESS"
   fi
 fi
-${config.includeBackfill ? `
-# ── Backfill wait ────────────────────────────
-if [ "\$DEPLOY_STATUS" = "SUCCESS" ]; then
-  echo ""
-  echo "${t('d_backfill_waiting')}"
-  echo "  ${t('d_backfill_wait_info')}"
-  echo ""
-  BACKFILL_RESULT="${t('d_backfill_timeout')}"
-  # Anchor the sentinel search at SCRIPT start, not wait-loop start. The
-# backfill custom resource runs DURING stack creation, so its 'Backfill
-# complete' line usually lands BEFORE the stack wait returns and this
-# loop begins. A wait-loop-start anchor filters that line out -> every
-# backfill deploy spun the full 1200s and reported timeout on a backfill
-# that had long finished (release gate 32B-1, 2026-07-18).
-BACKFILL_WAIT_START_MS=\$SCRIPT_START_MS
-  WAIT=0
-  # See rationale in the single-account branch — backfill is a Custom::Backfill
-  # CustomResource, not an EventBridge rule. Poll the Lambda's log group directly.
-  while [ \$WAIT -lt 1200 ]; do
-    COMPLETE=\$(aws logs filter-log-events \\
-      --log-group-name "/aws/lambda/map-auto-tagger-backfill-\$MPE" \\
-      --region "\$REGION" \\
-      --filter-pattern '"Backfill complete"' \\
-      --start-time "\$BACKFILL_WAIT_START_MS" \\
-      --max-items 1 \\
-      --query 'events[0].message' \\
-      --output text 2>/dev/null)
-    if [ -n "\$COMPLETE" ] && [ "\$COMPLETE" != "None" ]; then
-      BACKFILL_RESULT="\$COMPLETE"
-      echo "  ✅ ${t('d_backfill_done')} \$BACKFILL_RESULT"
-      break
-    fi
-    sleep 30
-    WAIT=\$((WAIT + 30))
-    echo "  ${t('d_backfill_in_progress')} (\${WAIT}s)"
-  done
-  echo ""
-fi` : ''}
+
+# NOTE: no backfill wait in multi-account mode — neither the management nor
+# the per-account org template deploys a backfill Lambda, so there is nothing
+# to wait for. A prior version emitted the single-account wait here anyway:
+# it polled a log group that can never exist, and the unguarded aws call
+# killed the whole deploy under set -e with exit 254 (gate finding 32B-5/7,
+# 2026-09-10). The configurator now refuses backfill for multi-account
+# deployments at the UI and config level as well.
 # ── Step 3: Report ───────────────────────────
 echo ""
 echo "${t('d_step3')}"
@@ -11746,7 +11754,6 @@ echo "${t('d_step3')}"
     echo "------------------"
     echo "  - Auto-tagger: ${regions.join(', ')}"
     echo "  - EventBridge, DLQ, CloudWatch alarm, SSM config"
-    ${config.includeBackfill ? `echo "  - Backfill Lambda"` : ''}
     echo ""
     echo "${t('r_verify')}"
     echo "--------------"
@@ -11754,10 +11761,6 @@ echo "${t('d_step3')}"
     echo "  ${t('r_verify2')}"
     echo "  ${t('r_verify3')} \$MPE"
     echo ""
-    ${config.includeBackfill ? `echo "${t('r_backfill_result')}"
-    echo "----------------"
-    echo "  \$BACKFILL_RESULT"
-    echo ""` : ''}
   else
     echo "${t('r_action')}"
     echo "  ${t('r_action_desc')}"
