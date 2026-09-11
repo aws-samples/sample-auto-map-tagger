@@ -30,7 +30,7 @@ All services below have an explicit handler in the Lambda function **and** the c
 | Auto Scaling | Auto Scaling groups | ASG-specific `create_or_update_tags` |
 | EMR | Clusters (RunJobFlow) | RGTA |
 | EMR Serverless | Applications | RGTA |
-| Elastic Beanstalk | Applications (RGTA); environments (native `UpdateTagsForResource` — UNVERIFIED live since the v22.2.1 dispatch fix; the prior RGTA path lost the tag to indexing lag, gate finding P27B-BEANSTALK-ENV 2026-09-11) | RGTA / native |
+| Elastic Beanstalk | Applications (RGTA, live-verified); environments = best-effort attribution only — the native `UpdateTagsForResource` call is accepted but Beanstalk applies it asynchronously and can fail silently under least privilege (see LIMITATIONS "Elastic Beanstalk environment tags"). **MAP credit unaffected**: the environment's cost-bearing resources (EC2, EBS, EIP, SG, ENI, S3) are tagged individually by their own handlers — live-verified 2026-09-11 | RGTA / native |
 | GameLift | Builds, scripts, fleets | RGTA |
 | Mainframe Modernization (M2) | Environments, applications (universal ARN scan) | RGTA |
 
