@@ -4,6 +4,21 @@ All notable changes to the MAP 2.0 Auto-Tagger.
 
 ---
 
+## v22.2.1 — 2026-09-10
+
+**Fixed (PATCH — deploy-time reporting only; no template or runtime change. Regenerate `deploy.sh` from the configurator to pick this up; existing deployed stacks are unaffected):**
+
+- **Multi-account `deploy.sh` reported SUCCESS on a partial or failed StackSet rollout** (customer incident 2026-09-04: a 16-account × 2-region org deploy stuck at 4/32 instances printed "Setup Complete! Auto-tagging is now active across all accounts" and wrote `Result: SUCCESS`; a bucket created 2 days later was still untagged). Four compounding defects in the StackSet wait/report block, the first dating to v19.17:
+  1. **Failed-instance detection filtered on the wrong field — the failure branch was dead code.** The query used the top-level StackInstance `Status`, whose enum is only `CURRENT | OUTDATED | INOPERABLE`; `FAILED`/`CANCELLED` exist only in `StackInstanceStatus.DetailedStatus`. The filter could never match, so failed instances just looked "not ready" forever. **Correction to the v22.1.0 notes:** the per-instance `StatusReason` surfacing claimed there (PR #112) sat inside this dead branch and never actually executed — it works for the first time in this release.
+  2. **The 1200s timeout fallback flipped any non-empty rollout to SUCCESS.** The CT6-004 fix (#118) covered `TOTAL==0`; `TOTAL>0`-but-incomplete remained a blanket success. A timed-out rollout now resolves `INCOMPLETE` — never SUCCESS — with the exact re-check command.
+  3. **Progress counted stack instances but labeled them "accounts"** (16 accounts × 2 regions surfaced as "32 accounts" — the customer's report of an "account count mismatch"). Progress now reports both: `N/M stack instances ready across K account(s)`.
+  4. **The report's "Per-Account Status" section echoed a command string instead of executing it — and a mangled one** (broken `\`-escaping produced an un-runnable fragment), so a partial rollout left no artifact naming the failed instances. The report now embeds the executed per-instance table (`Account, Region, DetailedStatus, StatusReason`), on failure as well as success.
+  - The wait now polls the StackSet **operation** to a terminal state (`list-stack-set-operations`, the pattern `delete.sh` and the editor flow already used), then classifies instances by `DetailedStatus` — an operation can end `SUCCEEDED` with failed instances under failure tolerance, so failures are counted explicitly. `SKIPPED_SUSPENDED_ACCOUNT` instances are reported as skipped, not failed.
+  - **If you deployed multi-account before this fix and trusted the success banner, audit your rollout:** `aws cloudformation list-stack-instances --stack-set-name <StackSet from your deploy report> --region <region> --query 'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus,StatusReason]' --output table` — any non-`SUCCEEDED` instance means that account/region has no working tagger (missed tags are not recoverable; redeploy the failed instances promptly).
+- **Test-suite hardening (why four defects survived every gate):** the generated bash was never executed by any layer — unit tests grepped the generator source (one asserted the wrong-field query *verbatim*; another asserted the timeout-to-SUCCESS fallback as intended behavior), and the E2E harness deploys StackSets via boto3 with its own correct polling, bypassing `deploy.sh`. New `tests/unit/deploy-script-stackset-wait.test.js` generates the real org `deploy.sh`, gates it with `bash -n`, and executes the extracted wait+report block against a stubbed `aws` CLI across five scenarios (clean rollout, the 2026-09-04 partial failure, timeout-while-running, zero instances, operation FAILED); the two bug-enshrining assertions are replaced. Mutation-verified: reintroducing the wrong-field filter fails the suite.
+
+---
+
 ## v22.2.0 — 2026-07-27
 
 **Added (MINOR — safe in-place update; new resources only, no new parameters. Existing deployments pick this up via `upgrade.sh` or a re-run of `deploy.sh`):**

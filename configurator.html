@@ -1171,7 +1171,7 @@
         // Template version — single source of truth for the SemVer constant.
         // The deployable YAML and configurator.html are both generated from src/
         // (npm run build), so this constant flows into every artifact automatically.
-        const TEMPLATE_VERSION = 'v22.2.0';
+        const TEMPLATE_VERSION = 'v22.2.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -1179,6 +1179,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // Keep the newest entry's version in sync with TEMPLATE_VERSION above.
         const VERSION_HISTORY = [
+            {
+                version: 'v22.2.1',
+                date: '2026-09-10',
+                changes: [
+                    { tag: 'bugfix', text: 'Multi-account deploy.sh no longer reports SUCCESS on a partial or failed StackSet rollout (customer incident 2026-09-04). The wait loop filtered instances on the top-level Status field, whose enum (CURRENT|OUTDATED|INOPERABLE) can never be FAILED/CANCELLED — so failed instances were never detected, and the 20-minute timeout fallback declared any non-empty rollout a success ("Setup Complete!" at 4/32 instances). deploy.sh now polls the StackSet operation to a terminal state, classifies instances by StackInstanceStatus.DetailedStatus (surfacing each failed instance\'s StatusReason inline — this v22.1.0 claim never actually worked until now), reports honest counts (stack instances vs distinct accounts — a 16-account × 2-region org is 32 instances, previously mislabeled "32 accounts"), resolves a timed-out rollout as INCOMPLETE instead of SUCCESS, and writes the real per-instance status table into the deploy report (previously a mangled, never-executed command string). If you deployed multi-account before this fix, audit your rollout: aws cloudformation list-stack-instances --stack-set-name <your StackSet> --region <region> --query \'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus,StatusReason]\' --output table' },
+                ],
+            },
             {
                 version: 'v22.2.0',
                 date: '2026-07-27',
@@ -11182,6 +11189,7 @@ DEPLOY_TIME=\$(date '+%Y-%m-%d %H:%M:%S')
 SCRIPT_START_MS=\$(( \$(date +%s) * 1000 ))
 PREFLIGHT_LOG=""
 DEPLOY_STATUS="NOT STARTED"
+STACKSET_NAME=""
 
 # ────────────────────────────────────────────
 echo ""
@@ -11591,7 +11599,9 @@ while true; do
   WAIT_SECS=\$((WAIT_SECS + 30))
   echo "  ${t('d_still_deploying')} (\${WAIT_SECS}s ${t('d_elapsed')})"
 done
-# Wait for StackSet instances to reach CURRENT (stack may be COMPLETE before StackSet finishes).
+# ── StackSet rollout wait ────────────────────
+# Wait for the StackSet rollout operation to finish (the management stack may
+# be COMPLETE before the StackSet instances are).
 # Gate on "NOT STARTED" rather than -z: DEPLOY_STATUS is initialized non-empty at the top of
 # the script, so the prior -z guard was always false and this whole StackSet-wait block ran
 # as dead code. Any upstream failure marks DEPLOY_STATUS="FAILED — ..." and skips this block.
@@ -11601,54 +11611,75 @@ if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
   if [ -n "\$STACKSET_NAME" ] && [ "\$STACKSET_NAME" != "None" ]; then
     echo ""
     echo "  Waiting for StackSet instances to deploy..."
+    # Poll the StackSet OPERATION to a terminal state (the pattern delete-flow
+    # and editor-flow already use), then classify instances by
+    # StackInstanceStatus.DetailedStatus. Do NOT filter on the top-level
+    # Status=='FAILED': that enum is only CURRENT|OUTDATED|INOPERABLE, so the
+    # old filter could never match and a failed rollout was declared SUCCESS
+    # (customer incident 2026-09-04). Read-only polls tolerate transient AWS
+    # errors via '|| true' + :-0 defaults — set -e must not kill the wait.
     SS_WAIT=0
+    OP_STATUS=""
+    READY=0; TOTAL=0; ACCOUNTS=0
     while [ \$SS_WAIT -lt 1200 ]; do
-      OUTDATED=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
-        --region "\$REGION" --query "Summaries[?Status!='CURRENT'].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
-      FAILED=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
-        --region "\$REGION" --query "Summaries[?Status=='CANCELLED'||Status=='FAILED'].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
+      OP_STATUS=\$(aws cloudformation list-stack-set-operations --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "Summaries[0].Status" --output text 2>/dev/null || true)
+      READY=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "length(Summaries[?StackInstanceStatus.DetailedStatus=='SUCCEEDED'])" --output text 2>/dev/null || true)
       TOTAL=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
-        --region "\$REGION" --query "Summaries[*].Account" --output text 2>/dev/null | wc -w | tr -d ' ')
-      CURRENT=\$((TOTAL - OUTDATED))
-      echo "  StackSet progress: \${CURRENT}/\${TOTAL} accounts ready... (\${SS_WAIT}s)"
-      if [ "\$TOTAL" -gt 0 ] && [ "\$OUTDATED" -eq 0 ]; then
-        echo "  ✅ StackSet: all \${TOTAL} accounts ready"
-        DEPLOY_STATUS="SUCCESS"
-        break
-      elif [ "\$FAILED" -gt 0 ]; then
-        DEPLOY_STATUS="FAILED — \$FAILED account(s) failed in StackSet"
-        echo "  ❌ \$FAILED account(s) failed:"
-        # StatusReason surfaces the actual failure (e.g. the per-account
-        # CloudTrail preflight's message) so the customer sees WHY without
-        # a separate console/CLI dig into the StackSet.
-        aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
-            --region "\$REGION" --query "Summaries[?Status=='CANCELLED'||Status=='FAILED'].[Account,Region,StatusReason]" \\
-            --output text 2>/dev/null | while IFS=\$'\\t' read -r FAIL_ACCT FAIL_REGION FAIL_REASON; do
-          echo "     - \$FAIL_ACCT (\$FAIL_REGION): \${FAIL_REASON:-No reason reported — check CloudFormation StackSet for details.}"
-        done
+        --region "\$REGION" --query "length(Summaries)" --output text 2>/dev/null || true)
+      ACCOUNTS=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+        --region "\$REGION" --query "Summaries[*].Account" --output text 2>/dev/null | tr '\\t' '\\n' | sort -u | grep -c . || true)
+      READY=\${READY:-0}; TOTAL=\${TOTAL:-0}; ACCOUNTS=\${ACCOUNTS:-0}
+      echo "  StackSet progress: \${READY}/\${TOTAL} stack instances ready across \${ACCOUNTS} account(s)... (\${SS_WAIT}s)"
+      if [ "\$OP_STATUS" = "SUCCEEDED" ] || [ "\$OP_STATUS" = "FAILED" ] || [ "\$OP_STATUS" = "STOPPED" ]; then
         break
       fi
       sleep 30
       SS_WAIT=\$((SS_WAIT + 30))
     done
-    # If the 1200s wait expired without reaching all-CURRENT or any FAILED:
-    # distinguish "still rolling out" (TOTAL>0 — CloudFormation tracks the
-    # rest, call it success) from "no instances ever appeared" (TOTAL==0 —
-    # the StackSet deployed to nothing; e.g. its target OUs are empty, or a
-    # stale StackSetName Output points at a deleted StackSet after a partial
-    # v21→v22 migration). The old catch-all flipped TOTAL==0 to SUCCESS
-    # after 1200s — "Setup Complete!" with zero taggers org-wide (CT6-004
-    # defect 3). Zero instances is a failure, loudly.
-    if [ "\$DEPLOY_STATUS" = "NOT STARTED" ]; then
-        if [ "\$TOTAL" -gt 0 ] 2>/dev/null; then
-            DEPLOY_STATUS="SUCCESS"
-        else
-            DEPLOY_STATUS="FAILED — StackSet \$STACKSET_NAME has ZERO stack instances after \${SS_WAIT}s"
-            echo "  ❌ StackSet \$STACKSET_NAME never created any stack instances."
-            echo "     No member account received a tagger. Check that the target OU(s)"
-            echo "     contain accounts, and that the StackSet exists:"
-            echo "       aws cloudformation list-stack-instances --stack-set-name \$STACKSET_NAME --region \$REGION"
-        fi
+    # An operation can end SUCCEEDED with failed instances when failure
+    # tolerance is set, so count failures explicitly by DetailedStatus.
+    SS_FAIL_FILTER="StackInstanceStatus.DetailedStatus=='FAILED' || StackInstanceStatus.DetailedStatus=='CANCELLED' || StackInstanceStatus.DetailedStatus=='INOPERABLE' || StackInstanceStatus.DetailedStatus=='FAILED_IMPORT'"
+    FAILED_N=\$(aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+      --region "\$REGION" --query "length(Summaries[?\$SS_FAIL_FILTER])" --output text 2>/dev/null || true)
+    FAILED_N=\${FAILED_N:-0}
+    if [ "\$TOTAL" -eq 0 ]; then
+      # Zero instances after the wait is a loud failure (CT6-004 defect 3):
+      # target OUs empty, or a stale StackSetName Output after a partial
+      # v21→v22 migration.
+      DEPLOY_STATUS="FAILED — StackSet \$STACKSET_NAME has ZERO stack instances after \${SS_WAIT}s"
+      echo "  ❌ StackSet \$STACKSET_NAME never created any stack instances."
+      echo "     No member account received a tagger. Check that the target OU(s)"
+      echo "     contain accounts, and that the StackSet exists:"
+      echo "       aws cloudformation list-stack-instances --stack-set-name \$STACKSET_NAME --region \$REGION"
+    elif [ "\$FAILED_N" -gt 0 ]; then
+      DEPLOY_STATUS="FAILED — \$FAILED_N of \$TOTAL stack instance(s) failed in StackSet"
+      echo "  ❌ \$FAILED_N of \$TOTAL stack instance(s) failed:"
+      # StatusReason surfaces the actual failure (e.g. the per-account
+      # CloudTrail preflight's message) so the customer sees WHY without
+      # a separate console/CLI dig into the StackSet.
+      aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+          --region "\$REGION" --query "Summaries[?\$SS_FAIL_FILTER].[Account,Region,StatusReason]" \\
+          --output text 2>/dev/null | while IFS=\$'\\t' read -r FAIL_ACCT FAIL_REGION FAIL_REASON; do
+        echo "     - \$FAIL_ACCT (\$FAIL_REGION): \${FAIL_REASON:-No reason reported — check CloudFormation StackSet for details.}"
+      done
+    elif [ "\$OP_STATUS" = "SUCCEEDED" ]; then
+      if [ "\$READY" -eq "\$TOTAL" ]; then
+        echo "  ✅ StackSet: all \$TOTAL stack instances across \$ACCOUNTS account(s) ready"
+      else
+        # Operation finished, none failed: the remainder were skipped
+        # (e.g. SKIPPED_SUSPENDED_ACCOUNT).
+        echo "  ✅ StackSet rollout finished: \$READY/\$TOTAL instances deployed, \$((TOTAL - READY)) skipped (e.g. suspended accounts)"
+      fi
+      DEPLOY_STATUS="SUCCESS"
+    else
+      # Timeout with the operation still running. NOT success: a rollout this
+      # slow may include failed instances CloudFormation hasn't finalized yet.
+      DEPLOY_STATUS="INCOMPLETE — StackSet rollout not finished after \${SS_WAIT}s (\$READY/\$TOTAL stack instances ready)"
+      echo "  ⚠️  StackSet rollout still in progress after \${SS_WAIT}s: \$READY/\$TOTAL instances ready."
+      echo "     Not declaring success. Re-check per-instance status with:"
+      echo "       aws cloudformation list-stack-instances --stack-set-name \$STACKSET_NAME --region \$REGION --query 'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus,StatusReason]' --output table"
     fi
   else
     DEPLOY_STATUS="SUCCESS"
@@ -11727,14 +11758,22 @@ echo "${t('d_step3')}"
     echo "----------------"
     echo "  \$BACKFILL_RESULT"
     echo ""` : ''}
-    echo "${t('r_perstatus')}"
-    echo "-------------------"
-    echo "  aws cloudformation list-stack-instances --stack-set-name map-auto-tagger-\$MPE \\"
-    echo "    --query 'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus]' \\"
-    echo "    --output table --region \$REGION"
   else
     echo "${t('r_action')}"
     echo "  ${t('r_action_desc')}"
+  fi
+  # Per-instance status is EXECUTED into the report (success or failure —
+  # it matters most on failure). The old version echoed a command string,
+  # and a broken one: its \\\\-escaping printed a mangled, un-runnable
+  # command, so a partial rollout left no artifact naming the failed
+  # instances (customer incident 2026-09-04).
+  if [ -n "\${STACKSET_NAME:-}" ] && [ "\$STACKSET_NAME" != "None" ]; then
+    echo ""
+    echo "${t('r_perstatus')}"
+    echo "-------------------"
+    aws cloudformation list-stack-instances --stack-set-name "\$STACKSET_NAME" \\
+      --region "\$REGION" --query "Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus,StatusReason]" \\
+      --output table 2>/dev/null || echo "  (could not list stack instances — run: aws cloudformation list-stack-instances --stack-set-name \$STACKSET_NAME --region \$REGION)"
   fi
   echo ""
   echo "${t('r_support')}"

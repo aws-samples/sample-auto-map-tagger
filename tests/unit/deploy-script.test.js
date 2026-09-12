@@ -63,8 +63,19 @@ describe('deploy script — StackSet failure reason surfaced inline', () => {
   const src = fs.readFileSync(
     path.join(__dirname, '../../src/js/deploy/script-deploy.js'), 'utf8');
 
-  it('queries StatusReason for failed/cancelled StackSet instances', () => {
-    expect(src).toContain("Summaries[?Status=='CANCELLED'||Status=='FAILED'].[Account,Region,StatusReason]");
+  it('classifies failures by StackInstanceStatus.DetailedStatus, never the top-level Status', () => {
+    // The top-level StackInstance Status enum is CURRENT|OUTDATED|INOPERABLE —
+    // a Status=='FAILED' filter can never match, which made the failure branch
+    // dead code and certified a stuck rollout as SUCCESS (customer incident
+    // 2026-09-04). A prior version of this test asserted that wrong query
+    // verbatim: it was written from the code, not from the API contract.
+    expect(src).not.toContain("Status=='CANCELLED'||Status=='FAILED'");
+    expect(src).toContain("StackInstanceStatus.DetailedStatus=='FAILED'");
+    expect(src).toContain('[Account,Region,StatusReason]');
+  });
+
+  it('waits on the StackSet operation, the delete-flow/editor-flow pattern', () => {
+    expect(src).toContain('list-stack-set-operations');
   });
 
   it('prints the reason per failed account instead of just a count', () => {

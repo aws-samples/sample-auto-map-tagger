@@ -1,7 +1,7 @@
         // Template version — single source of truth for the SemVer constant.
         // The deployable YAML and configurator.html are both generated from src/
         // (npm run build), so this constant flows into every artifact automatically.
-        const TEMPLATE_VERSION = 'v22.2.0';
+        const TEMPLATE_VERSION = 'v22.2.1';
 
         // Version history surfaced in the Update flow. Bullets are intentionally English-only —
         // translating release notes across 7 languages for every PR is unsustainable. Labels
@@ -9,6 +9,13 @@
         // Tags: bugfix, coverage, breaking, security, perf, other.
         // Keep the newest entry's version in sync with TEMPLATE_VERSION above.
         const VERSION_HISTORY = [
+            {
+                version: 'v22.2.1',
+                date: '2026-09-10',
+                changes: [
+                    { tag: 'bugfix', text: 'Multi-account deploy.sh no longer reports SUCCESS on a partial or failed StackSet rollout (customer incident 2026-09-04). The wait loop filtered instances on the top-level Status field, whose enum (CURRENT|OUTDATED|INOPERABLE) can never be FAILED/CANCELLED — so failed instances were never detected, and the 20-minute timeout fallback declared any non-empty rollout a success ("Setup Complete!" at 4/32 instances). deploy.sh now polls the StackSet operation to a terminal state, classifies instances by StackInstanceStatus.DetailedStatus (surfacing each failed instance\'s StatusReason inline — this v22.1.0 claim never actually worked until now), reports honest counts (stack instances vs distinct accounts — a 16-account × 2-region org is 32 instances, previously mislabeled "32 accounts"), resolves a timed-out rollout as INCOMPLETE instead of SUCCESS, and writes the real per-instance status table into the deploy report (previously a mangled, never-executed command string). If you deployed multi-account before this fix, audit your rollout: aws cloudformation list-stack-instances --stack-set-name <your StackSet> --region <region> --query \'Summaries[*].[Account,Region,StackInstanceStatus.DetailedStatus,StatusReason]\' --output table' },
+                ],
+            },
             {
                 version: 'v22.2.0',
                 date: '2026-07-27',
