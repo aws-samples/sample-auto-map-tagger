@@ -65,6 +65,21 @@ Tags are always applied eventually — this is a latency variance, not a reliabi
 
 ---
 
+## Elastic Beanstalk environment tags apply asynchronously and can fail silently (MAP credit unaffected)
+
+Tagging a Beanstalk *environment* is not a synchronous write: `UpdateTagsForResource` only queues an internal Beanstalk "environment tag update" workflow, which can later fail with a bare `Environment tag update failed` event — no error ever reaches the caller, so the tagger cannot detect or retry it. Live differential (2026-09-11): the same call succeeded end-to-end under an admin role but failed asynchronously under the tagger's least-privilege role, indicating the workflow exercises the caller's permissions beyond the documented tagging actions. Broadening the tagger's role for one attribution tag is not worth the least-privilege cost.
+
+**MAP credit is unaffected**: the environment resource itself carries no cost line — the environment's cost-bearing resources (EC2 instance, EBS volume, EIP, security group, ENI, launch template, the Beanstalk S3 bucket) are each tagged individually by their own creation-event handlers (live-verified 2026-09-11, all carried `map-migrated` within minutes). The environment-level tag is best-effort attribution only; apply it manually if wanted:
+`aws elasticbeanstalk update-tags-for-resource --resource-arn <env-arn> --tags-to-add Key=map-migrated,Value=<mpe>`
+
+---
+
+## Backfill is single-account only (not available for multi-account deployments)
+
+The backfill Lambda exists only in the single-account template — neither the multi-account management template nor the per-account StackSet template deploys it. The configurator disables the backfill option when multi-account mode is selected and says so. To tag resources that existed before deployment in an organization, run a **single-account deployment with backfill enabled in each target account before the organization rollout** (the competing-tagger preflight refuses a second tagger with overlapping scope in the same account, so do the backfill deploys first and delete those stacks — existing tags survive deletion — before deploying the StackSet). Before v22.2.1 the configurator accepted the org+backfill combination and generated a script that waited on the nonexistent backfill Lambda — the wait either killed the deploy (exit 254) or reported a spurious backfill timeout, while pre-existing resources silently never got tagged.
+
+---
+
 ## Backfill is bounded by the Lambda 15-minute ceiling (may be PARTIAL)
 
 The optional deploy-time backfill sweeps CloudTrail from the agreement start date for every subscribed event type inside a single Lambda invocation, which has a hard 900-second limit. An old agreement start date combined with a large event history can exceed that budget. The backfill stops itself before the ceiling (so stack creation always completes) and reports `PARTIAL` in the CloudFormation custom-resource Reason, naming how many event types were cut off. Resources created before deployment in the cut-off types stay untagged — apply tags to those manually. CloudTrail `LookupEvents` is also limited to the trailing 90 days, so a backfill can never reach further back than that regardless of the agreement date.

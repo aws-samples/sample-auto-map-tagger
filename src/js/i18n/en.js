@@ -122,6 +122,8 @@ const en_translations = {
             rv_target_accounts:'Target Accounts', rv_tag_non_vpc:'Tag non-VPC services',
             rv_all_resources:'All resources in target account(s)',
             rv_backfill_enabled:'Enabled — tags existing resources since agreement start date (~5 min after deploy)',
+            rv_backfill_not_multi:'Not available for multi-account deployments',
+            ui_backfill_multi_note:'Backfill is available for single-account deployments only — multi-account (organization) deployments do not include the backfill Lambda. To tag pre-existing resources, run a single-account deployment with backfill in each target account.',
             rv_desc_single:"One CloudFormation stack. Deploy directly in the customer's account:",
             rv_desc_stackset:'Two files generated. Deploy the management account template once — it auto-discovers your org structure and provisions the specified accounts:',
             rv_desc_central:'Central Lambda in one account + cross-account IAM role in each member account:',

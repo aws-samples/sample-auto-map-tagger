@@ -1873,6 +1873,21 @@ def tag_resource(arn, tag_key, tag_value, tagging_client=None, ec2_client=None, 
         cw = get_service_client('cloudwatch')
         _retry_throttles(lambda: cw.tag_resource(ResourceARN=arn, Tags=[{'Key': tag_key, 'Value': tag_value}]))
         return True
+    elif ':elasticbeanstalk:' in arn and ':environment/' in arn:
+        # P27B-BEANSTALK-ENV (gate130, 2026-09-11 — first live test of the
+        # #111 env ARN constructor): RGTA's index does not see a fresh
+        # environment for many minutes, answering "Resource not found for
+        # ARN" until well past the create-race grace — the tag was
+        # permanently lost even though the constructor was correct. The
+        # native API instead answers "…invalid state… Must be Ready" (already
+        # a TRANSIENT marker) until provisioning finishes, then succeeds — so
+        # SQS retries ride environment readiness, not RGTA indexing lag.
+        # IAM: UpdateTagsForResource authorizes via elasticbeanstalk:AddTags
+        # for TagsToAdd, which the canonical permission list already grants.
+        # Applications stay on RGTA — they tag fine there (live-verified).
+        eb = get_service_client('elasticbeanstalk')
+        _retry_throttles(lambda: eb.update_tags_for_resource(ResourceArn=arn, TagsToAdd=[{'Key': tag_key, 'Value': tag_value}]))
+        return True
     elif ':dsql:' in arn:
         _retry_throttles(lambda: get_service_client('dsql').tag_resource(resourceArn=arn, tags={tag_key: tag_value}))
         return True
@@ -2063,6 +2078,12 @@ _TRANSIENT_MARKERS = (
 _NOT_FOUND_MARKERS = (
     'ResourceNotFoundException',
     'Requested resource not found',
+    # RGTA's own spelling in FailedResourcesMap ("Resource not found for ARN
+    # '<arn>'") — RGTA answers this for resources its index hasn't caught up
+    # with yet, not just deleted ones. Unmatched, it fell through to
+    # permanent_actionable and DLQ'd mid-provisioning resources (gate130
+    # P27B-BEANSTALK-ENV, 2026-09-11 — the "match both spellings" class).
+    'Resource not found for ARN',
     'NoSuchBucket',
     'InvalidInstanceID.NotFound',
     'DBInstanceNotFound',
